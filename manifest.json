@@ -1,0 +1,16 @@
+{
+  "name": "Closure",
+  "id": "json-exporter",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "capabilities": [],
+  "enableProposedApi": false,
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": [
+      "https://api.github.com"
+    ],
+    "reasoning": "Pushes exported design token JSON to GitHub via the REST API."
+  }
+}

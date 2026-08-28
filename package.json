@@ -1,0 +1,14 @@
+{
+  "name": "pillar-token-build",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:web":     "style-dictionary build --config sd.web.js",
+    "build:android": "style-dictionary build --config sd.android.js",
+    "build:ios":     "style-dictionary build --config sd.ios.js",
+    "build:all":     "npm run build:web && npm run build:android && npm run build:ios"
+  },
+  "dependencies": {
+    "style-dictionary": "^3.0.0"
+  }
+}

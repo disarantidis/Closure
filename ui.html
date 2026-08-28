@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Closure · JSON export from Figma</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /*
+      UI restyled to the disarantidis_ReactJS design system ("resolve.").
+      Visual language only — every element id, class hook, DOM node and the entire
+      <script> are unchanged. Colour is driven through the existing --app-* custom
+      properties (the same names applyPaletteVars()/buildNeutralPalettes() write),
+      so the plugin still adopts a loaded Figma file's neutral palette at runtime;
+      the DS palette below is the default/idle look. Structural tokens (radius,
+      spacing, type, motion, shadow) mirror design-tokens/tokens.css.
+    */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* GT Ultra — declared local()-only, exactly as the design system ships it.
+       Resolves to the brand faces on a machine that has them; falls through to
+       Inter (loaded in <head>) / system-ui everywhere else. Ships no files. */
+    @font-face { font-family:'GT Ultra'; src: local('GTUltra-Regular'), local('GT Ultra Regular'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'GT Ultra'; src: local('GTUltra-Medium'), local('GT Ultra Medium'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'GT Ultra'; src: local('GTUltra-Bold'), local('GT Ultra Bold'); font-weight:600 700; font-style:normal; font-display:swap; }
+    @font-face { font-family:'GT Ultra Fine'; src: local('GTUltraFine-Regular'), local('GT Ultra Fine Regular'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'GT Ultra Fine'; src: local('GTUltraFine-Bold'), local('GT Ultra Fine Bold'); font-weight:600 700; font-style:normal; font-display:swap; }
+
+    :root {
+      /* ── structural tokens (theme-independent) ───────────────────────── */
+      --font-sans: 'GT Ultra', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-display: 'GT Ultra Fine', 'GT Ultra', 'Inter', Georgia, serif;
+
+      --radius-xs: 6px; --radius-s: 8px; --radius-m: 12px;
+      --radius-l: 16px; --radius-xl: 18px; --radius-full: 999px;
+
+      --sp-0: 4px; --sp-1: 8px; --sp-2: 10px; --sp-3: 12px; --sp-4: 16px;
+      --sp-5: 18px; --sp-6: 22px; --sp-7: 28px; --sp-8: 34px;
+
+      --type-microcopy: 12px; --type-body-s: 13px; --type-body-m: 15px;
+      --type-body-l: 16px; --type-title-s: 17px;
+      --w-regular: 400; --w-medium: 500; --w-semibold: 600; --w-bold: 700;
+
+      --dur-fast: 150ms; --dur-medium: 250ms;
+      --ease: cubic-bezier(0.2, 0, 0, 1);
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --hairline: 1px;
+      --glass-blur: 10px;
+
+      /* ── DEFAULT THEME = DARK · DS dark palette mapped onto --app-* ───── */
+      --app-bg: #1A1A1A;
+      --app-surface: rgba(255,255,255,0.055);
+      --app-surface-strong: #262626;
+      --app-surface-soft: rgba(255,255,255,0.035);
+      --app-border: rgba(238,238,238,0.12);
+      --app-border-strong: rgba(238,238,238,0.22);
+      --app-text: #EEEEEE;
+      --app-text-muted: #979797;
+      --app-text-subtle: #606060;
+      --app-heading: #F5F5F4;
+      --app-accent: #FFFFFF;
+      --app-accent-hover: #E4E4E2;
+      --app-on-accent: #000000;
+      --app-success: #93CF9E;
+      --app-success-hover: #A5D7AE;
+      --app-danger: #E9938A;
+      --app-warning-surface: rgba(233,147,138,0.13);
+      --app-shadow-accent: rgba(0,0,0,0.34);
+      --app-shadow-success: rgba(0,0,0,0.34);
+
+      --shadow-low: 0 1px 2px 0 rgba(0,0,0,0.36), 0 1px 3px 0 rgba(0,0,0,0.44);
+      --shadow-medium: 0 4px 8px -2px rgba(0,0,0,0.48), 0 2px 4px -1px rgba(0,0,0,0.40);
+      --shadow-high: 0 12px 28px -6px rgba(0,0,0,0.60), 0 4px 10px -3px rgba(0,0,0,0.48);
+
+      /* status scheme islands (DS success/error scheme) — dark, for Alert/Toast */
+      --sc-success-surface: #213E28; --sc-success-fill: rgba(26,49,32,0.5);
+      --sc-success-text: #F8FCF9; --sc-success-text-soft: #D5ECD9;
+      --sc-success-stroke: #4D7154; --sc-success-accent: #93CF9E;
+      --sc-error-surface: #4B241E; --sc-error-fill: rgba(61,30,25,0.5);
+      --sc-error-text: #FDF8F7; --sc-error-text-soft: #F3DBD9;
+      --sc-error-stroke: #844A45; --sc-error-accent: #DB9792;
+    }
+
+    /* ── LIGHT THEME · DS light palette (warm neutral, black accent) ───── */
+    body.theme-light {
+      --app-bg: #D6D6D3;
+      --app-surface: rgba(252,252,252,0.5);
+      --app-surface-strong: #EAEAE9;
+      --app-surface-soft: rgba(26,26,26,0.04);
+      --app-border: #DEDEDC;
+      --app-border-strong: #CFCFCC;
+      --app-text: #1A1A1A;
+      --app-text-muted: #585858;
+      --app-text-subtle: #8A8A87;
+      --app-heading: #1A1A1A;
+      --app-accent: #000000;
+      --app-accent-hover: #262626;
+      --app-on-accent: #FFFFFF;
+      --app-success: #366740;
+      --app-success-hover: #2F5938;
+      --app-danger: #783630;
+      --app-warning-surface: rgba(120,54,48,0.10);
+      --app-shadow-accent: rgba(24,22,18,0.16);
+      --app-shadow-success: rgba(24,22,18,0.12);
+
+      --shadow-low: 0 1px 2px 0 rgba(24,22,18,0.06), 0 1px 3px 0 rgba(24,22,18,0.08);
+      --shadow-medium: 0 4px 8px -2px rgba(24,22,18,0.08), 0 2px 4px -1px rgba(24,22,18,0.06);
+      --shadow-high: 0 12px 28px -6px rgba(24,22,18,0.12), 0 4px 10px -3px rgba(24,22,18,0.08);
+
+      /* status scheme islands (DS success/error scheme) — light */
+      --sc-success-surface: #BBE3C6; --sc-success-fill: rgba(165,215,174,0.5);
+      --sc-success-text: #1A3120; --sc-success-text-soft: #2F5938;
+      --sc-success-stroke: #ABDCBA; --sc-success-accent: #366740;
+      --sc-error-surface: #EECFC9; --sc-error-fill: rgba(233,188,185,0.5);
+      --sc-error-text: #3D1E19; --sc-error-text-soft: #69302A;
+      --sc-error-stroke: #E5B7AD; --sc-error-accent: #783630;
+    }
+
+    /* theme toggle icon swap — unchanged behaviour */
+    #theme-toggle .icon-sun { display: none; }
+    #theme-toggle .icon-moon { display: block; }
+    body.theme-light #theme-toggle .icon-sun { display: block; }
+    body.theme-light #theme-toggle .icon-moon { display: none; }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      font-family: var(--font-sans);
+      font-size: var(--type-body-s);
+      line-height: 1.45;
+      background: var(--app-bg);
+      color: var(--app-text);
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--sp-4) var(--sp-4) var(--sp-3);
+      border-bottom: var(--hairline) solid var(--app-border);
+      flex-shrink: 0;
+    }
+    .header-brand { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; }
+    .title {
+      font-family: var(--font-display);
+      font-size: var(--type-title-s);
+      font-weight: var(--w-bold);
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+      color: var(--app-heading);
+    }
+    .header-brand .title-tag {
+      font-size: var(--type-microcopy);
+      font-weight: var(--w-medium);
+      color: var(--app-text-muted);
+      letter-spacing: 0.01em;
+    }
+    .header-right { display: flex; align-items: center; gap: var(--sp-1); }
+
+    /* header icon buttons = DS ghost/square buttons */
+    .btn-settings {
+      width: 32px; height: 32px; padding: 0;
+      border: var(--hairline) solid transparent;
+      background: transparent;
+      border-radius: var(--radius-s);
+      color: var(--app-text-muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+    }
+    .btn-settings:hover { background: var(--app-surface-soft); color: var(--app-text); }
+    .btn-settings:active { background: var(--app-surface); }
+    .btn-settings:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+    .btn-settings.active { background: var(--app-surface); color: var(--app-text); }
+
+    /* ── Page scaffolding (show/hide contract unchanged) ───────────────── */
+    .main-page {
+      display: flex; flex-direction: column; flex: 1; min-height: 0;
+      overflow-y: auto; overflow-x: hidden;
+    }
+    .main-page.hidden { display: none; }
+
+    .main-page::-webkit-scrollbar, .settings-page::-webkit-scrollbar,
+    .collections-list::-webkit-scrollbar { width: 8px; }
+    .main-page::-webkit-scrollbar-track, .settings-page::-webkit-scrollbar-track,
+    .collections-list::-webkit-scrollbar-track { background: transparent; }
+    .main-page::-webkit-scrollbar-thumb, .settings-page::-webkit-scrollbar-thumb,
+    .collections-list::-webkit-scrollbar-thumb { background: var(--app-border-strong); border-radius: var(--radius-full); }
+    .main-page::-webkit-scrollbar-thumb:hover, .settings-page::-webkit-scrollbar-thumb:hover,
+    .collections-list::-webkit-scrollbar-thumb:hover { background: var(--app-text-subtle); }
+
+    .page { display: none; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; }
+    .page.visible { display: flex; }
+
+    /* ── Settings page ─────────────────────────────────────────────────── */
+    .settings-page { padding: var(--sp-4); overflow-y: auto; overflow-x: hidden; flex-direction: column; }
+    .settings-page .settings-page-content { overflow: visible; flex: 1; min-height: 0; padding-top: var(--sp-5); }
+    .settings-page label {
+      display: block;
+      font-size: var(--type-microcopy);
+      font-weight: var(--w-semibold);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--app-text-muted);
+      margin: var(--sp-4) 0 var(--sp-1);
+    }
+    .settings-page label:first-of-type { margin-top: 0; }
+
+    .settings-page input, .commit-input {
+      width: 100%;
+      padding: 12px 14px;
+      font-family: var(--font-sans);
+      font-size: var(--type-body-s);
+      background: var(--app-surface);
+      border: var(--hairline) solid var(--app-border-strong);
+      border-radius: var(--radius-m);
+      color: var(--app-text);
+      transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+    }
+    .settings-page input::placeholder, .commit-input::placeholder { color: var(--app-text-muted); }
+    .settings-page input:hover, .commit-input:hover { border-color: var(--app-text-subtle); }
+    .settings-page input:focus, .commit-input:focus {
+      outline: none;
+      border-color: var(--app-accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent) 28%, transparent);
+    }
+
+    .settings-actions { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-6); }
+    .settings-actions button {
+      width: 100%; padding: 12px 16px;
+      border-radius: var(--radius-m);
+      font-family: var(--font-sans);
+      font-size: var(--type-body-s);
+      font-weight: var(--w-semibold);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+    }
+    .btn-save-settings { background: var(--app-accent); border: var(--hairline) solid transparent; color: var(--app-on-accent); box-shadow: var(--shadow-low); }
+    .btn-save-settings:hover:not(:disabled) { background: var(--app-accent-hover); }
+    .btn-save-settings:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-clear-settings { background: transparent; border: var(--hairline) solid var(--app-border-strong); color: var(--app-text-muted); }
+    .btn-clear-settings:hover {
+      background: var(--app-warning-surface);
+      border-color: color-mix(in srgb, var(--app-danger) 45%, transparent);
+      color: var(--app-danger);
+    }
+
+    .btn-back {
+      display: flex; align-items: center; gap: var(--sp-1);
+      padding: var(--sp-1) 0;
+      border: none; background: transparent;
+      color: var(--app-text-muted);
+      font-family: var(--font-sans); font-size: var(--type-body-s);
+      cursor: pointer; transition: color var(--dur-fast) var(--ease);
+    }
+    .btn-back:hover { color: var(--app-text); }
+
+    .header-settings {
+      display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+      padding: var(--sp-4) var(--sp-4) var(--sp-3);
+      border-bottom: var(--hairline) solid var(--app-border);
+      flex-shrink: 0;
+    }
+    .header-settings .title { flex: 1; }
+    .header-settings .git-logo { color: var(--app-text-muted); flex-shrink: 0; display: flex; }
+
+    /* ── Collection-modes banner (kept in DOM, hidden inline) ──────────── */
+    .collection-modes-banner {
+      margin: var(--sp-3) var(--sp-4) var(--sp-1);
+      border: var(--hairline) solid var(--app-border);
+      border-radius: var(--radius-l);
+      background: var(--app-surface);
+      padding: var(--sp-2);
+      flex-shrink: 0;
+    }
+    .collection-modes-banner .banner-collections { display: flex; flex-direction: column; gap: var(--sp-1); }
+    .collection-modes-banner .banner-loading { font-size: var(--type-microcopy); color: var(--app-text-muted); }
+    .collection-modes-banner .collection-row {
+      display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-1);
+      padding: var(--sp-1) var(--sp-2);
+      background: var(--app-surface-soft);
+      border: var(--hairline) solid var(--app-border);
+      border-radius: var(--radius-s);
+    }
+    .collection-modes-banner .collection-row .col-name { font-size: var(--type-microcopy); font-weight: var(--w-semibold); color: var(--app-text); min-width: 90px; flex-shrink: 0; }
+    .collection-modes-banner .collection-row .col-select {
+      flex: 1; min-width: 0; border-radius: var(--radius-xs);
+      border: var(--hairline) solid var(--app-border-strong);
+      background: var(--app-bg); color: var(--app-text);
+      font-size: var(--type-microcopy); font-family: inherit; padding: 4px 6px; outline: none;
+    }
+    .collection-modes-banner .collection-row .col-select:focus { border-color: var(--app-accent); }
+    .collection-modes-banner .collection-row.dep-disabled { opacity: 0.45; }
+    .collection-modes-banner .collection-row.dep-disabled .col-select { cursor: not-allowed; }
+    .collection-modes-banner .collection-row .dep-hint { display: none; flex-basis: 100%; font-size: 9px; font-style: italic; line-height: 1.3; color: var(--app-text-muted); margin-top: 1px; }
+    .collection-modes-banner .collection-row.dep-disabled .dep-hint { display: block; }
+    .collection-modes-banner .collection-row.has-extensions { display: flex; gap: var(--sp-1); }
+    .collection-modes-banner .collection-row.has-extensions .col-select { flex: 1; min-width: 0; }
+
+    /* ── Segmented control (Single / Separate) = DS .nd-seg ────────────── */
+    .segment-filter, .segment-control {
+      display: flex;
+      background: var(--app-surface);
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      backdrop-filter: blur(var(--glass-blur));
+      border: var(--hairline) solid var(--app-border);
+      border-radius: var(--radius-s);
+      padding: var(--sp-0);
+      gap: var(--sp-0);
+      margin: var(--sp-3) var(--sp-4) var(--sp-3);
+    }
+    .segment-control { margin: var(--sp-3) var(--sp-4) 0; }
+    .segment-filter button, .segment-control button {
+      flex: 1;
+      padding: 5px 10px;
+      font-family: var(--font-sans);
+      font-size: var(--type-microcopy);
+      font-weight: var(--w-medium);
+      border: none; background: transparent;
+      color: var(--app-text-muted);
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+    }
+    .segment-filter button:hover:not(:disabled):not(.active),
+    .segment-control button:hover:not(.active) { color: var(--app-text); background: var(--app-surface-soft); }
+    .segment-filter button.active, .segment-control button.active {
+      background: var(--app-accent);
+      color: var(--app-on-accent);
+      font-weight: var(--w-semibold);
+      box-shadow: var(--shadow-low);
+    }
+    .segment-filter button:disabled, .segment-control button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Collections list ──────────────────────────────────────────────── */
+    .collections-wrap {
+      flex: 1; display: flex; flex-direction: column;
+      padding: 0 var(--sp-4) var(--sp-4);
+      opacity: 0; transition: opacity var(--dur-medium) var(--ease);
+      min-height: 0; overflow: hidden;
+    }
+    .collections-wrap.visible { opacity: 1; }
+
+    .loading-state, .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 44px var(--sp-4);
+      color: var(--app-text-muted);
+      font-size: var(--type-body-s);
+      text-align: center;
+    }
+    .empty-state .hint { font-size: var(--type-microcopy); margin-top: var(--sp-1); color: var(--app-text-subtle); }
+
+    /* DS spinner (replaces the wizard loader) */
+    .nd-spinner-wrap { display: flex; flex-direction: column; align-items: center; gap: var(--sp-4); padding: var(--sp-6) 0; }
+    .nd-spinner { animation: spin 0.8s linear infinite; }
+    .nd-spinner-rail { stroke: var(--app-border); }
+    .nd-spinner-arc { stroke: var(--app-accent); }
+    .loader-text { font-size: var(--type-body-s); color: var(--app-text-muted); font-weight: var(--w-medium); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .collections-list {
+      display: flex; flex-direction: column; gap: 2px;
+      flex: 1; overflow-y: auto; min-height: 0;
+      padding-top: var(--sp-1);
+    }
+
+    .select-all, .collection-item {
+      display: flex; align-items: center; gap: var(--sp-2);
+      padding: var(--sp-2) var(--sp-3);
+      border-radius: var(--radius-m);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease);
+    }
+    .select-all {
+      font-size: var(--type-microcopy);
+      font-weight: var(--w-semibold);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--app-text-muted);
+      margin-bottom: 2px;
+    }
+    .collection-item { font-size: var(--type-body-s); color: var(--app-text); }
+    .select-all:hover, .collection-item:hover { background: var(--app-surface-soft); }
+    .collection-item .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .collection-item .count {
+      font-size: var(--type-microcopy);
+      color: var(--app-text-muted);
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+      background: var(--app-surface-soft);
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+    }
+
+    /* Checkbox = DS .nd-checkmark (native input, appearance:none) */
+    .checkbox-custom {
+      appearance: none; -webkit-appearance: none;
+      position: relative;
+      width: 18px; height: 18px; flex-shrink: 0;
+      margin: 0;
+      border-radius: var(--radius-xs);
+      border: var(--hairline) solid var(--app-border-strong);
+      background: var(--app-surface);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+    }
+    .checkbox-custom:hover { border-color: var(--app-text-subtle); }
+    .checkbox-custom:checked { background: var(--app-accent); border-color: var(--app-accent); }
+    .checkbox-custom:checked::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-color: var(--app-on-accent);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4 4 10-10' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 13px 13px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4 4 10-10' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 13px 13px no-repeat;
+    }
+    /* DS indeterminate: same accent surface as checked, but a bar (= "some") not a tick */
+    .checkbox-custom:indeterminate { background: var(--app-accent); border-color: var(--app-accent); }
+    .checkbox-custom:indeterminate::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-color: var(--app-on-accent);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12h12' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12h12' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+    }
+    .checkbox-custom:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+
+    /* ── Stats bar = DS card ───────────────────────────────────────────── */
+    .stats-bar {
+      display: flex; gap: var(--sp-3);
+      padding: var(--sp-3) var(--sp-4);
+      margin: 0 var(--sp-4) var(--sp-4);
+      font-size: var(--type-microcopy);
+      color: var(--app-text-muted);
+      background: var(--app-surface);
+      border: var(--hairline) solid var(--app-border);
+      border-radius: var(--radius-m);
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      backdrop-filter: blur(var(--glass-blur));
+    }
+    .stats-bar span { display: flex; align-items: center; gap: var(--sp-1); }
+    .stats-bar span:not(:last-child)::after { content: ''; width: 1px; height: 11px; margin-left: var(--sp-3); background: var(--app-border-strong); }
+    .stats-bar strong { color: var(--app-text); font-weight: var(--w-semibold); font-variant-numeric: tabular-nums; }
+
+    /* ── Closure warning = DS error alert ──────────────────────────────── */
+    /* DS Alert (error tone) — a scheme island: the whole surface tints, with an
+       accent glyph, a bold title and recessive body text (.nd-alert). */
+    .closure-warning {
+      display: flex; align-items: flex-start; gap: var(--sp-2);
+      margin: 0 var(--sp-4) var(--sp-4);
+      padding: var(--sp-3);
+      border-radius: var(--radius-m);
+      background-color: var(--sc-error-surface);
+      background-image: linear-gradient(var(--sc-error-fill) 0 100%);
+      border: var(--hairline) solid var(--sc-error-stroke);
+      color: var(--sc-error-text);
+      font-size: var(--type-microcopy);
+      line-height: 1.4;
+    }
+    .closure-warning .cw-icon { color: var(--sc-error-accent); font-size: 14px; line-height: 1.1; flex-shrink: 0; }
+    .closure-warning .cw-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .closure-warning #cw-title { color: var(--sc-error-text); font-weight: var(--w-bold); }
+    .closure-warning #cw-detail { color: var(--sc-error-text-soft); }
+
+    /* ── Action buttons ────────────────────────────────────────────────── */
+    .actions { padding: 0 var(--sp-4) var(--sp-4); flex-shrink: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+    .commit-input-wrap { margin-bottom: 2px; }
+
+    .btn-primary, .btn-secondary {
+      width: 100%;
+      display: flex; align-items: center; justify-content: center; gap: var(--sp-1);
+      border-radius: var(--radius-m);
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+    }
+    /* primary = DS v-primary (accent, opaque) */
+    .btn-primary {
+      padding: 14px 20px;
+      background: var(--app-accent);
+      color: var(--app-on-accent);
+      border: var(--hairline) solid transparent;
+      font-size: var(--type-body-m);
+      font-weight: var(--w-semibold);
+      box-shadow: var(--shadow-low);
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--app-accent-hover); box-shadow: var(--shadow-medium); }
+    .btn-primary:active:not(:disabled) { transform: translateY(0.5px); }
+    .btn-primary:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+    .btn-primary.success { background: var(--app-success); color: var(--app-on-accent); }
+    .btn-primary.success:hover:not(:disabled) { background: var(--app-success-hover); }
+    .btn-primary .btn-spinner {
+      width: 15px; height: 15px;
+      border: 2px solid color-mix(in srgb, var(--app-on-accent) 35%, transparent);
+      border-top-color: var(--app-on-accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    /* secondary = DS v-tonal (glass container) */
+    .btn-secondary {
+      padding: 12px 20px;
+      background: var(--app-surface);
+      color: var(--app-text);
+      border: var(--hairline) solid transparent;
+      font-size: var(--type-body-s);
+      font-weight: var(--w-semibold);
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--app-surface-soft); }
+    .btn-secondary:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+    .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Toast = DS alert surface with scheme stripe ───────────────────── */
+    /* DS Toast = a floating Alert. Same scheme-island surface as .nd-alert
+       (tone tints the whole box), plus the top-layer lift (shadow-high). The
+       glyph echoes the Alert's tone icon in the accent colour; success is the
+       default tone, .error swaps the scheme + glyph. */
+    .toast {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 32px); max-width: calc(100% - 32px);
+      box-sizing: border-box;
+      display: flex; align-items: flex-start; gap: var(--sp-2);
+      text-align: left;
+      padding: var(--sp-3);
+      background-color: var(--sc-success-surface);
+      background-image: linear-gradient(var(--sc-success-fill) 0 100%);
+      color: var(--sc-success-text);
+      border: var(--hairline) solid var(--sc-success-stroke);
+      border-radius: var(--radius-m);
+      font-size: var(--type-body-s);
+      font-weight: var(--w-medium);
+      box-shadow: var(--shadow-high);
+      z-index: 100;
+      animation: toastSlideUp 0.35s var(--ease-out) forwards;
+    }
+    .toast::before {
+      content: ''; flex: none; width: 16px; height: 16px; margin-top: 1px;
+      background-color: var(--sc-success-accent);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 6L9 17l-5-5' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 6L9 17l-5-5' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+    }
+    .toast.error {
+      background-color: var(--sc-error-surface);
+      background-image: linear-gradient(var(--sc-error-fill) 0 100%);
+      color: var(--sc-error-text);
+      border-color: var(--sc-error-stroke);
+    }
+    .toast.error::before {
+      background-color: var(--sc-error-accent);
+      -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18 6L6 18M6 6l12 12' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18 6L6 18M6 6l12 12' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+    }
+    .toast.hiding { animation: toastSlideDown 0.3s var(--ease) forwards; }
+    @keyframes toastSlideUp { from { opacity: 0; transform: translateX(-50%) translateY(20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+    @keyframes toastSlideDown { from { opacity: 1; transform: translateX(-50%) translateY(0); } to { opacity: 0; transform: translateX(-50%) translateY(20px); } }
+
+    /* ── Resize handle ─────────────────────────────────────────────────── */
+    .resize-handle {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 12px;
+      cursor: ns-resize;
+      background: linear-gradient(to bottom, transparent 0%, var(--app-border) 100%);
+      opacity: 0; transition: opacity var(--dur-fast) var(--ease); z-index: 1000;
+    }
+    .resize-handle:hover, .resize-handle.active { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="main-page" id="main-page">
+    <header class="header">
+      <div class="header-brand">
+        <h1 class="title">Closure</h1>
+        <span class="title-tag">Export JSON straight from Figma</span>
+      </div>
+      <div class="header-right">
+        <button class="btn-settings" id="theme-toggle" title="Toggle light / dark" aria-label="Toggle light / dark">
+          <!-- moon (shown in dark mode) -->
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <!-- sun (shown in light mode) -->
+          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+          </svg>
+        </button>
+        <button class="btn-settings" id="settings-btn" title="Git settings" aria-label="Git settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Theme-preview banner hidden: the plugin theme is now driven by the
+         light/dark toggle in the header instead of Figma scheme/card dropdowns. -->
+    <section class="collection-modes-banner" aria-label="Collection modes preview" style="display:none;">
+      <div class="banner-collections" id="banner-collections">
+        <p class="banner-loading">Loading collections...</p>
+      </div>
+    </section>
+    
+    <!-- Format toggle hidden: export is locked to Token Studio by default.
+         Kept in the DOM (display:none) so the existing exportMode logic still works. -->
+    <div class="segment-control" id="export-mode-control" style="display:none;">
+      <button type="button" data-mode="native" id="export-mode-native">Native</button>
+      <button type="button" class="active" data-mode="token-studio" id="export-mode-ts">Token Studio</button>
+    </div>
+
+    <div class="segment-filter" id="segment-filter">
+      <button type="button" class="segment-btn active" data-mode="single" id="segment-single">Single Document</button>
+      <button type="button" class="segment-btn" data-mode="separate" id="segment-separate">Separate Documents</button>
+    </div>
+    
+    <div class="collections-wrap" id="collections-wrap">
+    <div class="loading-state" id="loading-state">
+      <div class="nd-spinner-wrap">
+        <svg class="nd-spinner" width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle class="nd-spinner-rail" cx="12" cy="12" r="9" stroke-width="2.4"/>
+          <path class="nd-spinner-arc" d="M12 3a9 9 0 0 1 9 9" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+        <p class="loader-text">Gathering your tokens…</p>
+      </div>
+    </div>
+    <div class="collections-list" id="collections-list" style="display: none;"></div>
+    <div class="empty-state" id="empty-state" style="display: none;">
+      <p>No variable collections found.</p>
+      <p class="hint">Add variables in Figma to see them here.</p>
+    </div>
+  </div>
+  
+  <footer class="stats-bar" id="stats-bar" style="display: none;">
+    <span><strong id="stat-collections">0</strong> Collections</span>
+    <span><strong id="stat-tokens">0</strong> Tokens</span>
+  </footer>
+
+  <div class="closure-warning" id="closure-warning" style="display: none;">
+    <span class="cw-icon">⚠</span>
+    <div class="cw-body">
+      <strong id="cw-title">Broken references</strong>
+      <span id="cw-detail"></span>
+    </div>
+  </div>
+  
+    <div class="actions">
+      <div class="commit-input-wrap" id="commit-wrap">
+        <input type="text" id="commit-message" class="commit-input" placeholder="Enter commit message...">
+      </div>
+      <button class="btn-primary" id="push-btn" disabled>
+        <span class="btn-spinner" id="push-spinner" style="display: none;"></span>
+        <span class="btn-text" id="push-text">Push to Git</span>
+      </button>
+      <button class="btn-secondary" id="download-btn" disabled>
+        <span class="btn-text" id="download-text">Download single</span>
+      </button>
+    </div>
+  </div>
+  
+  <div class="page settings-page" id="settings-page">
+    <header class="header-settings">
+      <div class="git-logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+        </svg>
+      </div>
+      <h1 class="title">Git Settings</h1>
+      <button class="btn-back" id="back-btn" type="button" aria-label="Back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Back
+      </button>
+    </header>
+    <div class="settings-page-content">
+      <label>GitHub Token</label>
+      <input type="password" id="git-token" placeholder="ghp_xxxxxxxxxxxx">
+      <label>Repo Owner/Name</label>
+      <input type="text" id="git-repo" placeholder="owner/repository">
+      <label>File Path</label>
+      <input type="text" id="git-filepath" placeholder="design-tokens.json">
+      <label>Branch</label>
+      <input type="text" id="git-branch" placeholder="main">
+      <div class="settings-actions">
+        <button class="btn-save-settings" id="save-settings-btn" type="button" disabled>Save Settings</button>
+        <button class="btn-clear-settings" id="clear-settings-btn" type="button">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var rawData = null;
+    var transformedData = null;
+    var selectedCollections = [];
+    
+    var gitSettings = {
+      getState: function() {
+        return {
+          token: document.getElementById('git-token').value,
+          repo: document.getElementById('git-repo').value.trim(),
+          filepath: document.getElementById('git-filepath').value.trim() || 'design-tokens.json',
+          branch: document.getElementById('git-branch').value.trim() || 'main'
+        };
+      },
+      setState: function(config) {
+        if (!config) return;
+        document.getElementById('git-token').value = config.token || '';
+        document.getElementById('git-repo').value = config.repo || '';
+        document.getElementById('git-filepath').value = config.filepath || 'design-tokens.json';
+        document.getElementById('git-branch').value = config.branch || 'main';
+        gitSettings.updateSaveButton();
+      },
+      updateSaveButton: function() {
+        var token = document.getElementById('git-token').value.trim();
+        document.getElementById('save-settings-btn').disabled = !token;
+      },
+      init: function() {
+        parent.postMessage({ pluginMessage: { type: 'LOAD_GIT_SETTINGS' } }, '*');
+      }
+    };
+    
+    document.getElementById('settings-btn').addEventListener('click', function() {
+      document.getElementById('main-page').classList.add('hidden');
+      document.getElementById('settings-page').classList.add('visible');
+    });
+
+    // ── Plugin light/dark theme toggle ─────────────────────────────────────
+    var THEME_KEY = 'json-exporter-theme';
+    var currentTheme = 'dark';
+    // Neutral light/dark palettes fetched from foundations (filled after extract).
+    var neutralPalettes = { light: null, dark: null };
+    var APP_COLOR_VARS = [
+      '--app-bg','--app-surface','--app-surface-soft','--app-border','--app-border-strong',
+      '--app-text','--app-text-muted','--app-text-subtle','--app-heading','--app-accent',
+      '--app-accent-hover','--app-on-accent','--app-success','--app-success-hover','--app-danger',
+      '--app-warning-surface','--app-shadow-accent','--app-shadow-success'
+    ];
+    function applyTheme(mode) {
+      currentTheme = mode;
+      document.body.classList.toggle('theme-light', mode === 'light');
+      try { localStorage.setItem(THEME_KEY, mode); } catch (e) {}
+      // Prefer the neutral colours fetched from the foundations; if not yet
+      // available (before extract) fall back to the CSS defaults.
+      applyPaletteVars((typeof neutralPalettes !== 'undefined' && neutralPalettes[mode]) || null);
+    }
+    (function initTheme() {
+      var saved = null;
+      try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
+      applyTheme(saved === 'light' ? 'light' : 'dark'); // default: dark
+    })();
+    document.getElementById('theme-toggle').addEventListener('click', function() {
+      applyTheme(document.body.classList.contains('theme-light') ? 'dark' : 'light');
+    });
+    
+    document.getElementById('back-btn').addEventListener('click', function() {
+      document.getElementById('settings-page').classList.remove('visible');
+      document.getElementById('main-page').classList.remove('hidden');
+    });
+    
+    document.querySelectorAll('#settings-page input').forEach(function(inp) {
+      inp.addEventListener('input', function() { gitSettings.updateSaveButton(); });
+    });
+    
+    document.getElementById('save-settings-btn').addEventListener('click', function() {
+      parent.postMessage({
+        pluginMessage: { type: 'SAVE_GIT_SETTINGS', config: gitSettings.getState() }
+      }, '*');
+    });
+    
+    document.getElementById('clear-settings-btn').addEventListener('click', function() {
+      if (!confirm('Clear all Git settings? This will remove your token and repo configuration.')) return;
+      parent.postMessage({ pluginMessage: { type: 'CLEAR_GIT_SETTINGS' } }, '*');
+    });
+    
+    gitSettings.init();
+    
+    function triggerExtract() {
+      parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', triggerExtract);
+    } else {
+      triggerExtract();
+    }
+    
+    var pushBtn = document.getElementById('push-btn');
+    var pushText = document.getElementById('push-text');
+    var pushSpinner = document.getElementById('push-spinner');
+    var downloadBtn = document.getElementById('download-btn');
+    var downloadText = document.getElementById('download-text');
+    var segmentFilter = document.getElementById('segment-filter');
+    var documentMode = 'single';
+    var exportMode = 'token-studio';
+    var collectionsList = document.getElementById('collections-list');
+    var loadingState = document.getElementById('loading-state');
+    var emptyState = document.getElementById('empty-state');
+    var statsBar = document.getElementById('stats-bar');
+    var collectionsWrap = document.getElementById('collections-wrap');
+    var bannerNode = document.querySelector('.collection-modes-banner');
+    var bannerCollectionsContainer = document.getElementById('banner-collections');
+    var colorCollections = [];
+    var selectedModes = {};
+    var rowRegistry = {}; // collection name -> { row, select, hint } for dependency gating
+
+    function colorToRgbaParts(color) {
+      if (!color || typeof color !== 'object' || color.r === undefined) return null;
+      return {
+        r: Math.round(color.r * 255),
+        g: Math.round(color.g * 255),
+        b: Math.round(color.b * 255),
+        a: color.a !== undefined ? color.a : 1
+      };
+    }
+
+    function colorToCss(color) {
+      var c = colorToRgbaParts(color);
+      if (!c) return null;
+      return c.a >= 0.999 ? ('rgb(' + c.r + ', ' + c.g + ', ' + c.b + ')') : ('rgba(' + c.r + ', ' + c.g + ', ' + c.b + ', ' + c.a.toFixed(3) + ')');
+    }
+
+    function withAlpha(cssColor, alpha) {
+      if (typeof cssColor !== 'string') return cssColor;
+      var match = cssColor.match(/rgba?\(([^)]+)\)/);
+      if (!match) return cssColor;
+      var parts = match[1].split(',').map(function(p) { return p.trim(); });
+      if (parts.length < 3) return cssColor;
+      return 'rgba(' + parts[0] + ', ' + parts[1] + ', ' + parts[2] + ', ' + alpha + ')';
+    }
+
+    function findColorByName(colorVars, modeId, patterns) {
+      for (var i = 0; i < patterns.length; i++) {
+        var pattern = patterns[i].toLowerCase();
+        for (var j = 0; j < colorVars.length; j++) {
+          var v = colorVars[j];
+          var name = String(v.name).toLowerCase();
+          // Match exact name OR name ending with the pattern (e.g., "scheme/basic/background" matches "basic/background")
+          if (name === pattern || name.endsWith('/' + pattern) || name.endsWith(pattern)) {
+            var resolved = v.resolvedValuesByMode && v.resolvedValuesByMode[modeId];
+            if (resolved && resolved.type === 'VARIABLE_ALIAS') {
+              continue;
+            }
+            var css = colorToCss(resolved);
+            if (css) {
+              console.log('[findColor] Matched "' + pattern + '" via "' + v.name + '" = ' + css);
+              return css;
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+    function applyThemeFromCollection(collection, modeId) {
+      var root = document.documentElement;
+      if (!collection || !modeId) return;
+
+      var vars = collection.variables || [];
+      var colorVars = vars.filter(function(v) { return v && v.type === 'COLOR'; });
+
+      console.log('[Theme] =====================================');
+      console.log('[Theme] Collection:', collection.name, '| Mode ID:', modeId);
+      console.log('[Theme] Color vars:', colorVars.length);
+      
+      // Find background token and show its resolved value for this mode
+      var bgToken = colorVars.find(function(v) { 
+        var n = v.name.toLowerCase();
+        return n.indexOf('background') !== -1 && n.indexOf('subtle') === -1 && n.indexOf('card') === -1;
+      });
+      if (bgToken) {
+        console.log('[Theme] Background token found:', bgToken.name);
+        console.log('[Theme] Available mode IDs:', Object.keys(bgToken.resolvedValuesByMode || {}));
+        var bgResolved = bgToken.resolvedValuesByMode && bgToken.resolvedValuesByMode[modeId];
+        console.log('[Theme] Resolved value for mode ' + modeId + ':', bgResolved);
+        var bgCss = colorToCss(bgResolved);
+        console.log('[Theme] As CSS:', bgCss);
+      } else {
+        console.log('[Theme] No background token found!');
+      }
+
+      var bg = findColorByName(colorVars, modeId, [
+        'basic/background'
+      ]) || '#121212';
+
+      var surface = findColorByName(colorVars, modeId, [
+        'basic/background-subtle',
+        'basic/background-card'
+      ]) || '#1e1e1e';
+
+      var border = findColorByName(colorVars, modeId, [
+        'basic/stroke',
+        'basic/stroke-subtle'
+      ]) || 'rgba(255,255,255,0.12)';
+
+      var textPrimary = findColorByName(colorVars, modeId, [
+        'basic/text'
+      ]) || '#E5E5E5';
+
+      var textSecondary = findColorByName(colorVars, modeId, [
+        'basic/text-recessive'
+      ]) || '#9CA3AF';
+
+      var accent = findColorByName(colorVars, modeId, [
+        'basic/accent'
+      ]) || '#007AFF';
+
+      var onAccent = findColorByName(colorVars, modeId, [
+        'basic/on-accent',
+        'basic/text-on-accent',
+        'on-accent'
+      ]) || '#FFFFFF';
+
+      var success = findColorByName(colorVars, modeId, [
+        'feedback/success',
+        'success'
+      ]) || '#34C759';
+
+      var danger = findColorByName(colorVars, modeId, [
+        'feedback/error',
+        'error'
+      ]) || '#FF3B30';
+
+      console.log('[Theme] Colors:', { bg: bg, surface: surface, border: border, textPrimary: textPrimary, accent: accent });
+
+      root.style.setProperty('--app-bg', bg);
+      root.style.setProperty('--app-surface', surface);
+      root.style.setProperty('--app-surface-soft', withAlpha(surface, 0.5));
+      root.style.setProperty('--app-border', border);
+      root.style.setProperty('--app-border-strong', border);
+      root.style.setProperty('--app-text', textPrimary);
+      root.style.setProperty('--app-text-muted', textSecondary);
+      root.style.setProperty('--app-text-subtle', withAlpha(textSecondary, 0.7));
+      root.style.setProperty('--app-heading', textPrimary);
+      root.style.setProperty('--app-accent', accent);
+      root.style.setProperty('--app-accent-hover', withAlpha(accent, 0.8));
+      root.style.setProperty('--app-on-accent', onAccent);
+      root.style.setProperty('--app-success', success);
+      root.style.setProperty('--app-success-hover', withAlpha(success, 0.8));
+      root.style.setProperty('--app-danger', danger);
+      root.style.setProperty('--app-warning-surface', withAlpha(danger, 0.2));
+      root.style.setProperty('--app-shadow-accent', withAlpha(accent, 0.35));
+      root.style.setProperty('--app-shadow-success', withAlpha(success, 0.35));
+
+      if (bannerNode) {
+        bannerNode.style.setProperty('--banner-bg-start', bg);
+        bannerNode.style.setProperty('--banner-bg-end', surface);
+        bannerNode.style.setProperty('--banner-border', border);
+        bannerNode.style.setProperty('--banner-text-strong', textPrimary);
+        bannerNode.style.setProperty('--banner-text-soft', textSecondary);
+        bannerNode.style.setProperty('--banner-card-bg', surface);
+        bannerNode.style.setProperty('--banner-card-border', border);
+      }
+    }
+
+    // ── Neutral-scheme palette for the light/dark toggle ────────────────────
+    // The header toggle themes the plugin UI from the foundations: the NEUTRAL
+    // scheme in light and dark. Colours are read from the `.mode` collection's
+    // neutral group (mode/… — not mode-inverted / mode-magenta / mode-secondary),
+    // so the other schemes are never involved.
+    // (neutralPalettes and APP_COLOR_VARS are declared near the theme toggle so
+    // they are initialised before initTheme() runs.)
+
+    function extractPalette(colorVars, modeId) {
+      return {
+        bg:        findColorByName(colorVars, modeId, ['basic/background']) || '#121212',
+        surface:   findColorByName(colorVars, modeId, ['basic/background-subtle', 'basic/background-card']) || '#1e1e1e',
+        border:    findColorByName(colorVars, modeId, ['basic/stroke', 'basic/stroke-subtle']) || 'rgba(255,255,255,0.12)',
+        text:      findColorByName(colorVars, modeId, ['basic/text']) || '#E5E5E5',
+        textMuted: findColorByName(colorVars, modeId, ['basic/text-recessive']) || '#9CA3AF',
+        accent:    findColorByName(colorVars, modeId, ['basic/accent']) || '#007AFF',
+        onAccent:  findColorByName(colorVars, modeId, ['basic/on-accent', 'basic/text-on-accent', 'on-accent']) || '#FFFFFF',
+        success:   findColorByName(colorVars, modeId, ['feedback/success', 'success']) || '#34C759',
+        danger:    findColorByName(colorVars, modeId, ['feedback/error', 'error']) || '#FF3B30'
+      };
+    }
+
+    // Apply a fetched palette as inline CSS variables on <body> (overrides the
+    // hardcoded :root / .theme-light fallbacks). Pass null to clear (fall back).
+    function applyPaletteVars(p) {
+      var s = document.body.style;
+      if (!p) { APP_COLOR_VARS.forEach(function(k) { s.removeProperty(k); }); return; }
+      s.setProperty('--app-bg', p.bg);
+      s.setProperty('--app-surface', p.surface);
+      s.setProperty('--app-surface-soft', withAlpha(p.surface, 0.5));
+      s.setProperty('--app-border', p.border);
+      s.setProperty('--app-border-strong', p.border);
+      s.setProperty('--app-text', p.text);
+      s.setProperty('--app-text-muted', p.textMuted);
+      s.setProperty('--app-text-subtle', withAlpha(p.textMuted, 0.7));
+      s.setProperty('--app-heading', p.text);
+      s.setProperty('--app-accent', p.accent);
+      s.setProperty('--app-accent-hover', withAlpha(p.accent, 0.8));
+      s.setProperty('--app-on-accent', p.onAccent);
+      s.setProperty('--app-success', p.success);
+      s.setProperty('--app-success-hover', withAlpha(p.success, 0.8));
+      s.setProperty('--app-danger', p.danger);
+      s.setProperty('--app-warning-surface', withAlpha(p.danger, 0.2));
+      s.setProperty('--app-shadow-accent', withAlpha(p.accent, 0.35));
+      s.setProperty('--app-shadow-success', withAlpha(p.success, 0.35));
+    }
+
+    // Read the neutral light/dark palettes from the .mode collection.
+    function buildNeutralPalettes() {
+      neutralPalettes = { light: null, dark: null };
+      if (!rawData || !Array.isArray(rawData.collections)) return;
+      var modeCol = null;
+      rawData.collections.forEach(function(c) {
+        if (c && String(c.name).toLowerCase() === '.mode') modeCol = c;
+      });
+      if (!modeCol || !Array.isArray(modeCol.modes)) return;
+      // Neutral group only: names starting with "mode/" (excludes mode-inverted,
+      // mode-magenta, mode-secondary — i.e. the other schemes).
+      var neutralVars = (modeCol.variables || []).filter(function(v) {
+        return v && v.type === 'COLOR' && /^mode\//i.test(v.name);
+      });
+      if (!neutralVars.length) return;
+      modeCol.modes.forEach(function(m) {
+        var nm = String(m.name || '').toLowerCase();
+        if (nm.indexOf('light') !== -1) neutralPalettes.light = extractPalette(neutralVars, m.modeId);
+        else if (nm.indexOf('dark') !== -1) neutralPalettes.dark = extractPalette(neutralVars, m.modeId);
+      });
+      console.log('[Theme] Neutral palettes fetched — light:', !!neutralPalettes.light, 'dark:', !!neutralPalettes.dark);
+    }
+
+    // ── Scheme dependency rules ────────────────────────────────────────────
+    // Some leaf collections only sit on an ACTIVE alias chain under specific
+    // scheme/card selections. Outside those, changing them has zero visual
+    // effect, so we grey the row out. Rules verified against the live
+    // "ODS Test Foundation" Figma file:
+    //   .secondary  → live only when scheme=secondary OR card is a secondary-card
+    //   .mode       → no effect for static schemes (white / black)
+    //   magenta*    → live only when scheme=magenta OR card=magenta-card
+    //   .section    → modifier of .card, dead when card=not-a-card
+    var SECONDARY_CARD_MODES = ['secondary-card', 'secondary-card-subtle'];
+    var STATIC_SCHEMES = ['white', 'black'];
+
+    function currentModeName(collectionName) {
+      var modeId = selectedModes[collectionName];
+      if (!modeId) return null;
+      var col = colorCollections.find(function(c) { return c.name === collectionName; });
+      if (!col) return null;
+      for (var i = 0; i < col.modes.length; i++) {
+        if (col.modes[i].modeId === modeId) return col.modes[i].name;
+      }
+      return null;
+    }
+
+    function setRowState(name, enabled, hintText) {
+      var entry = rowRegistry[name];
+      if (!entry) return;
+      entry.row.classList.toggle('dep-disabled', !enabled);
+      if (entry.select) entry.select.disabled = !enabled;
+      if (entry.hint) entry.hint.textContent = enabled ? '' : (hintText || '');
+    }
+
+    function updateDependencyStates() {
+      var scheme = currentModeName('.scheme');
+      var card = currentModeName('.card');
+
+      // 1) .secondary palette
+      if (rowRegistry['.secondary']) {
+        var secActive = (scheme === 'secondary') || (SECONDARY_CARD_MODES.indexOf(card) !== -1);
+        setRowState('.secondary', secActive,
+          'No visual effect here — set .scheme to "secondary" or .card to a secondary-card.');
+      }
+
+      // 2) .mode (light/dark) — irrelevant for static schemes
+      if (rowRegistry['.mode']) {
+        var modeActive = STATIC_SCHEMES.indexOf(scheme) === -1;
+        setRowState('.mode', modeActive,
+          '"' + scheme + '" is a static scheme — light/dark has no effect.');
+      }
+
+      // 3) magenta palette dropdown(s), if any are ever rendered (future-proof:
+      //    .magenta-light/.magenta-dark are single-mode today, so not in the banner)
+      Object.keys(rowRegistry).forEach(function(name) {
+        if (name.toLowerCase().indexOf('magenta') !== -1) {
+          var magActive = (scheme === 'magenta') || (card === 'magenta-card');
+          setRowState(name, magActive,
+            'No visual effect here — set .scheme to "magenta" or .card to "magenta-card".');
+        }
+      });
+
+      // 4) .section — modifier of .card
+      if (rowRegistry['.section']) {
+        var sectionActive = card !== 'not-a-card';
+        setRowState('.section', sectionActive,
+          'Needs a card — set .card to anything other than "not-a-card".');
+      }
+    }
+
+    function rebuildThemeOptions() {
+      if (!bannerCollectionsContainer) return;
+      // Banner is hidden — plugin theme is controlled by the header light/dark
+      // toggle, so don't render rows or override --app-* colors from Figma.
+      if (bannerNode && bannerNode.style.display === 'none') return;
+      colorCollections = [];
+      rowRegistry = {};
+      selectedModes = {};
+      bannerCollectionsContainer.innerHTML = '';
+
+      if (!rawData || !Array.isArray(rawData.collections)) {
+        bannerCollectionsContainer.innerHTML = '<p class="banner-loading">No collections found</p>';
+        return;
+      }
+
+      rawData.collections.forEach(function(collection) {
+        if (!collection || !Array.isArray(collection.modes)) return;
+        if (collection.modes.length < 2) return;
+        var colNameLower = (collection.name || '').toLowerCase();
+        if (colNameLower.indexOf('restriction') !== -1 || colNameLower.indexOf('_restricted') !== -1) return;
+        var colorVarCount = collection.variables.filter(function(v) { return v && v.type === 'COLOR'; }).length;
+        if (colorVarCount > 0) {
+          colorCollections.push(collection);
+        }
+      });
+
+      console.log('[Theme] Color collections found:', colorCollections.map(function(c) { return c.name + ' (' + c.modes.length + ' modes)'; }));
+
+      if (colorCollections.length === 0) {
+        bannerCollectionsContainer.innerHTML = '<p class="banner-loading">No color collections found</p>';
+        return;
+      }
+
+      // Group collections by their modes (collections with same modes are "extensions" of each other)
+      var groupedByModes = {};
+      var standaloneCollections = [];
+
+      colorCollections.forEach(function(collection) {
+        var modeKey = collection.modes.map(function(m) { return m.name; }).sort().join('|');
+        if (!groupedByModes[modeKey]) {
+          groupedByModes[modeKey] = [];
+        }
+        groupedByModes[modeKey].push(collection);
+      });
+
+      // Separate standalone (single collection with unique modes) from extension groups
+      Object.keys(groupedByModes).forEach(function(key) {
+        var group = groupedByModes[key];
+        if (group.length === 1) {
+          standaloneCollections.push(group[0]);
+        }
+      });
+
+      var primaryCollection = null;
+
+      // Render standalone collections (single dropdown with label)
+      standaloneCollections.forEach(function(collection) {
+        var row = document.createElement('div');
+        row.className = 'collection-row';
+
+        var label = document.createElement('span');
+        label.className = 'col-name';
+        label.textContent = collection.name;
+
+        var select = document.createElement('select');
+        select.className = 'col-select';
+        select.dataset.collectionName = collection.name;
+
+        collection.modes.forEach(function(mode) {
+          var option = document.createElement('option');
+          option.value = mode.modeId;
+          option.textContent = mode.name;
+          select.appendChild(option);
+        });
+
+        selectedModes[collection.name] = collection.modes[0].modeId;
+
+        var hint = document.createElement('span');
+        hint.className = 'dep-hint';
+
+        select.addEventListener('change', function() {
+          selectedModes[collection.name] = select.value;
+          applyThemeFromCollection(collection, select.value);
+          updateDependencyStates();
+        });
+
+        row.appendChild(label);
+        row.appendChild(select);
+        row.appendChild(hint);
+        bannerCollectionsContainer.appendChild(row);
+
+        rowRegistry[collection.name] = { row: row, select: select, hint: hint };
+
+        var colNameLower = collection.name.toLowerCase();
+        if (colNameLower === 'foundation' || colNameLower === '.mode') {
+          primaryCollection = collection;
+        }
+      });
+
+      // Render extension groups (two dropdowns: collection selector + mode selector)
+      Object.keys(groupedByModes).forEach(function(key) {
+        var group = groupedByModes[key];
+        if (group.length <= 1) return; // Skip standalone
+
+        var row = document.createElement('div');
+        row.className = 'collection-row has-extensions';
+
+        // Left dropdown: collection selector
+        var collectionSelect = document.createElement('select');
+        collectionSelect.className = 'col-select extension-select';
+
+        group.forEach(function(col) {
+          var option = document.createElement('option');
+          option.value = col.name;
+          option.textContent = col.name;
+          collectionSelect.appendChild(option);
+        });
+
+        // Right dropdown: mode selector
+        var modeSelect = document.createElement('select');
+        modeSelect.className = 'col-select';
+
+        var currentCollection = group[0];
+        currentCollection.modes.forEach(function(mode) {
+          var option = document.createElement('option');
+          option.value = mode.modeId;
+          option.textContent = mode.name;
+          modeSelect.appendChild(option);
+        });
+
+        selectedModes[currentCollection.name] = currentCollection.modes[0].modeId;
+
+        // Update mode dropdown when collection changes
+        collectionSelect.addEventListener('change', function() {
+          var selectedColName = collectionSelect.value;
+          var selectedCol = group.find(function(c) { return c.name === selectedColName; });
+          if (!selectedCol) return;
+
+          // Update mode dropdown options
+          modeSelect.innerHTML = '';
+          selectedCol.modes.forEach(function(mode) {
+            var option = document.createElement('option');
+            option.value = mode.modeId;
+            option.textContent = mode.name;
+            modeSelect.appendChild(option);
+          });
+
+          selectedModes[selectedCol.name] = selectedCol.modes[0].modeId;
+          applyThemeFromCollection(selectedCol, selectedCol.modes[0].modeId);
+        });
+
+        // Apply theme when mode changes
+        modeSelect.addEventListener('change', function() {
+          var selectedColName = collectionSelect.value;
+          var selectedCol = group.find(function(c) { return c.name === selectedColName; });
+          if (!selectedCol) return;
+
+          selectedModes[selectedCol.name] = modeSelect.value;
+          applyThemeFromCollection(selectedCol, modeSelect.value);
+        });
+
+        row.appendChild(collectionSelect);
+        row.appendChild(modeSelect);
+        bannerCollectionsContainer.appendChild(row);
+
+        // Set first extension group's first collection as primary if no standalone primary
+        if (!primaryCollection) {
+          primaryCollection = currentCollection;
+        }
+      });
+
+      if (!primaryCollection && colorCollections.length > 0) {
+        primaryCollection = colorCollections[0];
+      }
+
+      if (primaryCollection) {
+        applyThemeFromCollection(primaryCollection, primaryCollection.modes[0].modeId);
+      }
+
+      updateDependencyStates();
+    }
+
+    
+    function getTokensToExport() {
+      if (!transformedData) return null;
+      var tokens = transformedData.tokens;
+      // In Token Studio mode the output keys are set names (e.g. 'core', 'mode/light'),
+      // not raw Figma collection names — skip the collection filter entirely.
+      if (exportMode === 'token-studio') return tokens;
+      if (selectedCollections.length > 0 && selectedCollections.length < Object.keys(transformedData.tokens).length) {
+        tokens = {};
+        selectedCollections.forEach(function(name) {
+          if (transformedData.tokens[name]) tokens[name] = transformedData.tokens[name];
+        });
+      }
+      return tokens;
+    }
+    
+    function showToast(message, isError) {
+      var existing = document.querySelector('.toast');
+      if (existing) existing.remove();
+      var t = document.createElement('div');
+      t.className = 'toast' + (isError ? ' error' : '');
+      t.textContent = message;
+      document.body.appendChild(t);
+      setTimeout(function() {
+        t.classList.add('hiding');
+        setTimeout(function() { t.remove(); }, 300);
+      }, 2500);
+    }
+    
+    function formatTokenCount(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+      if (n >= 1000) return Math.round(n / 1000) + 'k';
+      return String(n);
+    }
+    
+    function updateActionUI() {
+      document.querySelectorAll('.segment-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.mode === documentMode);
+        btn.disabled = !transformedData;
+      });
+      downloadText.textContent = documentMode === 'single' ? 'Download single' : 'Download separate';
+      pushBtn.disabled = !transformedData;
+      downloadBtn.disabled = !transformedData;
+    }
+    
+    document.getElementById('export-mode-control').querySelectorAll('button').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        exportMode = btn.dataset.mode;
+        document.getElementById('export-mode-control').querySelectorAll('button').forEach(function(b) {
+          b.classList.toggle('active', b.dataset.mode === exportMode);
+        });
+        if (rawData) {
+          transformedData = null;
+          updateActionUI();
+          parent.postMessage({
+            pluginMessage: {
+              type: 'transform',
+              raw: rawData,
+              exportMode: exportMode,
+              selectedCollections: selectedCollections.length > 0 ? selectedCollections : null
+            }
+          }, '*');
+        }
+      });
+    });
+
+    segmentFilter.querySelectorAll('.segment-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (btn.disabled) return;
+        documentMode = btn.dataset.mode;
+        updateActionUI();
+      });
+    });
+    updateActionUI();
+    
+    function pushToGitHub() {
+      var tokens = getTokensToExport();
+      if (!tokens) return;
+      
+      var token = document.getElementById('git-token').value.trim();
+      var repo = document.getElementById('git-repo').value.trim();
+      var filePath = document.getElementById('git-filepath').value.trim() || 'design-tokens.json';
+      var branch = document.getElementById('git-branch').value.trim() || 'main';
+      var commitMsg = document.getElementById('commit-message').value.trim() || 'Update design tokens from Figma';
+      
+      if (!token || !repo) {
+        showToast('Configure GitHub Token and Repo in Settings', true);
+        document.getElementById('settings-btn').click();
+        return;
+      }
+      
+      var parts = repo.split('/');
+      if (parts.length < 2) {
+        showToast('Repo must be owner/repo', true);
+        return;
+      }
+      
+      var owner = parts[0];
+      var repoName = parts[1];
+      
+      pushBtn.disabled = true;
+      pushBtn.classList.remove('success');
+      pushSpinner.style.display = 'inline-block';
+      pushText.textContent = 'Pushing…';
+      
+      var content = btoa(unescape(encodeURIComponent(JSON.stringify(tokens, null, 2))));
+      var apiUrl = 'https://api.github.com/repos/' + encodeURIComponent(owner) + '/' + encodeURIComponent(repoName) + '/contents/' + filePath.split('/').map(encodeURIComponent).join('/');
+      var headers = {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      };
+      
+      fetch(apiUrl, { method: 'GET', headers: headers })
+        .then(function(r) {
+          if (r.status === 404) {
+            return r.json().then(function(err) {
+              console.error('GitHub API Detailed Error (GET 404):', err);
+              throw { status: 404, message: 'Token cannot see repo. Check token scope.' };
+            }).catch(function(e) {
+              if (e.status) throw e;
+              throw { status: 404, message: 'Not Found' };
+            });
+          }
+          if (!r.ok) {
+            return r.json().then(function(err) {
+              console.error('GitHub API Detailed Error (GET):', err);
+              throw { status: r.status, message: err.message || 'Request failed' };
+            });
+          }
+          return r.json();
+        })
+        .then(function(existing) {
+          var sha = existing.sha;
+          if (!sha) {
+            throw { status: 0, message: 'No SHA in response' };
+          }
+          
+          var body = {
+            message: commitMsg,
+            content: content,
+            branch: branch,
+            sha: sha
+          };
+          
+          return fetch(apiUrl, {
+            method: 'PUT',
+            headers: headers,
+            body: JSON.stringify(body)
+          });
+        })
+        .then(function(r) {
+          if (!r.ok) {
+            return r.json().then(function(err) {
+              console.error('GitHub API Detailed Error (PUT):', err);
+              var msg = err.message || 'Push failed';
+              if (err.errors && err.errors.length) msg += ' - ' + err.errors.map(function(e) { return e.message; }).join('; ');
+              throw { status: r.status, message: msg };
+            });
+          }
+          return r.json();
+        })
+        .then(function() {
+          pushBtn.classList.add('success');
+          pushSpinner.style.display = 'none';
+          pushText.textContent = '✓ Pushed';
+          showToast('Successfully pushed to GitHub');
+        })
+        .catch(function(err) {
+          var toastMsg = err.status ? 'Error ' + err.status : (err.message || 'Push failed');
+          if (err.message && err.status) toastMsg += ' – ' + err.message;
+          showToast(toastMsg, true);
+        })
+        .finally(function() {
+          pushBtn.disabled = false;
+          pushSpinner.style.display = 'none';
+          pushText.textContent = 'Push to Git';
+          updateActionUI();
+        });
+    }
+    
+    function doDownloadSingle() {
+      var tokens = getTokensToExport();
+      if (!tokens) return;
+      var json = JSON.stringify(tokens, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = exportMode === 'token-studio' ? 'tokens-token-studio.json' : 'tokens-native.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      parent.postMessage({ pluginMessage: { type: 'notify', message: '✅ JSON downloaded successfully!' } }, '*');
+    }
+    
+    function doDownloadSeparate() {
+      var tokens = getTokensToExport();
+      if (!tokens) return;
+      var safeName = function(name) {
+        return name.replace(/[^a-zA-Z0-9\-_.]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'tokens';
+      };
+      Object.keys(tokens).forEach(function(collectionName) {
+        var single = {};
+        single[collectionName] = tokens[collectionName];
+        var json = JSON.stringify(single, null, 2);
+        var blob = new Blob([json], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = safeName(collectionName) + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+      parent.postMessage({ pluginMessage: { type: 'notify', message: '✅ ' + Object.keys(tokens).length + ' JSON files downloaded!' } }, '*');
+    }
+    
+    pushBtn.addEventListener('click', pushToGitHub);
+    
+    downloadBtn.addEventListener('click', function() {
+      if (documentMode === 'single') doDownloadSingle();
+      else doDownloadSeparate();
+    });
+    
+    window.onmessage = function(event) {
+      var msg = event.data.pluginMessage;
+      if (!msg) return;
+      
+      if (msg.type === 'extracted') {
+        rawData = { collections: msg.collections, styles: msg.styles };
+        selectedCollections = msg.collections.map(function(col) { return col.name; });
+        // Fetch neutral light/dark colours from foundations and re-apply the
+        // current theme so the toggle uses real tokens (not the CSS fallback).
+        buildNeutralPalettes();
+        applyTheme(currentTheme);
+        rebuildThemeOptions();
+        
+        loadingState.style.display = 'none';
+        emptyState.style.display = 'none';
+        
+        if (msg.collections.length === 0) {
+          emptyState.style.display = 'flex';
+          collectionsWrap.classList.add('visible');
+          return;
+        }
+        
+        collectionsList.style.display = 'flex';
+        collectionsList.innerHTML = '';
+        
+        var selectAllRow = document.createElement('label');
+        selectAllRow.className = 'select-all';
+        var selectAllCb = document.createElement('input');
+        selectAllCb.type = 'checkbox';
+        selectAllCb.checked = true;
+        selectAllCb.className = 'checkbox-custom';
+        selectAllCb.addEventListener('change', function() {
+          var checked = selectAllCb.checked;
+          msg.collections.forEach(function(col) {
+            var cb = document.getElementById('col-' + col.name);
+            if (cb) cb.checked = checked;
+          });
+          selectedCollections = checked ? msg.collections.map(function(c) { return c.name; }) : [];
+          selectAllCb.indeterminate = false;
+        });
+
+        // Reflect partial selection as the checkbox's mixed / indeterminate state
+        // (DS checkmark: a tick means "all of it", a bar means "some of it").
+        function syncSelectAll() {
+          var total = msg.collections.length;
+          var sel = selectedCollections.length;
+          selectAllCb.checked = total > 0 && sel === total;
+          selectAllCb.indeterminate = sel > 0 && sel < total;
+        }
+        selectAllRow.appendChild(selectAllCb);
+        selectAllRow.appendChild(document.createTextNode('Select all'));
+        collectionsList.appendChild(selectAllRow);
+        
+        msg.collections.forEach(function(col) {
+          var item = document.createElement('label');
+          item.className = 'collection-item';
+          var checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = true;
+          checkbox.id = 'col-' + col.name;
+          checkbox.className = 'checkbox-custom';
+          checkbox.addEventListener('change', function() {
+            if (checkbox.checked) {
+              selectedCollections.push(col.name);
+            } else {
+              selectedCollections = selectedCollections.filter(function(n) { return n !== col.name; });
+            }
+            syncSelectAll();
+          });
+          var nameSpan = document.createElement('span');
+          nameSpan.className = 'name';
+          nameSpan.textContent = col.name;
+          var countSpan = document.createElement('span');
+          countSpan.className = 'count';
+          countSpan.textContent = (col.variables ? col.variables.length : 0);
+          item.appendChild(checkbox);
+          item.appendChild(nameSpan);
+          item.appendChild(countSpan);
+          collectionsList.appendChild(item);
+        });
+        
+        collectionsWrap.classList.add('visible');
+        
+        parent.postMessage({
+          pluginMessage: {
+            type: 'transform',
+            raw: rawData,
+            exportMode: exportMode,
+            selectedCollections: selectedCollections.length > 0 ? selectedCollections : null
+          }
+        }, '*');
+      }
+      
+      if (msg.type === 'transformed') {
+        transformedData = msg.payload;
+        updateActionUI();
+        
+        statsBar.style.display = 'flex';
+        document.getElementById('stat-collections').textContent = msg.validation.actual.topLevelCollections;
+        document.getElementById('stat-tokens').textContent = formatTokenCount(msg.validation.actual.totalTokens);
+
+        // Reference-closure check: warn when the export ships dangling {refs}
+        var cw = document.getElementById('closure-warning');
+        var closure = msg.validation && msg.validation.closure;
+        if (closure && !closure.ok) {
+          var roots = (closure.missingRoots || []).map(function(r) {
+            return r + ' (' + closure.byRoot[r] + ')';
+          }).join(', ');
+          document.getElementById('cw-title').textContent =
+            closure.brokenCount + ' broken references — export is incomplete';
+          document.getElementById('cw-detail').textContent =
+            'Unresolved sets: ' + roots + '. Make sure every referenced collection ' +
+            '(e.g. .section / .card) is present, then re-extract.';
+          cw.style.display = 'flex';
+        } else if (cw) {
+          cw.style.display = 'none';
+        }
+
+        parent.postMessage({
+          pluginMessage: {
+            type: 'notify',
+            message: (closure && !closure.ok)
+              ? '⚠ Exported with ' + closure.brokenCount + ' broken references — see warning'
+              : '✅ Extraction complete! ' + msg.validation.actual.topLevelCollections + ' collections found'
+          }
+        }, '*');
+      }
+      
+      if (msg.type === 'error') {
+        loadingState.style.display = 'flex';
+        loadingState.querySelector('p').textContent = 'Error: ' + msg.message;
+        collectionsList.style.display = 'none';
+        emptyState.style.display = 'none';
+        collectionsWrap.classList.add('visible');
+        
+        parent.postMessage({
+          pluginMessage: { type: 'notify', message: '❌ Error: ' + msg.message, error: true }
+        }, '*');
+      }
+      
+      if (msg.type === 'GIT_SETTINGS_LOADED') {
+        gitSettings.setState(msg.config || {});
+      }
+      
+      if (msg.type === 'GIT_SETTINGS_SAVED') {
+        showToast('Settings Saved Successfully!');
+      }
+      
+      if (msg.type === 'GIT_SETTINGS_CLEARED') {
+        gitSettings.setState({ token: '', repo: '', filepath: 'design-tokens.json', branch: 'main' });
+      }
+    };
+
+    rebuildThemeOptions();
+  </script>
+
+
+  <div class="resize-handle" id="resize-handle"></div>
+  <script>
+  (function() {
+    var handle = document.getElementById('resize-handle');
+    var startY = 0;
+    var startHeight = 0;
+    var isDragging = false;
+
+    handle.addEventListener('mousedown', function(e) {
+      isDragging = true;
+      startY = e.clientY;
+      startHeight = window.innerHeight;
+      handle.classList.add('active');
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!isDragging) return;
+      var delta = e.clientY - startY;
+      var newHeight = Math.max(300, Math.min(900, startHeight + delta));
+      parent.postMessage({ pluginMessage: { type: 'resize', height: newHeight } }, '*');
+    });
+
+    document.addEventListener('mouseup', function() {
+      if (isDragging) {
+        isDragging = false;
+        handle.classList.remove('active');
+      }
+    });
+  })();
+  </script>
+</body>
+</html>
