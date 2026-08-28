@@ -1,10 +1,10 @@
-# Token Studio typography parity (JSON Exporter)
+# Typography parity (Closure)
 
-This document describes the **problem we fixed**, **what changed in `code.js`**, and **how that relates** to Token Studio JSON vs Figma variables for the **JSON Exporter** Figma plugin.
+This document describes the **problem we fixed**, **what changed in `code.js`**, and **how that relates** to the exported design-token JSON vs Figma variables for the **Closure** Figma plugin.
 
 ## Problem
 
-Downstream tools (Token Studio transforms, Style Dictionary, etc.) expect **semantic typography token groups** under `core`:
+Downstream tools (Style Dictionary and other design-token transforms) expect **semantic typography token groups** under `core`:
 
 - `core.lineHeights` — keys `0`…`3`, `type: "lineHeights"`, values as **percentage strings** (e.g. `"100%"`, `"130%"`).
 - `core.letterSpacing` — keys `0`…`8`, `type: "letterSpacing"`, values as **percentage strings** (e.g. `"-5%"` … `"0.5%"`).
@@ -20,30 +20,30 @@ The plugin also emitted **kebab-case** groups (`line-heights`, `letter-spacing`)
 
 ## Solution (implemented in `code.js`)
 
-We added **`ensureCoreTokenStudioLineHeightsLetterSpacing(core)`**, called from **`toTokenStudioFormat`** immediately after **`ensureCoreTextCaseAndDecorationPrimitives`**.
+We added **`ensureCoreLineHeightsLetterSpacing(core)`**, called from **`toTokenFormat`** immediately after **`ensureCoreTextCaseAndDecorationPrimitives`**.
 
 Behaviour:
 
 1. **`lineHeights`**
    - If `0`–`3` are not all present, we try to derive semantic entries from **`core["line-heights"]`** using the multiplier map (`100`→`0`, `130`→`1`, `120`→`2`, `125`→`3`) and coerce values to `%` strings.
-   - If still incomplete, we fill from **reference defaults** (aligned with Nato / Token Studio style): `100%`, `130%`, `120%`, `125%`.
+   - If still incomplete, we fill from **reference defaults**: `100%`, `130%`, `120%`, `125%`.
    - If all four exist but values lack `%`, we normalize where appropriate.
 
 2. **`letterSpacing`**
-   - If fewer than **nine** entries (`0`–`8`), we merge with **reference defaults** (same percentages as the Nato Token Studio reference file).
+   - If fewer than **nine** entries (`0`–`8`), we merge with **reference defaults** (the same percentages as the reference token file).
    - Existing entries from Figma are preserved where present; missing indices are filled.
 
-This makes **`{lineHeights.*}`** and **`{letterSpacing.*}`** resolvable without requiring Token Studio to be the source of those groups in Figma.
+This makes **`{lineHeights.*}`** and **`{letterSpacing.*}`** resolvable without requiring an external tool to be the source of those groups in Figma.
 
 ## Related code (for navigation)
 
-- `toTokenStudioFormat` — wires in the ensure step after core is built.
+- `toTokenFormat` — wires in the ensure step after core is built.
 - Existing helpers such as **`syncTypographyCompositeLineHeights`**, **`applyNatoCompositeRefStrings`**, **`walkAndFinalizeNatoTypographyComposites`** — still assume these semantic groups exist; the ensure step supplies them.
 
 ## What this does *not* guarantee
 
-- **Identical JSON to a Token Studio file export** from another tool: `core` may still differ in **key order**, extra kebab groups (`font-sizes`, `font-weights`, …), **Inter** vs another family, or **`Elevation`** inside `core` if that only exists in Token Studio’s file shape.
-- **Same numeric result as Token Studio** for every token unless **Figma variables** match the same design decisions (family, scale, modes). The plugin exports **what Figma stores**; Token Studio JSON may reflect a different snapshot or typography scale.
+- **Identical JSON to another tool's export**: `core` may still differ in **key order**, extra kebab groups (`font-sizes`, `font-weights`, …), **Inter** vs another family, or **`Elevation`** inside `core` if that only exists in another tool's file shape.
+- **Same numeric result** for every token unless **Figma variables** match the same design decisions (family, scale, modes). The plugin exports **what Figma stores**; another tool's JSON may reflect a different snapshot or typography scale.
 - **Full math expressions** everywhere: Figma variables are mostly **values** and **aliases**, not arbitrary expressions. Expressions like `N*{dimension.base}` in JSON are often **reconstructed** in export logic where supported (e.g. dimension base), not read as a stored formula from Figma.
 
 ## Verification
@@ -55,7 +55,7 @@ After a reload of the plugin in Figma and a fresh export:
 
 ## Related files
 
-- **`TOKEN_STUDIO_TYPOGRAPHY.md`** (this file) — typography parity for Token Studio-style references.
-- **`README.md`** — product overview: **JSON Exporter** (Token Studio JSON export).
+- **`TYPOGRAPHY.md`** (this file) — typography parity for semantic composite references.
+- **`README.md`** — product overview: **Closure** (design-token JSON export).
 - **`THEMING.md`** — plugin UI theming (light/dark toggle).
 - **`BACKLOG.md`** — known limitations (e.g. math expressions).

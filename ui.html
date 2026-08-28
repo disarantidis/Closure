@@ -606,11 +606,11 @@
       </div>
     </section>
     
-    <!-- Format toggle hidden: export is locked to Token Studio by default.
+    <!-- Format toggle hidden: export is locked to the token JSON format by default.
          Kept in the DOM (display:none) so the existing exportMode logic still works. -->
     <div class="segment-control" id="export-mode-control" style="display:none;">
       <button type="button" data-mode="native" id="export-mode-native">Native</button>
-      <button type="button" class="active" data-mode="token-studio" id="export-mode-ts">Token Studio</button>
+      <button type="button" class="active" data-mode="token-studio" id="export-mode-ts">Tokens</button>
     </div>
 
     <div class="segment-filter" id="segment-filter">
@@ -1280,7 +1280,7 @@
     function getTokensToExport() {
       if (!transformedData) return null;
       var tokens = transformedData.tokens;
-      // In Token Studio mode the output keys are set names (e.g. 'core', 'mode/light'),
+      // In token-export mode the output keys are set names (e.g. 'core', 'mode/light'),
       // not raw Figma collection names — skip the collection filter entirely.
       if (exportMode === 'token-studio') return tokens;
       if (selectedCollections.length > 0 && selectedCollections.length < Object.keys(transformedData.tokens).length) {
@@ -1465,7 +1465,7 @@
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url;
-      a.download = exportMode === 'token-studio' ? 'tokens-token-studio.json' : 'tokens-native.json';
+      a.download = exportMode === 'token-studio' ? 'design-tokens.json' : 'tokens-native.json';
       a.click();
       URL.revokeObjectURL(url);
       parent.postMessage({ pluginMessage: { type: 'notify', message: '✅ JSON downloaded successfully!' } }, '*');

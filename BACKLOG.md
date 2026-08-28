@@ -6,10 +6,10 @@
 **Status**: Backlog (Minor)
 **Added**: 2026-04-08
 
-**Issue**: Token Studio exports dimension tokens with math expressions like `1*{dimension.base}`, but Figma resolves these to computed values (e.g., `4`) when imported. The original expressions are lost.
+**Issue**: Some design-token tools export dimension tokens with math expressions like `1*{dimension.base}`, but Figma resolves these to computed values (e.g., `4`) when imported. The original expressions are lost.
 
 **Example**:
-- Token Studio: `"value": "1*{dimension.base}"`
+- Token tooling: `"value": "1*{dimension.base}"`
 - Figma/Plugin: `"value": "4"`
 
 **Impact**: Low - Values are mathematically correct, just missing the expression syntax.
@@ -26,5 +26,5 @@
 ## Related docs
 
 - `README.md` — product overview.
-- `TOKEN_STUDIO_TYPOGRAPHY.md` — typography parity details.
+- `TYPOGRAPHY.md` — typography parity details.
 - `THEMING.md` — plugin UI theming.

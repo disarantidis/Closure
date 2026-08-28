@@ -1,6 +1,10 @@
 # Plugin Theming
 
-This document describes how the JSON Exporter plugin themes its own UI.
+This document describes how the Closure plugin themes its own UI.
+
+The UI is styled to the **disarantidis_ReactJS ("resolve.")** design system — a
+warm-neutral palette with a monochrome accent (black in light, white in dark).
+The theming *mechanism* below is unchanged; only the palette values are the DS's.
 
 ---
 
@@ -14,13 +18,13 @@ The plugin UI is themed by a **manual light / dark switch** in the header (🌙 
 
    ```css
    :root {
-     --app-bg: #121212;
-     --app-surface: rgba(255,255,255,0.06);
-     --app-border: rgba(255,255,255,0.12);
-     --app-text: #E5E5E5;
-     --app-text-muted: #9CA3AF;
-     --app-accent: #007AFF;
-     /* ... */
+     --app-bg: #1A1A1A;
+     --app-surface: rgba(255,255,255,0.055);
+     --app-border: rgba(238,238,238,0.12);
+     --app-text: #EEEEEE;
+     --app-text-muted: #979797;
+     --app-accent: #FFFFFF;   /* monochrome accent (white in dark) */
+     /* + structural DS tokens: --radius-*, --sp-*, --type-*, shadows … */
    }
    ```
 
@@ -28,12 +32,12 @@ The plugin UI is themed by a **manual light / dark switch** in the header (🌙 
 
    ```css
    body.theme-light {
-     --app-bg: #FFFFFF;
-     --app-surface: rgba(0,0,0,0.04);
-     --app-border: rgba(0,0,0,0.12);
-     --app-text: #1F2937;
-     --app-text-muted: #6B7280;
-     --app-accent: #007AFF;
+     --app-bg: #D6D6D3;
+     --app-surface: rgba(252,252,252,0.5);
+     --app-border: #DEDEDC;
+     --app-text: #1A1A1A;
+     --app-text-muted: #585858;
+     --app-accent: #000000;   /* monochrome accent (black in light) */
      /* ... */
    }
    ```
