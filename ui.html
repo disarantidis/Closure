@@ -8,49 +8,49 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* Excludes RADD's own elements: this plugin's pre-existing reset is
-       unlayered author CSS, same as every rule in this file, while RADD's
-       component rules live inside @layer radd.components — and unlayered
+    /* Excludes Pomegranate's own elements: this plugin's pre-existing reset is
+       unlayered author CSS, same as every rule in this file, while Pomegranate's
+       component rules live inside @layer pom.components — and unlayered
        CSS always beats layered CSS regardless of specificity. Left
        unscoped, `padding: 0` and `margin: 0` here silently zero out EVERY
-       RADD component's own padding/margin tokens (confirmed on Button,
+       Pomegranate component's own padding/margin tokens (confirmed on Button,
        IconButton, TextField, TextArea, SegmentedControl — all computed to
-       0px despite real, non-zero padding tokens). RADD sets box-sizing:
-       border-box on its own elements already (@layer radd.reset), so
+       0px despite real, non-zero padding tokens). Pom sets box-sizing:
+       border-box on its own elements already (@layer pom.reset), so
        excluding them from that part too is redundant, not harmful. */
-    *:not([class*="RADD"]) { margin: 0; padding: 0; box-sizing: border-box; }
+    *:not([class*="Pom"]) { margin: 0; padding: 0; box-sizing: border-box; }
 
-    /* RADD components set `display` unconditionally on their own class
-       (e.g. .RADDButton { display: flex }), which — being an author style —
+    /* Pomegranate components set `display` unconditionally on their own class
+       (e.g. .PomButton { display: flex }), which — being an author style —
        silently beats the browser's built-in `[hidden] { display: none }` UA
        rule. Restated as an author rule (with !important so it always wins
        regardless of source order) so `.hidden = true` keeps working on them. */
     [hidden] { display: none !important; }
 
-    /* RADD's TextArea "standard" status border resolves to
+    /* Pomegranate's TextArea "standard" status border resolves to
        --colours-basic-stroke, which is pure white in dark mode — a stark
        1px line next to --colours-basic-stroke-subtle, which --app-border
        (and so every other border in this app) uses. Re-pointed at that
        subtler stroke token, per the README's token-override pattern. */
-    .RADDTextArea {
-      --RADDTextArea-InputField-before-border--status-standard: var(--strokes-1) solid var(--colours-basic-stroke-subtle);
+    .PomTextArea {
+      --PomTextArea-InputField-before-border--status-standard: var(--strokes-1) solid var(--colours-basic-stroke-subtle);
     }
 
-    /* @desquared/radd-reactjs@3.0.1 wires the *typed text* font for
+    /* the Pomegranate kit@3.0.1 wires the *typed text* font for
        size="small" on both TextField and TextArea to --body-m-bold (700
        weight) — confirmed against the package's own typography.css, which
        also defines a --body-m-regular (500 weight) at the same 1rem size
        that every other component's body copy uses. Any text a user types
        renders bold, which reads as broken rather than a design choice.
        Re-pointed at the regular weight; only fixes the input's own text,
-       not the field label (RADD's bold label is a normal, intentional
+       not the field label (Pomegranate's bold label is a normal, intentional
        pattern this app already otherwise follows). */
-    .RADDTextField, .RADDTextArea {
-      --RADDTextField-Input-font--size-small: var(--body-m-regular);
-      --RADDTextArea-Input-font--size-small: var(--body-m-regular);
+    .PomTextField, .PomTextArea {
+      --PomTextField-Input-font--size-small: var(--body-m-regular);
+      --PomTextArea-Input-font--size-small: var(--body-m-regular);
     }
 
-    /* RADD's own TextField.css collapses .RADDTextField-InputContainer to
+    /* Pomegranate's own TextField.css collapses .PomTextField-InputContainer to
        height:0/overflow:hidden until its own internal "filled" state (true
        when focused OR has a value OR is readonly — see the compiled
        TextField source) adds --filled, expanding it back to height:unset.
@@ -60,46 +60,46 @@
        on that — so every empty, unfocused field (leading icon, placeholder,
        cursor) was invisibly clipped away until clicked, confirmed via the
        real computed style/DOM, not a screenshot-rendering artifact. */
-    .RADDTextField-InputContainer {
+    .PomTextField-InputContainer {
       height: unset;
       overflow: unset;
     }
 
-    /* Same upstream pattern as the TextField/TextArea fix above: RADD wires
-       RADDDialogContent's body `text` to --body-m-bold (700 weight) — the
+    /* Same upstream pattern as the TextField/TextArea fix above: Pom wires
+       PomDialogContent's body `text` to --body-m-bold (700 weight) — the
        title correctly uses --subtitle (also 700, by design for a heading),
        but the body copy has no such reasoning and just reads as broken.
        Re-pointed at --body-m-regular (500 weight). */
-    .RADDDialog {
-      --RADDDialog-Text-font: var(--body-m-regular);
+    .PomDialog {
+      --PomDialog-Text-font: var(--body-m-regular);
     }
 
-    /* RADDDialogContent's title container renders unconditionally (fixed
+    /* PomDialogContent's title container renders unconditionally (fixed
        min-height + padding) even with no `title` passed — only the heading
        span inside it is conditional. The token-modal dialog below skips
        `title` so it can render its own icon+heading row instead (`title`
        is a plain string prop — no slot for an icon), so this collapses the
        resulting empty container rather than leaving a blank gap above that
        row. Self-scoping: only matches a dialog with no title at all. */
-    .RADDDialog-TitleContainer:empty {
+    .PomDialog-TitleContainer:empty {
       display: none;
     }
 
-    /* RADD's own spacing puts a 24px bottom pad on contentSlot's own
+    /* Pomegranate's own spacing puts a 24px bottom pad on contentSlot's own
        container PLUS another 24px top pad on the action buttons' container
        — 48px total between the token field and the buttons, clearly too
        much in this compact dialog. Trimmed via `className="token-modal-dialog"`
        on this dialog only. Two DIFFERENT tokens control that second gap
        depending on the panel's current height at render time:
-       RADDDialogContent's own `stickyButton` prop defaults true, so at this
-       plugin's normal 420×740 panel it's `--RADDDialog-SlotContainer3-padding--stickyButton`
+       PomDialogContent's own `stickyButton` prop defaults true, so at this
+       plugin's normal 420×740 panel it's `--PomDialog-SlotContainer3-padding--stickyButton`
        (confirmed via the real DOM: the action row's padded ancestor is
-       `.RADDDialog-SlotContainer3--stickyButton`, not SlotContainer2) — but
+       `.PomDialog-SlotContainer3--stickyButton`, not SlotContainer2) — but
        stickyButton turns itself off below a 600px-tall viewport
        (`isSmallViewport`, DialogContent's own internal check), which is
        reachable here since the panel's height is user-resizable (the
        drag-handle in ui.template.html), and that shorter-panel case renders
-       through `--RADDDialog-SlotContainer2-padding` instead. Both are
+       through `--PomDialog-SlotContainer2-padding` instead. Both are
        overridden together so the gap stays trimmed either way — this was
        originally only SlotContainer2 (a plain guess at which token
        applied), which turned out to be the wrong one for this plugin's own
@@ -119,20 +119,20 @@
          just this side, spacing-component-2 (4px) -> spacing-component-6
          (20px, exactly +16px), landing on a real token instead of an
          arbitrary px value. New total: 20 + 4 = 24px. */
-      --RADDDialog-SlotContainer-padding: 0 var(--spacing-component-7) var(--spacing-component-6) var(--spacing-component-7);
-      --RADDDialog-SlotContainer2-padding: var(--spacing-component-2) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
-      --RADDDialog-SlotContainer3-padding--stickyButton: var(--spacing-component-2) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
+      --PomDialog-SlotContainer-padding: 0 var(--spacing-component-7) var(--spacing-component-6) var(--spacing-component-7);
+      --PomDialog-SlotContainer2-padding: var(--spacing-component-2) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
+      --PomDialog-SlotContainer3-padding--stickyButton: var(--spacing-component-2) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
     }
 
     /* The GitHub/GitLab "Remove?" confirm dialogs use `text` (not
        contentSlot), so their own version of the same double-padding stack
-       is --RADDDialog-TextSection's bottom pad plus whichever of the two
+       is --PomDialog-TextSection's bottom pad plus whichever of the two
        tokens above actually renders for the current panel height — see the
        long comment on .token-modal-dialog for why both are needed, and why
        each is a top-only 4-value override rather than a single value. */
     .remove-confirm-dialog {
-      --RADDDialog-SlotContainer2-padding: var(--spacing-component-4) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
-      --RADDDialog-SlotContainer3-padding--stickyButton: var(--spacing-component-4) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
+      --PomDialog-SlotContainer2-padding: var(--spacing-component-4) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
+      --PomDialog-SlotContainer3-padding--stickyButton: var(--spacing-component-4) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
     }
 
     /* This app's own chrome vars are aliases onto the Pomegranate
@@ -207,7 +207,7 @@
     }
 
     .header-logo {
-      /* the RADD wordmark is hidden — this is Closure now (Pomegranate DS) */
+      /* the legacy wordmark is hidden — this is Closure now (Pomegranate DS) */
       display: none;
     }
 
@@ -215,7 +215,7 @@
       flex-shrink: 0;
     }
 
-    /* Custom pill, not a RADD component — same look the old .app-version
+    /* Custom pill, not a Pomegranate component — same look the old .app-version
        span had. */
     .version-tag-label {
       font-size: 10px;
@@ -335,7 +335,7 @@
     }
     .folder-paths-title {
       margin: 0;
-      /* One step up from --body-s-bold (the size RADD's own TextField label
+      /* One step up from --body-s-bold (the size Pomegranate's own TextField label
          renders at for size:'small' — the sibling "GitLab Token" etc.
          labels on this same page): this class now labels genuine page
          SECTIONS ("Push destination", "Repository settings", "GitLab" /
@@ -377,7 +377,7 @@
     /* Folder / path row on the main screen: [ folder dropdown ][ file name ].
        A grid (not flex) so both columns are always exactly equal width —
        flex sizing here left the dropdown hugging its own content (a
-       RADDDropdownSelect isn't stretched internally), so an empty GitHub
+       PomDropdownSelect isn't stretched internally), so an empty GitHub
        dropdown rendered narrower than GitLab's filled one right above it;
        1fr/1fr columns fix both the dropdown-vs-filename split AND the
        gitlab-row-vs-github-row match, in one rule shared by both rows. */
@@ -592,7 +592,7 @@
 
     /* Reuses a class that used to have zero matching markup (the historical
        GitHub/GitLab/Both picker this is reviving was fully removed once
-       before — see radd-migration-progress memory). No top margin —
+       before — see pom-migration-progress memory). No top margin —
        .output-format above it already supplies the 40px rhythm — just a
        bottom margin to keep that rhythm before the GitLab fields that now
        follow it. Padding-left on the
@@ -769,7 +769,7 @@
       /* Padding lives here, not on .collections-wrap: this is the element
          that actually scrolls, so this is what needs breathing room at its
          own top/bottom edges — otherwise a mid-scroll row clips flush
-         against the viewport with no fade/inset. Top is 0: RADDAccordion's
+         against the viewport with no fade/inset. Top is 0: PomAccordion's
          own header padding (8px) + its title's line-height already provide
          clearance before the first paint, and adding more on top of that
          re-opens the too-large header-to-accordion gap. */
@@ -801,7 +801,7 @@
     }
     /* Read-only per-collection row, inside the accordion's contentSlot —
        no checkbox, no hover/pointer: nothing here is interactive anymore.
-       No left/right padding: RADDAccordion's own ContentFrame already
+       No left/right padding: PomAccordion's own ContentFrame already
        insets left/right to match the header's own left inset, so adding
        more here would misalign rows from the "Scanned collections" title
        above them — vertical padding only. */
@@ -849,7 +849,7 @@
       text-align: left;
     }
 
-    /* RADD's own "subtitle" text style, same token used for the token-modal
+    /* Pomegranate's own "subtitle" text style, same token used for the token-modal
        dialog's title earlier in this migration — not a hand-picked size. */
     .collections-summary {
       font: var(--subtitle);
@@ -863,11 +863,11 @@
       gap: 6px;
     }
 
-    /* More breathing room than RADD's own default (4px 8px) — mainly
+    /* More breathing room than Pomegranate's own default (4px 8px) — mainly
        top/bottom, so the chip doesn't read as cramped against its bold
        label text. */
-    .collections-summary-tags .RADDTagStatic {
-      --RADDTagStatic-padding: var(--spacing-component-3) var(--spacing-component-4) var(--spacing-component-3) var(--spacing-component-4);
+    .collections-summary-tags .PomTagStatic {
+      --PomTagStatic-padding: var(--spacing-component-3) var(--spacing-component-4) var(--spacing-component-3) var(--spacing-component-4);
     }
 
     /* contentSlot: the read-only per-collection rows, revealed on expand. */
@@ -918,10 +918,10 @@
       margin-bottom: 4px;
     }
 
-    /* RADDToast has no built-in screen position (a design-system component
+    /* PomToast has no built-in screen position (a design-system component
        shouldn't assume one) — buttons.tsx sets fixed/bottom/z-index etc. via
        inline style, and applies this class for the entrance animation only
-       (RADDNotification renders null → element on open, a real DOM
+       (PomNotification renders null → element on open, a real DOM
        insertion, so this replays correctly every time it reopens). */
     .toast-enter {
       animation: toastSlideUp 0.35s ease-out forwards;
@@ -947,7 +947,7 @@
       opacity: 1;
     }
   </style>
-  <!-- Bundled by scripts/build-ui.js: RADD design tokens + RADDButton CSS. -->
+  <!-- Bundled by scripts/build-ui.js: Pom design tokens + PomButton CSS. -->
   <style>/* src/vendor/pomegranate/styles/tokens.css */
 :root {
   --background: #D6D6D3;
@@ -20837,23 +20837,6 @@ html[data-theme=dark] {
     <header class="header">
       <div class="header-panel">
         <div class="header-title-row">
-          <!-- @desquared/web-icons ships this as dist/logo/radd-aqua.svg — a
-               single static asset file (not a component), with 4 stacked
-               color layers toggled by a display:none class; only the aqua
-               layer's paths + its own gradient are kept here, the other 3
-               (amber/magenta/ice) dropped since this app only ever shows one. -->
-          <svg class="header-logo" viewBox="0 0 792 334.6" xmlns="http://www.w3.org/2000/svg" aria-label="RADD" role="img">
-            <linearGradient id="raddLogoGradient" gradientUnits="userSpaceOnUse" x1="625.6217" y1="167.318" x2="729.3487" y2="167.318">
-              <stop offset="0" stop-color="#3DE4DC" stop-opacity="0.3"/>
-              <stop offset="1" stop-color="#3DE4DC"/>
-            </linearGradient>
-            <path fill="#3DE4DC" d="M12.5,321.5H5.8V100.1h6.7V321.5z M34.2,321.5V100.1h6.7v221.4H34.2z M62.7,321.5V100.1h6.7v13.4c16.7-8.4,34.7-12.5,52.2-12.5v6.7c-17.5,0-35.9,4.6-52.2,13.4v25.9c14.6-10.9,32.6-17.5,52.2-17.5v6.7c-20.1,0-38.4,7.1-52.2,19.2v34.3c9.6-18.8,29.7-31.7,52.2-31.7v6.7c-29.2,0-52.2,23.4-52.2,52.2v104.9H62.7z"/>
-            <path fill="#3DE4DC" d="M119.2,210.8C119.2,146.8,171,95,234.9,95c18.8,0,36.3,4.6,52.2,12.5v-7.5h6.7v221.4h-6.7v-7.5c-15.9,7.9-33.4,12.5-52.2,12.5C171,326.5,119.2,274.7,119.2,210.8z M343.9,100.1h6.7v221.4h-6.7V100.1z M315.5,321.5V100.1h6.7v221.4H315.5z M125.8,210.8c0,60.2,48.9,109,109,109c18.8,0,36.8-4.6,52.2-12.9v-26.3c-14.6,11.3-32.6,17.5-52.2,17.5c-48,0-87.3-39.3-87.3-87.3s39.3-87.3,87.3-87.3c19.6,0,37.6,6.7,52.2,17.5v-25.9c-15.5-8.4-33.4-13.4-52.2-13.4C174.7,101.7,125.8,150.6,125.8,210.8z M154.3,210.8c0,44.7,35.9,80.6,80.6,80.6c20.1,0,38-7.1,52.2-18.8v-34.3c-10,18.4-29.7,31.3-52.2,31.3c-32.6,0-58.9-26.3-58.9-58.9s26.3-58.9,58.9-58.9c22.6,0,42.2,12.9,52.2,31.7v-34.3c-14.2-12.1-32.2-19.2-52.2-19.2C190.2,130.1,154.3,166.1,154.3,210.8z M182.7,210.8c0,28.8,23.4,52.2,52.2,52.2c29.2,0,52.2-23.4,52.2-52.2s-23-52.2-52.2-52.2C206.1,158.5,182.7,181.9,182.7,210.8z"/>
-            <path fill="#3DE4DC" d="M372.3,210.8C372.3,146.8,424.1,95,488,95c18.8,0,36.3,4.6,52.2,12.5V8.2h6.7v313.3h-6.7v-7.5c-15.9,7.9-33.4,12.5-52.2,12.5C424.1,326.5,372.3,274.7,372.3,210.8z M568.6,321.5V8.2h6.7v313.3H568.6z M597,321.5V8.2h6.7v313.3H597z M379,210.8c0,60.2,48.9,109,109,109c18.8,0,36.8-4.6,52.2-12.9v-26.3c-14.6,11.3-32.6,17.5-52.2,17.5c-48,0-87.3-39.3-87.3-87.3s39.3-87.3,87.3-87.3c19.6,0,37.6,6.7,52.2,17.5v-25.9c-15.5-8.4-33.4-13.4-52.2-13.4C427.9,101.7,379,150.6,379,210.8z M407.4,210.8c0,44.7,35.9,80.6,80.6,80.6c20.1,0,38-7.1,52.2-18.8v-34.3c-10,18.4-29.7,31.3-52.2,31.3c-32.6,0-58.9-26.3-58.9-58.9s26.3-58.9,58.9-58.9c22.6,0,42.2,12.9,52.2,31.7v-34.3c-14.2-12.1-32.2-19.2-52.2-19.2C443.3,130.1,407.4,166.1,407.4,210.8z M435.8,210.8c0,28.8,23.4,52.2,52.2,52.2c29.2,0,52.2-23.4,52.2-52.2s-23-52.2-52.2-52.2C459.2,158.5,435.8,181.9,435.8,210.8z"/>
-            <path fill="url(#raddLogoGradient)" d="M722.7,107.6C706.8,99.6,689.2,95,670.4,95c-15.9,0-31,3.2-44.8,9v7.3c13.7-6.2,28.8-9.7,44.8-9.7c18.8,0,36.8,5,52.2,13.4V141c-14.6-10.9-32.6-17.5-52.2-17.5c-16.4,0-31.7,4.6-44.8,12.5v7.7c12.8-8.5,28.2-13.5,44.8-13.5c20.1,0,38,7.1,52.2,19.2v34.3c-10-18.8-29.7-31.7-52.2-31.7c-18,0-34,8-44.8,20.7v11.5c9.1-15.3,25.8-25.5,44.8-25.5c29.2,0,52.2,23.4,52.2,52.2c0,28.8-23,52.2-52.2,52.2c-19.1,0-35.7-10.3-44.8-25.5V249c10.8,12.7,26.8,20.7,44.8,20.7c22.6,0,42.2-12.9,52.2-31.3v34.3c-14.2,11.7-32.2,18.8-52.2,18.8c-16.6,0-32-5-44.8-13.5v7.7c13.1,7.9,28.5,12.5,44.8,12.5c19.6,0,37.6-6.3,52.2-17.5v26.3c-15.5,8.4-33.4,12.9-52.2,12.9c-16,0-31.1-3.5-44.8-9.7v7.3c13.8,5.8,28.9,9,44.8,9c18.8,0,36.3-4.6,52.2-12.5v7.5h6.7V8.2h-6.7V107.6z"/>
-            <rect fill="#3DE4DC" x="751.1" y="8.2" width="6.7" height="313.3"/>
-            <rect fill="#3DE4DC" x="779.5" y="8.2" width="6.7" height="313.3"/>
-          </svg>
           <h1 class="title">Closure</h1>
           <div id="version-tag-mount" class="version-tag-mount"></div>
         </div>
@@ -20925,9 +20908,9 @@ html[data-theme=dark] {
              regardless of how many destinations are active), each with its
              provider's own logo glyph in front of the text — plain inline
              SVGs (not React-mounted), same reasoning as the settings-page
-             header's own decorative icon: @desquared/web-icons has no
+             header's own decorative icon: inline SVG icons has no
              third-party brand marks, and these exact monochrome path
-             shapes are this project's own pre-RADD icons (see git history —
+             shapes are this project's own pre-Pom icons (see git history —
              this repo used to show the GitHub one here before it became
              GitLab-only, then GitLab's own). When a provider has zero saved
              folder paths, .filename-row hides and .target-row-empty shows
@@ -21010,7 +20993,7 @@ html[data-theme=dark] {
       <div class="header-panel">
         <div class="git-logo">
           <!-- Same gear glyph as the main header's settings button
-               (@desquared/web-icons SettingsStandard) — decorative here,
+               (inline SVG icons SettingsStandard) — decorative here,
                not a control, so it's a plain inline SVG like this was
                before, not React-mounted. -->
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -47030,7 +47013,7 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
     return { setItems: (items, value) => set(() => ({ items, value })) };
   }
-  window.RaddButtons = {
+  window.PomButtons = {
     push: mountLiveButton(
       "push-btn-mount",
       { id: "push-btn", variant: "filled", size: "large", label: "Push to GitLab", style: { width: "100%" } },
@@ -47071,7 +47054,7 @@ html[data-theme=dark] {
       return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "version-tag-label", title: "Plugin version", children: label });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
-    window.RaddVersionTag = { setLabel: (label) => set(label) };
+    window.PomVersionTag = { setLabel: (label) => set(label) };
   }
   mountVersionTag("version-tag-mount");
   function mountTextField(mountId, props) {
@@ -47079,7 +47062,7 @@ html[data-theme=dark] {
   }
   mountTextField("export-filename-mount", { id: "export-filename", readonly: true, defaultValue: "tokens.json", tabIndex: -1, title: "GitLab JSON file name (set in Settings)" });
   mountTextField("github-filename-mount", { id: "github-filename", readonly: true, defaultValue: "tokens.json", tabIndex: -1, title: "GitHub JSON file name (set in Settings)" });
-  window.RaddCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false);
+  window.PomCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false);
   mountButton("add-repo-settings-btn-mount", { id: "add-repo-settings-btn", variant: "outline", size: "large", label: "Add Repo Settings", block: true });
   mountButton("gitlab-small-settings-btn-mount", { id: "gitlab-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) });
   mountButton("github-small-settings-btn-mount", { id: "github-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) });
@@ -47098,7 +47081,7 @@ html[data-theme=dark] {
   mountTextField("gh-repo-mount", { id: "gh-repo", label: "Repository (owner/repo)", placeholder: "my-org/my-repo" });
   mountTextField("gh-branch-mount", { id: "gh-branch", label: "Branch", placeholder: "main" });
   mountTextField("gh-filename-mount", { id: "gh-filename", label: "JSON file name", placeholder: "tokens.json" });
-  window.RaddExportMode = { onChange: null };
+  window.PomExportMode = { onChange: null };
   (function mountExportMode() {
     const container = document.getElementById("export-mode-control-mount");
     if (!container) return;
@@ -47113,7 +47096,7 @@ html[data-theme=dark] {
           options: [{ value: "0", label: "Native" }, { value: "1", label: "Token Studio" }],
           onChange: (v) => {
             setValue(v);
-            window.RaddExportMode.onChange?.(Number(v));
+            window.PomExportMode.onChange?.(Number(v));
           }
         }
       );
@@ -47139,7 +47122,7 @@ html[data-theme=dark] {
         const next = { ...state, [which]: checked };
         if (!next.gitlab && !next.github) next[which] = true;
         setState(next);
-        window.RaddPushTarget.onChange?.(targetFromCheckboxes(next));
+        window.PomPushTarget.onChange?.(targetFromCheckboxes(next));
       }
       return /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)(import_jsx_runtime18.Fragment, { children: [
         /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Checkbox, { size: "small", label: "GitLab", checked: state.gitlab, onChange: (c) => toggle("gitlab", c) }),
@@ -47147,7 +47130,7 @@ html[data-theme=dark] {
       ] });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
-    window.RaddPushTarget = { onChange: null, setValue: (v) => set(checkboxesFromTarget(v)) };
+    window.PomPushTarget = { onChange: null, setValue: (v) => set(checkboxesFromTarget(v)) };
   })();
   (function mountDtcgFormatSwitch() {
     const container = document.getElementById("dtcg-format-control-mount");
@@ -47164,13 +47147,13 @@ html[data-theme=dark] {
           checked: on,
           onChange: (c) => {
             setOn(c);
-            window.RaddDtcgFormat.onChange?.(c);
+            window.PomDtcgFormat.onChange?.(c);
           }
         }
       );
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
-    window.RaddDtcgFormat = { onChange: null, setValue: (v) => set(v) };
+    window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v) };
   })();
   (function mountRepoTabControl() {
     const container = document.getElementById("repo-settings-tab-mount");
@@ -47186,12 +47169,12 @@ html[data-theme=dark] {
           size: "small",
           value,
           options: [{ value: "github", label: "GitHub" }, { value: "gitlab", label: "GitLab" }],
-          onChange: (v) => window.RaddRepoTab.onChange?.(v)
+          onChange: (v) => window.PomRepoTab.onChange?.(v)
         }
       );
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
-    window.RaddRepoTab = { onChange: null, setValue: (v) => set(v) };
+    window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
   })();
   mountOnce(
     "skeleton-list",
@@ -47234,14 +47217,14 @@ html[data-theme=dark] {
       );
     }
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}));
-    window.RaddToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? "error" : "success", message })) };
+    window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? "error" : "success", message })) };
   })();
-  window.RaddFolderSelect = {
-    ...mountLiveDropdown("folder-select-mount", { id: "folder-select" }, (v) => window.RaddFolderSelect.onChange?.(v)),
+  window.PomFolderSelect = {
+    ...mountLiveDropdown("folder-select-mount", { id: "folder-select" }, (v) => window.PomFolderSelect.onChange?.(v)),
     onChange: null
   };
-  window.RaddGithubFolderSelect = {
-    ...mountLiveDropdown("github-folder-select-mount", { id: "github-folder-select" }, (v) => window.RaddGithubFolderSelect.onChange?.(v)),
+  window.PomGithubFolderSelect = {
+    ...mountLiveDropdown("github-folder-select-mount", { id: "github-folder-select" }, (v) => window.PomGithubFolderSelect.onChange?.(v)),
     onChange: null
   };
   function mountFolderList(mountId, bridgeKey, idPrefix) {
@@ -47282,8 +47265,8 @@ html[data-theme=dark] {
     }
     window[bridgeKey] = { render, onInput: null, onBlur: null, onRemove: null };
   }
-  mountFolderList("folder-list", "RaddFolderList", "folder-row-input");
-  mountFolderList("github-folder-list", "RaddGithubFolderList", "github-folder-row-input");
+  mountFolderList("folder-list", "PomFolderList", "folder-row-input");
+  mountFolderList("github-folder-list", "PomGithubFolderList", "github-folder-row-input");
   (function mountCollectionsAccordion() {
     const container = document.getElementById("collections-list");
     let set = () => {
@@ -47311,7 +47294,7 @@ html[data-theme=dark] {
       ) });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
-    window.RaddCollectionsAccordion = {
+    window.PomCollectionsAccordion = {
       setTitle: (title) => set((s) => ({ ...s, title })),
       setCollections: (collections) => set((s) => ({ ...s, collections })),
       setSummary: (tokens, size) => set((s) => ({ ...s, summary: { tokens, size } }))
@@ -47328,7 +47311,7 @@ html[data-theme=dark] {
       return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Alert, { tone: "error", title: s.title, children: s.detail });
     }
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}));
-    window.RaddClosureWarning = {
+    window.PomClosureWarning = {
       show: (title, detail) => set(() => ({ open: true, title, detail })),
       hide: () => set((s) => ({ ...s, open: false }))
     };
@@ -47362,22 +47345,22 @@ html[data-theme=dark] {
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}));
     register(() => setOpen(true));
   }
-  window.RaddRemoveGithubDialog = { open: () => {
+  window.PomRemoveGithubDialog = { open: () => {
   }, onConfirm: null };
   confirmDialog(
     "remove-github-dialog-mount",
-    { title: "Remove GitHub?", text: "This clears the saved GitHub token, repository, and folder paths from this plugin.", confirmLabel: "Remove", onConfirm: () => window.RaddRemoveGithubDialog.onConfirm?.() },
+    { title: "Remove GitHub?", text: "This clears the saved GitHub token, repository, and folder paths from this plugin.", confirmLabel: "Remove", onConfirm: () => window.PomRemoveGithubDialog.onConfirm?.() },
     (open) => {
-      window.RaddRemoveGithubDialog.open = open;
+      window.PomRemoveGithubDialog.open = open;
     }
   );
-  window.RaddRemoveGitlabDialog = { open: () => {
+  window.PomRemoveGitlabDialog = { open: () => {
   }, onConfirm: null };
   confirmDialog(
     "remove-gitlab-dialog-mount",
-    { title: "Remove GitLab?", text: "This clears the saved GitLab token, project, and folder paths from this plugin.", confirmLabel: "Remove", onConfirm: () => window.RaddRemoveGitlabDialog.onConfirm?.() },
+    { title: "Remove GitLab?", text: "This clears the saved GitLab token, project, and folder paths from this plugin.", confirmLabel: "Remove", onConfirm: () => window.PomRemoveGitlabDialog.onConfirm?.() },
     (open) => {
-      window.RaddRemoveGitlabDialog.open = open;
+      window.PomRemoveGitlabDialog.open = open;
     }
   );
   (function mountClearTokenDialog() {
@@ -47404,7 +47387,7 @@ html[data-theme=dark] {
             /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setO(false), children: "Cancel" }),
             /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, "data-scheme": "error", onClick: () => {
               setO(false);
-              window.RaddClearTokenDialog.onConfirm?.(provider);
+              window.PomClearTokenDialog.onConfirm?.(provider);
             }, children: "Clear" })
           ] }),
           children: null
@@ -47412,7 +47395,7 @@ html[data-theme=dark] {
       );
     }
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}));
-    window.RaddClearTokenDialog = {
+    window.PomClearTokenDialog = {
       open: (provider) => {
         (0, import_react_dom.flushSync)(() => setProvider(provider));
         setOpen(true);
@@ -47494,7 +47477,7 @@ html[data-theme=dark] {
             /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setStep(1), children: "Back" }),
             /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, onClick: () => {
               setO(false);
-              window.RaddOnboardingDialog.onConfirm?.(targetFromCheckboxes(state));
+              window.PomOnboardingDialog.onConfirm?.(targetFromCheckboxes(state));
             }, children: "Add Settings" })
           ] }),
           children: step === 1 ? /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)("div", { style: { display: "flex", flexDirection: "column", gap: 8, width: "100%" }, children: [
@@ -47505,7 +47488,7 @@ html[data-theme=dark] {
       );
     }
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}));
-    window.RaddOnboardingDialog = { open: () => setOpen(true), onConfirm: null };
+    window.PomOnboardingDialog = { open: () => setOpen(true), onConfirm: null };
   })();
 })();
 /*! Bundled license information:
@@ -47568,7 +47551,7 @@ react/cjs/react-jsx-runtime.development.js:
    *)
 */
 </script>
-  <!-- src/dtcg-format.js, inlined by scripts/build-ui.js. Defines window.RaddDtcg
+  <!-- src/dtcg-format.js, inlined by scripts/build-ui.js. Defines window.PomDtcg
        (the DTCG post-transform over the Token Studio tree). -->
   <script>/*
  * dtcg-format.js — DTCG (design-tokens.org) export format.
@@ -48018,14 +48001,14 @@ react/cjs/react-jsx-runtime.development.js:
     // package.json via `npm run version:set <x.y.z>` (scripts/set-version.js).
     var APP_VERSION = '1.4.0';
     (function renderVersion() {
-      window.RaddVersionTag.setLabel('v' + APP_VERSION);
+      window.PomVersionTag.setLabel('v' + APP_VERSION);
     })();
 
     var rawData = null;
     var transformedData = null;
     var selectedCollections = [];
 
-    // RADDTextField/RADDTextArea (buttons.tsx) track a "filled" visual state
+    // PomTextField/PomTextArea (buttons.tsx) track a "filled" visual state
     // internally, updated from their own onChange handler. Setting `.value`
     // directly (as below) doesn't fire that, since it bypasses the input's
     // React-attached listener entirely — dispatching a real `input` event
@@ -48050,7 +48033,7 @@ react/cjs/react-jsx-runtime.development.js:
     // ── Output file name ─────────────────────────────────────────────────────
     // A DTCG export gets its own file name so it never overwrites the Token
     // Studio JSON sitting at the same path. The suffix is applied to whatever
-    // name is configured — `radd.json` becomes `radd_dtcg.json`.
+    // name is configured — `tokens.json` becomes `tokens_dtcg.json`.
     //
     // The file name field stays the single source of truth: toggling the Output
     // format switch rewrites it in place rather than keeping a second hidden
@@ -48224,7 +48207,7 @@ react/cjs/react-jsx-runtime.development.js:
     // the same lastFigmaFileName rather than needing two separate call sites.
     function applyFileNameMatch(fileName) {
       if (fileName) lastFigmaFileName = fileName;
-      if (lastFigmaFileName) window.RaddCollectionsAccordion.setTitle(lastFigmaFileName);
+      if (lastFigmaFileName) window.PomCollectionsAccordion.setTitle(lastFigmaFileName);
       var path = matchFolderFromFileName(lastFigmaFileName);
       if (path && glFolders.indexOf(path) !== -1 && path !== glActiveFolder) {
         glActiveFolder = path;
@@ -48284,8 +48267,8 @@ react/cjs/react-jsx-runtime.development.js:
 
     // Settings: saved paths shown as editable fields (modify inline or
     // delete). Selection happens on the main screen.
-    // Each row's own input/remove-button is a RADDTextField/RADDIconButton
-    // (buttons.tsx). RaddFolderList.render() fully remounts every row on
+    // Each row's own input/remove-button is a PomTextField/PomIconButton
+    // (buttons.tsx). PomFolderList.render() fully remounts every row on
     // every call (same as the old list.innerHTML='' + rebuild) rather than
     // letting React diff/reuse them by index — otherwise, after a middle row
     // is removed, the shifted-index rows would keep their stale uncontrolled
@@ -48300,7 +48283,7 @@ react/cjs/react-jsx-runtime.development.js:
         // reload instead of being silently re-seeded.
         return { path: path, canEdit: true };
       });
-      window.RaddFolderList.render(rows);
+      window.PomFolderList.render(rows);
       renderFolderSelect();
       // Folder count can go to/from zero here (add/remove) — keep the main
       // screen's empty-state message in sync immediately, not just after
@@ -48310,12 +48293,12 @@ react/cjs/react-jsx-runtime.development.js:
 
     // Handlers the React row list (buttons.tsx) calls back into — same logic
     // the old per-row 'input'/'blur'/remove-click listeners had.
-    window.RaddFolderList.onInput = function(idx, value) {
+    window.PomFolderList.onInput = function(idx, value) {
       var oldVal = glFolders[idx];
       glFolders[idx] = value;
       if (glActiveFolder === oldVal) glActiveFolder = value;
     };
-    window.RaddFolderList.onBlur = function(idx, value) {
+    window.PomFolderList.onBlur = function(idx, value) {
       var oldVal = glFolders[idx];
       var norm = normFolder(value);
       glFolders[idx] = norm;
@@ -48323,7 +48306,7 @@ react/cjs/react-jsx-runtime.development.js:
       setFieldValue('folder-row-input-' + idx, norm);
       renderFolderSelect();
     };
-    window.RaddFolderList.onRemove = function(idx) {
+    window.PomFolderList.onRemove = function(idx) {
       var removed = glFolders[idx];
       glFolders.splice(idx, 1);
       if (glActiveFolder === removed) glActiveFolder = glFolders[0] || '';
@@ -48331,14 +48314,14 @@ react/cjs/react-jsx-runtime.development.js:
     };
 
     // Main screen: populate the folder dropdown (left of the file name).
-    // RADDDropdownSelect has no native <select>/<option> DOM (it's a
+    // PomDropdownSelect has no native <select>/<option> DOM (it's a
     // floating-ui combobox) — re-render its `items` from glFolders instead
     // of building option elements.
     function renderFolderSelect() {
       var items = glFolders.map(function(path) {
         return { label: path || '(repo root)', value: path };
       });
-      window.RaddFolderSelect.setItems(items, glActiveFolder);
+      window.PomFolderSelect.setItems(items, glActiveFolder);
     }
 
     // GitHub's independent folder-path list — same shape/behavior as
@@ -48349,17 +48332,17 @@ react/cjs/react-jsx-runtime.development.js:
       var rows = ghFolders.map(function(path) {
         return { path: path, canEdit: true };
       });
-      window.RaddGithubFolderList.render(rows);
+      window.PomGithubFolderList.render(rows);
       renderGithubFolderSelect();
       updatePushTargetUI();
     }
 
-    window.RaddGithubFolderList.onInput = function(idx, value) {
+    window.PomGithubFolderList.onInput = function(idx, value) {
       var oldVal = ghFolders[idx];
       ghFolders[idx] = value;
       if (ghActiveFolder === oldVal) ghActiveFolder = value;
     };
-    window.RaddGithubFolderList.onBlur = function(idx, value) {
+    window.PomGithubFolderList.onBlur = function(idx, value) {
       var oldVal = ghFolders[idx];
       var norm = normFolder(value);
       ghFolders[idx] = norm;
@@ -48367,7 +48350,7 @@ react/cjs/react-jsx-runtime.development.js:
       setFieldValue('github-folder-row-input-' + idx, norm);
       renderGithubFolderSelect();
     };
-    window.RaddGithubFolderList.onRemove = function(idx) {
+    window.PomGithubFolderList.onRemove = function(idx) {
       var removed = ghFolders[idx];
       ghFolders.splice(idx, 1);
       if (ghActiveFolder === removed) ghActiveFolder = ghFolders[0] || '';
@@ -48380,7 +48363,7 @@ react/cjs/react-jsx-runtime.development.js:
       var items = ghFolders.map(function(path) {
         return { label: path || '(repo root)', value: path };
       });
-      window.RaddGithubFolderSelect.setItems(items, ghActiveFolder);
+      window.PomGithubFolderSelect.setItems(items, ghActiveFolder);
     }
 
     // Settings has no view/edit mode: every field is editable the moment
@@ -48495,7 +48478,7 @@ react/cjs/react-jsx-runtime.development.js:
         // explicit `true` turns DTCG on.
         var previousDtcgShape = dtcgShape;
         dtcgShape = config.dtcg === true ? 'partial' : null;
-        window.RaddDtcgFormat.setValue(dtcgShape !== null);
+        window.PomDtcgFormat.setValue(dtcgShape !== null);
         // No filename rewrite here: a config saved with dtcg on already stored
         // the suffixed name, and defaultFilename() (read below when a provider
         // has none saved) follows dtcgShape, which is why this block runs
@@ -48575,7 +48558,7 @@ react/cjs/react-jsx-runtime.development.js:
         if (!activeSettingsTab || (activeSettingsTab === 'gitlab' && !gitlabAdded) || (activeSettingsTab === 'github' && !githubAdded)) {
           activeSettingsTab = gitlabAdded ? 'gitlab' : 'github';
         }
-        window.RaddRepoTab.setValue(activeSettingsTab);
+        window.PomRepoTab.setValue(activeSettingsTab);
         updateProviderSectionVisibility();
 
         // pushTarget must always point at an actually-available provider —
@@ -48589,7 +48572,7 @@ react/cjs/react-jsx-runtime.development.js:
         } else {
           pushTarget = (config.pushTarget === 'github' || config.pushTarget === 'both') ? config.pushTarget : 'gitlab';
         }
-        window.RaddPushTarget.setValue(pushTarget);
+        window.PomPushTarget.setValue(pushTarget);
         updatePushTargetUI();
 
         // Last, so it can name the file the seeded fields above actually hold.
@@ -48656,12 +48639,12 @@ react/cjs/react-jsx-runtime.development.js:
     // Clear a provider's token — confirmed, because the field is a password
     // input and cannot be read back before it goes.
     document.getElementById('gl-clear-token-btn').addEventListener('click', function() {
-      window.RaddClearTokenDialog.open('gitlab');
+      window.PomClearTokenDialog.open('gitlab');
     });
     document.getElementById('gh-clear-token-btn').addEventListener('click', function() {
-      window.RaddClearTokenDialog.open('github');
+      window.PomClearTokenDialog.open('github');
     });
-    window.RaddClearTokenDialog.onConfirm = function(provider) {
+    window.PomClearTokenDialog.onConfirm = function(provider) {
       setFieldValue(provider === 'github' ? 'gh-token' : 'gl-token', '');
       // Persist immediately rather than via the debounce: this is a
       // deliberate, confirmed action, and it must not be lost if the panel
@@ -48690,7 +48673,7 @@ react/cjs/react-jsx-runtime.development.js:
     });
 
     // Main-screen folder dropdown → sets the active target path and persists it.
-    window.RaddFolderSelect.onChange = function(value) {
+    window.PomFolderSelect.onChange = function(value) {
       glActiveFolder = value;
       renderFolderList();   // refresh the "in use" marker in Settings
       persistSettings();    // remember the pick
@@ -48711,7 +48694,7 @@ react/cjs/react-jsx-runtime.development.js:
 
     // Main-screen GitHub folder dropdown (shown only when relevant to the
     // current pushTarget) → same behavior as GitLab's own dropdown above.
-    window.RaddGithubFolderSelect.onChange = function(value) {
+    window.PomGithubFolderSelect.onChange = function(value) {
       ghActiveFolder = value;
       renderGithubFolderList();
       persistSettings();
@@ -48719,7 +48702,7 @@ react/cjs/react-jsx-runtime.development.js:
 
     // ── GitHub connection: optional, add/remove ────────────────────────────
     // Data-only init, factored out so the onboarding dialog (see
-    // window.RaddOnboardingDialog.onConfirm below) can reach the same
+    // window.PomOnboardingDialog.onConfirm below) can reach the same
     // blank-slate state without also forcing a tab-switch/edit-mode jump
     // that only makes sense when already on the Settings page.
     function addGithub() {
@@ -48734,14 +48717,14 @@ react/cjs/react-jsx-runtime.development.js:
     document.getElementById('add-github-btn').addEventListener('click', function() {
       addGithub();
       activeSettingsTab = 'github'; // jump to the tab holding the fields just added
-      window.RaddRepoTab.setValue(activeSettingsTab);
+      window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
       refreshSettingsControls();
       persistSettings();
     });
 
     document.getElementById('remove-github-btn').addEventListener('click', function() {
-      window.RaddRemoveGithubDialog.open();
+      window.PomRemoveGithubDialog.open();
     });
     // Data-only teardown, the mirror of addGithub() above — factored out
     // for the same reason: the onboarding dialog needs to un-add a provider
@@ -48755,15 +48738,15 @@ react/cjs/react-jsx-runtime.development.js:
       setFieldValue('gh-repo', '');
       setFieldValue('gh-branch', '');
     }
-    window.RaddRemoveGithubDialog.onConfirm = function() {
+    window.PomRemoveGithubDialog.onConfirm = function() {
       if (!gitlabAdded) return; // never remove the only remaining provider
       removeGithub();
       activeSettingsTab = 'gitlab'; // the tab switcher itself is about to disappear, but stay consistent
-      window.RaddRepoTab.setValue(activeSettingsTab);
+      window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
       if (pushTarget !== 'gitlab') {
         pushTarget = 'gitlab';
-        window.RaddPushTarget.setValue(pushTarget);
+        window.PomPushTarget.setValue(pushTarget);
       }
       updatePushTargetUI();
       persistSettings();
@@ -48788,14 +48771,14 @@ react/cjs/react-jsx-runtime.development.js:
     document.getElementById('add-gitlab-btn').addEventListener('click', function() {
       addGitlab();
       activeSettingsTab = 'gitlab';
-      window.RaddRepoTab.setValue(activeSettingsTab);
+      window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
       refreshSettingsControls();
       persistSettings();
     });
 
     document.getElementById('remove-gitlab-btn').addEventListener('click', function() {
-      window.RaddRemoveGitlabDialog.open();
+      window.PomRemoveGitlabDialog.open();
     });
     // Mirror of addGitlab(), same reasoning as removeGithub() above.
     function removeGitlab() {
@@ -48807,15 +48790,15 @@ react/cjs/react-jsx-runtime.development.js:
       setFieldValue('gl-project', '');
       setFieldValue('gl-branch', '');
     }
-    window.RaddRemoveGitlabDialog.onConfirm = function() {
+    window.PomRemoveGitlabDialog.onConfirm = function() {
       if (!githubAdded) return; // never remove the only remaining provider
       removeGitlab();
       activeSettingsTab = 'github';
-      window.RaddRepoTab.setValue(activeSettingsTab);
+      window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
       if (pushTarget !== 'github') {
         pushTarget = 'github';
-        window.RaddPushTarget.setValue(pushTarget);
+        window.PomPushTarget.setValue(pushTarget);
       }
       updatePushTargetUI();
       persistSettings();
@@ -48824,14 +48807,14 @@ react/cjs/react-jsx-runtime.development.js:
 
     // Switches which provider's connection-fields block is shown under
     // "Repository settings" — a view preference only, not persisted.
-    window.RaddRepoTab.onChange = function(value) {
+    window.PomRepoTab.onChange = function(value) {
       activeSettingsTab = value;
       updateProviderSectionVisibility();
     };
 
     // Settings-level push-destination preference (GitLab / GitHub / Both) —
     // the main screen's Push button just follows whatever this is set to.
-    window.RaddPushTarget.onChange = function(value) {
+    window.PomPushTarget.onChange = function(value) {
       pushTarget = value;
       persistSettings();
       updatePushTargetUI();
@@ -48854,7 +48837,7 @@ react/cjs/react-jsx-runtime.development.js:
     // never wipes it. goToFirstUnreadyProvider() (defined further down,
     // alongside "Add Repo Settings") then lands on whichever picked
     // provider still needs a token.
-    window.RaddOnboardingDialog.onConfirm = function(target) {
+    window.PomOnboardingDialog.onConfirm = function(target) {
       pushTarget = target;
       var wantsGitLab = (target === 'gitlab' || target === 'both');
       var wantsGitHub = (target === 'github' || target === 'both');
@@ -48865,10 +48848,10 @@ react/cjs/react-jsx-runtime.development.js:
       if (!wantsGitLab && gitlabAdded) removeGitlab();
       if (!wantsGitHub && githubAdded) removeGithub();
       activeSettingsTab = wantsGitLab ? 'gitlab' : 'github';
-      window.RaddRepoTab.setValue(activeSettingsTab);
+      window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
       refreshSettingsControls();
-      window.RaddPushTarget.setValue(pushTarget);
+      window.PomPushTarget.setValue(pushTarget);
       updatePushTargetUI();
       persistSettings();
       goToFirstUnreadyProvider();
@@ -48924,7 +48907,7 @@ react/cjs/react-jsx-runtime.development.js:
     // 'themes' previews the strict form: each document is merged from its own
     // sets and should therefore resolve every {a.b.c} reference it contains.
     function toDtcg(tokens) {
-      var result = window.RaddDtcg.toDtcgFormat(tokens, { shape: dtcgShape });
+      var result = window.PomDtcg.toDtcgFormat(tokens, { shape: dtcgShape });
       var report = result.report;
       console.log('[DTCG] ' + report.tokenCount + ' tokens, ' + report.describedCount +
         ' with $description, shape=' + dtcgShape, report);
@@ -48938,7 +48921,7 @@ react/cjs/react-jsx-runtime.development.js:
         if (unmapped.length) {
           console.warn('[DTCG] types with no DTCG equivalent, passed through: ' + unmapped.join(', '));
         }
-        console.log('[DTCG] reference closure', window.RaddDtcg.validateDtcgClosure(result.tokens));
+        console.log('[DTCG] reference closure', window.PomDtcg.validateDtcgClosure(result.tokens));
       }
       return result.tokens;
     }
@@ -48961,7 +48944,7 @@ react/cjs/react-jsx-runtime.development.js:
     }
     
     function showToast(message, isError) {
-      window.RaddToast.show(message, isError);
+      window.PomToast.show(message, isError);
     }
     
     function formatTokenCount(n) {
@@ -49034,7 +49017,7 @@ react/cjs/react-jsx-runtime.development.js:
       // visible and enabled in the mixed-readiness case (see
       // computePushReadiness()) — there a commit message still makes
       // sense, since the push goes ahead against whichever provider IS ready.
-      window.RaddCommitMessage.setDisabled(r.needsBigSetup);
+      window.PomCommitMessage.setDisabled(r.needsBigSetup);
       document.getElementById('commit-wrap').hidden = r.needsBigSetup;
       document.getElementById('push-btn-mount').hidden = r.needsBigSetup;
       document.getElementById('add-repo-settings-btn-mount').hidden = !r.needsBigSetup;
@@ -49042,16 +49025,16 @@ react/cjs/react-jsx-runtime.development.js:
       // Pushing requires a commit message — no commit without one.
       var hasCommitMsg = !!(document.getElementById('commit-message').value.trim());
       var blockedByCommitMsg = !r.needsBigSetup && !hasCommitMsg && !!transformedData;
-      window.RaddButtons.push.setDisabled(!transformedData || !hasCommitMsg || r.needsBigSetup);
+      window.PomButtons.push.setDisabled(!transformedData || !hasCommitMsg || r.needsBigSetup);
       if (!r.needsBigSetup) {
         // The button's own baseProps.label ('Push to GitLab', buttons.tsx)
         // is just an initial-render fallback — this always drives the real
         // label once settings have loaded, and follows effectiveTarget (not
         // raw pushTarget) so a mixed-readiness 'both' correctly reads
         // "Push to GitLab" rather than "Push to Both".
-        window.RaddButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
+        window.PomButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
       }
-      window.RaddButtons.download.setDisabled(!transformedData);
+      window.PomButtons.download.setDisabled(!transformedData);
     }
 
     // Shows a provider's dropdown+filename row, or — if it has zero saved
@@ -49097,7 +49080,7 @@ react/cjs/react-jsx-runtime.development.js:
       document.getElementById('main-page').classList.add('hidden');
       document.getElementById('settings-page').classList.add('visible');
       activeSettingsTab = provider;
-      window.RaddRepoTab.setValue(activeSettingsTab);
+      window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
       refreshSettingsControls();
       // Land right at the target field, ready to type — not just on the
@@ -49120,7 +49103,7 @@ react/cjs/react-jsx-runtime.development.js:
     // yet (see updateActionUI()) — jumps to whichever wanted provider isn't
     // ready (GitLab first, matching this app's usual gitlab-first default).
     // Shared by this button and the onboarding dialog's "Add Settings"
-    // (see window.RaddOnboardingDialog.onConfirm below) — gitlab-first,
+    // (see window.PomOnboardingDialog.onConfirm below) — gitlab-first,
     // matching this app's usual default precedence.
     function goToFirstUnreadyProvider() {
       var r = computePushReadiness();
@@ -49142,7 +49125,7 @@ react/cjs/react-jsx-runtime.development.js:
     });
     // Trash icon — unchecks this provider from the push destination
     // entirely, same effect as unchecking its box on the Settings page's
-    // Push destination control (window.RaddPushTarget.setValue keeps that
+    // Push destination control (window.PomPushTarget.setValue keeps that
     // control in sync). Shared by two placements: next to the small
     // settings button (only shown when the OTHER provider is ready) and
     // next to the empty-folder-path "+" button (only shown in 'both' mode
@@ -49151,13 +49134,13 @@ react/cjs/react-jsx-runtime.development.js:
     // pushTarget pointing at nothing.
     function removeGitlabFromPush() {
       pushTarget = 'github';
-      window.RaddPushTarget.setValue(pushTarget);
+      window.PomPushTarget.setValue(pushTarget);
       persistSettings();
       updatePushTargetUI();
     }
     function removeGithubFromPush() {
       pushTarget = 'gitlab';
-      window.RaddPushTarget.setValue(pushTarget);
+      window.PomPushTarget.setValue(pushTarget);
       persistSettings();
       updatePushTargetUI();
     }
@@ -49186,18 +49169,18 @@ react/cjs/react-jsx-runtime.development.js:
       }, '*');
     }
 
-    // RADDSegmentedControl (src/ui-react/buttons.tsx) owns its own selected-
+    // PomSegmentedControl (src/ui-react/buttons.tsx) owns its own selected-
     // segment styling; it just reports the clicked index here. Hidden in the
     // template — the Token Studio ↔ DTCG choice is the Output format switch in
     // Settings now — but left wired so the native mode stays reachable.
-    window.RaddExportMode.onChange = function(index) {
+    window.PomExportMode.onChange = function(index) {
       exportMode = index === 0 ? 'native' : 'token-studio';
       requestTransform();
     };
 
     // Settings → Output format. The DTCG shapes are a post-transform over the
     // Token Studio tree, so exportMode stays 'token-studio' either way.
-    window.RaddDtcgFormat.onChange = function(on) {
+    window.PomDtcgFormat.onChange = function(on) {
       dtcgShape = on ? 'partial' : null;
       // Rewrite the file names BEFORE persisting, so the saved config and the
       // fields on screen never disagree about where the export lands.
@@ -49215,12 +49198,12 @@ react/cjs/react-jsx-runtime.development.js:
     // pushToGit owns the button UI (busy / success / error / done).
 
     function pushBusy() {
-      window.RaddButtons.push.setDisabled(true);
-      window.RaddButtons.push.setSuccess(false);
-      window.RaddButtons.push.setLoading(true);
+      window.PomButtons.push.setDisabled(true);
+      window.PomButtons.push.setSuccess(false);
+      window.PomButtons.push.setLoading(true);
     }
     function pushDone() {
-      window.RaddButtons.push.setLoading(false);
+      window.PomButtons.push.setLoading(false);
       updateActionUI();
     }
 
@@ -49374,12 +49357,12 @@ react/cjs/react-jsx-runtime.development.js:
           var succeeded = results.filter(function(r) { return r.ok; });
           var failed = results.filter(function(r) { return !r.ok; });
           if (failed.length === 0) {
-            window.RaddButtons.push.setSuccess(true);
+            window.PomButtons.push.setSuccess(true);
             showToast('Successfully pushed to ' + succeeded.map(function(r) { return r.provider; }).join(' and '));
           } else if (succeeded.length === 0) {
             showToast(failed.map(function(r) { return r.provider + ': ' + errText(r.err); }).join(' — '), true);
           } else {
-            window.RaddButtons.push.setSuccess(true);
+            window.PomButtons.push.setSuccess(true);
             showToast(
               'Pushed to ' + succeeded.map(function(r) { return r.provider; }).join(', ') + ' — ' +
               failed.map(function(r) { return r.provider + ' failed: ' + errText(r.err); }).join(', '),
@@ -49445,7 +49428,7 @@ react/cjs/react-jsx-runtime.development.js:
         // the per-row breakdown; the header's aggregate summary (collections
         // / tokens / file size) is filled in separately once 'transformed'
         // arrives, since only that message knows the real totals.
-        window.RaddCollectionsAccordion.setCollections(
+        window.PomCollectionsAccordion.setCollections(
           msg.collections.map(function(col) {
             return { name: col.name, count: col.variables ? col.variables.length : 0 };
           })
@@ -49479,7 +49462,7 @@ react/cjs/react-jsx-runtime.development.js:
         // real file, not just a rough estimate off the raw token count.
         var exportJson = JSON.stringify(getTokensToExport(), null, 2);
         var exportMB = (new Blob([exportJson]).size / (1024 * 1024)).toFixed(2);
-        window.RaddCollectionsAccordion.setSummary(
+        window.PomCollectionsAccordion.setSummary(
           formatTokenCount(msg.validation.actual.totalTokens) + ' Tokens',
           exportMB + ' MB'
         );
@@ -49490,7 +49473,7 @@ react/cjs/react-jsx-runtime.development.js:
           var roots = (closure.missingRoots || []).map(function(r) {
             return r + ' (' + closure.byRoot[r] + ')';
           }).join(', ');
-          window.RaddClosureWarning.show(
+          window.PomClosureWarning.show(
             closure.brokenCount + ' unresolved references',
             'Some tokens point to references that are not present in this file: ' + roots + '. ' +
             'This usually means the referenced variable was renamed or deleted in Figma ' +
@@ -49498,7 +49481,7 @@ react/cjs/react-jsx-runtime.development.js:
             'references in Figma — the plugin exports exactly what the file contains.'
           );
         } else {
-          window.RaddClosureWarning.hide();
+          window.PomClosureWarning.hide();
         }
 
         parent.postMessage({
@@ -49541,7 +49524,7 @@ react/cjs/react-jsx-runtime.development.js:
         // not a one-time flag, so it correctly reappears if the user later
         // removes every provider and ends up fully unconfigured again.
         if (computePushReadiness().needsBigSetup) {
-          window.RaddOnboardingDialog.open();
+          window.PomOnboardingDialog.open();
         }
       }
       

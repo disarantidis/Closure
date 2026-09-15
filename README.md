@@ -2,153 +2,158 @@
 
 **Export JSON straight from Figma.** A Figma plugin that reads your design
 variables and exports them as clean, reference-complete **design-token JSON** —
-downloaded locally or pushed straight to GitHub.
+downloaded locally or pushed straight to **GitLab** and/or **GitHub**.
+
+The UI is built from a React source with our own **Pomegranate
+(disarantidis_ReactJS)** design system.
 
 ## Features
 
 - Exports design tokens from Figma variable collections, including extended/aliased collections.
-- **Portable design-token JSON**: `$themes`, `$metadata.tokenSetOrder`, `$figmaVariableReferences`, semantic token types — a widely-supported structure that downstream token tooling (Style Dictionary and similar) can consume.
+- **Portable design-token JSON**: `$themes`, `$metadata.tokenSetOrder`, `$figmaVariableReferences`, semantic token types — a widely-supported structure downstream token tooling (Style Dictionary and similar) can consume.
+- **Two output formats**, chosen with the **Output format** switch in Settings:
+  the default token JSON, or **DTCG** (`$value` / `$type` / `$description`, with
+  `$themes`/`$metadata` at the document root). DTCG exports to its own file name
+  (`tokens_dtcg.json`) so it never overwrites the default JSON. See [`DTCG.md`](./DTCG.md).
+- **Figma variable descriptions** are exported as DTCG `$description`, de-duplicated once per variable in a root `$extensions` map rather than repeated on every mode's token.
 - **Typography parity**: backfills `core.lineHeights` / `core.letterSpacing` so composite references like `{lineHeights.*}` / `{letterSpacing.*}` resolve instead of dangling (see `ensureCoreLineHeightsLetterSpacing` in `code.js`).
-- **Per-breakpoint typography**: breakpoint typography is written per mode, so responsive scales (e.g. `display` 72→96px) export correctly per breakpoint.
-- **Dimension math layer**: where applicable, reconstructs expressions like `N*{dimension.base}` and `{dimension.1}*N`.
-- **Reference-closure validation**: flags any dangling `{token.references}` before you ship the JSON — this is what the plugin is named for (see below).
-- Export as a **single document** or **separate documents** per token set.
-- **Download** locally or **Push to Git** (GitHub API; settings persisted in `figma.clientStorage`).
+- **Per-breakpoint typography** and a **dimension math layer** (`N*{dimension.base}`).
+- **Reference-closure validation**: flags any dangling `{token.references}` before you ship the JSON — this is what the plugin is named for.
+- **Download** locally, or **push to GitLab** (incl. self-hosted / Enterprise), **GitHub**, or **both**. Settings persist in `figma.clientStorage`.
+- Each provider keeps its **own** repository/project, branch, saved folder paths and file name — all editable in Settings; a token can be **cleared** without tearing down the rest.
+- A **commit message is required** to push (the Push button stays disabled until you enter one).
 - Export runs with validation stats (collection count + token count).
-- **Light / dark theme toggle** for the plugin UI (🌙 / ☀️), remembered across sessions.
+- **Dark UI** built to the **Pomegranate** design system (`src/vendor/pomegranate`).
 
-Details: [`TYPOGRAPHY.md`](./TYPOGRAPHY.md)
+Details: [`TYPOGRAPHY.md`](./TYPOGRAPHY.md) · [`DTCG.md`](./DTCG.md) · [`THEMING.md`](./THEMING.md)
 
-> **Note:** The output format is fixed to a single, portable design-token JSON
-> structure. A legacy "Native" format toggle still exists in the code but is
-> hidden (`#export-mode-control`, `display:none`). Every export is the token JSON.
-
-## UI
-
-Closure's UI is built to the **disarantidis_ReactJS** design system:
-a warm-neutral palette with a monochrome accent, DS tokens for radius / spacing /
-type, and DS components — button, segmented control, checkbox (with a mixed /
-indeterminate "select all"), text field, card, and scheme-island alerts / toast.
+## UI overview
 
 ```
 ┌────────────────────────────────────────┐
-│  Closure                    🌙   ⚙      │   ← title · theme toggle · Git settings
-│  Export JSON straight from Figma        │   ← subtitle
+│  Closure                    v1.4.0  ⚙   │   ← title · version · settings
 ├────────────────────────────────────────┤
-│  Single Document | Separate Documents   │
+│  ▸ <Figma file name>   1k Tokens · 18MB │   ← collections accordion + summary
 ├────────────────────────────────────────┤
-│  Collections list (checkboxes)          │
-├────────────────────────────────────────┤
-│  N Collections        Nk Tokens         │   ← validation stats
-├────────────────────────────────────────┤
-│  [ commit message ]                     │
-│  [ Push to Git ]   Download single      │
+│  ⬢ GitLab                               │
+│  [ folder ▾ ]  [ tokens.json ]          │   ← per push destination
+│  [ commit message ]  (required)         │
+│  [ Push to GitLab ]              ⬇       │   ← push + download
 └────────────────────────────────────────┘
 ```
 
-## Export flow
-
-1. Open **Closure** — collections are extracted automatically on open.
-2. Choose **Single Document** or **Separate Documents**.
-3. (Optional) select specific collections, or leave all selected.
-4. **Download** the JSON, or fill in a commit message and **Push to Git**.
+Settings holds the **Output format** switch, the **push destination** (GitLab /
+GitHub / both), and each provider's token / repo / branch / filename / saved
+folder paths. On first run a two-step dialog asks which destination(s) you want,
+then hands you to the fields each one still needs.
 
 ## Installation
 
-1. **Clone / open** this repo locally.
-2. **Load in Figma Desktop**:
-   - Plugins → Development → Import plugin from manifest
-   - Select `manifest.json`
-3. **Run**: Plugins → **Closure**
+1. **Clone** this repo locally.
+2. `npm install`
+3. `npm run ui:build` — regenerates `ui.html` from its sources (see below).
+4. **Load in Figma Desktop**: Plugins → Development → Import plugin from manifest → select `manifest.json`.
+5. **Run**: Plugins → **Closure**.
+
+## Building the UI
+
+> **`ui.html` is generated output — do not edit it by hand.** Your changes will be
+> overwritten by the next `npm run ui:build`.
+
+| File | What it is |
+|---|---|
+| `src/ui.template.html` | Markup, CSS and the plugin's vanilla-JS logic |
+| `src/ui-react/buttons.tsx` | Every Pomegranate component mounted into that markup |
+| `src/vendor/pomegranate/` | Vendored copy of the Pomegranate kit (components + `tokens.css` / `node.css`) |
+| `src/dtcg-format.js` | DTCG conversion (inlined into `ui.html`, also runs in Node) |
+
+`scripts/build-ui.js` bundles `buttons.tsx` with **esbuild** and inlines the JS
+and CSS into the template, because a Figma plugin's `ui` must be **one**
+self-contained file. `buttons.tsx` mounts the Pomegranate components into
+`<span id="…-mount">` placeholders and exposes `window.Radd*` bridges the
+template's vanilla script drives — so `code.js` and the template's logic are
+independent of which design system paints the controls.
+
+```bash
+npm run ui:build       # regenerate ui.html from its sources
+npm run ui:typecheck   # tsc --noEmit over src/ui-react (optional)
+npm run dtcg:preview   # convert an export to DTCG outside Figma + report
+npm run dtcg:selftest  # DTCG format / description-dedupe checks
+```
 
 ## Technical architecture
 
 ```javascript
-// Export pipeline (code.js)
+// Export pipeline (code.js — the plugin sandbox)
 - extractVariables()        → Figma variables → raw collections
-- transformToFinalFormat()  → native tree
+- transformToFinalFormat()  → native tree (opt-in { includeDescriptions } for DTCG)
 - toTokenFormat()           → $themes, foundation, breakpoints, typography fixes
 - validateReferenceClosure()→ catches dangling {token.references}
+// DTCG is a pure post-transform over that tree (src/dtcg-format.js)
 ```
 
 Message flow:
 ```
-UI (ui.html)  ──'extract'──▶  code.js: figma.variables.getLocalVariableCollectionsAsync()
-UI            ──'transform'─▶  code.js: toTokenFormat()
-UI            ── Download / Push to Git
+UI (ui.html)  ──'extract' / 'GET_FILE_INFO' / 'LOAD_GIT_SETTINGS'──▶  code.js
+UI            ──'transform' { includeDescriptions }───────────────▶  code.js
+UI            ──'SAVE_GIT_SETTINGS'───────────────────────────────▶  code.js
+UI            ── Download / Push to GitLab and/or GitHub (fetch, from the UI iframe)
 ```
 
-The export reads Figma variables directly through the plugin API — no external server or service is required.
+The push runs from the plugin's UI iframe via `fetch`; the sandbox makes no
+network calls. The export reads Figma variables directly through the plugin API
+— no external server or service is required.
 
-## Extended / aliased collections
+## Push to GitLab / GitHub
 
-The export resolves alias chains across collections so that downstream tools receive fully linked tokens. Token sets are produced per collection/mode (e.g. `core`, `mode/light`, scheme sets, breakpoints), with `$figmaVariableReferences` mapping back to the originating Figma variable IDs.
+The ⚙ button opens **Settings**, where you add GitLab, GitHub, or both; each
+keeps its own saved folder paths (picked on the main screen) and file name, so
+the pushed path is `folder + filename` per destination. A "both" push runs the
+two sequentially and reports each outcome, so one failing does not abort the
+other. Each provider's token field has a **Clear** button (confirmed).
 
-The verified RADD alias chain is:
+### Network allowlist (important for Enterprise)
+
+A Figma plugin can only reach domains listed in `manifest.json` →
+`networkAccess.allowedDomains`. It ships with:
+
+```json
+"allowedDomains": [
+  "https://gitlab.com",
+  "https://gitlab.devops.telekom.de",
+  "https://api.github.com"
+]
 ```
-foundation → .scheme → .mode → .section → .card → leaf (.white/.black/.magenta-*/.secondary) → .core
-```
-Every middle link must be present in the export or references dangle — which the closure validation catches.
 
-## Reference-closure validation
-
-After building the JSON, the plugin scans every `{token.reference}` and checks it resolves to a token that exists in the output. If not, a warning shows the broken-reference count and which token sets are missing, so an incomplete/partial export never ships silently. This closure check is where the plugin gets its name.
-
-## Push to Git
-
-Fill in the GitHub settings (token, repo, filepath, branch) via the ⚙ button. Settings are stored in `figma.clientStorage`. The manifest whitelists only `https://api.github.com` for this — the plugin makes no other network calls.
-
-## Troubleshooting
-
-### Collections don't appear
-- Open the console: Plugins → Development → Open Console.
-- Re-open the plugin to force a fresh extract.
-- Check the diagnostic logs (e.g. `[Closure v8] Collection "..."`).
-
-### Broken references warning after export
-- The export references a token set that wasn't included. Make sure every referenced collection (e.g. `.section` / `.card`) is present, then re-extract.
+To push to another self-hosted / Enterprise GitLab, add that instance's origin
+and re-import the plugin from the manifest.
 
 ## Files
 
 ```
 Closure/
-├── code.js                 # Export + token transforms
-├── ui.html                 # UI, Git push, light/dark toggle
+├── code.js                 # Export + token transforms (plugin sandbox)
+├── ui.html                 # GENERATED — built from src/, do not edit
 ├── manifest.json           # Plugin configuration + network allowlist
+├── src/
+│   ├── ui.template.html    # UI source: markup, CSS, vanilla-JS logic
+│   ├── dtcg-format.js       # DTCG conversion (inlined into ui.html, also runs in Node)
+│   ├── ui-react/buttons.tsx # Pomegranate components mounted into the template
+│   └── vendor/pomegranate/  # Vendored Pomegranate kit (components + tokens.css/node.css)
+├── scripts/                # build-ui.js, dtcg-preview/selftest/descriptions
 ├── README.md               # This file
 ├── TYPOGRAPHY.md           # Typography parity (lineHeights / letterSpacing)
-├── THEMING.md              # Plugin UI theming (light/dark toggle)
+├── DTCG.md                 # DTCG output format
+├── THEMING.md              # Plugin UI theming (dark, Pomegranate tokens)
 └── BACKLOG.md              # Known limitations & follow-ups
 ```
 
-## Export format
-
-The export targets a portable design-token JSON (single file, slash-delimited token sets, `$themes`, `$metadata`).
-
-### Themes
-- Theme objects (per collection/mode) with `selectedTokenSets`.
-- `$figmaVariableReferences` → Figma variable IDs.
-- `$figmaCollectionId` / `$figmaModeId` where applicable.
-- Theme IDs change per export session (expected with Figma).
-
-### Token sets
-- **Foundation** — spacing, sizing, radius, colours, typography, strokes, grid, elevation, variant.
-- **Mode** — Light / Dark (+ elevation composites where defined).
-- **Scheme** — the scheme/leaf sets present in the file.
-- **Breakpoints** — Mobile, Tablet, Laptop, Desktop, Large Desktop (+ per-breakpoint typography composites).
-- **Layout** — `layout/layout` where columns exist.
-- **Restrictions** — where present in the file.
-
-### Known limitations
-- `BACKLOG.md` — math expressions and edge cases.
-- `TYPOGRAPHY.md` — what "parity" does and does not mean.
-
 ## Keyboard shortcuts
 - **Tab** — move focus between UI elements
-- **Enter** — activate the focused button (e.g. Download)
-- **Esc** — close the plugin
+- **Enter** / **Space** — activate the focused control
+- **Esc** — close the open dialog, or the plugin
 
 ---
 
-**Product:** Closure (`manifest.json`) · pipeline logs: `Closure v8`
-**Status:** ✅ Active development / production use
+**Product:** Closure (`manifest.json`, v1.4.0) · design system: Pomegranate (disarantidis_ReactJS)
+**Status:** ✅ Active development

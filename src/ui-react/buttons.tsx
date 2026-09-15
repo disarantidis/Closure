@@ -1,11 +1,11 @@
 /*
   buttons.tsx — mounts the plugin UI's live components into the template's
-  <span id="…-mount"> placeholders, and defines the window.Radd* bridges the
+  <span id="…-mount"> placeholders, and defines the window.Pom* bridges the
   template's vanilla JS drives them through.
 
   DESIGN SYSTEM: this is the Pomegranate (disarantidis_ReactJS) build. Every
-  component below is the vendored Pomegranate kit (src/vendor/pomegranate), not
-  @desquared/radd-reactjs. The window.Radd* bridge names and every rendered
+  component below is the vendored Pomegranate kit (src/vendor/pomegranate) —
+  no @desquared kit anywhere. The window.Pom* bridge names and every rendered
   element `id` are preserved verbatim, so ui.template.html's vanilla script keeps
   working unchanged against the same contract.
 
@@ -55,7 +55,7 @@ const IconFolder = svg('M3 7a2 2 0 012-2h3.5l2 2H19a2 2 0 012 2v8a2 2 0 01-2 2H5
 const IconAdd = svg('M12 5v14M5 12h14');
 const IconRemove = svg('M5 12h14');
 
-/* ── size / variant maps (RADD prop shape → Pomegranate) ───────────────────── */
+/* ── size / variant maps (mount prop shape → Pomegranate) ───────────────────── */
 function btnVariant(v?: string): 'primary' | 'tonal' | 'ghost' {
   if (v === 'filled') return 'primary';
   if (v === 'ghost') return 'ghost';
@@ -127,13 +127,13 @@ function PomTextArea(props: any) {
   );
 }
 
-/* ── Pomegranate Button, from the RADD-shaped prop bag the mounts pass ──────── */
+/* ── Pomegranate Button, from the prop bag the mounts pass ──────── */
 function PomButton(props: any) {
   const {
     id, variant, size, label, destructive, icon, leftIcon, buttonLeftIcon,
     disabled, loading, active, style, title, onClick, block, flex,
   } = props;
-  const iconOnly = !!icon; // RADD IconButton bag carries `icon`; text buttons carry `label`
+  const iconOnly = !!icon; // the icon-button bag carries `icon`; text buttons carry `label`
   const leading = iconOnly ? icon : (leftIcon ? buttonLeftIcon : undefined);
   const extra: any = {};
   if (destructive) extra['data-scheme'] = 'error';
@@ -249,7 +249,7 @@ function mountLiveDropdown(mountId: string, base: any, onSelect: (v: string) => 
   return { setItems: (items, value) => set(() => ({ items, value })) };
 }
 
-/* ── window.Radd* bridge shapes (types stripped by esbuild; kept for clarity) ─ */
+/* ── window.Pom* bridge shapes (types stripped by esbuild; kept for clarity) ─ */
 type FolderListBridge = {
   render: (rows: { path: string; canEdit: boolean }[]) => void;
   onInput: ((idx: number, value: string) => void) | null;
@@ -260,33 +260,33 @@ type FolderSelectBridge = { setItems: (items: any[], selectedValue: string) => v
 type PushTarget = 'gitlab' | 'github' | 'both';
 declare global {
   interface Window {
-    RaddButtons: { push: LiveHandle; download: LiveIconHandle };
-    RaddExportMode: { onChange: ((index: number) => void) | null };
-    RaddToast: { show: (message: string, isError?: boolean) => void };
-    RaddFolderSelect: FolderSelectBridge;
-    RaddGithubFolderSelect: FolderSelectBridge;
-    RaddFolderList: FolderListBridge;
-    RaddGithubFolderList: FolderListBridge;
-    RaddCollectionsAccordion: {
+    PomButtons: { push: LiveHandle; download: LiveIconHandle };
+    PomExportMode: { onChange: ((index: number) => void) | null };
+    PomToast: { show: (message: string, isError?: boolean) => void };
+    PomFolderSelect: FolderSelectBridge;
+    PomGithubFolderSelect: FolderSelectBridge;
+    PomFolderList: FolderListBridge;
+    PomGithubFolderList: FolderListBridge;
+    PomCollectionsAccordion: {
       setTitle: (title: string) => void;
       setCollections: (collections: { name: string; count: number }[]) => void;
       setSummary: (tokensLabel: string, sizeLabel: string) => void;
     };
-    RaddClosureWarning: { show: (title: string, detail: string) => void; hide: () => void };
-    RaddCommitMessage: DisabledHandle;
-    RaddVersionTag: { setLabel: (label: string) => void };
-    RaddRemoveGithubDialog: { open: () => void; onConfirm: (() => void) | null };
-    RaddRemoveGitlabDialog: { open: () => void; onConfirm: (() => void) | null };
-    RaddClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
-    RaddRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
-    RaddPushTarget: { onChange: ((value: PushTarget) => void) | null; setValue: (value: PushTarget) => void };
-    RaddDtcgFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void };
-    RaddOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
+    PomClosureWarning: { show: (title: string, detail: string) => void; hide: () => void };
+    PomCommitMessage: DisabledHandle;
+    PomVersionTag: { setLabel: (label: string) => void };
+    PomRemoveGithubDialog: { open: () => void; onConfirm: (() => void) | null };
+    PomRemoveGitlabDialog: { open: () => void; onConfirm: (() => void) | null };
+    PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
+    PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
+    PomPushTarget: { onChange: ((value: PushTarget) => void) | null; setValue: (value: PushTarget) => void };
+    PomDtcgFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void };
+    PomOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
   }
 }
 
 /* ── push + download ───────────────────────────────────────────────────────── */
-window.RaddButtons = {
+window.PomButtons = {
   push: mountLiveButton(
     'push-btn-mount',
     { id: 'push-btn', variant: 'filled', size: 'large', label: 'Push to GitLab', style: { width: '100%' } },
@@ -327,7 +327,7 @@ function mountVersionTag(mountId: string) {
     return <span className="version-tag-label" title="Plugin version">{label}</span>;
   }
   if (container) flushSync(() => createRoot(container).render(<View />));
-  window.RaddVersionTag = { setLabel: (label) => set(label) };
+  window.PomVersionTag = { setLabel: (label) => set(label) };
 }
 mountVersionTag('version-tag-mount');
 
@@ -337,7 +337,7 @@ function mountTextField(mountId: string, props: any) { mountOnce(mountId, <PomTe
 mountTextField('export-filename-mount', { id: 'export-filename', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitLab JSON file name (set in Settings)' });
 mountTextField('github-filename-mount', { id: 'github-filename', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitHub JSON file name (set in Settings)' });
 
-window.RaddCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false);
+window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false);
 
 mountButton('add-repo-settings-btn-mount', { id: 'add-repo-settings-btn', variant: 'outline', size: 'large', label: 'Add Repo Settings', block: true });
 mountButton('gitlab-small-settings-btn-mount', { id: 'gitlab-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) });
@@ -361,7 +361,7 @@ mountTextField('gh-branch-mount', { id: 'gh-branch', label: 'Branch', placeholde
 mountTextField('gh-filename-mount', { id: 'gh-filename', label: 'JSON file name', placeholder: 'tokens.json' });
 
 /* ── hidden export-mode segmented control (Native / Token Studio) ───────────── */
-window.RaddExportMode = { onChange: null };
+window.PomExportMode = { onChange: null };
 (function mountExportMode() {
   const container = document.getElementById('export-mode-control-mount');
   if (!container) return;
@@ -373,7 +373,7 @@ window.RaddExportMode = { onChange: null };
         size="small"
         value={value}
         options={[{ value: '0', label: 'Native' }, { value: '1', label: 'Token Studio' }]}
-        onChange={(v: string) => { setValue(v); window.RaddExportMode.onChange?.(Number(v)); }}
+        onChange={(v: string) => { setValue(v); window.PomExportMode.onChange?.(Number(v)); }}
       />
     );
   }
@@ -400,7 +400,7 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
       const next = { ...state, [which]: checked } as PushCheckboxState;
       if (!next.gitlab && !next.github) next[which] = true;
       setState(next);
-      window.RaddPushTarget.onChange?.(targetFromCheckboxes(next));
+      window.PomPushTarget.onChange?.(targetFromCheckboxes(next));
     }
     return (
       <>
@@ -410,7 +410,7 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
     );
   }
   if (container) flushSync(() => createRoot(container).render(<View />));
-  window.RaddPushTarget = { onChange: null, setValue: (v) => set(checkboxesFromTarget(v)) };
+  window.PomPushTarget = { onChange: null, setValue: (v) => set(checkboxesFromTarget(v)) };
 })();
 
 /* ── Settings → Output format switch (Token Studio / DTCG) ──────────────────── */
@@ -425,12 +425,12 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
         size="small"
         label="Tokens Studio DTCG"
         checked={on}
-        onChange={(c: boolean) => { setOn(c); window.RaddDtcgFormat.onChange?.(c); }}
+        onChange={(c: boolean) => { setOn(c); window.PomDtcgFormat.onChange?.(c); }}
       />
     );
   }
   if (container) flushSync(() => createRoot(container).render(<View />));
-  window.RaddDtcgFormat = { onChange: null, setValue: (v) => set(v) };
+  window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v) };
 })();
 
 /* ── GitHub / GitLab repo-settings tab switcher ────────────────────────────── */
@@ -446,12 +446,12 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
         size="small"
         value={value}
         options={[{ value: 'github', label: 'GitHub' }, { value: 'gitlab', label: 'GitLab' }]}
-        onChange={(v: string) => window.RaddRepoTab.onChange?.(v as 'gitlab' | 'github')}
+        onChange={(v: string) => window.PomRepoTab.onChange?.(v as 'gitlab' | 'github')}
       />
     );
   }
   if (container) flushSync(() => createRoot(container).render(<View />));
-  window.RaddRepoTab = { onChange: null, setValue: (v) => set(v) };
+  window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
 })();
 
 /* ── loading skeletons ─────────────────────────────────────────────────────── */
@@ -494,21 +494,21 @@ mountOnce('actions-skeleton',
     );
   }
   if (container) createRoot(container).render(<View />);
-  window.RaddToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? 'error' : 'success', message })) };
+  window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? 'error' : 'success', message })) };
 })();
 
 /* ── folder-path dropdowns (main screen) ───────────────────────────────────── */
-window.RaddFolderSelect = {
-  ...mountLiveDropdown('folder-select-mount', { id: 'folder-select' }, (v) => window.RaddFolderSelect.onChange?.(v)),
+window.PomFolderSelect = {
+  ...mountLiveDropdown('folder-select-mount', { id: 'folder-select' }, (v) => window.PomFolderSelect.onChange?.(v)),
   onChange: null,
 };
-window.RaddGithubFolderSelect = {
-  ...mountLiveDropdown('github-folder-select-mount', { id: 'github-folder-select' }, (v) => window.RaddGithubFolderSelect.onChange?.(v)),
+window.PomGithubFolderSelect = {
+  ...mountLiveDropdown('github-folder-select-mount', { id: 'github-folder-select' }, (v) => window.PomGithubFolderSelect.onChange?.(v)),
   onChange: null,
 };
 
 /* ── folder-path lists (Settings) — rebuilt often, every row remounts ──────── */
-function mountFolderList(mountId: string, bridgeKey: 'RaddFolderList' | 'RaddGithubFolderList', idPrefix: string) {
+function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithubFolderList', idPrefix: string) {
   const container = document.getElementById(mountId);
   const root = container ? createRoot(container) : null;
   let generation = 0;
@@ -543,8 +543,8 @@ function mountFolderList(mountId: string, bridgeKey: 'RaddFolderList' | 'RaddGit
   }
   (window as any)[bridgeKey] = { render, onInput: null, onBlur: null, onRemove: null };
 }
-mountFolderList('folder-list', 'RaddFolderList', 'folder-row-input');
-mountFolderList('github-folder-list', 'RaddGithubFolderList', 'github-folder-row-input');
+mountFolderList('folder-list', 'PomFolderList', 'folder-row-input');
+mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-input');
 
 /* ── collections accordion (read-only breakdown) ───────────────────────────── */
 (function mountCollectionsAccordion() {
@@ -581,7 +581,7 @@ mountFolderList('github-folder-list', 'RaddGithubFolderList', 'github-folder-row
     );
   }
   if (container) flushSync(() => createRoot(container).render(<View />));
-  window.RaddCollectionsAccordion = {
+  window.PomCollectionsAccordion = {
     setTitle: (title) => set((s) => ({ ...s, title })),
     setCollections: (collections) => set((s) => ({ ...s, collections })),
     setSummary: (tokens, size) => set((s) => ({ ...s, summary: { tokens, size } })),
@@ -599,7 +599,7 @@ mountFolderList('github-folder-list', 'RaddGithubFolderList', 'github-folder-row
     return <Alert tone="error" title={s.title}>{s.detail}</Alert>;
   }
   if (container) createRoot(container).render(<View />);
-  window.RaddClosureWarning = {
+  window.PomClosureWarning = {
     show: (title, detail) => set(() => ({ open: true, title, detail })),
     hide: () => set((s) => ({ ...s, open: false })),
   };
@@ -632,15 +632,15 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
   register(() => setOpen(true));
 }
 
-window.RaddRemoveGithubDialog = { open: () => {}, onConfirm: null };
+window.PomRemoveGithubDialog = { open: () => {}, onConfirm: null };
 confirmDialog('remove-github-dialog-mount',
-  { title: 'Remove GitHub?', text: 'This clears the saved GitHub token, repository, and folder paths from this plugin.', confirmLabel: 'Remove', onConfirm: () => window.RaddRemoveGithubDialog.onConfirm?.() },
-  (open) => { window.RaddRemoveGithubDialog.open = open; });
+  { title: 'Remove GitHub?', text: 'This clears the saved GitHub token, repository, and folder paths from this plugin.', confirmLabel: 'Remove', onConfirm: () => window.PomRemoveGithubDialog.onConfirm?.() },
+  (open) => { window.PomRemoveGithubDialog.open = open; });
 
-window.RaddRemoveGitlabDialog = { open: () => {}, onConfirm: null };
+window.PomRemoveGitlabDialog = { open: () => {}, onConfirm: null };
 confirmDialog('remove-gitlab-dialog-mount',
-  { title: 'Remove GitLab?', text: 'This clears the saved GitLab token, project, and folder paths from this plugin.', confirmLabel: 'Remove', onConfirm: () => window.RaddRemoveGitlabDialog.onConfirm?.() },
-  (open) => { window.RaddRemoveGitlabDialog.open = open; });
+  { title: 'Remove GitLab?', text: 'This clears the saved GitLab token, project, and folder paths from this plugin.', confirmLabel: 'Remove', onConfirm: () => window.PomRemoveGitlabDialog.onConfirm?.() },
+  (open) => { window.PomRemoveGitlabDialog.open = open; });
 
 /* clear-token: one dialog, both providers */
 (function mountClearTokenDialog() {
@@ -662,14 +662,14 @@ confirmDialog('remove-gitlab-dialog-mount',
         actions={
           <div style={{ display: 'flex', flexDirection: 'row', gap: 12, width: '100%' }}>
             <Button variant="tonal" size="large" style={{ flex: 1 }} onClick={() => setO(false)}>Cancel</Button>
-            <Button variant="primary" size="large" style={{ flex: 1 }} data-scheme="error" onClick={() => { setO(false); window.RaddClearTokenDialog.onConfirm?.(provider); }}>Clear</Button>
+            <Button variant="primary" size="large" style={{ flex: 1 }} data-scheme="error" onClick={() => { setO(false); window.PomClearTokenDialog.onConfirm?.(provider); }}>Clear</Button>
           </div>
         }
       >{null}</Dialog>
     );
   }
   if (container) createRoot(container).render(<View />);
-  window.RaddClearTokenDialog = {
+  window.PomClearTokenDialog = {
     open: (provider) => { flushSync(() => setProvider(provider)); setOpen(true); },
     onConfirm: null,
   };
@@ -735,7 +735,7 @@ function ProviderChoiceCard({ which, label, checked, onToggle }: { which: 'gitla
           ) : (
             <div style={{ display: 'flex', flexDirection: 'row', gap: 12, width: '100%' }}>
               <Button variant="tonal" size="large" style={{ flex: 1 }} onClick={() => setStep(1)}>Back</Button>
-              <Button variant="primary" size="large" style={{ flex: 1 }} onClick={() => { setO(false); window.RaddOnboardingDialog.onConfirm?.(targetFromCheckboxes(state)); }}>Add Settings</Button>
+              <Button variant="primary" size="large" style={{ flex: 1 }} onClick={() => { setO(false); window.PomOnboardingDialog.onConfirm?.(targetFromCheckboxes(state)); }}>Add Settings</Button>
             </div>
           )
         }
@@ -750,5 +750,5 @@ function ProviderChoiceCard({ which, label, checked, onToggle }: { which: 'gitla
     );
   }
   if (container) createRoot(container).render(<View />);
-  window.RaddOnboardingDialog = { open: () => setOpen(true), onConfirm: null };
+  window.PomOnboardingDialog = { open: () => setOpen(true), onConfirm: null };
 })();

@@ -43,9 +43,9 @@ async function main() {
 
   const template = fs.readFileSync(path.join(ROOT, 'src/ui.template.html'), 'utf8');
   const html = template
-    .replace('__RADD_BUTTONS_STYLE__', () => style)
-    .replace('__RADD_BUTTONS_SCRIPT__', () => script)
-    .replace('__RADD_DTCG_SCRIPT__', () => dtcg);
+    .replace('__Pom_BUTTONS_STYLE__', () => style)
+    .replace('__Pom_BUTTONS_SCRIPT__', () => script)
+    .replace('__Pom_DTCG_SCRIPT__', () => dtcg);
 
   const outFile = path.join(ROOT, 'ui.html');
   fs.writeFileSync(outFile, html);
