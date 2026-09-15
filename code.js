@@ -1,5 +1,5 @@
-// Closure — Figma plugin (design-token JSON export)
-figma.showUI(__html__, { width: 380, height: 740, themeColors: true });
+// JSON Exporter — Figma plugin (Token Studio JSON export)
+figma.showUI(__html__, { width: 420, height: 740, themeColors: true });
 
 function normalizeVariableName(name, collectionName) {
   if (!name) return '';
@@ -97,7 +97,7 @@ function formatValue(value, type) {
   if (type === 'COLOR' && value && typeof value === 'object' && value.r !== undefined) {
     var r = Math.round(value.r * 255), g = Math.round(value.g * 255), b = Math.round(value.b * 255);
     var a = value.a !== undefined ? value.a : 1;
-    // uppercase hex, no spaces in rgba — matches the reference format
+    // uppercase hex, no spaces in rgba — matches Token Studio reference format
     return a === 1
       ? '#' + [r, g, b].map(function(x) { return x.toString(16).padStart(2, '0').toUpperCase(); }).join('')
       : 'rgba(' + r + ',' + g + ',' + b + ',' + parseFloat(a.toFixed(2)) + ')';
@@ -220,7 +220,7 @@ function buildAliasPath(aliasedVar, aliasedVarCollection, currentCollectionName,
   return normalized.replace(/\//g, '.');
 }
 
-// --- TOKEN MATH: dimension.N → N*{dimension.base} when divisible (matches the token math layer) ---
+// --- TOKEN STUDIO: dimension.N → N*{dimension.base} when divisible (matches Token Studio math layer) ---
 function applyDimensionBaseExpressions(core) {
   if (!core || !core.dimension || !core.dimension.base) return core;
   var baseTok = core.dimension.base;
@@ -598,7 +598,7 @@ function walkAndFinalizeNatoTypographyComposites(core, obj) {
 // scale in this system ({letterSpacing.7}). The source stores 0 letter-spacing
 // for all scales, but the composite builder defaulted to index 0 (-5%); force
 // the correct index. (Underline is NOT applied: the Figma source has no
-// text-decoration on links — that underline only exists in the design-token app
+// text-decoration on links — that underline only exists in the Token Studio app
 // export, so emitting it would invent data not present in the file.)
 function applyCanonicalBreakpointTypography(breakpointContent) {
   if (!breakpointContent || !breakpointContent.typography) return;
@@ -680,10 +680,14 @@ function coerceBreakpointSpacingSizingToDimensionExpressions(breakpointContent, 
 }
 
 // --- TRANSFORMATION ENGINE ---
-function transformToFinalFormat(rawData) {
+// options.includeDescriptions — carry each variable's Figma description onto its
+// tokens. Off by default so the Token Studio export stays byte-identical to what
+// it has always produced; the DTCG formats turn it on to populate $description.
+function transformToFinalFormat(rawData, options) {
+  var includeDescriptions = !!(options && options.includeDescriptions);
   var output = {};
   var tokenCounter = 0;
-  console.log('[Closure v8] transformToFinalFormat — collections:', rawData.collections.length);
+  console.log('[JSON Exporter v8] transformToFinalFormat — collections:', rawData.collections.length);
 
   var maps = buildCollectionMap(rawData.collections);
   var modeMap = maps.modeMap;
@@ -757,6 +761,11 @@ function transformToFinalFormat(rawData) {
 
         var token = { type: finalType, value: tokenValue };
 
+        // Figma's per-variable description. Carried on every mode's token (the
+        // description belongs to the variable, not the mode) and surfaced as
+        // DTCG's $description.
+        if (includeDescriptions && v.description) token.description = v.description;
+
         if (!(aliasData && aliasData.isAlias) && tokenValue !== undefined && tokenValue !== null) {
           if (tokenPath.indexOf('font-weights/') !== -1 || /(^|\/)weight$/i.test(tokenPath)) {
             token.value = normalizeFontWeightLiteral(tokenValue);
@@ -794,7 +803,7 @@ function transformToFinalFormat(rawData) {
   return { tokens: output, count: tokenCounter };
 }
 
-// --- the token format: font-family / fontFamilies token slugs must be lowercase (Safiro → safiro) ---
+// --- Token Studio: font-family / fontFamilies token slugs must be lowercase (Safiro → safiro) ---
 function normalizeFontFamilyAliasSegments(str) {
   if (typeof str !== 'string') return str;
   return str
@@ -848,7 +857,7 @@ function fixFoundationTokens(obj, pathParts) {
       Object.prototype.hasOwnProperty.call(obj, 'type')) {
     var tokenType  = getFoundationTokenType(pathParts) || obj.type;
     var tokenValue = obj.value;
-    // Fix 6: radius.full is '999' (string) in the token format, not 999 (number)
+    // Fix 6: radius.full is '999' (string) in Token Studio, not 999 (number)
     if (pathParts[0] === 'radius' && tokenValue === 999) tokenValue = '999';
     var result = { value: tokenValue, type: tokenType };
     var ks = Object.keys(obj);
@@ -864,6 +873,15 @@ function fixFoundationTokens(obj, pathParts) {
     out[keys[j]] = fixFoundationTokens(obj[keys[j]], pathParts.concat([keys[j]]));
   }
   return out;
+}
+
+// Three fixups below rebuild token nodes from scratch, dropping every key beyond
+// value/type. Carry the description across so it survives to $description.
+// Deliberately narrow: those same rebuilds also drop codeSyntax, and preserving
+// that as well would change the existing Token Studio export.
+function carryDescription(target, source) {
+  if (source && source.description) target.description = source.description;
+  return target;
 }
 
 // Fix 7: Reorder all token nodes so `value` comes before `type`
@@ -1002,7 +1020,7 @@ function fixCoreTokens(obj, pathParts) {
     else if (first === 'font-weights')        cType = 'number';         // dash group
     else if (first === 'paragraphSpacing')    cType = 'paragraphSpacing'; // camelCase group
     else if (first === 'paragraph-spacing')   cType = 'number';           // dash group
-    else if (first === 'paragraphIndent')     cType = 'paragraphIndent';  // semantic type
+    else if (first === 'paragraphIndent')     cType = 'paragraphIndent';  // Token Studio semantic type
     else if (first === 'paragraph-indents')   cType = 'number';           // dash group
     else if (first && first.startsWith('viewport-')) cType = 'sizing';    // viewport-* tokens
     if (first === 'font-weights' && cValue !== undefined && cValue !== null) {
@@ -1032,7 +1050,7 @@ function fixCoreTokens(obj, pathParts) {
   var keys = Object.keys(obj);
   for (var j = 0; j < keys.length; j++) {
     var k = keys[j];
-    // Fix H: lowercase font-family / fontFamilies sub-keys (the token format: safiro not Safiro)
+    // Fix H: lowercase font-family / fontFamilies sub-keys (Token Studio: safiro not Safiro)
     var outKey = k;
     if (pathParts.length === 1 && (pathParts[0] === 'font-family' || pathParts[0] === 'fontFamilies')) {
       outKey = k.toLowerCase();
@@ -1064,7 +1082,7 @@ function fixBreakpointTypes(obj, pathParts) {
     if (t === 'number' && typeof v === 'number') {
       v = formatFloatForExport(v);
     }
-    return { value: v, type: t };
+    return carryDescription({ value: v, type: t }, obj);
   }
 
   var result = {};
@@ -1113,10 +1131,10 @@ function addTypographyComposite(scaleObj, scaleName) {
   if (!rebuilt['text-decoration'] && scaleObj.textDecoration) rebuilt['text-decoration'] = scaleObj.textDecoration;
 
   if (rebuilt.weight && rebuilt.weight.value !== undefined) {
-    rebuilt.weight = {
+    rebuilt.weight = carryDescription({
       value: normalizeFontWeightLiteral(rebuilt.weight.value),
       type: 'number'
-    };
+    }, rebuilt.weight);
   }
 
   if (!rebuilt['font-family'] && cv.fontFamily) {
@@ -1151,7 +1169,7 @@ function fixBreakpointTypography(typObj) {
 function fixLayoutColumnTypes(obj) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
   if (Object.prototype.hasOwnProperty.call(obj, 'value') && Object.prototype.hasOwnProperty.call(obj, 'type')) {
-    return { value: obj.value, type: 'sizing' };
+    return carryDescription({ value: obj.value, type: 'sizing' }, obj);
   }
   var result = {};
   Object.keys(obj).forEach(function(k) { result[k] = fixLayoutColumnTypes(obj[k]); });
@@ -1207,7 +1225,7 @@ function generateHashFromId(id) {
 }
 
 function stripVariableIdPrefix(id) {
-  // Convert Figma variable ID to a 40-character hex hash (the token JSON format)
+  // Convert Figma variable ID to a 40-character hex hash (Token Studio format)
   if (typeof id === 'string') {
     // Remove any prefix like "VariableID:" and generate hash
     var cleanId = id;
@@ -1220,13 +1238,13 @@ function stripVariableIdPrefix(id) {
 }
 
 /**
- * the reference token file: foundation $figmaStyleReferences uses
+ * Token Studio / Nato reference: foundation $figmaStyleReferences uses
  * (1) short keys elevation.level-1 … level-6 only,
  * (2) typography.*.* ,
  * (3) long keys elevation.level-0.level-0 … level-6.level-6 ,
  * (4) app-bar / FAB with duplicated last segment (e.g. .flat.flat).
  */
-function buildFoundationStyleRefs(rawData, formatStyleId, toTokenCase) {
+function buildFoundationStyleRefs(rawData, formatStyleId, toTokenStudioCase) {
   var refs = {};
   if (!rawData || !rawData.styles) return refs;
 
@@ -1239,7 +1257,7 @@ function buildFoundationStyleRefs(rawData, formatStyleId, toTokenCase) {
   if (rawData.styles.effectStyles) {
     rawData.styles.effectStyles.forEach(function(style) {
       var nameParts = style.name.split('/');
-      var lowerParts = nameParts.map(function(p) { return toTokenCase(p); });
+      var lowerParts = nameParts.map(function(p) { return toTokenStudioCase(p); });
       var basePath = lowerParts.join('.');
       var lastSeg = lowerParts[lowerParts.length - 1];
       var id = formatStyleId(style.id);
@@ -1269,10 +1287,10 @@ function buildFoundationStyleRefs(rawData, formatStyleId, toTokenCase) {
       var id = formatStyleId(style.id);
       var tokenPath;
       if (nameParts.length >= 2) {
-        var lp = nameParts.map(function(p) { return toTokenCase(p); });
+        var lp = nameParts.map(function(p) { return toTokenStudioCase(p); });
         tokenPath = lp.join('.') + '.' + lp[lp.length - 1];
       } else {
-        var converted = toTokenCase(style.name);
+        var converted = toTokenStudioCase(style.name);
         tokenPath = 'typography.' + converted + '.' + converted;
       }
       typoEntries.push({ key: tokenPath, id: id });
@@ -1292,7 +1310,7 @@ function buildFoundationStyleRefs(rawData, formatStyleId, toTokenCase) {
   return refs;
 }
 
-/** Canonical token set order (Nato reference). */
+/** Canonical Token Studio token set order (Nato reference). */
 var TOKEN_STUDIO_SET_ORDER = [
   'core',
   'foundation',
@@ -1371,7 +1389,7 @@ function buildThemes(rawData, tokenSetNames) {
     collectionMap[col.name] = col;
   });
 
-  // Helper: convert style ID to the token JSON format "S:hash," (single comma)
+  // Helper: convert style ID to Token Studio format "S:hash," (single comma)
   function formatStyleId(id) {
     var cleanId = String(id).replace(/^S:/, '');
     // Generate hash from style ID
@@ -1383,9 +1401,9 @@ function buildThemes(rawData, tokenSetNames) {
     var refs = {};
     if (!rawData.styles) return refs;
 
-    // Helper to convert style name to the token JSON format
+    // Helper to convert style name to Token Studio format
     // "Body M Bold" -> "body-M-bold", "Title L" -> "title-L"
-    function toTokenCase(name) {
+    function toTokenStudioCase(name) {
       var kebab = name.replace(/\s+/g, '-');
       var parts = kebab.split('-');
       var result = parts.map(function(part) {
@@ -1397,14 +1415,14 @@ function buildThemes(rawData, tokenSetNames) {
       return result.join('-');
     }
 
-    // Layout / columns theme: empty style map (the reference token file)
+    // Layout / columns theme: empty style map (Token Studio reference)
     if (themeGroup === 'layout') {
       return {};
     }
 
     // Foundation: Nato key order + duplicate elevation segments + typography block
     if (themeName === 'foundation' && (themeGroup == null || themeGroup === '')) {
-      return buildFoundationStyleRefs(rawData, formatStyleId, toTokenCase);
+      return buildFoundationStyleRefs(rawData, formatStyleId, toTokenStudioCase);
     }
 
     // Breakpoint themes only have typography styles with breakpoint prefix
@@ -1414,10 +1432,10 @@ function buildThemes(rawData, tokenSetNames) {
           var nameParts = style.name.split('/');
           var tokenPath;
           if (nameParts.length >= 2) {
-            var lowerParts = nameParts.map(function(p) { return toTokenCase(p); });
+            var lowerParts = nameParts.map(function(p) { return toTokenStudioCase(p); });
             tokenPath = 'breakpoint.' + lowerParts.join('.') + '.' + lowerParts[lowerParts.length - 1];
           } else {
-            var converted = toTokenCase(style.name);
+            var converted = toTokenStudioCase(style.name);
             tokenPath = 'breakpoint.typography.' + converted + '.' + converted;
           }
           refs[tokenPath] = formatStyleId(style.id);
@@ -1471,10 +1489,10 @@ function buildThemes(rawData, tokenSetNames) {
         var nameParts = style.name.split('/');
         var tokenPath;
         if (nameParts.length >= 2) {
-          var lowerParts = nameParts.map(function(p) { return toTokenCase(p); });
+          var lowerParts = nameParts.map(function(p) { return toTokenStudioCase(p); });
           tokenPath = lowerParts.join('.') + '.' + lowerParts[lowerParts.length - 1];
         } else {
-          var converted = toTokenCase(style.name);
+          var converted = toTokenStudioCase(style.name);
           tokenPath = 'typography.' + converted + '.' + converted;
         }
         refs[tokenPath] = formatStyleId(style.id);
@@ -1502,7 +1520,7 @@ function buildThemes(rawData, tokenSetNames) {
     }
   }
 
-  // Core theme with dot prefix (as in the token format)
+  // Core theme with dot prefix (like Token Studio)
   if (tokenSetNames.indexOf('core') !== -1) {
     var coreCol = collectionMap['.core'] || collectionMap['core'];
     if (coreCol && coreCol.modes.length > 0) {
@@ -1547,7 +1565,7 @@ function buildThemes(rawData, tokenSetNames) {
       if (tokenSetNames.indexOf(tokenSetKey) !== -1) {
         var selectedSets = {};
         selectedSets[tokenSetKey] = 'enabled';
-        // the token format uses restrictions/unrestricted as source for mode themes
+        // Token Studio uses restrictions/unrestricted as source for mode themes
         if (tokenSetNames.indexOf('restrictions/unrestricted') !== -1) {
           selectedSets['restrictions/unrestricted'] = 'source';
         }
@@ -1656,7 +1674,7 @@ function buildThemes(rawData, tokenSetNames) {
     });
   }
 
-  // Breakpoint themes - use original Figma mode names as in the token format
+  // Breakpoint themes - use original Figma mode names like Token Studio
   var breakpointCol = collectionMap['.breakpoint'];
   if (breakpointCol) {
     breakpointCol.modes.forEach(function(mode, idx) {
@@ -1724,7 +1742,7 @@ function buildThemes(rawData, tokenSetNames) {
       name: config.name
     };
 
-    // Add group field if present (the token format uses this for grouping themes)
+    // Add group field if present (Token Studio uses this for grouping themes)
     if (config.group) {
       theme.group = config.group;
     }
@@ -1811,7 +1829,7 @@ function ensureCoreTextCaseAndDecorationPrimitives(core) {
   return core;
 }
 
-/** Nato_8-4-26_3: semantic line-height scale (composite refs {lineHeights.0}…{lineHeights.3}). */
+/** Nato_8-4-26_3 / Token Studio: semantic line-height scale (composite refs {lineHeights.0}…{lineHeights.3}). */
 var NATO_TS_DEFAULT_LINE_HEIGHTS = {
   '0': { value: '100%', type: 'lineHeights' },
   '1': { value: '130%', type: 'lineHeights' },
@@ -1827,7 +1845,7 @@ var NATO_LINE_HEIGHT_KEBAB_TO_SEMANTIC = {
   '125': '3'
 };
 
-/** Nato_8-4-26_3: letterSpacing.0…8 (composite refs {letterSpacing.N}). */
+/** Nato_8-4-26_3 / Token Studio: letterSpacing.0…8 (composite refs {letterSpacing.N}). */
 var NATO_TS_DEFAULT_LETTER_SPACING = {
   '0': { value: '-5%', type: 'letterSpacing' },
   '1': { value: '-4%', type: 'letterSpacing' },
@@ -1897,10 +1915,10 @@ function mergeLetterSpacingSemantic(partial, defaults) {
 }
 
 /**
- * Ensures the camelCase groups core.lineHeights and core.letterSpacing exist so
+ * Ensures Token Studio camelCase groups core.lineHeights and core.letterSpacing exist so
  * composite typography refs like {lineHeights.0} and {letterSpacing.7} resolve (Nato_8-4-26_3).
  */
-function ensureCoreLineHeightsLetterSpacing(core) {
+function ensureCoreTokenStudioLineHeightsLetterSpacing(core) {
   if (!core || typeof core !== 'object') return core;
 
   var lhExisting = core.lineHeights;
@@ -2011,7 +2029,7 @@ function buildCoreElevationReference() {
   };
 }
 
-function toTokenFormat(native, rawData) {
+function toTokenStudioFormat(native, rawData) {
   var out = {};
 
   // Rule 2: core — unwrap double nesting + type corrections (Nato-style camel primitives) + dimension math
@@ -2021,7 +2039,7 @@ function toTokenFormat(native, rawData) {
   }
   if (!out['core']) out['core'] = {};
   ensureCoreTextCaseAndDecorationPrimitives(out['core']);
-  ensureCoreLineHeightsLetterSpacing(out['core']);
+  ensureCoreTokenStudioLineHeightsLetterSpacing(out['core']);
 
   // Rule 8 (spec): foundation — unwrap double nesting
   if (native['foundation'] && native['foundation']['foundation']) {
@@ -2035,7 +2053,7 @@ function toTokenFormat(native, rawData) {
     out['foundation'] = {};
   }
 
-  // the token format dimension-math layer: raw numeric foundation tokens in
+  // Token Studio dimension-math layer: raw numeric foundation tokens in
   // sizing/component, radius and strokes are expressed as {dimension.1}*N
   // (N = value / dimension.1). The `full` sentinel (999) stays raw.
   (function applyFoundationDimensionExpressions() {
@@ -2132,7 +2150,7 @@ function toTokenFormat(native, rawData) {
   });
   out['foundation']['typography'] = foundTypography;
 
-  // Reorder foundation keys to match the reference token file order
+  // Reorder foundation keys to match Token Studio reference order
   var FOUNDATION_KEY_ORDER = ['spacing', 'sizing', 'radius', 'colours', 'typography', 'strokes', 'grid', 'elevation', 'variant'];
   var orderedFoundation = {};
   FOUNDATION_KEY_ORDER.forEach(function(k) {
@@ -2206,7 +2224,7 @@ function toTokenFormat(native, rawData) {
     'XL Desktop': 'desktop',
     'XXL Large Desktop': 'large-desktop'
   };
-  // the token format key order for breakpoint content
+  // Token Studio key order for breakpoint content
   var BP_KEY_ORDER = ['spacing', 'sizing', 'typography', 'grid', 'stretch-grid', 'overflow-grid', 
                       'fixed-grid', 'columns', 'layout', 'breakpoint-string'];
   
@@ -2236,7 +2254,7 @@ function toTokenFormat(native, rawData) {
         content = withTypo;
       }
       
-      // Reorder keys to match the token format
+      // Reorder keys to match Token Studio
       var orderedContent = {};
       BP_KEY_ORDER.forEach(function(k) {
         if (content[k] !== undefined) orderedContent[k] = content[k];
@@ -2262,7 +2280,7 @@ function toTokenFormat(native, rawData) {
   var tokenSetNames = Object.keys(out).filter(function(k) { return k !== '$themes'; });
   out['$themes'] = buildThemes(rawData, tokenSetNames);
 
-  // the token format: Nato-style typography (camel composite refs, kebab standalone, per-scale lineHeight / line-height formula)
+  // Token Studio: Nato-style typography (camel composite refs, kebab standalone, per-scale lineHeight / line-height formula)
   Object.keys(out).forEach(function(tsKey) {
     if (tsKey.indexOf('breakpoint/') !== 0 || !out[tsKey].breakpoint) return;
     var bp = out[tsKey].breakpoint;
@@ -2296,7 +2314,7 @@ function toTokenFormat(native, rawData) {
   // mode, Level 1-6). These are fixed raw boxShadow values that are NOT stored as
   // Figma variables (shadows aren't variables) and don't resolve from the effect
   // styles (which read zero on the neutral path), so they are emitted verbatim to
-  // match the canonical reference export exactly.
+  // match the canonical Token Studio export exactly.
   if (!out['core']) out['core'] = {};
   out['core']['Elevation'] = buildCoreElevationReference();
 
@@ -2345,7 +2363,7 @@ function validateReferenceClosure(tokens) {
     })(tokens[setName], '');
   });
 
-  // Extract genuine token references from a value. A real reference is
+  // Extract genuine Token Studio references from a value. A real reference is
   // {dotted.path} with no quotes/colons — this skips literal composite shadow
   // value objects like {"color":"#000","type":"dropShadow",...}.
   function refsOf(v) {
@@ -2407,7 +2425,14 @@ var GIT_CONFIG_KEY = 'json-exporter-git-config';
 // --- MESSAGE HANDLER ---
 figma.ui.onmessage = function(msg) {
   if (msg.type === 'resize') {
-    figma.ui.resize(380, msg.height);
+    figma.ui.resize(420, msg.height);
+    return;
+  }
+
+  // Lightweight: report the current file name immediately, without waiting for
+  // the (slow) variable extraction — used to auto-select the target folder.
+  if (msg.type === 'GET_FILE_INFO') {
+    figma.ui.postMessage({ type: 'fileInfo', fileName: (figma.root && figma.root.name) || '' });
     return;
   }
 
@@ -2431,13 +2456,6 @@ figma.ui.onmessage = function(msg) {
     return;
   }
 
-  if (msg.type === 'CLEAR_GIT_SETTINGS') {
-    figma.clientStorage.deleteAsync(GIT_CONFIG_KEY).then(function() {
-      figma.ui.postMessage({ type: 'GIT_SETTINGS_CLEARED' });
-    });
-    return;
-  }
-
   if (msg.type === 'extract') {
     figma.variables.getLocalVariableCollectionsAsync().then(function(collections) {
 
@@ -2455,7 +2473,7 @@ figma.ui.onmessage = function(msg) {
         var hasParent = !!col.parentVariableCollectionId;
         var hasRoot = !!col.rootVariableCollectionId;
         var hasOverrides = !!col.variableOverrides;
-        console.log('[Closure v8] Collection "' + col.name + '"' +
+        console.log('[JSON Exporter v8] Collection "' + col.name + '"' +
           ' | isExtension=' + isExt +
           ' | parentId=' + (col.parentVariableCollectionId || 'none') +
           ' | rootId=' + (col.rootVariableCollectionId || 'none') +
@@ -2469,7 +2487,7 @@ figma.ui.onmessage = function(msg) {
       var methodCheckPromise = sampleVarId
         ? figma.variables.getVariableByIdAsync(sampleVarId).then(function(v) {
             var hasMethod = v && typeof v.valuesByModeForCollectionAsync === 'function';
-            console.log('[Closure v8] valuesByModeForCollectionAsync available: ' + hasMethod);
+            console.log('[JSON Exporter v8] valuesByModeForCollectionAsync available: ' + hasMethod);
             return hasMethod;
           })
         : Promise.resolve(false);
@@ -2531,8 +2549,8 @@ figma.ui.onmessage = function(msg) {
             if (isExtended && varPairs.length > 0 && varPairs[0]) {
               var firstVarModeIds = Object.keys(varPairs[0].collectionValues);
               var colModeIds = col.modes.map(function(m) { return m.modeId; });
-              console.log('[Closure v8] Extended "' + col.name + '" first var modeIds: ' + JSON.stringify(firstVarModeIds.slice(0, 3)));
-              console.log('[Closure v8] Extended "' + col.name + '" collection modeIds: ' + JSON.stringify(colModeIds.slice(0, 3)));
+              console.log('[JSON Exporter v8] Extended "' + col.name + '" first var modeIds: ' + JSON.stringify(firstVarModeIds.slice(0, 3)));
+              console.log('[JSON Exporter v8] Extended "' + col.name + '" collection modeIds: ' + JSON.stringify(colModeIds.slice(0, 3)));
               // Log first alias to verify override detection
               var firstAlias = null;
               for (var i = 0; i < varPairs.length && !firstAlias; i++) {
@@ -2547,7 +2565,7 @@ figma.ui.onmessage = function(msg) {
                 }
               }
               if (firstAlias) {
-                console.log('[Closure v8] Extended "' + col.name + '" first alias: ' + JSON.stringify(firstAlias));
+                console.log('[JSON Exporter v8] Extended "' + col.name + '" first alias: ' + JSON.stringify(firstAlias));
               }
             }
 
@@ -2624,6 +2642,27 @@ figma.ui.onmessage = function(msg) {
         return Promise.all(promises);
       });
     }).then(function(result) {
+      // How many variables actually carry a Figma description, counted on the RAW
+      // extraction — upstream of transformToFinalFormat, the Token Studio fixups
+      // and the DTCG conversion. If this says 0, the descriptions are not in the
+      // file; if it says N > 0 but the export has none, the loss is ours.
+      (function logDescriptionCoverage() {
+        var total = 0, described = 0;
+        result.forEach(function(col) {
+          col.variables.forEach(function(v) {
+            total++;
+            if (v.description) described++;
+          });
+        });
+        var pct = total ? Math.round((described / total) * 100) : 0;
+        console.log('[JSON Exporter] Figma descriptions: ' + described + ' of ' +
+          total + ' variables (' + pct + '%)');
+        if (!described && total) {
+          console.log('[JSON Exporter] No variable in this file has a description — ' +
+            'nothing for the DTCG export to carry into $description.');
+        }
+      })();
+
       // Also extract local styles (text styles and effect styles) for $figmaStyleReferences
       var textStyles = figma.getLocalTextStyles().map(function(style) {
         return {
@@ -2640,26 +2679,29 @@ figma.ui.onmessage = function(msg) {
         };
       });
       
-      figma.ui.postMessage({ 
-        type: 'extracted', 
+      figma.ui.postMessage({
+        type: 'extracted',
         collections: result,
+        fileName: (figma.root && figma.root.name) || '',
         styles: {
           textStyles: textStyles,
           effectStyles: effectStyles
         }
       });
     }).catch(function(e) {
-      console.error('[Closure v8] Extract error:', e);
+      console.error('[JSON Exporter v8] Extract error:', e);
       figma.ui.postMessage({ type: 'error', message: e.message });
     });
   }
 
   if (msg.type === 'transform') {
-    var nativeResult = transformToFinalFormat(msg.raw);
+    var nativeResult = transformToFinalFormat(msg.raw, {
+      includeDescriptions: !!msg.includeDescriptions
+    });
     var exportMode = msg.exportMode || 'token-studio';
     var finalTokens;
     if (exportMode === 'token-studio') {
-      finalTokens = toTokenFormat(nativeResult.tokens, msg.raw);
+      finalTokens = toTokenStudioFormat(nativeResult.tokens, msg.raw);
     } else {
       finalTokens = nativeResult.tokens;
     }
@@ -2667,8 +2709,8 @@ figma.ui.onmessage = function(msg) {
       ? validateReferenceClosure(finalTokens)
       : { ok: true, brokenCount: 0, totalRefs: 0, byRoot: {}, missingRoots: [], sampleBroken: [] };
     if (!closure.ok) {
-      console.warn('[Closure] ⚠ ' + closure.brokenCount + ' broken references. Missing sets: ' + closure.missingRoots.join(', '));
-      console.warn('[Closure] sample:', closure.sampleBroken);
+      console.warn('[JSON Exporter] ⚠ ' + closure.brokenCount + ' broken references. Missing sets: ' + closure.missingRoots.join(', '));
+      console.warn('[JSON Exporter] sample:', closure.sampleBroken);
     }
     figma.ui.postMessage({
       type: 'transformed',

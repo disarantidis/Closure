@@ -1,0 +1,2895 @@
+<!DOCTYPE html>
+<html data-mode="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JSON Exporter · Token Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Excludes RADD's own elements: this plugin's pre-existing reset is
+       unlayered author CSS, same as every rule in this file, while RADD's
+       component rules live inside @layer radd.components — and unlayered
+       CSS always beats layered CSS regardless of specificity. Left
+       unscoped, `padding: 0` and `margin: 0` here silently zero out EVERY
+       RADD component's own padding/margin tokens (confirmed on Button,
+       IconButton, TextField, TextArea, SegmentedControl — all computed to
+       0px despite real, non-zero padding tokens). RADD sets box-sizing:
+       border-box on its own elements already (@layer radd.reset), so
+       excluding them from that part too is redundant, not harmful. */
+    *:not([class*="RADD"]) { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* RADD components set `display` unconditionally on their own class
+       (e.g. .RADDButton { display: flex }), which — being an author style —
+       silently beats the browser's built-in `[hidden] { display: none }` UA
+       rule. Restated as an author rule (with !important so it always wins
+       regardless of source order) so `.hidden = true` keeps working on them. */
+    [hidden] { display: none !important; }
+
+    /* RADD's TextArea "standard" status border resolves to
+       --colours-basic-stroke, which is pure white in dark mode — a stark
+       1px line next to --colours-basic-stroke-subtle, which --app-border
+       (and so every other border in this app) uses. Re-pointed at that
+       subtler stroke token, per the README's token-override pattern. */
+    .RADDTextArea {
+      --RADDTextArea-InputField-before-border--status-standard: var(--strokes-1) solid var(--colours-basic-stroke-subtle);
+    }
+
+    /* @desquared/radd-reactjs@3.0.1 wires the *typed text* font for
+       size="small" on both TextField and TextArea to --body-m-bold (700
+       weight) — confirmed against the package's own typography.css, which
+       also defines a --body-m-regular (500 weight) at the same 1rem size
+       that every other component's body copy uses. Any text a user types
+       renders bold, which reads as broken rather than a design choice.
+       Re-pointed at the regular weight; only fixes the input's own text,
+       not the field label (RADD's bold label is a normal, intentional
+       pattern this app already otherwise follows). */
+    .RADDTextField, .RADDTextArea {
+      --RADDTextField-Input-font--size-small: var(--body-m-regular);
+      --RADDTextArea-Input-font--size-small: var(--body-m-regular);
+    }
+
+    /* RADD's own TextField.css collapses .RADDTextField-InputContainer to
+       height:0/overflow:hidden until its own internal "filled" state (true
+       when focused OR has a value OR is readonly — see the compiled
+       TextField source) adds --filled, expanding it back to height:unset.
+       That's a floating-label pattern: while empty and unfocused, the
+       label sits where the input normally would, and the real input+icon
+       stay invisibly collapsed until focus. None of this app's fields rely
+       on that — so every empty, unfocused field (leading icon, placeholder,
+       cursor) was invisibly clipped away until clicked, confirmed via the
+       real computed style/DOM, not a screenshot-rendering artifact. */
+    .RADDTextField-InputContainer {
+      height: unset;
+      overflow: unset;
+    }
+
+    /* Same upstream pattern as the TextField/TextArea fix above: RADD wires
+       RADDDialogContent's body `text` to --body-m-bold (700 weight) — the
+       title correctly uses --subtitle (also 700, by design for a heading),
+       but the body copy has no such reasoning and just reads as broken.
+       Re-pointed at --body-m-regular (500 weight). */
+    .RADDDialog {
+      --RADDDialog-Text-font: var(--body-m-regular);
+    }
+
+    /* RADDDialogContent's title container renders unconditionally (fixed
+       min-height + padding) even with no `title` passed — only the heading
+       span inside it is conditional. The token-modal dialog below skips
+       `title` so it can render its own icon+heading row instead (`title`
+       is a plain string prop — no slot for an icon), so this collapses the
+       resulting empty container rather than leaving a blank gap above that
+       row. Self-scoping: only matches a dialog with no title at all. */
+    .RADDDialog-TitleContainer:empty {
+      display: none;
+    }
+
+    /* RADD's own spacing puts a 24px bottom pad on contentSlot's own
+       container PLUS another 24px top pad on the action buttons' container
+       — 48px total between the token field and the buttons, clearly too
+       much in this compact dialog. Trimmed via `className="token-modal-dialog"`
+       on this dialog only. Two DIFFERENT tokens control that second gap
+       depending on the panel's current height at render time:
+       RADDDialogContent's own `stickyButton` prop defaults true, so at this
+       plugin's normal 420×740 panel it's `--RADDDialog-SlotContainer3-padding--stickyButton`
+       (confirmed via the real DOM: the action row's padded ancestor is
+       `.RADDDialog-SlotContainer3--stickyButton`, not SlotContainer2) — but
+       stickyButton turns itself off below a 600px-tall viewport
+       (`isSmallViewport`, DialogContent's own internal check), which is
+       reachable here since the panel's height is user-resizable (the
+       drag-handle in ui.template.html), and that shorter-panel case renders
+       through `--RADDDialog-SlotContainer2-padding` instead. Both are
+       overridden together so the gap stays trimmed either way — this was
+       originally only SlotContainer2 (a plain guess at which token
+       applied), which turned out to be the wrong one for this plugin's own
+       actual default height, caught later while fixing the same mistake
+       for .remove-confirm-dialog below.
+
+       Both tokens are set via the 4-value `padding` shorthand (top only
+       reduced, right/bottom/left left at the normal --spacing-component-7)
+       — NOT a single value. A single value applies to all four sides, which
+       first shipped here by mistake and visibly squashed the button row's
+       LEFT/RIGHT inset far tighter than the field/text above it (caught
+       from a real screenshot: the buttons read flush with the dialog's
+       outer edge while the field above still had its normal margin). */
+    .token-modal-dialog {
+      /* Field→buttons gap = this bottom value + SlotContainer2/3's own top
+         value below (4px + 4px = 8px total) — bumped +16px by increasing
+         just this side, spacing-component-2 (4px) -> spacing-component-6
+         (20px, exactly +16px), landing on a real token instead of an
+         arbitrary px value. New total: 20 + 4 = 24px. */
+      --RADDDialog-SlotContainer-padding: 0 var(--spacing-component-7) var(--spacing-component-6) var(--spacing-component-7);
+      --RADDDialog-SlotContainer2-padding: var(--spacing-component-2) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
+      --RADDDialog-SlotContainer3-padding--stickyButton: var(--spacing-component-2) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
+    }
+
+    /* The GitHub/GitLab "Remove?" confirm dialogs use `text` (not
+       contentSlot), so their own version of the same double-padding stack
+       is --RADDDialog-TextSection's bottom pad plus whichever of the two
+       tokens above actually renders for the current panel height — see the
+       long comment on .token-modal-dialog for why both are needed, and why
+       each is a top-only 4-value override rather than a single value. */
+    .remove-confirm-dialog {
+      --RADDDialog-SlotContainer2-padding: var(--spacing-component-4) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
+      --RADDDialog-SlotContainer3-padding--stickyButton: var(--spacing-component-4) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
+    }
+
+    /* This app's own chrome vars are aliases onto RADD's own design tokens
+       (--colours-* from @desquared/radd-design-tokens-radd), so the plugin's
+       plain CSS and its RADD components always resolve to the same palette.
+       The app is dark-only by design (data-mode="dark" is set statically on
+       <html>, no toggle) — light mode still exists in the token package
+       itself ([data-mode="light"] in light-mode-tokens.css) but nothing in
+       this app switches to it. */
+    :root {
+      --app-bg: var(--colours-basic-background);
+      --app-surface: var(--colours-basic-background-subtle);
+      --app-surface-soft: var(--colours-interaction-states-hover-background-subtle-hover);
+      --app-border: var(--colours-basic-stroke-subtle);
+      --app-border-strong: var(--colours-basic-stroke);
+      --app-text: var(--colours-basic-text);
+      --app-text-muted: var(--colours-basic-text-recessive);
+      --app-text-subtle: var(--colours-basic-text-recessive);
+      --app-heading: var(--colours-basic-text);
+      --app-accent: var(--colours-basic-accent);
+      --app-danger: var(--colours-functional-destructive-standard);
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--app-bg);
+      color: var(--app-text);
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      padding: 16px 16px 14px;
+      flex-shrink: 0;
+    }
+
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--app-heading);
+    }
+
+    /* Shared by the main header and the Settings header (same class, same
+       size/padding on both — see ui-react/buttons.tsx history) so the two
+       land in the identical place when switching pages. Same surface
+       language as .export-panel at the bottom of the main screen. */
+    .header-panel {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+      background: var(--app-surface);
+      border-radius: 24px;
+      padding: 10px 14px;
+    }
+
+    .header-title-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      min-width: 0;
+    }
+
+    .header-logo {
+      height: 20px;
+      width: auto;
+      flex-shrink: 0;
+    }
+
+    .version-tag-mount {
+      flex-shrink: 0;
+    }
+
+    /* Custom pill, not a RADD component — same look the old .app-version
+       span had. */
+    .version-tag-label {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--app-text-subtle);
+      letter-spacing: 0.02em;
+      padding: 1px 6px;
+      border: 1px solid var(--app-border);
+      border-radius: 999px;
+      line-height: 1.6;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .main-page {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    
+    .main-page.hidden {
+      display: none;
+    }
+    
+    .main-page::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .main-page::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .main-page::-webkit-scrollbar-thumb {
+      background: var(--app-border);
+      border-radius: 4px;
+    }
+    
+    .main-page::-webkit-scrollbar-thumb:hover {
+      background: var(--app-text-muted);
+    }
+    
+    .page {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+    
+    .page.visible {
+      display: flex;
+    }
+    
+    /* No padding here on purpose — .header-settings manages its own inset
+       (same 16px/16px/14px as .header on the main screen), and
+       .settings-page-content below manages its own. Padding here would
+       double up with .header-settings's, pushing its .header-panel further
+       in than the main screen's, so the two pages' header containers no
+       longer land in the same place when switching between them. */
+    .settings-page {
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex-direction: column;
+    }
+    
+    .settings-page::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .settings-page::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .settings-page::-webkit-scrollbar-thumb {
+      background: var(--app-border);
+      border-radius: 4px;
+    }
+    
+    .settings-page .settings-page-content {
+      overflow: visible;
+      /* Deliberately NOT flex:1/min-height:0. Those existed to push the old
+         sticky action bar down to the bottom of a short page; with that bar
+         gone they actively broke this box — flex:1 sized it to the flex
+         line rather than to its own content, so on a page long enough to
+         scroll the children spilled out past it (overflow is visible) and
+         padding-bottom landed somewhere in the MIDDLE of the page instead
+         of after the last card. Sized by content, the padding lands where
+         it reads.
+         Left/right/bottom replace what used to come from .settings-page's
+         own padding; top stays the extra 20px (vs the header's own 14px
+         bottom padding) that was already there. Bottom is larger than the
+         sides on purpose, so the last card has real run-out below it
+         rather than ending flush with the panel edge. */
+      padding: 20px 16px 40px;
+    }
+
+    #gitlab-fields, #github-connection-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    /* Leads its own .provider-card now, so it needs neither the old
+       margin-top (the card's own margin supplies the gap above) nor the
+       old padding-left that hand-aligned it with the folder icon in the
+       rows below (the card's padding sets that inset for the heading and
+       the rows alike, so they line up by construction). */
+    .folder-paths-heading {
+      margin-bottom: 16px;
+    }
+    .folder-paths-title {
+      margin: 0;
+      /* One step up from --body-s-bold (the size RADD's own TextField label
+         renders at for size:'small' — the sibling "GitLab Token" etc.
+         labels on this same page): this class now labels genuine page
+         SECTIONS ("Push destination", "Repository settings", "GitLab" /
+         "GitHub", "Saved Folder Path"), not just a field-label-sized
+         caption, so it reads as a proper section title. --body-m-bold
+         (16px/700) also happens to land at the page's own <h1> size (also
+         16px, just 600 weight) — was previously scoped to just "Push
+         destination" alone; now shared by every section title for a
+         consistent hierarchy across the whole page. */
+      font: var(--body-m-bold);
+      letter-spacing: var(--body-m-bold-letter-spacing);
+      color: var(--app-text);
+    }
+    .folder-paths-subtitle {
+      margin: 2px 0 0;
+      font: var(--microcopy-regular);
+      letter-spacing: var(--microcopy-regular-letter-spacing);
+      color: var(--app-text-muted);
+      opacity: .7;
+    }
+
+
+    /* Back lives in the settings header now (see .header-settings), so the
+       page has no bottom action bar at all — Edit/Save/Cancel went away
+       with the view/edit mode, and there is nothing left to stick to the
+       bottom or fade content out behind. */
+
+    /* Standard-settings note + read-only look */
+    .settings-note {
+      font-size: 12px;
+      color: var(--app-text-muted);
+      background: var(--app-surface-soft);
+      border: 1px solid var(--app-border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      margin-bottom: 14px;
+    }
+
+    /* Folder / path row on the main screen: [ folder dropdown ][ file name ].
+       A grid (not flex) so both columns are always exactly equal width —
+       flex sizing here left the dropdown hugging its own content (a
+       RADDDropdownSelect isn't stretched internally), so an empty GitHub
+       dropdown rendered narrower than GitLab's filled one right above it;
+       1fr/1fr columns fix both the dropdown-vs-filename split AND the
+       gitlab-row-vs-github-row match, in one rule shared by both rows. */
+    .filename-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    #folder-select-mount, #github-folder-select-mount,
+    #export-filename-mount, #github-filename-mount { min-width: 0; }
+    /* One block per provider (header + its filename-row) — see the HTML
+       comment above .gitlab-target-wrap. Only needs its own top margin
+       when a second block can follow it; .commit-input-wrap's own 4px is
+       enough otherwise, so this is additive, not a replacement. */
+    .target-block + .target-block { margin-top: 12px; }
+    /* The title and the empty-state "+ Add folder path" share one line —
+       title on the left, the add-affordance flush right, so a provider
+       with nothing saved yet still reads as one coherent row instead of
+       two stacked ones. */
+    .target-row-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 6px;
+      /* Confirmed by the user against the real plugin: the whole title
+       block (logo + text) should sit inset by this amount to read as
+       aligned with the dropdown/text-area content below, not flush with
+       the row's outer edge. (An earlier attempt at this same padding was
+       reverted based on this project's own browser-test measurement of
+       the title text vs. the dropdown's inner value text lining up
+       without it — that measurement wasn't the right proxy for how this
+       actually reads in the real plugin; trust the user's direct visual
+       confirmation here over it.) padding-right pulls the empty-state "+"
+       button in by the same amount on that side. */
+      padding: 0 var(--spacing-component-6);
+    }
+    .target-row-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font: var(--microcopy-bold);
+      letter-spacing: var(--microcopy-bold-letter-spacing);
+      color: var(--app-text-muted);
+    }
+    .target-row-title-icon { flex-shrink: 0; }
+    /* Shown instead of the dropdown+filename row when a provider has zero
+       saved folder paths (e.g. freshly-added GitHub, before its first
+       folder is added in Settings) — an empty dropdown with nothing to
+       select read as broken, not "not configured yet". */
+    .target-row-empty {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .target-row-empty-label {
+      font: var(--microcopy-regular);
+      letter-spacing: var(--microcopy-regular-letter-spacing);
+      color: var(--app-text-muted);
+    }
+    /* Houses the small "Add ___ Settings" button and its trash-icon
+       neighbor together as one right-aligned group (see .target-row-header's
+       space-between) when a provider isn't ready but the other one is. */
+    .target-row-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Read-only list of saved folder paths in Settings (managed via Edit). */
+    .folder-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .folder-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* A provider's token field with its Clear button alongside. Same row
+       idiom as .folder-add below; the field takes the slack so the button
+       stays hard against the right edge whatever the panel width. The
+       button's mount span is hidden while the field is empty, and a hidden
+       span is still a flex item, so the gap only applies when it shows. */
+    .token-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .token-row > #gl-token-mount,
+    .token-row > #gh-token-mount { flex: 1; min-width: 0; }
+    .token-row > [hidden] { display: none; }
+
+    .folder-add {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .folder-add[hidden] { display: none; }
+    .folder-add input, #folder-new-mount, #github-folder-new-mount { flex: 1; }
+
+    /* Both GitLab and GitHub are equally add/removable — same field/list
+       visual language for each provider's own heading + "Remove" action.
+       The flex row's justify-content:space-between keeps "Remove ___"
+       flush at the right edge. */
+    /* The row itself is bare — the surface comes from whichever card it
+       sits in: .provider-card for an added provider (heading + its fields
+       share one container) or .provider-add-row when the row IS the whole
+       card. No padding-left of its own any more: inside either card, the
+       card's own padding sets the inset, and the heading lines up flush
+       with the left edge of the fields stacked below it. */
+    .provider-section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    /* The provider name + its logo badge, side by side (was plain text). */
+    .provider-section-heading .folder-paths-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    /* Small round chip behind each provider's brand mark — same surface
+       token/treatment as .header-panel's own background, scaled down to
+       fit a single icon instead of a whole row. */
+    .provider-logo-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--app-surface);
+      color: var(--app-text-muted);
+      flex-shrink: 0;
+    }
+    /* Shared header-style card surface — same surface/radius recipe as
+       .header-panel. Two users: an added provider's whole connection block
+       (.provider-card — heading AND its fields in one container), and the
+       single-row "Add ___" affordance for a provider that isn't added yet
+       (.provider-add-row). One recipe so the two never drift apart. */
+    .provider-card,
+    .provider-add-row {
+      background: var(--app-surface);
+      border-radius: 24px;
+      margin-bottom: 24px;
+    }
+    /* Evenly inset on all four sides: the heading and every field below it
+       sit against the same left edge. */
+    .provider-card {
+      padding: 14px;
+    }
+    /* The "Add ___" row sits at the END of the section, after whichever
+       provider(s) are already configured. #add-gitlab-row/#add-github-row
+       can never both be visible at once (gitlabAdded/githubAdded are never
+       both false), so no stacking gap to worry about between them. Tighter
+       vertical padding than .provider-card because it holds one row of
+       content rather than a whole stack, and no margin under its heading
+       (nothing follows it inside the card). Its own margin-bottom is
+       harmless as the last thing on the page — .settings-page-content's
+       padding supplies the real run-out below it. */
+    .provider-add-row {
+      padding: 10px 14px;
+      margin-bottom: 24px;
+    }
+    .provider-add-row.provider-section-heading {
+      margin-bottom: 24px;
+    }
+
+    /* "Repository settings" — always-visible heading for whichever
+       provider's connection fields are shown below (see
+       updateProviderSectionVisibility() in the script). No top margin,
+       same reasoning as .push-target above: the page's own top padding, or
+       .push-target's bottom margin when that section is also visible,
+       already supplies the gap above it. */
+    .repo-settings-heading {
+      margin: 0 0 24px;
+    }
+    .repo-settings-heading > .folder-paths-title {
+      padding-left: var(--spacing-component-6);
+    }
+    /* The GitLab/GitHub tab switcher itself only renders once a second
+       provider exists (buttons.tsx mounts a segmented control here) — see
+       updateProviderSectionVisibility(). margin-bottom only has an effect
+       while visible, so it's safe to declare unconditionally. */
+    #repo-settings-tabs-row {
+      margin-bottom: 24px;
+    }
+
+    /* "Output format" — Token Studio vs Tokens Studio DTCG. Leads the page, so
+       margin (the page's own top padding already spaces it from the header),
+       and the standard 40px bottom rhythm before whatever follows. Same
+       title/control indent as .push-target below: a switch, like a checkbox,
+       has no card padding of its own to push it in from the row edge, so the
+       indent comes from the container. */
+    .output-format {
+      margin: 0 0 40px;
+    }
+    .output-format > .folder-paths-title {
+      padding-left: var(--spacing-component-6);
+      margin-bottom: 16px;
+    }
+    #dtcg-format-control-mount {
+      display: block;
+      padding-left: var(--spacing-component-6);
+    }
+    /* Sits under the switch rather than directly under a title, so it needs
+       more than .folder-paths-subtitle's default 2px of separation. */
+    .output-format > .folder-paths-subtitle {
+      margin-top: 8px;
+      padding-left: var(--spacing-component-6);
+    }
+
+    /* Reuses a class that used to have zero matching markup (the historical
+       GitHub/GitLab/Both picker this is reviving was fully removed once
+       before — see radd-migration-progress memory). No top margin —
+       .output-format above it already supplies the 40px rhythm — just a
+       bottom margin to keep that rhythm before the GitLab fields that now
+       follow it. Padding-left on the
+       title is scoped to the title only (not the whole container) so the
+       GitLab/GitHub checkboxes below stay flush with the row edge, same as
+       how the folder-icon alignment above only ever shifts the heading
+       text, never the rows. */
+    .push-target {
+      margin: 0 0 40px;
+    }
+    .push-target > .folder-paths-title {
+      padding-left: var(--spacing-component-6);
+      margin-bottom: 16px;
+    }
+    /* The two checkboxes render as a vertical list (buttons.tsx mounts them
+       as siblings, no wrapping div of their own). Same padding-left as the
+       title above — unlike a folder row, a checkbox has no card padding of
+       its own to push its icon in from the row edge, so the indent has to
+       come from the container instead; the end result is the same column
+       (icon left edge at 36px) as the title and the folder icons share. */
+    #push-target-control-mount {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-left: var(--spacing-component-6);
+    }
+
+    /* Outer spacing wrapper only, same padding as .header on the main
+       screen — the actual visible container is .header-panel (shared class,
+       same background/radius/padding as the main screen's) nested inside,
+       so both pages' header containers land at the identical size/position
+       when switching between them. */
+    .header-settings {
+      display: flex;
+      align-items: center;
+      padding: 16px 16px 14px;
+      flex-shrink: 0;
+    }
+    
+    .header-settings .title {
+      flex: 1;
+    }
+    
+    .header-settings .git-logo {
+      color: var(--app-text-muted);
+      flex-shrink: 0;
+    }
+
+    .collections-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      /* No top/bottom padding here on purpose — #collections-list below is
+         the actual overflow-y:auto scroll container, so vertical breathing
+         room belongs on IT (see its own padding) or it never applies once
+         scrolled: this wrap's own edges only bound the unscrolled frame. */
+      padding: 0 16px;
+      opacity: 0;
+      transition: opacity 200ms ease;
+      min-height: 0;
+      overflow: hidden;
+    }
+    
+    .collections-wrap.visible {
+      opacity: 1;
+    }
+    
+    .loading-state, .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 16px;
+      color: var(--app-text-muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    /* Fun loader */
+    .fun-loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 24px 0;
+    }
+    
+    .fun-loader .wizard-box {
+      position: relative;
+      width: 72px;
+      height: 72px;
+    }
+    
+    .fun-loader .wizard-svg {
+      width: 72px;
+      height: 72px;
+      animation: wizardBounce 1.2s ease-in-out infinite;
+      filter: drop-shadow(0 4px 12px rgba(139, 92, 246, 0.4));
+    }
+    
+    .fun-loader .sparkle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: #FBBF24;
+      border-radius: 50%;
+      animation: sparklePop 1.5s ease-in-out infinite;
+    }
+    
+    .fun-loader .sparkle:nth-child(1) { top: 8px; left: 4px; animation-delay: 0s; }
+    .fun-loader .sparkle:nth-child(2) { top: 4px; right: 12px; animation-delay: 0.2s; }
+    .fun-loader .sparkle:nth-child(3) { top: 24px; right: 0; animation-delay: 0.4s; }
+    .fun-loader .sparkle:nth-child(4) { bottom: 16px; right: 8px; animation-delay: 0.6s; }
+    .fun-loader .sparkle:nth-child(5) { bottom: 8px; left: 50%; margin-left: -4px; animation-delay: 0.8s; }
+    .fun-loader .sparkle:nth-child(6) { bottom: 20px; left: 8px; animation-delay: 1s; }
+    .fun-loader .sparkle:nth-child(7) { top: 20px; left: 0; animation-delay: 1.2s; }
+    
+    .fun-loader .loader-dots {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .fun-loader .loader-dots span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--app-accent);
+      animation: dotBounce 0.6s ease-in-out infinite alternate;
+    }
+    
+    .fun-loader .loader-dots span:nth-child(1) { animation-delay: 0s; }
+    .fun-loader .loader-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .fun-loader .loader-dots span:nth-child(3) { animation-delay: 0.3s; }
+    
+    .fun-loader .loader-text {
+      font-size: 13px;
+      color: var(--app-text-muted);
+      font-weight: 500;
+    }
+    
+    @keyframes wizardBounce {
+      0%, 100% { transform: translateY(0) rotate(-2deg); }
+      50% { transform: translateY(-8px) rotate(2deg); }
+    }
+    
+    @keyframes sparklePop {
+      0%, 100% { opacity: 0.3; transform: scale(0.6); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+    
+    @keyframes dotBounce {
+      from { transform: translateY(0); }
+      to { transform: translateY(-6px); }
+    }
+    
+    .empty-state .hint {
+      font-size: 11px;
+      margin-top: 8px;
+      opacity: 0.7;
+    }
+    
+    .collections-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      border: none;
+      background: transparent;
+      transition: opacity 0.35s ease;
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+      /* Padding lives here, not on .collections-wrap: this is the element
+         that actually scrolls, so this is what needs breathing room at its
+         own top/bottom edges — otherwise a mid-scroll row clips flush
+         against the viewport with no fade/inset. Top is 0: RADDAccordion's
+         own header padding (8px) + its title's line-height already provide
+         clearance before the first paint, and adding more on top of that
+         re-opens the too-large header-to-accordion gap. */
+      padding: 0 0 12px;
+    }
+    /* This is its own scroll container (not .main-page, which just wraps
+       it) — needs the same thin-scrollbar treatment, or it shows the raw
+       OS/browser default instead. */
+    .collections-list::-webkit-scrollbar { width: 8px; }
+    .collections-list::-webkit-scrollbar-track { background: transparent; }
+    .collections-list::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
+    .collections-list::-webkit-scrollbar-thumb:hover { background: var(--app-text-muted); }
+
+
+    /* Loading skeleton — mirrors the collection rows while extraction runs. */
+    .skeleton-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .skeleton-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;   /* align the checkbox skeleton with the fields below */
+    }
+    /* Read-only per-collection row, inside the accordion's contentSlot —
+       no checkbox, no hover/pointer: nothing here is interactive anymore.
+       No left/right padding: RADDAccordion's own ContentFrame already
+       insets left/right to match the header's own left inset, so adding
+       more here would misalign rows from the "Scanned collections" title
+       above them — vertical padding only. */
+    .collection-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      font-size: 13px;
+      color: var(--app-text);
+      border-radius: 12px;
+    }
+
+    .collection-item .name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .collection-item .count {
+      font-size: 11px;
+      color: var(--app-text-muted);
+      flex-shrink: 0;
+    }
+
+    /* Decorative — "this one's included", not a control. */
+    .collection-item-check {
+      color: var(--app-accent);
+      flex-shrink: 0;
+    }
+
+    /* headerSlot content: title + tags stacked, always visible whether
+       expanded or not (unlike the per-collection rows, which are inside
+       contentSlot and only mount when expanded). flex:1 pushes the
+       accordion's own chevron to the right; text-align:left overrides the
+       <button> UA default of center (the header itself renders as a
+       native <button>). */
+    .collections-header {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-width: 0;
+      text-align: left;
+    }
+
+    /* RADD's own "subtitle" text style, same token used for the token-modal
+       dialog's title earlier in this migration — not a hand-picked size. */
+    .collections-summary {
+      font: var(--subtitle);
+      letter-spacing: var(--subtitle-letter-spacing);
+      color: var(--app-heading);
+    }
+
+    .collections-summary-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    /* More breathing room than RADD's own default (4px 8px) — mainly
+       top/bottom, so the chip doesn't read as cramped against its bold
+       label text. */
+    .collections-summary-tags .RADDTagStatic {
+      --RADDTagStatic-padding: var(--spacing-component-3) var(--spacing-component-4) var(--spacing-component-3) var(--spacing-component-4);
+    }
+
+    /* contentSlot: the read-only per-collection rows, revealed on expand. */
+    .collections-readonly-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 100%;
+    }
+
+    #closure-warning-mount { margin: 0 16px 16px; }
+    #closure-warning-mount:empty { margin: 0; }
+
+    .actions {
+      padding: 0 16px 16px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .actions[hidden] { display: none !important; }
+    .actions-skeleton[hidden] { display: none !important; }
+
+    /* Groups the folder/filename row, commit message, and push/download
+       buttons into one visually distinct block — same subtle-surface
+       language as .settings-note elsewhere in the app. */
+    .export-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      /* --app-surface-soft is a hover-state token (--colours-interaction-
+         states-hover-background-subtle-hover) — too close to a disabled
+         button's own grey, confusing next to Push when it's disabled.
+         --app-surface is the actual neutral/static shade
+         (--colours-basic-background-subtle), not tied to any interaction
+         state. */
+      background: var(--app-surface);
+      border-radius: 24px;
+      padding: 16px 12px 12px;
+    }
+    .actions-skeleton .sk-row { display: flex; gap: 8px; }
+
+    /* Push fills the row; Download is a fixed-size icon button beside it. */
+    .push-download-row { display: flex; gap: 10px; align-items: center; }
+    #push-btn-mount, #add-repo-settings-btn-mount { flex: 1; min-width: 0; }
+    
+    .commit-input-wrap {
+      margin-bottom: 4px;
+    }
+
+    /* RADDToast has no built-in screen position (a design-system component
+       shouldn't assume one) — buttons.tsx sets fixed/bottom/z-index etc. via
+       inline style, and applies this class for the entrance animation only
+       (RADDNotification renders null → element on open, a real DOM
+       insertion, so this replays correctly every time it reopens). */
+    .toast-enter {
+      animation: toastSlideUp 0.35s ease-out forwards;
+    }
+    @keyframes toastSlideUp {
+      from { opacity: 0; transform: translateX(-50%) translateY(24px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    .resize-handle {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 12px;
+      cursor: ns-resize;
+      background: linear-gradient(to bottom, transparent 0%, var(--app-border) 100%);
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 1000;
+    }
+    .resize-handle:hover, .resize-handle.active {
+      opacity: 1;
+    }
+  </style>
+  <!-- Bundled by scripts/build-ui.js: RADD design tokens + RADDButton CSS. -->
+  <style>__RADD_BUTTONS_STYLE__</style>
+</head>
+<body>
+  <div class="main-page" id="main-page">
+    <header class="header">
+      <div class="header-panel">
+        <div class="header-title-row">
+          <!-- @desquared/web-icons ships this as dist/logo/radd-aqua.svg — a
+               single static asset file (not a component), with 4 stacked
+               color layers toggled by a display:none class; only the aqua
+               layer's paths + its own gradient are kept here, the other 3
+               (amber/magenta/ice) dropped since this app only ever shows one. -->
+          <svg class="header-logo" viewBox="0 0 792 334.6" xmlns="http://www.w3.org/2000/svg" aria-label="RADD" role="img">
+            <linearGradient id="raddLogoGradient" gradientUnits="userSpaceOnUse" x1="625.6217" y1="167.318" x2="729.3487" y2="167.318">
+              <stop offset="0" stop-color="#3DE4DC" stop-opacity="0.3"/>
+              <stop offset="1" stop-color="#3DE4DC"/>
+            </linearGradient>
+            <path fill="#3DE4DC" d="M12.5,321.5H5.8V100.1h6.7V321.5z M34.2,321.5V100.1h6.7v221.4H34.2z M62.7,321.5V100.1h6.7v13.4c16.7-8.4,34.7-12.5,52.2-12.5v6.7c-17.5,0-35.9,4.6-52.2,13.4v25.9c14.6-10.9,32.6-17.5,52.2-17.5v6.7c-20.1,0-38.4,7.1-52.2,19.2v34.3c9.6-18.8,29.7-31.7,52.2-31.7v6.7c-29.2,0-52.2,23.4-52.2,52.2v104.9H62.7z"/>
+            <path fill="#3DE4DC" d="M119.2,210.8C119.2,146.8,171,95,234.9,95c18.8,0,36.3,4.6,52.2,12.5v-7.5h6.7v221.4h-6.7v-7.5c-15.9,7.9-33.4,12.5-52.2,12.5C171,326.5,119.2,274.7,119.2,210.8z M343.9,100.1h6.7v221.4h-6.7V100.1z M315.5,321.5V100.1h6.7v221.4H315.5z M125.8,210.8c0,60.2,48.9,109,109,109c18.8,0,36.8-4.6,52.2-12.9v-26.3c-14.6,11.3-32.6,17.5-52.2,17.5c-48,0-87.3-39.3-87.3-87.3s39.3-87.3,87.3-87.3c19.6,0,37.6,6.7,52.2,17.5v-25.9c-15.5-8.4-33.4-13.4-52.2-13.4C174.7,101.7,125.8,150.6,125.8,210.8z M154.3,210.8c0,44.7,35.9,80.6,80.6,80.6c20.1,0,38-7.1,52.2-18.8v-34.3c-10,18.4-29.7,31.3-52.2,31.3c-32.6,0-58.9-26.3-58.9-58.9s26.3-58.9,58.9-58.9c22.6,0,42.2,12.9,52.2,31.7v-34.3c-14.2-12.1-32.2-19.2-52.2-19.2C190.2,130.1,154.3,166.1,154.3,210.8z M182.7,210.8c0,28.8,23.4,52.2,52.2,52.2c29.2,0,52.2-23.4,52.2-52.2s-23-52.2-52.2-52.2C206.1,158.5,182.7,181.9,182.7,210.8z"/>
+            <path fill="#3DE4DC" d="M372.3,210.8C372.3,146.8,424.1,95,488,95c18.8,0,36.3,4.6,52.2,12.5V8.2h6.7v313.3h-6.7v-7.5c-15.9,7.9-33.4,12.5-52.2,12.5C424.1,326.5,372.3,274.7,372.3,210.8z M568.6,321.5V8.2h6.7v313.3H568.6z M597,321.5V8.2h6.7v313.3H597z M379,210.8c0,60.2,48.9,109,109,109c18.8,0,36.8-4.6,52.2-12.9v-26.3c-14.6,11.3-32.6,17.5-52.2,17.5c-48,0-87.3-39.3-87.3-87.3s39.3-87.3,87.3-87.3c19.6,0,37.6,6.7,52.2,17.5v-25.9c-15.5-8.4-33.4-13.4-52.2-13.4C427.9,101.7,379,150.6,379,210.8z M407.4,210.8c0,44.7,35.9,80.6,80.6,80.6c20.1,0,38-7.1,52.2-18.8v-34.3c-10,18.4-29.7,31.3-52.2,31.3c-32.6,0-58.9-26.3-58.9-58.9s26.3-58.9,58.9-58.9c22.6,0,42.2,12.9,52.2,31.7v-34.3c-14.2-12.1-32.2-19.2-52.2-19.2C443.3,130.1,407.4,166.1,407.4,210.8z M435.8,210.8c0,28.8,23.4,52.2,52.2,52.2c29.2,0,52.2-23.4,52.2-52.2s-23-52.2-52.2-52.2C459.2,158.5,435.8,181.9,435.8,210.8z"/>
+            <path fill="url(#raddLogoGradient)" d="M722.7,107.6C706.8,99.6,689.2,95,670.4,95c-15.9,0-31,3.2-44.8,9v7.3c13.7-6.2,28.8-9.7,44.8-9.7c18.8,0,36.8,5,52.2,13.4V141c-14.6-10.9-32.6-17.5-52.2-17.5c-16.4,0-31.7,4.6-44.8,12.5v7.7c12.8-8.5,28.2-13.5,44.8-13.5c20.1,0,38,7.1,52.2,19.2v34.3c-10-18.8-29.7-31.7-52.2-31.7c-18,0-34,8-44.8,20.7v11.5c9.1-15.3,25.8-25.5,44.8-25.5c29.2,0,52.2,23.4,52.2,52.2c0,28.8-23,52.2-52.2,52.2c-19.1,0-35.7-10.3-44.8-25.5V249c10.8,12.7,26.8,20.7,44.8,20.7c22.6,0,42.2-12.9,52.2-31.3v34.3c-14.2,11.7-32.2,18.8-52.2,18.8c-16.6,0-32-5-44.8-13.5v7.7c13.1,7.9,28.5,12.5,44.8,12.5c19.6,0,37.6-6.3,52.2-17.5v26.3c-15.5,8.4-33.4,12.9-52.2,12.9c-16,0-31.1-3.5-44.8-9.7v7.3c13.8,5.8,28.9,9,44.8,9c18.8,0,36.3-4.6,52.2-12.5v7.5h6.7V8.2h-6.7V107.6z"/>
+            <rect fill="#3DE4DC" x="751.1" y="8.2" width="6.7" height="313.3"/>
+            <rect fill="#3DE4DC" x="779.5" y="8.2" width="6.7" height="313.3"/>
+          </svg>
+          <h1 class="title">JSON Exporter</h1>
+          <div id="version-tag-mount" class="version-tag-mount"></div>
+        </div>
+        <div class="header-right">
+          <span id="settings-btn-mount"></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Format toggle hidden: export is locked to Token Studio by default.
+         Kept in the DOM (display:none) so the existing exportMode logic still
+         works. The Token Studio ↔ DTCG choice lives in Settings instead
+         (see #dtcg-format-control-mount). -->
+    <div id="export-mode-control-mount" style="display:none;"></div>
+
+    
+    <div class="collections-wrap" id="collections-wrap">
+    <!-- Skeleton placeholder shown while foundations are read in the background. -->
+    <div class="skeleton-list" id="skeleton-list" aria-hidden="true"></div>
+    <div class="loading-state" id="loading-state" style="display: none;">
+      <div class="fun-loader">
+        <div class="wizard-box">
+          <span class="sparkle"></span>
+          <span class="sparkle"></span>
+          <span class="sparkle"></span>
+          <span class="sparkle"></span>
+          <span class="sparkle"></span>
+          <span class="sparkle"></span>
+          <span class="sparkle"></span>
+          <svg class="wizard-svg" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 48 Q32 58 44 48 L44 38 Q32 42 20 38 Z" fill="#7C3AED"/>
+            <circle cx="32" cy="30" r="14" fill="#FCD34D"/>
+            <path d="M32 8 L48 28 L32 24 L16 28 Z" fill="#8B5CF6"/>
+            <path d="M32 24 L32 6" stroke="#A78BFA" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M48 20 L50 26 L56 26 L52 30 L54 36 L48 32 L42 36 L44 30 L38 26 Z" fill="#FBBF24"/>
+            <circle cx="27" cy="28" r="2.5" fill="#1F2937"/>
+            <circle cx="37" cy="28" r="2.5" fill="#1F2937"/>
+            <path d="M26 36 Q32 41 38 36" stroke="#1F2937" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+            <ellipse cx="22" cy="32" rx="3" ry="2" fill="#FCA5A5" opacity="0.6"/>
+            <ellipse cx="42" cy="32" rx="3" ry="2" fill="#FCA5A5" opacity="0.6"/>
+          </svg>
+        </div>
+        <div class="loader-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <p class="loader-text">Gathering your tokens…</p>
+      </div>
+    </div>
+    <div class="collections-list" id="collections-list" style="display: none;"></div>
+    <div class="empty-state" id="empty-state" style="display: none;">
+      <p>No variable collections found.</p>
+      <p class="hint">Add variables in Figma to see them here.</p>
+    </div>
+  </div>
+  
+  <div id="closure-warning-mount"></div>
+  
+    <!-- Skeleton twin of the action area, shown while the list loads. -->
+    <div class="actions actions-skeleton" id="actions-skeleton"></div>
+
+    <div class="actions" id="actions" hidden>
+      <div class="export-panel">
+        <!-- One block per provider, each with its own folder path + JSON
+             file name (the file name itself is set in Settings — see
+             gl-filename-mount/gh-filename-mount — this is a read-only
+             display, same as the folder path is picked here but the
+             saved-path list is managed in Settings). The row-title always
+             shows (which push location a row is for should be clear
+             regardless of how many destinations are active), each with its
+             provider's own logo glyph in front of the text — plain inline
+             SVGs (not React-mounted), same reasoning as the settings-page
+             header's own decorative icon: @desquared/web-icons has no
+             third-party brand marks, and these exact monochrome path
+             shapes are this project's own pre-RADD icons (see git history —
+             this repo used to show the GitHub one here before it became
+             GitLab-only, then GitLab's own). When a provider has zero saved
+             folder paths, .filename-row hides and .target-row-empty shows
+             instead of an empty, nothing-selected dropdown (see
+             updatePushTargetUI()). -->
+        <div class="commit-input-wrap target-block" id="gitlab-target-wrap">
+          <div class="target-row-header">
+            <div class="target-row-title" id="gitlab-target-title" hidden>
+              <svg class="target-row-title-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024"/>
+              </svg>
+              <span>GitLab</span>
+            </div>
+            <div class="target-row-empty" id="gitlab-target-empty" hidden>
+              <span class="target-row-empty-label">Add folder path (optional)</span>
+              <span id="gitlab-empty-add-btn-mount"></span>
+              <!-- 'both' mode only (see updateTargetRow()'s bothMode param) —
+                   same "uncheck this provider's push box" shortcut as the
+                   trash button below, offered here too since a ready-but-
+                   pathless provider is just as valid a moment to bail out
+                   of pushing to it. -->
+              <span id="gitlab-empty-remove-push-btn-mount" hidden></span>
+            </div>
+            <!-- Shown instead of target-row-empty — 'both' mode only —
+                 when GitLab isn't ready but GitHub is (see
+                 updatePushTargetUI()/updateTargetRow()). Title/logo stay
+                 visible; only the field row below is replaced. The trash
+                 button unchecks GitLab from the push destination entirely
+                 (mirrors unchecking its box in Settings), leaving GitHub —
+                 already confirmed ready here — as the sole target. -->
+            <div class="target-row-actions" id="gitlab-target-actions" hidden>
+              <span id="gitlab-small-settings-btn-mount"></span>
+              <span id="gitlab-remove-push-btn-mount"></span>
+            </div>
+          </div>
+          <div class="filename-row" id="gitlab-filename-row">
+            <span id="folder-select-mount"></span>
+            <span id="export-filename-mount"></span>
+          </div>
+        </div>
+        <div class="commit-input-wrap target-block" id="github-target-wrap" hidden>
+          <div class="target-row-header">
+            <div class="target-row-title" id="github-target-title" hidden>
+              <svg class="target-row-title-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+              </svg>
+              <span>GitHub</span>
+            </div>
+            <div class="target-row-empty" id="github-target-empty" hidden>
+              <span class="target-row-empty-label">Add folder path (optional)</span>
+              <span id="github-empty-add-btn-mount"></span>
+              <span id="github-empty-remove-push-btn-mount" hidden></span>
+            </div>
+            <div class="target-row-actions" id="github-target-actions" hidden>
+              <span id="github-small-settings-btn-mount"></span>
+              <span id="github-remove-push-btn-mount"></span>
+            </div>
+          </div>
+          <div class="filename-row" id="github-filename-row">
+            <span id="github-folder-select-mount"></span>
+            <span id="github-filename-mount"></span>
+          </div>
+        </div>
+        <div class="commit-input-wrap" id="commit-wrap">
+          <span id="commit-message-mount"></span>
+        </div>
+        <div class="push-download-row">
+          <div id="push-btn-mount"></div>
+          <!-- Replaces the Push button in this same slot whenever no
+               active destination is workable yet (see updateActionUI()). -->
+          <span id="add-repo-settings-btn-mount" hidden></span>
+          <div id="download-btn-mount"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="page settings-page" id="settings-page">
+    <header class="header-settings">
+      <div class="header-panel">
+        <div class="git-logo">
+          <!-- Same gear glyph as the main header's settings button
+               (@desquared/web-icons SettingsStandard) — decorative here,
+               not a control, so it's a plain inline SVG like this was
+               before, not React-mounted. -->
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path fill-rule="evenodd" clip-rule="evenodd" d="m14 1 .5 2.75a.992.992 0 0 0 1.448.71l.102-.06 2.3-1.6 2.85 2.85-1.6 2.3c-.378.567-.087 1.312.537 1.52l.113.03L23 10v4l-2.75.5a.992.992 0 0 0-.71 1.448l.06.102 1.6 2.3-2.85 2.85-2.3-1.6c-.567-.378-1.312-.087-1.52.537l-.03.113L14 23h-4l-.5-2.75c-.142-.661-.863-1.01-1.448-.71l-.102.06-2.3 1.6-2.85-2.85 1.6-2.3c.378-.567.087-1.312-.537-1.52l-.113-.03L1 14v-4l2.75-.5a.992.992 0 0 0 .71-1.448L4.4 7.95l-1.6-2.3L5.65 2.8l2.3 1.6c.567.378 1.312.087 1.52-.537l.03-.113L10 1zm-1.25 1.5h-1.5l-.3 1.5c-.2 1.2-1.25 2.05-2.45 2.05-.437 0-.875-.115-1.246-.345L5.8 4.7 4.75 5.75l.9 1.3c.464.65.584 1.472.318 2.227L5.9 9.45c-.279.743-.902 1.27-1.67 1.462l-.18.038-1.55.3v1.5l1.55.25c.85.15 1.5.7 1.85 1.5a2.43 2.43 0 0 1-.149 2.247l-.101.153-.9 1.3 1.05 1.05 1.3-.9c.4-.3.9-.45 1.4-.45 1.145 0 2.154.774 2.418 1.889l.332 1.711h1.5l.3-1.55c.2-1.2 1.25-2.05 2.45-2.05.438 0 .875.115 1.245.345L18.2 19.25l1.05-1.05-.9-1.3c-.5-.7-.55-1.6-.25-2.3.279-.743.902-1.27 1.67-1.462l.18-.038 1.55-.3v-1.5l-1.55-.3c-.85-.15-1.5-.7-1.85-1.5a2.43 2.43 0 0 1 .149-2.247l.101-.153.9-1.3-1.05-1.05-1.3.9c-.4.3-.9.45-1.4.45a2.474 2.474 0 0 1-2.418-1.889zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6"/>
+          </svg>
+        </div>
+        <h1 class="title">Settings</h1>
+        <!-- Back sits at the header's right edge, mirroring the main
+             screen's own settings button in the same spot of the same
+             .header-panel. .header-settings .title's flex:1 is what pushes
+             it there. -->
+        <span id="back-btn-mount"></span>
+      </div>
+    </header>
+    <div class="settings-page-content">
+      <!-- Output format. Always visible and leads the page: it decides what
+           every download and push actually contains, so it outranks the
+           destination settings below it. Off = the Token Studio JSON this
+           plugin has always produced; on = Tokens Studio DTCG, written to a
+           _dtcg file name so the two never overwrite each other. -->
+      <div class="output-format">
+        <p class="folder-paths-title">Output format</p>
+        <span id="dtcg-format-control-mount"></span>
+        <p class="folder-paths-subtitle" id="output-format-hint"></p>
+      </div>
+
+      <!-- Only meaningful — and only shown — once GitHub is configured
+           alongside GitLab; a general Settings-level preference the main
+           screen's Push button just follows (see performPush()). Leads the
+           page (before the GitLab/GitHub connection fields) since it's the
+           setting most users will come back to change. -->
+      <div class="push-target" id="push-target-section" hidden>
+        <p class="folder-paths-title">Push destination</p>
+        <span id="push-target-control-mount"></span>
+      </div>
+
+      <!-- Always-visible heading for whichever provider's connection fields
+           are shown below. The tabs themselves only appear once BOTH
+           providers are added (see updateProviderSectionVisibility()) —
+           with only one, there's nothing to switch between, so that one
+           provider's block just shows directly beneath the title (no
+           tabs), with the other's "Add ___" button standing in for the
+           switcher instead. -->
+      <div class="repo-settings-heading">
+        <p class="folder-paths-title">Repository settings</p>
+      </div>
+      <div id="repo-settings-tabs-row" hidden>
+        <span id="repo-settings-tab-mount"></span>
+      </div>
+
+      <div id="gitlab-block">
+        <!-- Heading + connection fields share ONE card. The "Saved Folder
+             Path" list below stays outside it: its rows are already cards
+             in their own right, and nesting them would read as a card
+             inside a card. -->
+        <div class="provider-card">
+          <div class="provider-section-heading">
+            <p class="folder-paths-title">
+              <span class="provider-logo-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024"/>
+                </svg>
+              </span>
+              GitLab
+            </p>
+            <span id="remove-gitlab-btn-mount" hidden></span>
+          </div>
+          <div id="gitlab-fields">
+            <!-- Token + its Clear button share a row, the same
+                 [field][icon button] shape as the folder-add rows below. -->
+            <div class="token-row">
+              <span id="gl-token-mount"></span>
+              <span id="gl-clear-token-btn-mount" hidden></span>
+            </div>
+            <span id="gl-host-mount"></span>
+            <span id="gl-project-mount"></span>
+            <span id="gl-branch-mount"></span>
+            <span id="gl-filename-mount"></span>
+          </div>
+        </div>
+
+        <!-- Saved paths get their own card, sibling to the connection
+             card above — heading, the rows, and the add-a-path row all
+             inside it. -->
+        <div class="provider-card">
+          <div class="folder-paths-heading">
+            <p class="folder-paths-title">Saved Folder Path</p>
+            <p class="folder-paths-subtitle">Choose on the main screen</p>
+          </div>
+          <div class="folder-list" id="folder-list"></div>
+          <!-- Always visible: adding a path no longer needs an edit mode. -->
+          <div class="folder-add" id="folder-add">
+            <span id="folder-new-mount"></span>
+            <span id="folder-add-btn-mount"></span>
+          </div>
+        </div>
+      </div>
+      <div id="github-fields" hidden>
+        <div class="provider-card">
+          <div class="provider-section-heading">
+            <p class="folder-paths-title">
+              <span class="provider-logo-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+              </span>
+              GitHub
+            </p>
+            <span id="remove-github-btn-mount" hidden></span>
+          </div>
+          <div id="github-connection-fields">
+            <div class="token-row">
+              <span id="gh-token-mount"></span>
+              <span id="gh-clear-token-btn-mount" hidden></span>
+            </div>
+            <span id="gh-repo-mount"></span>
+            <span id="gh-branch-mount"></span>
+            <span id="gh-filename-mount"></span>
+          </div>
+        </div>
+
+        <div class="provider-card">
+          <div class="folder-paths-heading">
+            <p class="folder-paths-title">Saved Folder Path</p>
+            <p class="folder-paths-subtitle">Choose on the main screen</p>
+          </div>
+          <div class="folder-list" id="github-folder-list"></div>
+          <div class="folder-add" id="github-folder-add">
+            <span id="github-folder-new-mount"></span>
+            <span id="github-folder-add-btn-mount"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Whichever provider isn't added yet gets its "Add ___" affordance
+           here, at the END of the section, below whichever provider(s) are
+           already configured — adding a second one is a rarer action than
+           editing the connection you already have, so it comes after it. Same
+           logo+name-left / action-right shape AND the same header-style
+           card as the already-added heading below (both carry
+           .provider-section-heading; see .provider-add-row). -->
+      <div class="provider-section-heading provider-add-row" id="add-gitlab-row" hidden>
+        <p class="folder-paths-title">
+          <span class="provider-logo-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024"/>
+            </svg>
+          </span>
+          GitLab
+        </p>
+        <span id="add-gitlab-btn-mount"></span>
+      </div>
+      <!-- GitHub is optional — add-only until configured, then editable and
+           removable just like GitLab, but never required. -->
+      <div class="provider-section-heading provider-add-row" id="add-github-row">
+        <p class="folder-paths-title">
+          <span class="provider-logo-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+          </span>
+          GitHub
+        </p>
+        <span id="add-github-btn-mount"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm dialogs for removing each provider's connection. Real mount
+       points were missing entirely for these (a latent bug: `open()` was
+       silently a no-op — document.getElementById returned null, so the
+       dialog's own setOpenExternal closure never got reassigned off its
+       default no-op) until this round added the GitLab one and caught it. -->
+  <div id="remove-github-dialog-mount"></div>
+  <div id="remove-gitlab-dialog-mount"></div>
+  <!-- First-run nudge — opened from the GIT_SETTINGS_LOADED handler
+       whenever nothing is configured yet (computePushReadiness().needsBigSetup). -->
+  <div id="clear-token-dialog-mount"></div>
+  <div id="onboarding-dialog-mount"></div>
+
+  <div id="toast-mount"></div>
+
+  <!-- Bundled by scripts/build-ui.js from src/ui-react/buttons.tsx. Must run
+       before the script below: it mounts the real <button> nodes that the
+       vanilla code looks up by id (push-btn, download-btn, etc). -->
+  <script>__RADD_BUTTONS_SCRIPT__</script>
+  <!-- src/dtcg-format.js, inlined by scripts/build-ui.js. Defines window.RaddDtcg
+       (the DTCG post-transform over the Token Studio tree). -->
+  <script>__RADD_DTCG_SCRIPT__</script>
+
+  <script>
+    // Plugin version — single source of truth in the UI. Keep in sync with
+    // package.json via `npm run version:set <x.y.z>` (scripts/set-version.js).
+    var APP_VERSION = '1.4.0';
+    (function renderVersion() {
+      window.RaddVersionTag.setLabel('v' + APP_VERSION);
+    })();
+
+    var rawData = null;
+    var transformedData = null;
+    var selectedCollections = [];
+
+    // RADDTextField/RADDTextArea (buttons.tsx) track a "filled" visual state
+    // internally, updated from their own onChange handler. Setting `.value`
+    // directly (as below) doesn't fire that, since it bypasses the input's
+    // React-attached listener entirely — dispatching a real `input` event
+    // after the assignment keeps the two in sync.
+    function setFieldValue(id, value) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      // React installs its own get/set descriptor on the input instance to
+      // track value changes (so it can tell a real edit from a plain script
+      // assignment). A plain `el.value = x` goes through THAT descriptor, so
+      // React's own bookkeeping still says "unchanged" and never fires
+      // onChange — its internal value state then wipes `x` back out on the
+      // next unrelated re-render.
+      // Calling the native prototype setter bypasses React's override so its
+      // change detection actually sees the new value and updates for real.
+      var proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+      var nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+      nativeSetter.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // ── Output file name ─────────────────────────────────────────────────────
+    // A DTCG export gets its own file name so it never overwrites the Token
+    // Studio JSON sitting at the same path. The suffix is applied to whatever
+    // name is configured — `radd.json` becomes `radd_dtcg.json`.
+    //
+    // The file name field stays the single source of truth: toggling the Output
+    // format switch rewrites it in place rather than keeping a second hidden
+    // name per provider, so what Settings shows is always what gets pushed.
+    var DEFAULT_FILENAME = 'tokens.json';
+    var DTCG_SUFFIX = '_dtcg';
+    // v1.4.0 development builds wrote _W3C before the output was renamed (it is
+    // Tokens Studio's partial DTCG, not strict W3C). Still recognised so a name
+    // saved by one of those strips cleanly, and re-suffixes to _dtcg, instead of
+    // becoming tokens_W3C_dtcg.json.
+    var LEGACY_DTCG_SUFFIXES = ['_W3C'];
+
+    function splitFilename(name) {
+      var s = String(name || '');
+      var dot = s.lastIndexOf('.');
+      return dot > 0 ? { base: s.slice(0, dot), ext: s.slice(dot) } : { base: s, ext: '' };
+    }
+    // Which suffix a name currently carries — the live one, a legacy one, or none.
+    function matchedDtcgSuffix(name) {
+      var base = splitFilename(name).base;
+      var all = [DTCG_SUFFIX].concat(LEGACY_DTCG_SUFFIXES);
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].length <= base.length && base.slice(-all[i].length) === all[i]) return all[i];
+      }
+      return null;
+    }
+    function hasDtcgSuffix(name) {
+      return matchedDtcgSuffix(name) !== null;
+    }
+    // Exact inverses, and both no-ops when the name is already in the wanted
+    // form — so they stay correct on a name the user has edited by hand, and
+    // toggling the switch back and forth round-trips instead of stacking
+    // suffixes or eating characters.
+    function dtcgFilename(name) {
+      if (!name) return name;
+      var found = matchedDtcgSuffix(name);
+      if (found === DTCG_SUFFIX) return name;
+      var p = splitFilename(name);
+      var stem = found ? p.base.slice(0, -found.length) : p.base;
+      return stem + DTCG_SUFFIX + p.ext;
+    }
+    function plainFilename(name) {
+      if (!name) return name;
+      var found = matchedDtcgSuffix(name);
+      if (!found) return name;
+      var p = splitFilename(name);
+      return p.base.slice(0, -found.length) + p.ext;
+    }
+    // What a freshly-seeded file name field starts from, in whichever format is
+    // currently active.
+    function defaultFilename() {
+      return dtcgShape ? dtcgFilename(DEFAULT_FILENAME) : DEFAULT_FILENAME;
+    }
+    // Rewrite both providers' file name fields for the format just picked.
+    // Runs off the fields themselves, so a customised name keeps its stem.
+    function applyFilenameForFormat() {
+      ['gl-filename', 'gh-filename'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var current = el.value.trim();
+        if (!current) return;   // empty = provider not added; leave it alone
+        setFieldValue(id, dtcgShape ? dtcgFilename(current) : plainFilename(current));
+      });
+    }
+
+    // Full repo path pushed to Git = per-provider folder + per-provider file
+    // name (both set in Settings — see gitlabConfig()/githubConfig()).
+    function composeFilePath(folder, filename) {
+      folder = (folder || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
+      var name = (filename || '').trim() || defaultFilename();
+      return folder ? folder + '/' + name : name;
+    }
+
+    // The plain "Download" action isn't tied to either push destination, so
+    // it needs one name to fall back on — GitLab's own file name when
+    // GitLab is configured, else GitHub's (mirrors the same gitlab-first
+    // fallback pushTarget itself uses elsewhere).
+    function primaryFilename() {
+      return gitlabAdded ? gitlabConfig().filename : githubConfig().filename;
+    }
+
+    // ── GitLab settings: baked-in standard defaults + editable overrides ──────
+    // Non-secret standard connection for this custom plugin. The token is NEVER
+    // hardcoded — it is entered in-plugin and stored only in clientStorage.
+    var GITLAB_DEFAULTS = {
+      host: 'https://gitlab.devops.telekom.de',
+      project: 'mdx/ods/design-tokens/design-tokens-json',
+      branch: 'main',
+      folders: ['src/oneID', 'src/iskon', 'src/spar', 'src/redBull']
+    };
+
+    // Whether the GitLab section is configured/shown — like githubAdded
+    // below, but defaults true: every config saved before this flag existed
+    // (and a brand-new install with no saved config at all) has no
+    // gitlabAdded field, and must keep behaving exactly as it always did
+    // (GitLab present, baked-in defaults). Only an explicit `false` (only
+    // ever written after a real "Remove GitLab") turns it off — see
+    // gitSettings.setState()'s `config.gitlabAdded !== false`.
+    var gitlabAdded = true;
+    var glFolders = GITLAB_DEFAULTS.folders.slice(); // saved folder paths
+    var glActiveFolder = glFolders[0];               // the picked target
+
+    // ── GitHub settings: optional, add/remove — no baked-in defaults, no
+    // Figma-filename auto-match (unlike GitLab, there's no company-wide
+    // "standard" GitHub repo).
+    var githubAdded = false;    // whether the GitHub section is configured/shown
+    var ghFolders = [];         // starts empty; user-managed only
+    var ghActiveFolder = '';
+    // Which provider's connection-fields block is currently shown under
+    // "Repository settings" (only meaningful once both providers exist and
+    // the tab switcher itself is visible — see updateProviderSectionVisibility()).
+    // Starts null so gitSettings.setState()'s first-ever run always picks a
+    // real default; left alone on later calls (e.g. Cancel) so switching
+    // tabs mid-edit doesn't get silently reset out from under the user.
+    var activeSettingsTab = null;
+    // 'gitlab' | 'github' | 'both' — a general Settings-level preference the
+    // main screen's Push button follows; only meaningful once githubAdded.
+    var pushTarget = 'gitlab';
+    // null = ship the Token Studio tree as-is; 'partial' runs the DTCG
+    // post-transform (src/dtcg-format.js) over it — see getTokensToExport.
+    // Driven by the Output format switch in Settings and persisted with the
+    // rest of the config, so it is declared up here with the other persisted
+    // settings state: gitSettings.setState({}) runs near the top of this
+    // script and reads it (via defaultFilename()), and a var declared further
+    // down would be hoisted but still unassigned at that point — and worse,
+    // would reset it when its own line was finally reached.
+    // ('sets' and 'themes' are the converter's other shapes; they stay
+    // CLI-only, see scripts/dtcg-preview.js.)
+    var dtcgShape = null;
+    // Declared this early (not just above updateActionUI, where it's used)
+    // because gitSettings.setState({}) runs near the top of this script,
+    // synchronously reaching updateActionUI on its very first call — a var
+    // declared further down would still be hoisted but not yet assigned at
+    // that point, reading as undefined and throwing.
+    var PUSH_TARGET_LABELS = { gitlab: 'Push to GitLab', github: 'Push to GitHub', both: 'Push to Both' };
+
+    function normFolder(p) {
+      return String(p || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
+    }
+
+    // Map a Figma foundation file name → a standard folder path. Generous,
+    // case/space/punctuation-insensitive aliases so "ODS Red Bull Foundation",
+    // "Red Bull", "redbull", etc. all resolve to src/redBull.
+    var FOLDER_MATCHERS = [
+      { path: 'src/oneID',   keywords: ['oneid', 'one id', 'one experience id'] },
+      { path: 'src/redBull', keywords: ['redbull', 'red bull'] },
+      { path: 'src/iskon',   keywords: ['iskon'] },
+      { path: 'src/spar',    keywords: ['spar', 'spar budget', 'skar'] }
+    ];
+    var lastFigmaFileName = null;
+
+    function normName(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
+    function matchFolderFromFileName(fileName) {
+      var norm = normName(fileName);
+      if (!norm) return null;
+      for (var i = 0; i < FOLDER_MATCHERS.length; i++) {
+        var kws = FOLDER_MATCHERS[i].keywords;
+        for (var j = 0; j < kws.length; j++) {
+          var kw = normName(kws[j]);
+          if (kw && norm.indexOf(kw) !== -1) return FOLDER_MATCHERS[i].path;
+        }
+      }
+      return null;
+    }
+
+    // Auto-select the matched folder (if present in the saved paths). Remembers
+    // the last file name so it can re-apply after settings load races the extract.
+    // Also drives the collections accordion's title — the real Figma file name
+    // (figma.root.name) rather than a fixed label, so both stay in sync off
+    // the same lastFigmaFileName rather than needing two separate call sites.
+    function applyFileNameMatch(fileName) {
+      if (fileName) lastFigmaFileName = fileName;
+      if (lastFigmaFileName) window.RaddCollectionsAccordion.setTitle(lastFigmaFileName);
+      var path = matchFolderFromFileName(lastFigmaFileName);
+      if (path && glFolders.indexOf(path) !== -1 && path !== glActiveFolder) {
+        glActiveFolder = path;
+        renderFolderList();   // refresh dropdown + settings list
+        persistSettings();    // remember the auto-selected target
+      }
+    }
+
+    // Read the GitLab settings from the (persisted) inputs + folder list.
+    function gitlabConfig() {
+      return {
+        token: document.getElementById('gl-token').value.trim(),
+        host: document.getElementById('gl-host').value.trim() || GITLAB_DEFAULTS.host,
+        project: document.getElementById('gl-project').value.trim() || GITLAB_DEFAULTS.project,
+        branch: document.getElementById('gl-branch').value.trim() || GITLAB_DEFAULTS.branch,
+        filename: document.getElementById('gl-filename').value.trim() || defaultFilename(),
+        folders: glFolders.slice(),
+        folder: glActiveFolder,        // active path used for the push
+        activeFolder: glActiveFolder
+      };
+    }
+    // Ready to push once a token is present (host/project/branch/folder have defaults).
+    function isGitLabReady() { var c = gitlabConfig(); return !!(c.token && c.project); }
+
+    // Read the GitHub settings from the (persisted) inputs + folder list.
+    // Mirrors gitlabConfig(), minus a host (public GitHub only) — `folder`
+    // is kept alongside `activeFolder` for the same reason gitlabConfig()
+    // has both: composeFilePath() reads `.folder`.
+    function githubConfig() {
+      return {
+        token: document.getElementById('gh-token').value.trim(),
+        repo: document.getElementById('gh-repo').value.trim(),
+        branch: document.getElementById('gh-branch').value.trim() || 'main',
+        filename: document.getElementById('gh-filename').value.trim() || defaultFilename(),
+        folders: ghFolders.slice(),
+        folder: ghActiveFolder,
+        activeFolder: ghActiveFolder
+      };
+    }
+    // Ready to push once a token and an owner/repo are present.
+    function isGitHubReady() { var c = githubConfig(); return !!(c.token && c.repo); }
+
+    // A Clear button is pointless — and misleading — next to an empty field,
+    // so each one tracks its own token's presence. Called from the auto-save
+    // listener (covers typing and pasting), from refreshSettingsControls()
+    // (covers load, add/remove, and the clear itself) and after a clear.
+    function updateClearTokenButtons() {
+      var gl = document.getElementById('gl-token');
+      var gh = document.getElementById('gh-token');
+      document.getElementById('gl-clear-token-btn-mount').hidden = !(gl && gl.value.trim());
+      document.getElementById('gh-clear-token-btn-mount').hidden = !(gh && gh.value.trim());
+    }
+
+    function persistSettings() {
+      parent.postMessage({ pluginMessage: { type: 'SAVE_GIT_SETTINGS', config: gitSettings.getState() } }, '*');
+    }
+
+    // Settings: saved paths shown as editable fields (modify inline or
+    // delete). Selection happens on the main screen.
+    // Each row's own input/remove-button is a RADDTextField/RADDIconButton
+    // (buttons.tsx). RaddFolderList.render() fully remounts every row on
+    // every call (same as the old list.innerHTML='' + rebuild) rather than
+    // letting React diff/reuse them by index — otherwise, after a middle row
+    // is removed, the shifted-index rows would keep their stale uncontrolled
+    // value instead of picking up the new path at that index.
+    function renderFolderList() {
+      if (glActiveFolder && glFolders.indexOf(glActiveFolder) === -1) glActiveFolder = glFolders[0] || '';
+      var rows = glFolders.map(function(path) {
+        // Every row — standard (baked-in) or user-added — can be modified or
+        // deleted. See gitSettings.setState(): a saved
+        // `folders` list is now trusted as the complete, authoritative set,
+        // so removing a standard path here actually stays removed across a
+        // reload instead of being silently re-seeded.
+        return { path: path, canEdit: true };
+      });
+      window.RaddFolderList.render(rows);
+      renderFolderSelect();
+      // Folder count can go to/from zero here (add/remove) — keep the main
+      // screen's empty-state message in sync immediately, not just after
+      // the next Save/Cancel.
+      updatePushTargetUI();
+    }
+
+    // Handlers the React row list (buttons.tsx) calls back into — same logic
+    // the old per-row 'input'/'blur'/remove-click listeners had.
+    window.RaddFolderList.onInput = function(idx, value) {
+      var oldVal = glFolders[idx];
+      glFolders[idx] = value;
+      if (glActiveFolder === oldVal) glActiveFolder = value;
+    };
+    window.RaddFolderList.onBlur = function(idx, value) {
+      var oldVal = glFolders[idx];
+      var norm = normFolder(value);
+      glFolders[idx] = norm;
+      if (glActiveFolder === oldVal) glActiveFolder = norm;
+      setFieldValue('folder-row-input-' + idx, norm);
+      renderFolderSelect();
+    };
+    window.RaddFolderList.onRemove = function(idx) {
+      var removed = glFolders[idx];
+      glFolders.splice(idx, 1);
+      if (glActiveFolder === removed) glActiveFolder = glFolders[0] || '';
+      renderFolderList();
+    };
+
+    // Main screen: populate the folder dropdown (left of the file name).
+    // RADDDropdownSelect has no native <select>/<option> DOM (it's a
+    // floating-ui combobox) — re-render its `items` from glFolders instead
+    // of building option elements.
+    function renderFolderSelect() {
+      var items = glFolders.map(function(path) {
+        return { label: path || '(repo root)', value: path };
+      });
+      window.RaddFolderSelect.setItems(items, glActiveFolder);
+    }
+
+    // GitHub's independent folder-path list — same shape/behavior as
+    // GitLab's above, minus the "standard paths" concept (nothing is
+    // baked-in, so every row is always removable).
+    function renderGithubFolderList() {
+      if (ghActiveFolder && ghFolders.indexOf(ghActiveFolder) === -1) ghActiveFolder = ghFolders[0] || '';
+      var rows = ghFolders.map(function(path) {
+        return { path: path, canEdit: true };
+      });
+      window.RaddGithubFolderList.render(rows);
+      renderGithubFolderSelect();
+      updatePushTargetUI();
+    }
+
+    window.RaddGithubFolderList.onInput = function(idx, value) {
+      var oldVal = ghFolders[idx];
+      ghFolders[idx] = value;
+      if (ghActiveFolder === oldVal) ghActiveFolder = value;
+    };
+    window.RaddGithubFolderList.onBlur = function(idx, value) {
+      var oldVal = ghFolders[idx];
+      var norm = normFolder(value);
+      ghFolders[idx] = norm;
+      if (ghActiveFolder === oldVal) ghActiveFolder = norm;
+      setFieldValue('github-folder-row-input-' + idx, norm);
+      renderGithubFolderSelect();
+    };
+    window.RaddGithubFolderList.onRemove = function(idx) {
+      var removed = ghFolders[idx];
+      ghFolders.splice(idx, 1);
+      if (ghActiveFolder === removed) ghActiveFolder = ghFolders[0] || '';
+      renderGithubFolderList();
+    };
+
+    // Main screen: GitHub's own folder dropdown, shown only when relevant
+    // to the current pushTarget (see updatePushTargetUI()).
+    function renderGithubFolderSelect() {
+      var items = ghFolders.map(function(path) {
+        return { label: path || '(repo root)', value: path };
+      });
+      window.RaddGithubFolderSelect.setItems(items, ghActiveFolder);
+    }
+
+    // Settings has no view/edit mode: every field is editable the moment
+    // the page opens, and changes persist on their own (see the auto-save
+    // listener below). This re-renders the folder lists and re-syncs the
+    // main screen from them. Which provider blocks and buttons are SHOWN
+    // is updateProviderSectionVisibility()'s job, not this one.
+    function refreshSettingsControls() {
+      updateClearTokenButtons();
+      if (gitlabAdded) renderFolderList();
+      if (githubAdded) renderGithubFolderList();
+      // The Settings fields are the source of truth — refresh the main
+      // screen's read-only file-name displays to match, same as the folder
+      // dropdowns already do via renderFolderList.
+      syncMainScreenFilenames();
+      // Also re-check whether the commit box should be disabled — a token
+      // or repo could have just been filled in (or cleared), and
+      // updatePushTargetUI() (the other call site for this) only runs on
+      // pushTarget/provider changes, not on every Settings edit.
+      updateActionUI();
+    }
+
+    // Keeps the main screen's read-only file-name fields in sync with each
+    // provider's own Settings field — called from refreshSettingsControls()
+    // and from the Settings auto-save, rather than wiring a separate
+    // onChange for a field that's never live-typed into from the main
+    // screen itself.
+    function syncMainScreenFilenames() {
+      if (gitlabAdded) setFieldValue('export-filename', gitlabConfig().filename);
+      if (githubAdded) setFieldValue('github-filename', githubConfig().filename);
+    }
+
+    // Shows/hides everything under "Repository settings": the GitLab/GitHub
+    // tab switcher itself (only meaningful once BOTH providers are actually
+    // added — with only one there's nothing left to switch between), each
+    // provider's whole block (fields + folder list + Remove) vs. its
+    // "Add ___" affordance, and the push-destination control (only a real
+    // choice once BOTH providers exist — with just one there's nowhere
+    // else to push to, so the picker would be pointless).
+    //
+    // Gating the tabs on BOTH (not just githubAdded) matters specifically
+    // for removal: if GitLab gets removed while GitHub stays added, the old
+    // `showTabs = githubAdded` check left the tab switcher visible with
+    // nothing sensible to show on the now-empty GitLab tab (a confusing
+    // "Add GitLab" floating under a tab switcher that no longer means
+    // anything). Now the switcher itself disappears the instant either
+    // provider drops below two, and the remaining single provider's block
+    // shows directly with the OTHER's "Add ___" button standing in for it.
+    function updateProviderSectionVisibility() {
+      var showTabs = gitlabAdded && githubAdded;
+      document.getElementById('repo-settings-tabs-row').hidden = !showTabs;
+
+      var showGitlabBlock = showTabs ? activeSettingsTab === 'gitlab' : gitlabAdded;
+      var showGithubBlock = showTabs ? activeSettingsTab === 'github' : githubAdded;
+
+      document.getElementById('gitlab-block').hidden = !showGitlabBlock;
+      document.getElementById('add-gitlab-row').hidden = gitlabAdded;
+      document.getElementById('github-fields').hidden = !showGithubBlock;
+      document.getElementById('add-github-row').hidden = githubAdded;
+
+      document.getElementById('push-target-section').hidden = !(githubAdded && gitlabAdded);
+
+      // Each provider's "Remove" is offered only while the OTHER one also
+      // exists — removing the last provider would leave nowhere to push to
+      // (both onConfirm handlers below refuse it outright). Same condition
+      // as the push-destination control right above, and it lives HERE
+      // rather than in refreshSettingsControls() because the remove
+      // handlers call only this function: gating it there left the button
+      // on screen after the other provider was removed, still visible but
+      // inert, since its own guard then swallowed every click.
+      document.getElementById('remove-gitlab-btn-mount').hidden = !(githubAdded && gitlabAdded);
+      document.getElementById('remove-github-btn-mount').hidden = !(githubAdded && gitlabAdded);
+    }
+
+    var gitSettings = {
+      getState: function() {
+        var state = {
+          version: 5,
+          pushTarget: pushTarget,
+          gitlabAdded: gitlabAdded,
+          // Output format switch. Stored as a plain boolean rather than the
+          // shape name so a config saved here stays readable if the converter
+          // ever grows more shapes.
+          dtcg: dtcgShape !== null
+        };
+        if (gitlabAdded) {
+          var c = gitlabConfig();
+          state.gitlab = {
+            token: c.token, host: c.host, project: c.project, branch: c.branch,
+            filename: c.filename, folders: c.folders, activeFolder: c.activeFolder
+          };
+        }
+        if (githubAdded) {
+          var gc = githubConfig();
+          state.github = {
+            token: gc.token, repo: gc.repo, branch: gc.branch,
+            filename: gc.filename, folders: gc.folders, activeFolder: gc.activeFolder
+          };
+        }
+        return state;
+      },
+      setState: function(config) {
+        if (!config) config = {};
+        // Explicit `false` is the only way this is ever off — every config
+        // saved before this flag existed (and a fresh install with no saved
+        // config at all) has no gitlabAdded field, and must keep behaving
+        // exactly as it always did (GitLab present, baked-in defaults).
+        gitlabAdded = config.gitlabAdded !== false;
+
+        // Output format. Absent in every config saved before this switch
+        // existed, which must keep exporting Token Studio JSON — so only an
+        // explicit `true` turns DTCG on.
+        var previousDtcgShape = dtcgShape;
+        dtcgShape = config.dtcg === true ? 'partial' : null;
+        window.RaddDtcgFormat.setValue(dtcgShape !== null);
+        // No filename rewrite here: a config saved with dtcg on already stored
+        // the suffixed name, and defaultFilename() (read below when a provider
+        // has none saved) follows dtcgShape, which is why this block runs
+        // before the fields are seeded. The hint is refreshed at the end of
+        // setState instead, once those fields actually hold their new values.
+        // The saved preference can land after the extract has already kicked
+        // off a transform (the two are independent round-trips to code.js), and
+        // this also runs on a Cancel-restore. Either way the transform has to
+        // re-run, because includeDescriptions is decided over there.
+        if (dtcgShape !== previousDtcgShape) requestTransform();
+
+        var gl = config.gitlab;
+        // Migrate legacy flat / v2 configs into a gitlab object.
+        if (!gl) {
+          if (config.provider === 'gitlab' || config.glProject || config.glHost) {
+            gl = { token: config.token, host: config.glHost, project: config.glProject, folder: config.folder, branch: config.branch };
+          } else { gl = {}; }
+        }
+        if (gitlabAdded) {
+          setFieldValue('gl-token', gl.token || '');
+          setFieldValue('gl-host', gl.host || GITLAB_DEFAULTS.host);
+          setFieldValue('gl-project', gl.project || GITLAB_DEFAULTS.project);
+          setFieldValue('gl-branch', gl.branch || GITLAB_DEFAULTS.branch);
+          setFieldValue('gl-filename', gl.filename || defaultFilename());
+          // The baked-in standard paths are only a first-run starting point,
+          // not a permanently-enforced floor — every row (standard or custom)
+          // can be removed (see renderFolderList), and once a
+          // `folders` array has ever been saved (even shorter than the 4
+          // standards, or empty), it's the complete, authoritative list from
+          // then on. GITLAB_DEFAULTS is only re-seeded for a config that has
+          // genuinely never saved a folders list at all.
+          if (Array.isArray(gl.folders)) {
+            glFolders = gl.folders.map(normFolder).filter(function(f) { return !!f; });
+          } else if (gl.folder !== undefined && gl.folder !== null && normFolder(gl.folder)) {
+            glFolders = [normFolder(gl.folder)];
+          } else {
+            glFolders = GITLAB_DEFAULTS.folders.slice();
+          }
+          glActiveFolder = (gl.activeFolder && glFolders.indexOf(normFolder(gl.activeFolder)) >= 0)
+            ? normFolder(gl.activeFolder) : glFolders[0];
+        } else {
+          setFieldValue('gl-token', '');
+          setFieldValue('gl-host', '');
+          setFieldValue('gl-project', '');
+          setFieldValue('gl-branch', '');
+          setFieldValue('gl-filename', '');
+          glFolders = [];
+          glActiveFolder = '';
+        }
+
+        // GitHub — absent entirely until the user adds it (no defaults, no
+        // migration path: this config shape didn't exist before version 5).
+        var gh = config.github;
+        githubAdded = !!(gh && typeof gh === 'object');
+        if (githubAdded) {
+          setFieldValue('gh-token', gh.token || '');
+          setFieldValue('gh-repo', gh.repo || '');
+          setFieldValue('gh-branch', gh.branch || 'main');
+          setFieldValue('gh-filename', gh.filename || defaultFilename());
+          ghFolders = Array.isArray(gh.folders) ? gh.folders.map(normFolder).filter(function(f) { return !!f; }) : [];
+          ghActiveFolder = (gh.activeFolder && ghFolders.indexOf(normFolder(gh.activeFolder)) >= 0)
+            ? normFolder(gh.activeFolder) : (ghFolders[0] || '');
+        } else {
+          setFieldValue('gh-token', '');
+          setFieldValue('gh-repo', '');
+          setFieldValue('gh-branch', '');
+          setFieldValue('gh-filename', '');
+          ghFolders = [];
+          ghActiveFolder = '';
+        }
+
+        // Keep whichever tab was already active if it's still valid (e.g. a
+        // Cancel-restore shouldn't yank the user to a different tab than
+        // the one they were looking at) — only pick a fresh default the
+        // first time (activeSettingsTab starts null) or if the provider it
+        // pointed at is no longer available.
+        if (!activeSettingsTab || (activeSettingsTab === 'gitlab' && !gitlabAdded) || (activeSettingsTab === 'github' && !githubAdded)) {
+          activeSettingsTab = gitlabAdded ? 'gitlab' : 'github';
+        }
+        window.RaddRepoTab.setValue(activeSettingsTab);
+        updateProviderSectionVisibility();
+
+        // pushTarget must always point at an actually-available provider —
+        // a stale value from before a removal falls back to whichever one
+        // remains (both removed is unreachable: the remove guards never
+        // let the last provider go).
+        if (!gitlabAdded) {
+          pushTarget = 'github';
+        } else if (!githubAdded) {
+          pushTarget = 'gitlab';
+        } else {
+          pushTarget = (config.pushTarget === 'github' || config.pushTarget === 'both') ? config.pushTarget : 'gitlab';
+        }
+        window.RaddPushTarget.setValue(pushTarget);
+        updatePushTargetUI();
+
+        // Last, so it can name the file the seeded fields above actually hold.
+        updateOutputFormatHint();
+
+        refreshSettingsControls();
+      },
+      init: function() {
+        parent.postMessage({ pluginMessage: { type: 'LOAD_GIT_SETTINGS' } }, '*');
+      }
+    };
+
+    function localStorageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+    function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+    document.getElementById('settings-btn').addEventListener('click', function() {
+      document.getElementById('main-page').classList.add('hidden');
+      document.getElementById('settings-page').classList.add('visible');
+    });
+
+    document.getElementById('back-btn').addEventListener('click', function() {
+      flushSettingsSave();
+      document.getElementById('settings-page').classList.remove('visible');
+      document.getElementById('main-page').classList.remove('hidden');
+    });
+
+    // Settings fields are always editable, so nothing commits them but this:
+    // every connection field auto-saves as it is typed into. Debounced so a
+    // burst of keystrokes is one clientStorage write rather than dozens, and
+    // silent — no toast — matching how the folder picker and the file-name
+    // auto-match already save themselves.
+    var settingsSaveTimer = null;
+    function scheduleSettingsSave() {
+      clearTimeout(settingsSaveTimer);
+      settingsSaveTimer = setTimeout(function() {
+        persistSettings();
+        // A token or repo may have just been filled in, which is what
+        // decides whether pushing is possible at all.
+        syncMainScreenFilenames();
+        updateActionUI();
+      }, 400);
+    }
+    ['gl-token', 'gl-host', 'gl-project', 'gl-branch', 'gl-filename',
+     'gh-token', 'gh-repo', 'gh-branch', 'gh-filename'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', scheduleSettingsSave);
+    });
+    // Show/hide each Clear button as its token field gains or loses content.
+    // Immediate, not debounced — this is pure UI, nothing is written here.
+    ['gl-token', 'gh-token'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', updateClearTokenButtons);
+    });
+    // Leaving Settings must not outrun a pending debounce — flush it.
+    function flushSettingsSave() {
+      if (!settingsSaveTimer) return;
+      clearTimeout(settingsSaveTimer);
+      settingsSaveTimer = null;
+      persistSettings();
+      syncMainScreenFilenames();
+      updateActionUI();
+    }
+
+    // Clear a provider's token — confirmed, because the field is a password
+    // input and cannot be read back before it goes.
+    document.getElementById('gl-clear-token-btn').addEventListener('click', function() {
+      window.RaddClearTokenDialog.open('gitlab');
+    });
+    document.getElementById('gh-clear-token-btn').addEventListener('click', function() {
+      window.RaddClearTokenDialog.open('github');
+    });
+    window.RaddClearTokenDialog.onConfirm = function(provider) {
+      setFieldValue(provider === 'github' ? 'gh-token' : 'gl-token', '');
+      // Persist immediately rather than via the debounce: this is a
+      // deliberate, confirmed action, and it must not be lost if the panel
+      // closes in the next 400ms.
+      persistSettings();
+      updateClearTokenButtons();
+      // The provider is now unready, which changes the main screen (Push is
+      // replaced by "Add Repo Settings", commit box disables).
+      updateActionUI();
+      showToast((provider === 'github' ? 'GitHub' : 'GitLab') + ' token cleared');
+      var field = document.getElementById(provider === 'github' ? 'gh-token' : 'gl-token');
+      if (field) field.focus();   // land ready to type the replacement
+    };
+
+    // Add a new folder path.
+    document.getElementById('folder-add-btn').addEventListener('click', function() {
+      var input = document.getElementById('folder-new');
+      var val = normFolder(input.value);
+      if (!val) return;
+      if (glFolders.indexOf(val) === -1) { glFolders.push(val); glActiveFolder = val; }
+      setFieldValue('folder-new', '');
+      renderFolderList();
+    });
+    document.getElementById('folder-new').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('folder-add-btn').click(); }
+    });
+
+    // Main-screen folder dropdown → sets the active target path and persists it.
+    window.RaddFolderSelect.onChange = function(value) {
+      glActiveFolder = value;
+      renderFolderList();   // refresh the "in use" marker in Settings
+      persistSettings();    // remember the pick
+    };
+
+    // Add a new folder path to GitHub's own list.
+    document.getElementById('github-folder-add-btn').addEventListener('click', function() {
+      var input = document.getElementById('github-folder-new');
+      var val = normFolder(input.value);
+      if (!val) return;
+      if (ghFolders.indexOf(val) === -1) { ghFolders.push(val); ghActiveFolder = val; }
+      setFieldValue('github-folder-new', '');
+      renderGithubFolderList();
+    });
+    document.getElementById('github-folder-new').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('github-folder-add-btn').click(); }
+    });
+
+    // Main-screen GitHub folder dropdown (shown only when relevant to the
+    // current pushTarget) → same behavior as GitLab's own dropdown above.
+    window.RaddGithubFolderSelect.onChange = function(value) {
+      ghActiveFolder = value;
+      renderGithubFolderList();
+      persistSettings();
+    };
+
+    // ── GitHub connection: optional, add/remove ────────────────────────────
+    // Data-only init, factored out so the onboarding dialog (see
+    // window.RaddOnboardingDialog.onConfirm below) can reach the same
+    // blank-slate state without also forcing a tab-switch/edit-mode jump
+    // that only makes sense when already on the Settings page.
+    function addGithub() {
+      githubAdded = true;
+      ghFolders = [];
+      ghActiveFolder = '';
+      setFieldValue('gh-token', '');
+      setFieldValue('gh-repo', '');
+      setFieldValue('gh-branch', 'main');
+      renderGithubFolderList();
+    }
+    document.getElementById('add-github-btn').addEventListener('click', function() {
+      addGithub();
+      activeSettingsTab = 'github'; // jump to the tab holding the fields just added
+      window.RaddRepoTab.setValue(activeSettingsTab);
+      updateProviderSectionVisibility();
+      refreshSettingsControls();
+      persistSettings();
+    });
+
+    document.getElementById('remove-github-btn').addEventListener('click', function() {
+      window.RaddRemoveGithubDialog.open();
+    });
+    // Data-only teardown, the mirror of addGithub() above — factored out
+    // for the same reason: the onboarding dialog needs to un-add a provider
+    // the user did NOT pick, without the tab-switch/toast that only make
+    // sense when removing one from the Settings page itself.
+    function removeGithub() {
+      githubAdded = false;
+      ghFolders = [];
+      ghActiveFolder = '';
+      setFieldValue('gh-token', '');
+      setFieldValue('gh-repo', '');
+      setFieldValue('gh-branch', '');
+    }
+    window.RaddRemoveGithubDialog.onConfirm = function() {
+      if (!gitlabAdded) return; // never remove the only remaining provider
+      removeGithub();
+      activeSettingsTab = 'gitlab'; // the tab switcher itself is about to disappear, but stay consistent
+      window.RaddRepoTab.setValue(activeSettingsTab);
+      updateProviderSectionVisibility();
+      if (pushTarget !== 'gitlab') {
+        pushTarget = 'gitlab';
+        window.RaddPushTarget.setValue(pushTarget);
+      }
+      updatePushTargetUI();
+      persistSettings();
+      showToast('GitHub removed');
+    };
+
+    // ── GitLab connection: now equally optional, add/remove ───────────────
+    // Same split as addGithub() above.
+    function addGitlab() {
+      gitlabAdded = true;
+      // Unlike GitHub, GitLab has a real company-wide standard to re-seed —
+      // re-adding it should restore the same useful starting point a fresh
+      // install gets, not a blank slate.
+      setFieldValue('gl-token', '');
+      setFieldValue('gl-host', GITLAB_DEFAULTS.host);
+      setFieldValue('gl-project', GITLAB_DEFAULTS.project);
+      setFieldValue('gl-branch', GITLAB_DEFAULTS.branch);
+      glFolders = GITLAB_DEFAULTS.folders.slice();
+      glActiveFolder = glFolders[0];
+      renderFolderList();
+    }
+    document.getElementById('add-gitlab-btn').addEventListener('click', function() {
+      addGitlab();
+      activeSettingsTab = 'gitlab';
+      window.RaddRepoTab.setValue(activeSettingsTab);
+      updateProviderSectionVisibility();
+      refreshSettingsControls();
+      persistSettings();
+    });
+
+    document.getElementById('remove-gitlab-btn').addEventListener('click', function() {
+      window.RaddRemoveGitlabDialog.open();
+    });
+    // Mirror of addGitlab(), same reasoning as removeGithub() above.
+    function removeGitlab() {
+      gitlabAdded = false;
+      glFolders = [];
+      glActiveFolder = '';
+      setFieldValue('gl-token', '');
+      setFieldValue('gl-host', '');
+      setFieldValue('gl-project', '');
+      setFieldValue('gl-branch', '');
+    }
+    window.RaddRemoveGitlabDialog.onConfirm = function() {
+      if (!githubAdded) return; // never remove the only remaining provider
+      removeGitlab();
+      activeSettingsTab = 'github';
+      window.RaddRepoTab.setValue(activeSettingsTab);
+      updateProviderSectionVisibility();
+      if (pushTarget !== 'github') {
+        pushTarget = 'github';
+        window.RaddPushTarget.setValue(pushTarget);
+      }
+      updatePushTargetUI();
+      persistSettings();
+      showToast('GitLab removed');
+    };
+
+    // Switches which provider's connection-fields block is shown under
+    // "Repository settings" — a view preference only, not persisted.
+    window.RaddRepoTab.onChange = function(value) {
+      activeSettingsTab = value;
+      updateProviderSectionVisibility();
+    };
+
+    // Settings-level push-destination preference (GitLab / GitHub / Both) —
+    // the main screen's Push button just follows whatever this is set to.
+    window.RaddPushTarget.onChange = function(value) {
+      pushTarget = value;
+      persistSettings();
+      updatePushTargetUI();
+    };
+
+    // First-run nudge (see the GIT_SETTINGS_LOADED handler below for when
+    // this opens). The pick is authoritative in BOTH directions: Settings
+    // ends up showing exactly the provider(s) ticked, nothing else.
+    //
+    // The second half matters because gitlabAdded starts out TRUE (a fresh
+    // install is GitLab-with-standard-defaults — see gitSettings.setState's
+    // `config.gitlabAdded !== false`). So picking GitHub alone used to add
+    // GitHub while leaving GitLab added too, and Settings showed both — the
+    // opposite of what was just chosen. Un-adding the unpicked one is what
+    // makes the dialog's answer stick.
+    //
+    // add*/remove* are the same data-only helpers the Settings-page
+    // "Add ___"/"Remove ___" buttons use, and each is guarded on the
+    // provider's current state, so re-picking something already configured
+    // never wipes it. goToFirstUnreadyProvider() (defined further down,
+    // alongside "Add Repo Settings") then lands on whichever picked
+    // provider still needs a token.
+    window.RaddOnboardingDialog.onConfirm = function(target) {
+      pushTarget = target;
+      var wantsGitLab = (target === 'gitlab' || target === 'both');
+      var wantsGitHub = (target === 'github' || target === 'both');
+      if (wantsGitLab && !gitlabAdded) addGitlab();
+      if (wantsGitHub && !githubAdded) addGithub();
+      // At least one box is always ticked (the dialog's own toggle guard),
+      // so this can never remove both and leave nowhere to push.
+      if (!wantsGitLab && gitlabAdded) removeGitlab();
+      if (!wantsGitHub && githubAdded) removeGithub();
+      activeSettingsTab = wantsGitLab ? 'gitlab' : 'github';
+      window.RaddRepoTab.setValue(activeSettingsTab);
+      updateProviderSectionVisibility();
+      refreshSettingsControls();
+      window.RaddPushTarget.setValue(pushTarget);
+      updatePushTargetUI();
+      persistSettings();
+      goToFirstUnreadyProvider();
+    };
+
+    gitSettings.setState({}); // render standard defaults immediately
+    gitSettings.init();       // then load any saved overrides
+    parent.postMessage({ pluginMessage: { type: 'GET_FILE_INFO' } }, '*'); // file name up-front (no wait for extract)
+    
+    function triggerExtract() {
+      parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', triggerExtract);
+    } else {
+      triggerExtract();
+    }
+    
+    var pushBtn = document.getElementById('push-btn');
+    var downloadBtn = document.getElementById('download-btn');
+    var exportMode = 'token-studio';
+    var collectionsList = document.getElementById('collections-list');
+    var loadingState = document.getElementById('loading-state');
+    var skeletonList = document.getElementById('skeleton-list');
+    var emptyState = document.getElementById('empty-state');
+    var collectionsWrap = document.getElementById('collections-wrap');
+    // Reveal the wrap immediately so the loading skeleton is visible while
+    // foundations are being read (it starts at opacity:0 until .visible).
+    collectionsWrap.classList.add('visible');
+
+    // Settings → Output format helper line. Spells out what the switch changes,
+    // and that it does NOT change where the file goes — same file name either
+    // way, so turning this on overwrites the Token Studio JSON at that path.
+    function updateOutputFormatHint() {
+      var el = document.getElementById('output-format-hint');
+      if (!el) return;
+      // Names the file it will actually be written to, so the _dtcg swap is
+      // visible here and not only in the file name field further down.
+      var name = primaryFilename();
+      el.textContent = dtcgShape
+        ? 'Tokens Studio DTCG ($value / $type), exported as ' + name + '.'
+        : 'Token Studio JSON — the format this plugin has always exported — as ' + name + '.';
+    }
+
+    // Convert the Token Studio tree to DTCG and log a conversion report.
+    //
+    // 'partial' is the production target: Tokens Studio's own DTCG shape, which
+    // config/normalize/build-dtcg.js consumes as tokens_W3C.json and finishes
+    // into strict DTCG. Nothing is rewritten here, so there is no closure check
+    // to run — $themes/$metadata stay at the root for the downstream resolver.
+    //
+    // 'themes' previews the strict form: each document is merged from its own
+    // sets and should therefore resolve every {a.b.c} reference it contains.
+    function toDtcg(tokens) {
+      var result = window.RaddDtcg.toDtcgFormat(tokens, { shape: dtcgShape });
+      var report = result.report;
+      console.log('[DTCG] ' + report.tokenCount + ' tokens, ' + report.describedCount +
+        ' with $description, shape=' + dtcgShape, report);
+      if (report.mathExpressions.length) {
+        console.warn('[DTCG] ' + report.mathExpressions.length + ' Token Studio math expressions preserved verbatim');
+      }
+      if (dtcgShape === 'partial') {
+        console.log('[DTCG] source $type values left for build-dtcg.js to map', report.sourceTypes);
+      } else {
+        var unmapped = Object.keys(report.unmappedTypes);
+        if (unmapped.length) {
+          console.warn('[DTCG] types with no DTCG equivalent, passed through: ' + unmapped.join(', '));
+        }
+        console.log('[DTCG] reference closure', window.RaddDtcg.validateDtcgClosure(result.tokens));
+      }
+      return result.tokens;
+    }
+
+    function getTokensToExport() {
+      if (!transformedData) return null;
+      var tokens = transformedData.tokens;
+      // In Token Studio mode the output keys are set names (e.g. 'core', 'mode/light'),
+      // not raw Figma collection names — skip the collection filter entirely.
+      if (exportMode === 'token-studio') {
+        return dtcgShape ? toDtcg(tokens) : tokens;
+      }
+      if (selectedCollections.length > 0 && selectedCollections.length < Object.keys(transformedData.tokens).length) {
+        tokens = {};
+        selectedCollections.forEach(function(name) {
+          if (transformedData.tokens[name]) tokens[name] = transformedData.tokens[name];
+        });
+      }
+      return tokens;
+    }
+    
+    function showToast(message, isError) {
+      window.RaddToast.show(message, isError);
+    }
+    
+    function formatTokenCount(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+      if (n >= 1000) return Math.round(n / 1000) + 'k';
+      return String(n);
+    }
+    
+    // While the list is loading, show the skeleton action area instead of the
+    // real path / commit / buttons.
+    function setActionsLoading(loading) {
+      var real = document.getElementById('actions');
+      var skel = document.getElementById('actions-skeleton');
+      if (real) real.hidden = loading;
+      if (skel) skel.hidden = !loading;
+    }
+
+    // Single source of truth for "what can actually be pushed right now" —
+    // shared by the main-screen UI (updateActionUI/updatePushTargetUI) and
+    // the real push action (pushToGit), so they can never disagree. In
+    // 'both' mode, if exactly one provider is ready, this silently narrows
+    // to just that one (effectiveTarget) instead of blocking the whole
+    // push — the other one gets a small "finish setting up" button instead
+    // of being hidden outright (mixedReadiness). Only single-provider mode
+    // (or 'both' with NEITHER ready) counts as fully blocked (needsBigSetup).
+    function computePushReadiness() {
+      var wantsGitLab = pushTarget === 'gitlab' || pushTarget === 'both';
+      var wantsGitHub = githubAdded && (pushTarget === 'github' || pushTarget === 'both');
+      var glReady = isGitLabReady();
+      var ghReady = isGitHubReady();
+      var bothMode = pushTarget === 'both' && githubAdded;
+
+      var effectiveTarget = pushTarget;
+      var mixedReadiness = false;
+      if (bothMode) {
+        if (glReady && ghReady) {
+          effectiveTarget = 'both';
+        } else if (glReady) {
+          effectiveTarget = 'gitlab';
+          mixedReadiness = true;
+        } else if (ghReady) {
+          effectiveTarget = 'github';
+          mixedReadiness = true;
+        }
+        // else neither ready — effectiveTarget stays 'both', needsBigSetup covers it.
+      }
+
+      var needsBigSetup =
+        (pushTarget === 'gitlab' && !glReady) ||
+        (pushTarget === 'github' && !ghReady) ||
+        (bothMode && !glReady && !ghReady);
+
+      return {
+        wantsGitLab: wantsGitLab, wantsGitHub: wantsGitHub,
+        glReady: glReady, ghReady: ghReady,
+        bothMode: bothMode, mixedReadiness: mixedReadiness,
+        effectiveTarget: effectiveTarget, needsBigSetup: needsBigSetup,
+        effectiveWantsGitLab: effectiveTarget === 'gitlab' || effectiveTarget === 'both',
+        effectiveWantsGitHub: effectiveTarget === 'github' || effectiveTarget === 'both'
+      };
+    }
+
+    function updateActionUI() {
+      var r = computePushReadiness();
+      // No workable destination at all yet (single-provider mode not
+      // ready, or 'both' with neither ready) — the commit box is pointless,
+      // so it's hidden outright (not just disabled — nothing to type
+      // towards yet), and the Push button itself is replaced by "Add Repo
+      // Settings" in its own slot (see goToProviderSettingsField()). Stays
+      // visible and enabled in the mixed-readiness case (see
+      // computePushReadiness()) — there a commit message still makes
+      // sense, since the push goes ahead against whichever provider IS ready.
+      window.RaddCommitMessage.setDisabled(r.needsBigSetup);
+      document.getElementById('commit-wrap').hidden = r.needsBigSetup;
+      document.getElementById('push-btn-mount').hidden = r.needsBigSetup;
+      document.getElementById('add-repo-settings-btn-mount').hidden = !r.needsBigSetup;
+
+      // Pushing requires a commit message — no commit without one.
+      var hasCommitMsg = !!(document.getElementById('commit-message').value.trim());
+      var blockedByCommitMsg = !r.needsBigSetup && !hasCommitMsg && !!transformedData;
+      window.RaddButtons.push.setDisabled(!transformedData || !hasCommitMsg || r.needsBigSetup);
+      if (!r.needsBigSetup) {
+        // The button's own baseProps.label ('Push to GitLab', buttons.tsx)
+        // is just an initial-render fallback — this always drives the real
+        // label once settings have loaded, and follows effectiveTarget (not
+        // raw pushTarget) so a mixed-readiness 'both' correctly reads
+        // "Push to GitLab" rather than "Push to Both".
+        window.RaddButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
+      }
+      window.RaddButtons.download.setDisabled(!transformedData);
+    }
+
+    // Shows a provider's dropdown+filename row, or — if it has zero saved
+    // folder paths — an explanatory message instead (an empty dropdown
+    // with nothing to select reads as broken, not "not configured yet").
+    // Always shows its own title when shown, even outside 'both'. When the
+    // provider isn't ready (no token/project or repo), the whole thing is
+    // replaced by either nothing (single-provider mode, or 'both' with
+    // neither ready — see updateActionUI()'s big "Add Repo Settings"
+    // instead) or, in 'both' mode with the OTHER provider ready, a small
+    // standalone "Add ___ Settings" button (showSmallBtn).
+    function updateTargetRow(prefix, wanted, ready, isEmpty, showSmallBtn, bothMode) {
+      var showNormal = wanted && ready;
+      var showSmall = wanted && !ready && showSmallBtn;
+      document.getElementById(prefix + '-target-wrap').hidden = !(showNormal || showSmall);
+      document.getElementById(prefix + '-target-title').hidden = !(showNormal || showSmall);
+      document.getElementById(prefix + '-filename-row').hidden = !showNormal || isEmpty;
+      document.getElementById(prefix + '-target-empty').hidden = !showNormal || !isEmpty;
+      document.getElementById(prefix + '-target-actions').hidden = !showSmall;
+      // Same "uncheck this provider" shortcut as -target-actions' trash
+      // button, offered here too — only in 'both' mode (there's always a
+      // valid other target to fall back to; single-provider mode has none).
+      document.getElementById(prefix + '-empty-remove-push-btn-mount').hidden = !(showNormal && isEmpty && bothMode);
+    }
+
+    function updatePushTargetUI() {
+      var r = computePushReadiness();
+      updateTargetRow('gitlab', r.wantsGitLab, r.glReady, glFolders.length === 0, r.mixedReadiness && r.effectiveTarget === 'github', r.bothMode);
+      updateTargetRow('github', r.wantsGitHub, r.ghReady, ghFolders.length === 0, r.mixedReadiness && r.effectiveTarget === 'gitlab', r.bothMode);
+      if (r.wantsGitHub && r.ghReady) renderGithubFolderSelect();
+      updateActionUI();
+    }
+
+    // The main screen's empty-state "+" button (a provider with zero saved
+    // folder paths) jumps straight to that provider's Settings tab, already
+    // at the same folder-add row its Settings-page "+"
+    // belongs to — reuses the existing add-folder flow rather than a
+    // second, main-screen-only way to do the same thing. Generalized to
+    // take any field id: also used to jump straight to a provider's token
+    // field when it has nothing configured yet (see the commit-area
+    // "Add ___ settings" buttons, wired below).
+    function goToProviderSettingsField(provider, fieldId) {
+      document.getElementById('main-page').classList.add('hidden');
+      document.getElementById('settings-page').classList.add('visible');
+      activeSettingsTab = provider;
+      window.RaddRepoTab.setValue(activeSettingsTab);
+      updateProviderSectionVisibility();
+      refreshSettingsControls();
+      // Land right at the target field, ready to type — not just on the
+      // right tab. A short delay gives the just-switched tab's layout a
+      // frame to settle before scrolling to / focusing the field.
+      setTimeout(function() {
+        var field = document.getElementById(fieldId);
+        if (!field) return;
+        field.scrollIntoView({ block: 'center' });
+        field.focus();
+      }, 30);
+    }
+    document.getElementById('gitlab-empty-add-btn').addEventListener('click', function() {
+      goToProviderSettingsField('gitlab', 'folder-new');
+    });
+    document.getElementById('github-empty-add-btn').addEventListener('click', function() {
+      goToProviderSettingsField('github', 'github-folder-new');
+    });
+    // Replaces the Push button itself when nothing workable is configured
+    // yet (see updateActionUI()) — jumps to whichever wanted provider isn't
+    // ready (GitLab first, matching this app's usual gitlab-first default).
+    // Shared by this button and the onboarding dialog's "Add Settings"
+    // (see window.RaddOnboardingDialog.onConfirm below) — gitlab-first,
+    // matching this app's usual default precedence.
+    function goToFirstUnreadyProvider() {
+      var r = computePushReadiness();
+      if (r.wantsGitLab && !r.glReady) {
+        goToProviderSettingsField('gitlab', 'gl-token');
+      } else if (r.wantsGitHub && !r.ghReady) {
+        goToProviderSettingsField('github', 'gh-token');
+      }
+    }
+    document.getElementById('add-repo-settings-btn').addEventListener('click', goToFirstUnreadyProvider);
+    // Small per-row "finish setting up" buttons — only ever shown (see
+    // updateTargetRow()) when the OTHER provider is already ready, so the
+    // push itself isn't blocked on these.
+    document.getElementById('gitlab-small-settings-btn').addEventListener('click', function() {
+      goToProviderSettingsField('gitlab', 'gl-token');
+    });
+    document.getElementById('github-small-settings-btn').addEventListener('click', function() {
+      goToProviderSettingsField('github', 'gh-token');
+    });
+    // Trash icon — unchecks this provider from the push destination
+    // entirely, same effect as unchecking its box on the Settings page's
+    // Push destination control (window.RaddPushTarget.setValue keeps that
+    // control in sync). Shared by two placements: next to the small
+    // settings button (only shown when the OTHER provider is ready) and
+    // next to the empty-folder-path "+" button (only shown in 'both' mode
+    // — see updateTargetRow()) — both call sites are only ever reachable
+    // when the OTHER provider is actually added, so this can never leave
+    // pushTarget pointing at nothing.
+    function removeGitlabFromPush() {
+      pushTarget = 'github';
+      window.RaddPushTarget.setValue(pushTarget);
+      persistSettings();
+      updatePushTargetUI();
+    }
+    function removeGithubFromPush() {
+      pushTarget = 'gitlab';
+      window.RaddPushTarget.setValue(pushTarget);
+      persistSettings();
+      updatePushTargetUI();
+    }
+    document.getElementById('gitlab-remove-push-btn').addEventListener('click', removeGitlabFromPush);
+    document.getElementById('github-remove-push-btn').addEventListener('click', removeGithubFromPush);
+    document.getElementById('gitlab-empty-remove-push-btn').addEventListener('click', removeGitlabFromPush);
+    document.getElementById('github-empty-remove-push-btn').addEventListener('click', removeGithubFromPush);
+
+    // Re-run the transform in code.js for the current exportMode / dtcgShape.
+    // Needed whenever either changes, because includeDescriptions is decided
+    // over in transformToFinalFormat — the UI cannot add descriptions after
+    // the fact. No-op before the first extract has landed.
+    function requestTransform() {
+      if (!rawData) return;
+      transformedData = null;
+      updateActionUI();
+      parent.postMessage({
+        pluginMessage: {
+          type: 'transform',
+          raw: rawData,
+          exportMode: exportMode,
+          // Descriptions are only carried when a DTCG shape needs them.
+          includeDescriptions: dtcgShape !== null,
+          selectedCollections: selectedCollections.length > 0 ? selectedCollections : null
+        }
+      }, '*');
+    }
+
+    // RADDSegmentedControl (src/ui-react/buttons.tsx) owns its own selected-
+    // segment styling; it just reports the clicked index here. Hidden in the
+    // template — the Token Studio ↔ DTCG choice is the Output format switch in
+    // Settings now — but left wired so the native mode stays reachable.
+    window.RaddExportMode.onChange = function(index) {
+      exportMode = index === 0 ? 'native' : 'token-studio';
+      requestTransform();
+    };
+
+    // Settings → Output format. The DTCG shapes are a post-transform over the
+    // Token Studio tree, so exportMode stays 'token-studio' either way.
+    window.RaddDtcgFormat.onChange = function(on) {
+      dtcgShape = on ? 'partial' : null;
+      // Rewrite the file names BEFORE persisting, so the saved config and the
+      // fields on screen never disagree about where the export lands.
+      applyFilenameForFormat();
+      updateOutputFormatHint();
+      persistSettings();
+      requestTransform();
+    };
+
+    updateActionUI();
+
+    // ── Push orchestration ─────────────────────────────────────────────────
+    // The main Push button sends the exported JSON to GitLab. pushGitLab is a
+    // promise that resolves on success and rejects with { status, message };
+    // pushToGit owns the button UI (busy / success / error / done).
+
+    function pushBusy() {
+      window.RaddButtons.push.setDisabled(true);
+      window.RaddButtons.push.setSuccess(false);
+      window.RaddButtons.push.setLoading(true);
+    }
+    function pushDone() {
+      window.RaddButtons.push.setLoading(false);
+      updateActionUI();
+    }
+
+    function encodeContent(tokens) {
+      return btoa(unescape(encodeURIComponent(JSON.stringify(tokens, null, 2))));
+    }
+
+    // Push to GitLab (incl. self-hosted). Returns a promise; no button UI here.
+    function pushGitLab(tokens) {
+      var c = gitlabConfig();
+      if (!c.token || !c.project) return Promise.reject({ message: 'GitLab not configured' });
+
+      var host = c.host.replace(/\/+$/, '');
+      var filePath = composeFilePath(c.folder, c.filename);
+      var commitMsg = document.getElementById('commit-message').value.trim();
+      if (!commitMsg) return Promise.reject({ message: 'Commit message is required' });
+      var content = encodeContent(tokens);
+      // Project id/path and file path must be URL-encoded (slashes -> %2F).
+      var base = host + '/api/v4/projects/' + encodeURIComponent(c.project) +
+                 '/repository/files/' + encodeURIComponent(filePath);
+      var headers = { 'PRIVATE-TOKEN': c.token, 'Content-Type': 'application/json' };
+
+      function readErr(r, stage) {
+        return r.json().then(function(err) {
+          console.error('GitLab API Error (' + stage + '):', err);
+          throw { status: r.status, message: err.message || err.error || 'Request failed' };
+        }).catch(function(e) {
+          if (e && e.status) throw e;
+          throw { status: r.status, message: 'Request failed' };
+        });
+      }
+
+      // Exists on this branch? PUT updates it, POST creates it.
+      return fetch(base + '?ref=' + encodeURIComponent(c.branch), { method: 'GET', headers: headers })
+        .then(function(r) {
+          if (r.status === 401 || r.status === 403) return readErr(r, 'GET auth');
+          var exists = r.ok;
+          if (!exists && r.status !== 404) return readErr(r, 'GET');
+          var body = { branch: c.branch, content: content, encoding: 'base64', commit_message: commitMsg };
+          return fetch(base, { method: exists ? 'PUT' : 'POST', headers: headers, body: JSON.stringify(body) });
+        })
+        .then(function(r) {
+          if (!r.ok) return readErr(r, 'WRITE');
+          return r.json();
+        });
+    }
+
+    // Push to GitHub. Contents API uses PUT for both create and update —
+    // whether the body includes `sha` is what decides which (a fetched
+    // sha means the file already exists on this branch; 404 = create).
+    function pushGitHub(tokens) {
+      var c = githubConfig();
+      if (!c.token || !c.repo) return Promise.reject({ message: 'GitHub not configured' });
+      // Exactly two segments — `owner/repo/anything` is a typo, not a repo we
+      // should quietly truncate down to `owner/repo` and push to.
+      var parts = c.repo.split('/');
+      if (parts.length !== 2 || !parts[0] || !parts[1]) return Promise.reject({ message: 'GitHub repo must be owner/repo' });
+
+      var filePath = composeFilePath(c.folder, c.filename);
+      var commitMsg = document.getElementById('commit-message').value.trim();
+      if (!commitMsg) return Promise.reject({ message: 'Commit message is required' });
+      var content = encodeContent(tokens);
+      var apiUrl = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
+                   encodeURIComponent(parts[1]) + '/contents/' + filePath.split('/').map(encodeURIComponent).join('/');
+      var headers = { 'Authorization': 'token ' + c.token, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
+
+      function readErr(r, stage) {
+        return r.json().then(function(err) {
+          console.error('GitHub API Error (' + stage + '):', err);
+          throw { status: r.status, message: err.message || 'Request failed' };
+        }).catch(function(e) {
+          if (e && e.status) throw e;
+          throw { status: r.status, message: 'Request failed' };
+        });
+      }
+
+      // Look up the file's current sha (needed to update it); 404 = doesn't
+      // exist yet = create (no sha in the write body).
+      return fetch(apiUrl + '?ref=' + encodeURIComponent(c.branch), { method: 'GET', headers: headers })
+        .then(function(r) {
+          if (r.status === 404) return null;
+          if (r.status === 401 || r.status === 403) return readErr(r, 'GET auth');
+          if (!r.ok) return readErr(r, 'GET');
+          return r.json();
+        })
+        .then(function(existing) {
+          var body = { message: commitMsg, content: content, branch: c.branch };
+          if (existing && existing.sha) body.sha = existing.sha;
+          return fetch(apiUrl, { method: 'PUT', headers: headers, body: JSON.stringify(body) });
+        })
+        .then(function(r) {
+          if (!r.ok) return readErr(r, 'WRITE');
+          return r.json();
+        });
+    }
+
+    function errText(err) {
+      var msg = err && err.status ? 'Error ' + err.status : ((err && err.message) || 'Push failed');
+      if (err && err.message && err.status) msg += ' – ' + err.message;
+      return msg;
+    }
+
+    // Push the exported tokens to whichever provider(s) pushTarget names.
+    // Both run sequentially when target is 'both' — one failing doesn't
+    // abort the other; the toast at the end reports each outcome.
+    function pushToGit() {
+      var tokens = getTokensToExport();
+      if (!tokens) return;
+
+      // A commit message is required — never commit without one.
+      if (!document.getElementById('commit-message').value.trim()) {
+        showToast('Enter a commit message before pushing', true);
+        document.getElementById('commit-message').focus();
+        return;
+      }
+
+      // Reuses the exact same readiness computation the main-screen UI
+      // renders from — effectiveWants* already excludes an unready
+      // provider in a mixed-readiness 'both' (see computePushReadiness()),
+      // so there's no separate per-provider not-ready check needed here
+      // any more; this guard is just defense against the Push button
+      // somehow firing while needsBigSetup is true (it's replaced by
+      // "Add Repo Settings" in that state, so shouldn't be reachable).
+      var r = computePushReadiness();
+      if (r.needsBigSetup) {
+        showToast('Configure repository settings first', true);
+        document.getElementById('settings-btn').click();
+        return;
+      }
+      var wantsGitLab = r.effectiveWantsGitLab;
+      var wantsGitHub = r.effectiveWantsGitHub;
+
+      pushBusy();
+      var results = [];
+      Promise.resolve()
+        .then(function() {
+          if (!wantsGitLab) return;
+          return pushGitLab(tokens).then(
+            function() { results.push({ provider: 'GitLab', ok: true }); },
+            function(err) { results.push({ provider: 'GitLab', ok: false, err: err }); }
+          );
+        })
+        .then(function() {
+          if (!wantsGitHub) return;
+          return pushGitHub(tokens).then(
+            function() { results.push({ provider: 'GitHub', ok: true }); },
+            function(err) { results.push({ provider: 'GitHub', ok: false, err: err }); }
+          );
+        })
+        .then(function() {
+          var succeeded = results.filter(function(r) { return r.ok; });
+          var failed = results.filter(function(r) { return !r.ok; });
+          if (failed.length === 0) {
+            window.RaddButtons.push.setSuccess(true);
+            showToast('Successfully pushed to ' + succeeded.map(function(r) { return r.provider; }).join(' and '));
+          } else if (succeeded.length === 0) {
+            showToast(failed.map(function(r) { return r.provider + ': ' + errText(r.err); }).join(' — '), true);
+          } else {
+            window.RaddButtons.push.setSuccess(true);
+            showToast(
+              'Pushed to ' + succeeded.map(function(r) { return r.provider; }).join(', ') + ' — ' +
+              failed.map(function(r) { return r.provider + ' failed: ' + errText(r.err); }).join(', '),
+              true
+            );
+          }
+        })
+        .finally(pushDone);
+    }
+
+    function doDownloadSingle() {
+      var tokens = getTokensToExport();
+      if (!tokens) return;
+      var json = JSON.stringify(tokens, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = primaryFilename();
+      a.click();
+      URL.revokeObjectURL(url);
+      parent.postMessage({ pluginMessage: { type: 'notify', message: '✅ JSON downloaded successfully!' } }, '*');
+    }
+    
+    pushBtn.addEventListener('click', pushToGit);
+    // Re-evaluate the Push button as the commit message is typed/cleared.
+    document.getElementById('commit-message').addEventListener('input', updateActionUI);
+
+    downloadBtn.addEventListener('click', doDownloadSingle);
+    
+    window.onmessage = function(event) {
+      var msg = event.data.pluginMessage;
+      if (!msg) return;
+      
+      // Early, lightweight file-name report (before the heavy extract) so the
+      // target folder is auto-selected as soon as the plugin opens.
+      if (msg.type === 'fileInfo') {
+        applyFileNameMatch(msg.fileName);
+        return;
+      }
+
+      if (msg.type === 'extracted') {
+        rawData = { collections: msg.collections, styles: msg.styles };
+        selectedCollections = msg.collections.map(function(col) { return col.name; });
+        // Re-assert the folder match from the file name (kept for robustness).
+        applyFileNameMatch(msg.fileName);
+
+        loadingState.style.display = 'none';
+        if (skeletonList) skeletonList.style.display = 'none';
+        emptyState.style.display = 'none';
+
+        if (msg.collections.length === 0) {
+          emptyState.style.display = 'flex';
+          collectionsWrap.classList.add('visible');
+          setActionsLoading(false);   // nothing to transform — reveal now
+          return;
+        }
+        
+        collectionsList.style.display = 'flex';
+        // Read-only accordion (buttons.tsx): one row per collection, no
+        // selection — every collection is always exported, so there's
+        // nothing here for the user to toggle. setCollections() only seeds
+        // the per-row breakdown; the header's aggregate summary (collections
+        // / tokens / file size) is filled in separately once 'transformed'
+        // arrives, since only that message knows the real totals.
+        window.RaddCollectionsAccordion.setCollections(
+          msg.collections.map(function(col) {
+            return { name: col.name, count: col.variables ? col.variables.length : 0 };
+          })
+        );
+
+        collectionsWrap.classList.add('visible');
+        
+        parent.postMessage({
+          pluginMessage: {
+            type: 'transform',
+            raw: rawData,
+            exportMode: exportMode,
+            // Descriptions are only carried when a DTCG shape needs them.
+            includeDescriptions: dtcgShape !== null,
+            selectedCollections: selectedCollections.length > 0 ? selectedCollections : null
+          }
+        }, '*');
+      }
+      
+      if (msg.type === 'transformed') {
+        transformedData = msg.payload;
+        updateActionUI();
+        // Reveal only now — the button's disabled/label state is already
+        // correct at this point, instead of appearing as "Push to GitLab"
+        // for a moment and then flipping to "Add commit message".
+        setActionsLoading(false);
+
+        // Summary tags at the bottom of the accordion: collections / tokens
+        // / file size — the exact same JSON.stringify(tokens, null, 2) the
+        // download/push actions actually send, so the MB figure matches the
+        // real file, not just a rough estimate off the raw token count.
+        var exportJson = JSON.stringify(getTokensToExport(), null, 2);
+        var exportMB = (new Blob([exportJson]).size / (1024 * 1024)).toFixed(2);
+        window.RaddCollectionsAccordion.setSummary(
+          formatTokenCount(msg.validation.actual.totalTokens) + ' Tokens',
+          exportMB + ' MB'
+        );
+
+        // Reference-closure check: warn when the export ships dangling {refs}
+        var closure = msg.validation && msg.validation.closure;
+        if (closure && !closure.ok) {
+          var roots = (closure.missingRoots || []).map(function(r) {
+            return r + ' (' + closure.byRoot[r] + ')';
+          }).join(', ');
+          window.RaddClosureWarning.show(
+            closure.brokenCount + ' unresolved references',
+            'Some tokens point to references that are not present in this file: ' + roots + '. ' +
+            'This usually means the referenced variable was renamed or deleted in Figma ' +
+            '(an orphaned alias), or its collection is not part of the export. Check those ' +
+            'references in Figma — the plugin exports exactly what the file contains.'
+          );
+        } else {
+          window.RaddClosureWarning.hide();
+        }
+
+        parent.postMessage({
+          pluginMessage: {
+            type: 'notify',
+            message: (closure && !closure.ok)
+              ? '⚠ Exported with ' + closure.brokenCount + ' broken references — see warning'
+              : '✅ Extraction complete! ' + msg.validation.actual.topLevelCollections + ' collections found'
+          }
+        }, '*');
+      }
+      
+      if (msg.type === 'error') {
+        if (skeletonList) skeletonList.style.display = 'none';
+        setActionsLoading(false);
+        loadingState.style.display = 'flex';
+        loadingState.querySelector('p').textContent = 'Error: ' + msg.message;
+        collectionsList.style.display = 'none';
+        emptyState.style.display = 'none';
+        collectionsWrap.classList.add('visible');
+        
+        parent.postMessage({
+          pluginMessage: { type: 'notify', message: '❌ Error: ' + msg.message, error: true }
+        }, '*');
+      }
+      
+      if (msg.type === 'GIT_SETTINGS_LOADED') {
+        gitSettings.setState(msg.config || {});
+        applyFileNameMatch();     // re-assert file-name auto-select over the loaded active
+        // No more auto-popup for a missing token here — updateActionUI()
+        // (called from within refreshSettingsControls(), which setState() ends with)
+        // already disables the commit box and shows an "Add ___ settings"
+        // button in its place whenever an active push target isn't ready,
+        // covering a missing token as just one case of that. The
+        // onboarding dialog is the one exception: a bigger, guided nudge
+        // shown on top of that fallback state — but only the very first
+        // time it's reached, since this runs once per plugin load and
+        // there's no persisted "seen it" flag (see mountOnboardingDialog's
+        // comment in buttons.tsx). Re-derived from readiness every load,
+        // not a one-time flag, so it correctly reappears if the user later
+        // removes every provider and ends up fully unconfigured again.
+        if (computePushReadiness().needsBigSetup) {
+          window.RaddOnboardingDialog.open();
+        }
+      }
+      
+      if (msg.type === 'GIT_SETTINGS_SAVED') {
+        // Silent: auto-detect and folder-picks save quietly. The explicit
+        // "Save Settings" button shows its own confirmation toast.
+      }
+    };
+  </script>
+
+
+  <div class="resize-handle" id="resize-handle"></div>
+  <script>
+  (function() {
+    var handle = document.getElementById('resize-handle');
+    var startY = 0;
+    var startHeight = 0;
+    var isDragging = false;
+
+    handle.addEventListener('mousedown', function(e) {
+      isDragging = true;
+      startY = e.clientY;
+      startHeight = window.innerHeight;
+      handle.classList.add('active');
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!isDragging) return;
+      var delta = e.clientY - startY;
+      var newHeight = Math.max(300, Math.min(900, startHeight + delta));
+      parent.postMessage({ pluginMessage: { type: 'resize', height: newHeight } }, '*');
+    });
+
+    document.addEventListener('mouseup', function() {
+      if (isDragging) {
+        isDragging = false;
+        handle.classList.remove('active');
+      }
+    });
+  })();
+  </script>
+</body>
+</html>
