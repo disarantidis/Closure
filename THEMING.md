@@ -2,7 +2,7 @@
 
 This document describes how the Closure plugin themes its own UI.
 
-The UI is styled to the **disarantidis_ReactJS ("resolve.")** design system — a
+The UI is styled to the **disarantidis_ReactJS** design system — a
 warm-neutral palette with a monochrome accent (black in light, white in dark).
 The theming *mechanism* below is unchanged; only the palette values are the DS's.
 

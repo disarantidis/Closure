@@ -25,7 +25,7 @@ Details: [`TYPOGRAPHY.md`](./TYPOGRAPHY.md)
 
 ## UI
 
-Closure's UI is built to the **disarantidis_ReactJS ("resolve.")** design system:
+Closure's UI is built to the **disarantidis_ReactJS** design system:
 a warm-neutral palette with a monochrome accent, DS tokens for radius / spacing /
 type, and DS components — button, segmented control, checkbox (with a mixed /
 indeterminate "select all"), text field, card, and scheme-island alerts / toast.
