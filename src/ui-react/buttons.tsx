@@ -554,7 +554,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     const [state, setState] = useState<any>({ title: 'Scanned collections', collections: [], summary: { tokens: '', size: '' } });
     set = setState;
     return (
-      <Accordion label="Scanned collections" size="large" defaultOpen={['collections']}>
+      <Accordion label="Scanned collections" size="large" level={3} defaultOpen={['collections']}>
         <AccordionItem
           id="collections"
           header={

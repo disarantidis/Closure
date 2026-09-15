@@ -143,14 +143,26 @@
        Pomegranate's own light palette lives on bare :root but nothing here
        switches to it. */
     :root {
-      --app-bg: var(--surface);
-      --app-surface: var(--container-3);
-      --app-surface-soft: var(--container-3-hover);
+      /* Pomegranate's LEVEL model (docs/knowledge-levels.md + LAYOUT-RULES.md):
+         the collapse left ONE fill name, --background, moved by [data-level]
+         islands; --surface / --container-* are gone. So:
+         · the ground is level 2 (the default :root island) and paints --background;
+         · a surface that should read as RAISED sets its own data-level, and
+           --app-surface then resolves to whatever rung its element stands on —
+           on the plain L2 ground it equals the ground, so panels that set no
+           level fall back to being sections (spacing, no bespoke box), which is
+           what LAYOUT-RULES asks for;
+         · a field sits ONE rung above its ground for free (fieldLevel), so a
+           field on the L2 ground is L3 with no extra wiring. The one real card
+           is the collections Accordion (level={3}); dialogs are L4. */
+      --app-bg: var(--background);
+      --app-surface: var(--background);
+      --app-surface-soft: var(--background-hover);
       --app-border: var(--stroke);
       --app-border-strong: var(--stroke-subtle);
       --app-text: var(--text);
       --app-text-muted: var(--text-recessive);
-      --app-text-subtle: var(--shade-400);
+      --app-text-subtle: var(--text-recessive);
       --app-heading: var(--text);
       --app-accent: var(--accent);
       --app-danger: #E5675E;
