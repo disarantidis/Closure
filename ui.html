@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html data-mode="dark">
+<html data-theme="dark" data-mode="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>JSON Exporter · Token Studio</title>
+  <title>Closure · Export JSON from Figma</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -135,25 +135,25 @@
       --RADDDialog-SlotContainer3-padding--stickyButton: var(--spacing-component-4) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
     }
 
-    /* This app's own chrome vars are aliases onto RADD's own design tokens
-       (--colours-* from @desquared/radd-design-tokens-radd), so the plugin's
-       plain CSS and its RADD components always resolve to the same palette.
-       The app is dark-only by design (data-mode="dark" is set statically on
-       <html>, no toggle) — light mode still exists in the token package
-       itself ([data-mode="light"] in light-mode-tokens.css) but nothing in
-       this app switches to it. */
+    /* This app's own chrome vars are aliases onto the Pomegranate
+       (disarantidis_ReactJS) design tokens from src/vendor/pomegranate
+       (tokens.css / node.css, bundled into ui.html), so the plugin's plain
+       CSS and its Pomegranate components resolve to the same palette. The app
+       is dark-only by design (data-theme="dark" is set statically on <html>);
+       Pomegranate's own light palette lives on bare :root but nothing here
+       switches to it. */
     :root {
-      --app-bg: var(--colours-basic-background);
-      --app-surface: var(--colours-basic-background-subtle);
-      --app-surface-soft: var(--colours-interaction-states-hover-background-subtle-hover);
-      --app-border: var(--colours-basic-stroke-subtle);
-      --app-border-strong: var(--colours-basic-stroke);
-      --app-text: var(--colours-basic-text);
-      --app-text-muted: var(--colours-basic-text-recessive);
-      --app-text-subtle: var(--colours-basic-text-recessive);
-      --app-heading: var(--colours-basic-text);
-      --app-accent: var(--colours-basic-accent);
-      --app-danger: var(--colours-functional-destructive-standard);
+      --app-bg: var(--surface);
+      --app-surface: var(--container-3);
+      --app-surface-soft: var(--container-3-hover);
+      --app-border: var(--stroke);
+      --app-border-strong: var(--stroke-subtle);
+      --app-text: var(--text);
+      --app-text-muted: var(--text-recessive);
+      --app-text-subtle: var(--shade-400);
+      --app-heading: var(--text);
+      --app-accent: var(--accent);
+      --app-danger: #E5675E;
     }
 
     html, body {
@@ -162,7 +162,7 @@
     }
     
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: 'GT Ultra', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: var(--app-bg);
       color: var(--app-text);
       display: flex;
@@ -207,9 +207,8 @@
     }
 
     .header-logo {
-      height: 20px;
-      width: auto;
-      flex-shrink: 0;
+      /* the RADD wordmark is hidden — this is Closure now (Pomegranate DS) */
+      display: none;
     }
 
     .version-tag-mount {
@@ -20855,7 +20854,7 @@ html[data-theme=dark] {
             <rect fill="#3DE4DC" x="751.1" y="8.2" width="6.7" height="313.3"/>
             <rect fill="#3DE4DC" x="779.5" y="8.2" width="6.7" height="313.3"/>
           </svg>
-          <h1 class="title">JSON Exporter</h1>
+          <h1 class="title">Closure</h1>
           <div id="version-tag-mount" class="version-tag-mount"></div>
         </div>
         <div class="header-right">
