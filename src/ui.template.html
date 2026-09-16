@@ -729,6 +729,25 @@
     .provider-card {
       padding: var(--spacing-component-5);
     }
+    /* Saved Folder Path, nested inside the provider's own card — it's this
+       provider's own config, not a separate section, so it reads as a
+       sub-card rather than a sibling card below the connection fields.
+       data-level="3" (in the markup) is what actually makes it read as
+       nested: level 3's own --background is a lighter, translucent fill
+       over the parent card's opaque level-2 one (tokens.css), the DS's
+       usual one-rung-up nested-surface step — not a colour picked by hand
+       here. Smaller radius and padding than the parent .provider-card
+       (16px vs its 24px/18px) — a nested card reads as nested partly by
+       being visibly smaller than what holds it, not just by its own
+       surface. margin-top, not the parent's own gap: this needs space
+       from the fields directly above it in the SAME card, which nothing
+       else in .provider-card currently provides between its own children. */
+    .provider-subcard {
+      background: var(--background);
+      border-radius: 16px;
+      padding: var(--spacing-component-4);
+      margin-top: var(--spacing-component-5);
+    }
     /* The "Add ___" row sits at the END of the section, after whichever
        provider(s) are already configured. #add-gitlab-row/#add-github-row
        can never both be visible at once (gitlabAdded/githubAdded are never
@@ -1628,10 +1647,12 @@
       </div>
 
       <div id="gitlab-block">
-        <!-- Heading + connection fields share ONE card. The "Saved Folder
-             Path" list below stays outside it: its rows are already cards
-             in their own right, and nesting them would read as a card
-             inside a card. -->
+        <!-- Heading, connection fields, and the saved-folder-path list all
+             share ONE card now — the folder paths are this provider's own
+             config, not a separate section, so they read as a sub-card
+             nested inside GitLab's own card (.provider-subcard, data-
+             level="3" — one rung up from this card's own 2, the DS's usual
+             nested-surface step) rather than a sibling card below it. -->
         <div class="provider-card" data-level="2">
           <div class="provider-section-heading">
             <p class="folder-paths-title">
@@ -1655,21 +1676,17 @@
             <span id="gl-project-mount"></span>
             <span id="gl-branch-mount"></span>
           </div>
-        </div>
-
-        <!-- Saved paths get their own card, sibling to the connection
-             card above — heading, the rows, and the add-a-path row all
-             inside it. -->
-        <div class="provider-card" data-level="2">
-          <div class="folder-paths-heading">
-            <p class="folder-paths-title">Saved Folder Path</p>
-            <p class="folder-paths-subtitle">Choose on the main screen</p>
-          </div>
-          <div class="folder-list" id="folder-list"></div>
-          <!-- Always visible: adding a path no longer needs an edit mode. -->
-          <div class="folder-add" id="folder-add">
-            <span id="folder-new-mount"></span>
-            <span id="folder-add-btn-mount"></span>
+          <div class="provider-subcard" data-level="3">
+            <div class="folder-paths-heading">
+              <p class="folder-paths-title">Saved Folder Path</p>
+              <p class="folder-paths-subtitle">Choose on the main screen</p>
+            </div>
+            <div class="folder-list" id="folder-list"></div>
+            <!-- Always visible: adding a path no longer needs an edit mode. -->
+            <div class="folder-add" id="folder-add">
+              <span id="folder-new-mount"></span>
+              <span id="folder-add-btn-mount"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -1694,17 +1711,16 @@
             <span id="gh-repo-mount"></span>
             <span id="gh-branch-mount"></span>
           </div>
-        </div>
-
-        <div class="provider-card" data-level="2">
-          <div class="folder-paths-heading">
-            <p class="folder-paths-title">Saved Folder Path</p>
-            <p class="folder-paths-subtitle">Choose on the main screen</p>
-          </div>
-          <div class="folder-list" id="github-folder-list"></div>
-          <div class="folder-add" id="github-folder-add">
-            <span id="github-folder-new-mount"></span>
-            <span id="github-folder-add-btn-mount"></span>
+          <div class="provider-subcard" data-level="3">
+            <div class="folder-paths-heading">
+              <p class="folder-paths-title">Saved Folder Path</p>
+              <p class="folder-paths-subtitle">Choose on the main screen</p>
+            </div>
+            <div class="folder-list" id="github-folder-list"></div>
+            <div class="folder-add" id="github-folder-add">
+              <span id="github-folder-new-mount"></span>
+              <span id="github-folder-add-btn-mount"></span>
+            </div>
           </div>
         </div>
       </div>
