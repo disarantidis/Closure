@@ -89,10 +89,6 @@ const svg = (d: string, opts?: { fill?: boolean; fillRule?: 'evenodd' }) => (siz
   );
 const IconArrowLeft = svg('M19 12H5M12 19l-7-7 7-7');
 const IconDownload = svg('M12 3v11m0 0l-4-4m4 4l4-4M5 20h14');
-// Lucide's "copy" glyph — two overlapping sheets, the standard "copy to
-// clipboard" mark. Leads the Copy button beside Download (buttons.tsx's
-// window.PomButtons.copy).
-const IconCopy = svg('M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1');
 // The exact gear glyph the Settings page's own header uses (ui.template.html,
 // the decorative .git-logo icon) — same path, so "Settings" reads as one
 // glyph everywhere instead of this button showing sliders and the page it
@@ -274,19 +270,16 @@ function mountLiveButton(mountId: string, base: any, initial: any, level: Level 
   };
 }
 
-type LiveIconHandle = { setDisabled: (v: boolean) => void; setLoading: (v: boolean) => void };
+type LiveIconHandle = { setDisabled: (v: boolean) => void };
 function mountLiveIconButton(mountId: string, base: any, initialDisabled: boolean, level: Level = GROUND): LiveIconHandle {
   const container = document.getElementById(mountId);
-  let set: (u: (s: any) => any) => void = () => {};
+  let set: (v: boolean) => void = () => {};
   function View() {
-    const [s, setS] = useState({ disabled: initialDisabled, loading: false }); set = setS;
-    return <PomButton {...base} disabled={s.disabled} loading={s.loading} />;
+    const [disabled, setD] = useState(initialDisabled); set = setD;
+    return <PomButton {...base} disabled={disabled} />;
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
-  return {
-    setDisabled: (v) => set((s) => ({ ...s, disabled: v })),
-    setLoading: (v) => set((s) => ({ ...s, loading: v })),
-  };
+  return { setDisabled: (v) => set(v) };
 }
 
 type DisabledHandle = { setDisabled: (v: boolean) => void };
@@ -346,7 +339,7 @@ type FolderSelectBridge = { setItems: (items: any[], selectedValue: string) => v
 type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
 declare global {
   interface Window {
-    PomButtons: { push: LiveHandle; download: LiveIconHandle; copy: LiveIconHandle };
+    PomButtons: { push: LiveHandle; download: LiveIconHandle };
     PomExportMode: { onChange: ((index: number) => void) | null };
     PomToast: { show: (message: string, isError?: boolean) => void };
     PomFolderSelect: FolderSelectBridge;
@@ -396,18 +389,6 @@ window.PomButtons = {
   download: mountLiveIconButton(
     'download-btn-mount',
     { id: 'download-btn', variant: 'filled', size: 'medium', leftIcon: true, buttonLeftIcon: IconDownload(24), label: 'Download', title: 'Download' },
-    true,
-    CARD_LEVEL,
-  ),
-  // Icon-only and tonal — the secondary action beside Download's now-
-  // primary/labeled treatment (same tonal-square shape Download itself
-  // used to have, before that one became "standard"). Copies the exact
-  // same JSON Download/Push already send (doCopyJson(), ui.template.html)
-  // straight to the clipboard, no file involved. Same size: 'medium' as
-  // Download, for the same reason.
-  copy: mountLiveIconButton(
-    'copy-btn-mount',
-    { id: 'copy-btn', variant: 'tonal', size: 'medium', icon: IconCopy(24), label: 'Copy JSON', title: 'Copy JSON to clipboard' },
     true,
     CARD_LEVEL,
   ),
@@ -717,18 +698,14 @@ mountOnce('skeleton-list',
 mountOnce('json-download-icon-skeleton-mount', <Skeleton shape="circle" size={16} label="Loading" />, TOP_CARD_LEVEL);
 mountOnce('json-download-title-skeleton-mount', <Skeleton shape="block" width={80} height={16} label="" />, TOP_CARD_LEVEL);
 mountOnce('json-download-tag-skeleton-mount', <Skeleton shape="block" width={60} height={22} label="" />, TOP_CARD_LEVEL);
-// 50px, not 44 — matches fieldRung="small" (Download/Copy below, and the
-// real field itself), confirmed via computed style: field/Copy/Download
-// all render at exactly 50px tall today. Same number in all three
-// skeleton pieces below for that reason, not independently chosen.
+// 50px, not 44 — matches the field/button band Download shares with the
+// real field itself, confirmed via computed style: field/Download both
+// render at exactly 50px tall today. Same number in both skeleton pieces
+// below for that reason, not independently chosen.
 mountOnce('json-download-field-skeleton-mount', <Skeleton shape="block" height={50} width={'100%'} label="" />, TOP_CARD_LEVEL);
 // 125x50 — the real Download button is a labeled button now (icon +
-// "Download" text, ~127px wide at fieldRung="small"), not the old
-// icon-only 44x44 square.
+// "Download" text, ~127px wide), not the old icon-only 44x44 square.
 mountOnce('json-download-btn-skeleton-mount', <Skeleton shape="block" width={125} height={50} label="" />, TOP_CARD_LEVEL);
-// Copy stayed icon-only/square, so its own skeleton keeps that shape —
-// just at fieldRung="small"'s real 50x50, not the old 44x44.
-mountOnce('json-copy-btn-skeleton-mount', <Skeleton shape="block" width={50} height={50} label="" />, TOP_CARD_LEVEL);
 // Mirrors the real push-settings card's current shape: a small icon+title
 // row (whichever provider ends up shown — GitLab or GitHub, not known
 // yet), one full-width folder-path field (the filename field that used to

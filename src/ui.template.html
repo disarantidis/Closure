@@ -1581,7 +1581,6 @@
       </div>
       <div class="json-download-fields">
         <span id="json-download-field-skeleton-mount"></span>
-        <span id="json-copy-btn-skeleton-mount"></span>
         <span id="json-download-btn-skeleton-mount"></span>
       </div>
     </div>
@@ -1610,11 +1609,6 @@
       </div>
       <div class="json-download-fields">
         <span id="primary-filename-mount"></span>
-        <!-- Copies the same JSON Download writes to a file, straight to
-             the clipboard instead — see doCopyJson() below. Sits left of
-             Download (secondary action before the primary one, both
-             flush against the field). -->
-        <div id="copy-btn-mount"></div>
         <div id="download-btn-mount"></div>
       </div>
     </div>
@@ -3097,7 +3091,6 @@
         window.PomButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
       }
       window.PomButtons.download.setDisabled(!transformedData);
-      window.PomButtons.copy.setDisabled(!transformedData);
     }
 
     // Shows a provider's dropdown+filename row, or — if it has zero saved
@@ -3493,86 +3486,12 @@
       parent.postMessage({ pluginMessage: { type: 'notify', message: '✅ JSON downloaded successfully!' } }, '*');
     }
 
-    // execCommand('copy') FIRST, and SYNCHRONOUSLY — it only counts as
-    // user-initiated when it runs in the exact same call stack as the
-    // click event itself. Chaining it after an awaited/rejected
-    // navigator.clipboard.writeText() (even just one .catch() microtask
-    // away) can lose that association inside a sandboxed iframe like
-    // Figma's plugin UI, which is exactly why that ordering still failed
-    // for real users: navigator.clipboard.writeText() was tried first,
-    // and by the time its rejection reached the execCommand fallback the
-    // gesture no longer carried through, so execCommand failed too and
-    // both paths died silently. Doing the synchronous attempt first (no
-    // async anything before it) is the correct, well-established pattern
-    // (the same one general-purpose clipboard-copy polyfills use) and
-    // gives it the best possible chance inside Figma's sandbox.
-    // navigator.clipboard.writeText() is still tried as a secondary
-    // fallback — Figma's own restrictions can differ by version/platform,
-    // so it's worth attempting even though it's the less reliable path
-    // here.
-    // Two attempts in a row (clipboard-then-execCommand, then execCommand-
-    // then-clipboard) still failed for real users with no way to tell WHY
-    // — "Could not copy" covers every possible cause. Logging both
-    // attempts' actual outcome so the next failure report can name the
-    // real reason (execCommand throwing vs. quietly returning false,
-    // navigator.clipboard missing vs. its writeText rejecting with a
-    // specific error) instead of guessing at another blind fix.
-    function legacyCopySync(text) {
-      var ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-      var ok = false;
-      var err = null;
-      try { ok = document.execCommand('copy'); } catch (e) { err = e; }
-      document.body.removeChild(ta);
-      console.log('[Closure Copy] execCommand(copy) ->', ok, err ? ('threw: ' + err.name + ': ' + err.message) : '(no exception)');
-      return ok;
-    }
-    function copyToClipboard(text) {
-      if (legacyCopySync(text)) return Promise.resolve();
-      var hasApi = !!(navigator.clipboard && navigator.clipboard.writeText);
-      console.log('[Closure Copy] navigator.clipboard.writeText available:', hasApi);
-      if (hasApi) {
-        return navigator.clipboard.writeText(text).catch(function(e) {
-          console.log('[Closure Copy] navigator.clipboard.writeText rejected:', e && e.name, e && e.message);
-          throw e;
-        });
-      }
-      return Promise.reject(new Error('execCommand(copy) failed and Clipboard API unavailable'));
-    }
-
-    // Same export as Download/Push, straight to the clipboard instead of a
-    // file. showToast() (a real working in-app toast — window.PomToast),
-    // not the 'notify' postMessage doDownloadSingle above sends: that type
-    // has no handler in code.js's figma.ui.onmessage, so it's silently a
-    // no-op there. Not fixed here — out of scope for this button — but
-    // worth not copying that same dead pattern into a brand-new feature
-    // that actually needs its confirmation to be seen.
-    function doCopyJson() {
-      var tokens = getTokensToExport();
-      if (!tokens) return;
-      var json = JSON.stringify(tokens, null, 2);
-      window.PomButtons.copy.setLoading(true);
-      copyToClipboard(json).then(function() {
-        window.PomButtons.copy.setLoading(false);
-        showToast('JSON copied to clipboard');
-      }, function() {
-        window.PomButtons.copy.setLoading(false);
-        showToast('Could not copy — try Download instead', true);
-      });
-    }
-
     pushBtn.addEventListener('click', pushToGit);
     // Re-evaluate the Push button as the commit message is typed/cleared.
     document.getElementById('commit-message').addEventListener('input', updateActionUI);
 
     downloadBtn.addEventListener('click', doDownloadSingle);
-    document.getElementById('copy-btn').addEventListener('click', doCopyJson);
-    
+
     window.onmessage = function(event) {
       var msg = event.data.pluginMessage;
       if (!msg) return;
