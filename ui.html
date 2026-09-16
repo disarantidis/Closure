@@ -660,9 +660,18 @@
        while "Repository settings" above it — like every other title on
        this page — renders its TEXT 22px in from that same edge, so the
        two never lined up despite the row's own box being correctly
-       positioned. */
+       positioned.
+
+       padding-right matches it, added once the control gained `block`
+       (fills the row's content width): with only padding-left, the
+       control's left edge sat 22px in but its right edge sat flush with
+       the row's own edge — 22px on one side, 0 on the other. Every other
+       control this indent applies to (the DTCG switch, the push-target
+       checkboxes) is intrinsically sized, so that asymmetry was invisible
+       until this one started filling its row. */
     #repo-settings-tabs-row {
       padding-left: var(--spacing-component-6);
+      padding-right: var(--spacing-component-6);
       margin-bottom: 24px;
     }
 
