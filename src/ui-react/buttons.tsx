@@ -345,7 +345,7 @@ mountButton('remove-github-btn-mount', { id: 'remove-github-btn', variant: 'ghos
 mountButton('add-gitlab-btn-mount', { id: 'add-gitlab-btn', variant: 'tonal', size: 'small', label: 'Add' }, CARD_LEVEL);
 mountButton('remove-gitlab-btn-mount', { id: 'remove-gitlab-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitLab' }, CARD_LEVEL);
 mountIconButton('back-btn-mount', { id: 'back-btn', variant: 'ghost', size: 'small', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(16) });
-mountIconButton('settings-btn-mount', { id: 'settings-btn', variant: 'ghost', size: 'small', title: 'Git settings', 'aria-label': 'Git settings', icon: IconSettings(16) });
+mountIconButton('settings-btn-mount', { id: 'settings-btn', variant: 'ghost', size: 'large', title: 'Git settings', 'aria-label': 'Git settings', icon: IconSettings(24) });
 
 /* ── version tag (custom pill) ─────────────────────────────────────────────── */
 function mountVersionTag(mountId: string) {
