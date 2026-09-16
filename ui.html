@@ -942,9 +942,11 @@
       text-overflow: ellipsis;
     }
 
-    .collection-item .count {
-      font-size: 11px;
-      color: var(--app-text-muted);
+    /* The count is a real Tag now (buttons.tsx), not a plain span — it
+       paints its own colour/size off the DS's tokens, so only the layout
+       fact this row needs to state is that it must not shrink in a flex
+       row beside .name's flex:1. */
+    .collection-item .nd-tag {
       flex-shrink: 0;
     }
 
@@ -47480,7 +47482,7 @@ html[data-theme=dark] {
           children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("div", { className: "collections-readonly-list", children: state.collections.map((c) => /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)("div", { className: "collection-item", children: [
             /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "collection-item-check", children: IconCheck(14) }),
             /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "name", children: c.name }),
-            /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "count", children: c.count })
+            /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Tag, { variant: "tonal", size: "small", children: c.count })
           ] }, c.name)) })
         }
       ) });

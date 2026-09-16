@@ -942,9 +942,11 @@
       text-overflow: ellipsis;
     }
 
-    .collection-item .count {
-      font-size: 11px;
-      color: var(--app-text-muted);
+    /* The count is a real Tag now (buttons.tsx), not a plain span — it
+       paints its own colour/size off the DS's tokens, so only the layout
+       fact this row needs to state is that it must not shrink in a flex
+       row beside .name's flex:1. */
+    .collection-item .nd-tag {
       flex-shrink: 0;
     }
 

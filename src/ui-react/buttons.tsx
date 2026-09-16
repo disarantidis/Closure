@@ -689,7 +689,14 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
               <div key={c.name} className="collection-item">
                 <span className="collection-item-check">{IconCheck(14)}</span>
                 <span className="name">{c.name}</span>
-                <span className="count">{c.count}</span>
+                {/* tonal, not ghost — matched the header's own token/size
+                    tags at first, but ghost paints no fill (background:
+                    none, node.css's .nd-tag.v-ghost), so it rendered
+                    pixel-identical to the plain <span> it replaced: a
+                    number in muted text, no visible tag. tonal actually
+                    paints a pill (--nd-field-fill), which is the whole
+                    point of asking for "the tags" here. */}
+                <Tag variant="tonal" size="small">{c.count}</Tag>
               </div>
             ))}
           </div>
