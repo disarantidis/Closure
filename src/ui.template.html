@@ -196,6 +196,15 @@
     #onboarding-dialog-mount .nd-dialog-content {
       padding: var(--spacing-component-5);
     }
+    /* Same treatment, same reasoning, for the "scanned collections" modal
+       (buttons.tsx's mountCollectionsAccordion, mounted at #collections-list)
+       — node.css's .nd-dialog-content default (10px/16px) read tight around
+       the per-collection rows, so bumped to the same uniform
+       --spacing-component-5 (18px) as the onboarding dialog above, for one
+       consistent modal-padding scale across the app rather than two. */
+    #collections-list .nd-dialog-content {
+      padding: var(--spacing-component-5);
+    }
 
     /* This app's own chrome vars are aliases onto the Pomegranate
        (disarantidis_ReactJS) design tokens from src/vendor/pomegranate
@@ -939,10 +948,12 @@
       background: transparent;
       transition: opacity 0.35s ease;
       /* Bottom breathing room before whatever follows in the page's own
-         flow (the export panel — see .actions below) — top is 0:
-         PomAccordion's own header padding (8px) + its title's line-height
-         already provide clearance before the first paint, and adding more
-         on top of that re-opens the too-large header-to-accordion gap. */
+         flow (the export panel — see .actions below) — top is 0, since
+         nothing precedes this in .collections-wrap once the collections
+         card (InteractiveCard, buttons.tsx) is its only visible content
+         (the modal Dialog takes no layout space until opened). Confirmed
+         via computed rects: card-bottom to .actions-top measures exactly
+         this value. */
       padding: 0 0 12px;
     }
 
@@ -962,12 +973,11 @@
       gap: 10px;
       padding: 10px 0;   /* align the checkbox skeleton with the fields below */
     }
-    /* Read-only per-collection row, inside the accordion's contentSlot —
-       no checkbox, no hover/pointer: nothing here is interactive anymore.
-       No left/right padding: PomAccordion's own ContentFrame already
-       insets left/right to match the header's own left inset, so adding
-       more here would misalign rows from the "Scanned collections" title
-       above them — vertical padding only. */
+    /* Read-only per-collection row, inside the modal Dialog's own content
+       (buttons.tsx) — no checkbox, no hover/pointer: nothing here is
+       interactive anymore. No left/right padding: the Dialog's own
+       .nd-dialog-content already insets left/right, so adding more here
+       would double that inset — vertical padding only. */
     .collection-item {
       display: flex;
       align-items: center;
@@ -999,19 +1009,32 @@
       flex-shrink: 0;
     }
 
-    /* headerSlot content: title + tags stacked, always visible whether
-       expanded or not (unlike the per-collection rows, which are inside
-       contentSlot and only mount when expanded). flex:1 pushes the
-       accordion's own chevron to the right; text-align:left overrides the
-       <button> UA default of center (the header itself renders as a
-       native <button>). */
+    /* InteractiveCard's own content slot (auto-wrapped in a CardBody, which
+       supplies the card's real padding — see Card.tsx's resolveCardChildren):
+       title row + tags, stacked. No flex:1/text-align:left here any more —
+       those were for sharing a native <button> header row with the
+       accordion's own chevron; InteractiveCard's hit target is a separate,
+       empty, absolutely-stretched sibling (its own "hit layer" pattern), so
+       this is free to just be its natural content width. */
     .collections-header {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      flex: 1;
       min-width: 0;
-      text-align: left;
+    }
+
+    /* Title + the "opens a modal" chevron, on one row. */
+    .collections-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .collections-header-chevron {
+      display: flex;
+      color: var(--app-text-muted);
+      flex-shrink: 0;
     }
 
     /* Pomegranate's own "subtitle" text style, same token used for the token-modal
@@ -1020,6 +1043,10 @@
       font: var(--subtitle);
       letter-spacing: var(--subtitle-letter-spacing);
       color: var(--app-heading);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .collections-summary-tags {
@@ -1038,7 +1065,9 @@
        than tuned smaller still, so these match the per-row count tags
        below (.collection-item .nd-tag), which never had an override. */
 
-    /* contentSlot: the read-only per-collection rows, revealed on expand. */
+    /* The read-only per-collection rows — now the modal's own body
+       (buttons.tsx's Dialog, opened from the InteractiveCard), not an
+       accordion's contentSlot revealed in place. */
     .collections-readonly-list {
       display: flex;
       flex-direction: column;
@@ -1692,7 +1721,7 @@
 
     // Auto-select the matched folder (if present in the saved paths). Remembers
     // the last file name so it can re-apply after settings load races the extract.
-    // Also drives the collections accordion's title — the real Figma file name
+    // Also drives the collections card's title — the real Figma file name
     // (figma.root.name) rather than a fixed label, so both stay in sync off
     // the same lastFigmaFileName rather than needing two separate call sites.
     function applyFileNameMatch(fileName) {
@@ -2928,12 +2957,13 @@
         }
         
         collectionsList.style.display = 'flex';
-        // Read-only accordion (buttons.tsx): one row per collection, no
-        // selection — every collection is always exported, so there's
-        // nothing here for the user to toggle. setCollections() only seeds
-        // the per-row breakdown; the header's aggregate summary (collections
-        // / tokens / file size) is filled in separately once 'transformed'
-        // arrives, since only that message knows the real totals.
+        // Collections card + modal (buttons.tsx): one row per collection in
+        // the modal, no selection — every collection is always exported, so
+        // there's nothing here for the user to toggle. setCollections() only
+        // seeds the per-row breakdown; the card's own aggregate summary
+        // (collections / tokens / file size) is filled in separately once
+        // 'transformed' arrives, since only that message knows the real
+        // totals.
         window.PomCollectionsAccordion.setCollections(
           msg.collections.map(function(col) {
             return { name: col.name, count: col.variables ? col.variables.length : 0 };
@@ -2962,7 +2992,7 @@
         // for a moment and then flipping to "Add commit message".
         setActionsLoading(false);
 
-        // Summary tags at the bottom of the accordion: collections / tokens
+        // Summary tags on the collections card: collections / tokens
         // / file size — the exact same JSON.stringify(tokens, null, 2) the
         // download/push actions actually send, so the MB figure matches the
         // real file, not just a rough estimate off the raw token count.
