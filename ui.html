@@ -149,16 +149,30 @@
          · the ground is level 1 — the DARKEST rung — set on <html> with
            data-surface="normal" so the darkest ground paints SOLID (a level
            1/3/4 ground without it goes translucent — "the ground is never glass");
-         · a surface that should read as RAISED sets its own data-level, and
-           --app-surface then resolves to whatever rung its element stands on —
-           on the ground it equals the ground, so panels that set no level fall
-           back to being sections (spacing, no bespoke box), which is what
-           LAYOUT-RULES asks for;
          · a field sits ONE rung above its ground for free (fieldLevel), so a
-           field on the L1 ground is L2 with no extra wiring. The one real card
-           is the collections Accordion (level={2}, one rung up from the ground);
-           dialogs are L4. buttons.tsx wraps every mount in a LevelContext
-           provider at the ground (GROUND=1) so the components compute from it. */
+           field on an L1 ground is L2 with no extra wiring, and a field on an
+           L2 card is L3; buttons.tsx threads the right ground into every
+           mount's own LevelContext.Provider (GROUND=1, CARD_LEVEL=2) so this
+           computes correctly instead of being hand-typed.
+
+         --app-bg / --app-surface / --app-surface-soft BELOW ARE NOT LIVE
+         ALIASES — READ THIS BEFORE REACHING FOR THEM ON A NEW SURFACE.
+         They resolve `var(--background)` exactly ONCE, here on :root, against
+         :root's OWN level (1). Custom-property inheritance carries that
+         already-resolved colour down as a plain value — it does not re-run
+         var(--background) per descendant — so a DEEPER element that sets its
+         own data-level (a card at 2, a well at 1 inside an L4 dialog) still
+         inherits :root's frozen colour through --app-surface, NOT its own
+         rung's. This bit exactly this file: .provider-card / .export-panel
+         painted `background: var(--app-surface)` and stayed the ground's
+         colour even after gaining `data-level="2"`, because the alias never
+         saw it. --background itself has no such trap (the DS's own .nd-card
+         paints it directly and tracks every level correctly) — so any
+         element that sets, or may ever set, its own data-level MUST paint
+         `var(--background)` / `var(--background-hover)` directly, never
+         through these three. They stay safe to use only on elements that are
+         guaranteed to remain at the ROOT's level for their whole life
+         (nothing below currently qualifies except body itself). */
       --app-bg: var(--background);
       --app-surface: var(--background);
       --app-surface-soft: var(--background-hover);
@@ -209,7 +223,7 @@
       gap: 10px;
       flex: 1;
       min-width: 0;
-      background: var(--app-surface);
+      background: var(--background);
       border-radius: 24px;
       padding: 10px 14px;
     }
@@ -383,7 +397,7 @@
     .settings-note {
       font-size: 12px;
       color: var(--app-text-muted);
-      background: var(--app-surface-soft);
+      background: var(--background-hover);
       border: 1px solid var(--app-border);
       border-radius: 10px;
       padding: 8px 12px;
@@ -540,7 +554,7 @@
       width: 24px;
       height: 24px;
       border-radius: 50%;
-      background: var(--app-surface);
+      background: var(--background);
       color: var(--app-text-muted);
       flex-shrink: 0;
     }
@@ -551,7 +565,10 @@
        (.provider-add-row). One recipe so the two never drift apart. */
     .provider-card,
     .provider-add-row {
-      background: var(--app-surface);
+      /* --background directly, NOT --app-surface — see the :root comment
+         above. Both carry data-level="2" (set in the markup), and the
+         alias is frozen at :root's own level so it never picked that up. */
+      background: var(--background);
       border-radius: 24px;
       margin-bottom: 24px;
     }
@@ -929,13 +946,10 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      /* --app-surface-soft is a hover-state token (--colours-interaction-
-         states-hover-background-subtle-hover) — too close to a disabled
-         button's own grey, confusing next to Push when it's disabled.
-         --app-surface is the actual neutral/static shade
-         (--colours-basic-background-subtle), not tied to any interaction
-         state. */
-      background: var(--app-surface);
+      /* --background directly, NOT --app-surface — see the :root comment
+         above. This carries data-level="2" (set in the markup); the alias
+         is frozen at :root's own level so it never picked that up. */
+      background: var(--background);
       border-radius: 24px;
       padding: 16px 12px 12px;
     }
@@ -20929,7 +20943,7 @@ html[data-theme=dark] {
     <div class="actions actions-skeleton" id="actions-skeleton"></div>
 
     <div class="actions" id="actions" hidden>
-      <div class="export-panel">
+      <div class="export-panel" data-level="2">
         <!-- One block per provider, each with its own folder path + JSON
              file name (the file name itself is set in Settings — see
              gl-filename-mount/gh-filename-mount — this is a read-only
@@ -21080,7 +21094,7 @@ html[data-theme=dark] {
              Path" list below stays outside it: its rows are already cards
              in their own right, and nesting them would read as a card
              inside a card. -->
-        <div class="provider-card">
+        <div class="provider-card" data-level="2">
           <div class="provider-section-heading">
             <p class="folder-paths-title">
               <span class="provider-logo-badge">
@@ -21109,7 +21123,7 @@ html[data-theme=dark] {
         <!-- Saved paths get their own card, sibling to the connection
              card above — heading, the rows, and the add-a-path row all
              inside it. -->
-        <div class="provider-card">
+        <div class="provider-card" data-level="2">
           <div class="folder-paths-heading">
             <p class="folder-paths-title">Saved Folder Path</p>
             <p class="folder-paths-subtitle">Choose on the main screen</p>
@@ -21123,7 +21137,7 @@ html[data-theme=dark] {
         </div>
       </div>
       <div id="github-fields" hidden>
-        <div class="provider-card">
+        <div class="provider-card" data-level="2">
           <div class="provider-section-heading">
             <p class="folder-paths-title">
               <span class="provider-logo-badge">
@@ -21146,7 +21160,7 @@ html[data-theme=dark] {
           </div>
         </div>
 
-        <div class="provider-card">
+        <div class="provider-card" data-level="2">
           <div class="folder-paths-heading">
             <p class="folder-paths-title">Saved Folder Path</p>
             <p class="folder-paths-subtitle">Choose on the main screen</p>
@@ -21166,7 +21180,7 @@ html[data-theme=dark] {
            logo+name-left / action-right shape AND the same header-style
            card as the already-added heading below (both carry
            .provider-section-heading; see .provider-add-row). -->
-      <div class="provider-section-heading provider-add-row" id="add-gitlab-row" hidden>
+      <div class="provider-section-heading provider-add-row" id="add-gitlab-row" data-level="2" hidden>
         <p class="folder-paths-title">
           <span class="provider-logo-badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -21179,7 +21193,7 @@ html[data-theme=dark] {
       </div>
       <!-- GitHub is optional — add-only until configured, then editable and
            removable just like GitLab, but never required. -->
-      <div class="provider-section-heading provider-add-row" id="add-github-row">
+      <div class="provider-section-heading provider-add-row" id="add-github-row" data-level="2">
         <p class="folder-paths-title">
           <span class="provider-logo-badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -46824,6 +46838,7 @@ html[data-theme=dark] {
   // src/ui-react/buttons.tsx
   var import_jsx_runtime18 = __toESM(require_jsx_runtime());
   var GROUND = 1;
+  var CARD_LEVEL = 2;
   var svg = (d, opts) => (size) => opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("path", { d }) }) : /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("path", { d }) });
   var IconArrowLeft = svg("M19 12H5M12 19l-7-7 7-7");
   var IconClose = svg("M18 6 6 18M6 6l12 12");
@@ -46841,10 +46856,10 @@ html[data-theme=dark] {
   function btnSize(s) {
     return s === "large" ? "large" : s === "medium" ? "medium" : "small";
   }
-  function mountOnce(mountId, node) {
+  function mountOnce(mountId, node, level = GROUND) {
     const container = document.getElementById(mountId);
     if (!container) return;
-    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: node })));
+    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: level, children: node })));
   }
   function PomTextField(props) {
     const {
@@ -46961,7 +46976,7 @@ html[data-theme=dark] {
       }
     );
   }
-  function mountLiveButton(mountId, base, initial) {
+  function mountLiveButton(mountId, base, initial, level = GROUND) {
     const container = document.getElementById(mountId);
     let set = () => {
     };
@@ -46986,7 +47001,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LiveButton, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LiveButton, {}) })));
     return {
       setDisabled: (disabled) => set((s) => ({ ...s, disabled })),
       setLoading: (loading) => set((s) => ({ ...s, loading })),
@@ -46994,7 +47009,7 @@ html[data-theme=dark] {
       setLabel: (label) => set((s) => ({ ...s, label }))
     };
   }
-  function mountLiveIconButton(mountId, base, initialDisabled) {
+  function mountLiveIconButton(mountId, base, initialDisabled, level = GROUND) {
     const container = document.getElementById(mountId);
     let set = () => {
     };
@@ -47003,10 +47018,10 @@ html[data-theme=dark] {
       set = setD;
       return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomButton, { ...base, disabled });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
-  function mountLiveTextArea(mountId, base, initialDisabled) {
+  function mountLiveTextArea(mountId, base, initialDisabled, level = GROUND) {
     const container = document.getElementById(mountId);
     let set = () => {
     };
@@ -47015,10 +47030,10 @@ html[data-theme=dark] {
       set = setD;
       return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomTextArea, { ...base, disabled });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
-  function mountLiveDropdown(mountId, base, onSelect) {
+  function mountLiveDropdown(mountId, base, onSelect, level = GROUND) {
     const container = document.getElementById(mountId);
     let set = () => {
     };
@@ -47042,37 +47057,39 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     return { setItems: (items, value) => set(() => ({ items, value })) };
   }
   window.PomButtons = {
     push: mountLiveButton(
       "push-btn-mount",
       { id: "push-btn", variant: "filled", size: "large", label: "Push to GitLab", style: { width: "100%" } },
-      { disabled: true, loading: false, success: false, label: null }
+      { disabled: true, loading: false, success: false, label: null },
+      CARD_LEVEL
     ),
     download: mountLiveIconButton(
       "download-btn-mount",
       { id: "download-btn", variant: "tonal", size: "large", icon: IconDownload(24), label: "Download", title: "Download" },
-      true
+      true,
+      CARD_LEVEL
     )
   };
-  function mountButton(mountId, props) {
-    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomButton, { ...props }));
+  function mountButton(mountId, props, level) {
+    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomButton, { ...props }), level);
   }
-  function mountIconButton(mountId, props) {
-    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomButton, { ...props }));
+  function mountIconButton(mountId, props, level) {
+    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomButton, { ...props }), level);
   }
-  mountIconButton("folder-add-btn-mount", { id: "folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) });
-  mountIconButton("github-folder-add-btn-mount", { id: "github-folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) });
-  mountIconButton("gl-clear-token-btn-mount", { id: "gl-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitLab token", "aria-label": "Clear GitLab token", icon: IconClose(16) });
-  mountIconButton("gh-clear-token-btn-mount", { id: "gh-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitHub token", "aria-label": "Clear GitHub token", icon: IconClose(16) });
-  mountIconButton("gitlab-empty-add-btn-mount", { id: "gitlab-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) });
-  mountIconButton("github-empty-add-btn-mount", { id: "github-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) });
-  mountButton("add-github-btn-mount", { id: "add-github-btn", variant: "tonal", size: "small", label: "Add" });
-  mountButton("remove-github-btn-mount", { id: "remove-github-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitHub" });
-  mountButton("add-gitlab-btn-mount", { id: "add-gitlab-btn", variant: "tonal", size: "small", label: "Add" });
-  mountButton("remove-gitlab-btn-mount", { id: "remove-gitlab-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitLab" });
+  mountIconButton("folder-add-btn-mount", { id: "folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
+  mountIconButton("github-folder-add-btn-mount", { id: "github-folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
+  mountIconButton("gl-clear-token-btn-mount", { id: "gl-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitLab token", "aria-label": "Clear GitLab token", icon: IconClose(16) }, CARD_LEVEL);
+  mountIconButton("gh-clear-token-btn-mount", { id: "gh-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitHub token", "aria-label": "Clear GitHub token", icon: IconClose(16) }, CARD_LEVEL);
+  mountIconButton("gitlab-empty-add-btn-mount", { id: "gitlab-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
+  mountIconButton("github-empty-add-btn-mount", { id: "github-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
+  mountButton("add-github-btn-mount", { id: "add-github-btn", variant: "tonal", size: "small", label: "Add" }, CARD_LEVEL);
+  mountButton("remove-github-btn-mount", { id: "remove-github-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitHub" }, CARD_LEVEL);
+  mountButton("add-gitlab-btn-mount", { id: "add-gitlab-btn", variant: "tonal", size: "small", label: "Add" }, CARD_LEVEL);
+  mountButton("remove-gitlab-btn-mount", { id: "remove-gitlab-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitLab" }, CARD_LEVEL);
   mountIconButton("back-btn-mount", { id: "back-btn", variant: "ghost", size: "small", title: "Back", "aria-label": "Back", icon: IconArrowLeft(16) });
   mountIconButton("settings-btn-mount", { id: "settings-btn", variant: "ghost", size: "small", title: "Git settings", "aria-label": "Git settings", icon: IconSettings(16) });
   function mountVersionTag(mountId) {
@@ -47089,30 +47106,30 @@ html[data-theme=dark] {
     window.PomVersionTag = { setLabel: (label) => set(label) };
   }
   mountVersionTag("version-tag-mount");
-  function mountTextField(mountId, props) {
-    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomTextField, { ...props }));
+  function mountTextField(mountId, props, level) {
+    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomTextField, { ...props }), level);
   }
-  mountTextField("export-filename-mount", { id: "export-filename", label: "File name", readonly: true, defaultValue: "tokens.json", tabIndex: -1, title: "GitLab JSON file name (set in Settings)" });
-  mountTextField("github-filename-mount", { id: "github-filename", label: "File name", readonly: true, defaultValue: "tokens.json", tabIndex: -1, title: "GitHub JSON file name (set in Settings)" });
-  window.PomCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false);
-  mountButton("add-repo-settings-btn-mount", { id: "add-repo-settings-btn", variant: "outline", size: "large", label: "Add Repo Settings", block: true });
-  mountButton("gitlab-small-settings-btn-mount", { id: "gitlab-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) });
-  mountButton("github-small-settings-btn-mount", { id: "github-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) });
-  mountIconButton("gitlab-remove-push-btn-mount", { id: "gitlab-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitLab from push destination", "aria-label": "Remove GitLab from push destination", icon: IconRemove(16) });
-  mountIconButton("github-remove-push-btn-mount", { id: "github-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitHub from push destination", "aria-label": "Remove GitHub from push destination", icon: IconRemove(16) });
-  mountIconButton("gitlab-empty-remove-push-btn-mount", { id: "gitlab-empty-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitLab from push destination", "aria-label": "Remove GitLab from push destination", icon: IconRemove(16) });
-  mountIconButton("github-empty-remove-push-btn-mount", { id: "github-empty-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitHub from push destination", "aria-label": "Remove GitHub from push destination", icon: IconRemove(16) });
-  mountTextField("folder-new-mount", { id: "folder-new", label: "Folder path", icon: IconFolder(16), placeholder: "e.g. src/something" });
-  mountTextField("github-folder-new-mount", { id: "github-folder-new", label: "Folder path", icon: IconFolder(16), placeholder: "e.g. src/something" });
-  mountTextField("gl-token-mount", { id: "gl-token", type: "password", label: "GitLab Token", placeholder: "glpat-\u2026 (stored only on this machine)" });
-  mountTextField("gl-host-mount", { id: "gl-host", label: "GitLab Host", placeholder: "https://gitlab.com" });
-  mountTextField("gl-project-mount", { id: "gl-project", label: "Project (path or ID)", placeholder: "group/subgroup/project or 1234" });
-  mountTextField("gl-branch-mount", { id: "gl-branch", label: "Branch", placeholder: "main" });
-  mountTextField("gl-filename-mount", { id: "gl-filename", label: "JSON file name", placeholder: "tokens.json" });
-  mountTextField("gh-token-mount", { id: "gh-token", type: "password", label: "GitHub Token", placeholder: "ghp-\u2026 (stored only on this machine)" });
-  mountTextField("gh-repo-mount", { id: "gh-repo", label: "Repository (owner/repo)", placeholder: "my-org/my-repo" });
-  mountTextField("gh-branch-mount", { id: "gh-branch", label: "Branch", placeholder: "main" });
-  mountTextField("gh-filename-mount", { id: "gh-filename", label: "JSON file name", placeholder: "tokens.json" });
+  mountTextField("export-filename-mount", { id: "export-filename", label: "File name", readonly: true, defaultValue: "tokens.json", tabIndex: -1, title: "GitLab JSON file name (set in Settings)" }, CARD_LEVEL);
+  mountTextField("github-filename-mount", { id: "github-filename", label: "File name", readonly: true, defaultValue: "tokens.json", tabIndex: -1, title: "GitHub JSON file name (set in Settings)" }, CARD_LEVEL);
+  window.PomCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false, CARD_LEVEL);
+  mountButton("add-repo-settings-btn-mount", { id: "add-repo-settings-btn", variant: "outline", size: "large", label: "Add Repo Settings", block: true }, CARD_LEVEL);
+  mountButton("gitlab-small-settings-btn-mount", { id: "gitlab-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
+  mountButton("github-small-settings-btn-mount", { id: "github-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
+  mountIconButton("gitlab-remove-push-btn-mount", { id: "gitlab-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitLab from push destination", "aria-label": "Remove GitLab from push destination", icon: IconRemove(16) }, CARD_LEVEL);
+  mountIconButton("github-remove-push-btn-mount", { id: "github-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitHub from push destination", "aria-label": "Remove GitHub from push destination", icon: IconRemove(16) }, CARD_LEVEL);
+  mountIconButton("gitlab-empty-remove-push-btn-mount", { id: "gitlab-empty-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitLab from push destination", "aria-label": "Remove GitLab from push destination", icon: IconRemove(16) }, CARD_LEVEL);
+  mountIconButton("github-empty-remove-push-btn-mount", { id: "github-empty-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitHub from push destination", "aria-label": "Remove GitHub from push destination", icon: IconRemove(16) }, CARD_LEVEL);
+  mountTextField("folder-new-mount", { id: "folder-new", label: "Folder path", icon: IconFolder(16), placeholder: "e.g. src/something" }, CARD_LEVEL);
+  mountTextField("github-folder-new-mount", { id: "github-folder-new", label: "Folder path", icon: IconFolder(16), placeholder: "e.g. src/something" }, CARD_LEVEL);
+  mountTextField("gl-token-mount", { id: "gl-token", type: "password", label: "GitLab Token", placeholder: "glpat-\u2026 (stored only on this machine)" }, CARD_LEVEL);
+  mountTextField("gl-host-mount", { id: "gl-host", label: "GitLab Host", placeholder: "https://gitlab.com" }, CARD_LEVEL);
+  mountTextField("gl-project-mount", { id: "gl-project", label: "Project (path or ID)", placeholder: "group/subgroup/project or 1234" }, CARD_LEVEL);
+  mountTextField("gl-branch-mount", { id: "gl-branch", label: "Branch", placeholder: "main" }, CARD_LEVEL);
+  mountTextField("gl-filename-mount", { id: "gl-filename", label: "JSON file name", placeholder: "tokens.json" }, CARD_LEVEL);
+  mountTextField("gh-token-mount", { id: "gh-token", type: "password", label: "GitHub Token", placeholder: "ghp-\u2026 (stored only on this machine)" }, CARD_LEVEL);
+  mountTextField("gh-repo-mount", { id: "gh-repo", label: "Repository (owner/repo)", placeholder: "my-org/my-repo" }, CARD_LEVEL);
+  mountTextField("gh-branch-mount", { id: "gh-branch", label: "Branch", placeholder: "main" }, CARD_LEVEL);
+  mountTextField("gh-filename-mount", { id: "gh-filename", label: "JSON file name", placeholder: "tokens.json" }, CARD_LEVEL);
   window.PomExportMode = { onChange: null };
   (function mountExportMode() {
     const container = document.getElementById("export-mode-control-mount");
@@ -47252,14 +47269,14 @@ html[data-theme=dark] {
     window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? "error" : "success", message })) };
   })();
   window.PomFolderSelect = {
-    ...mountLiveDropdown("folder-select-mount", { id: "folder-select" }, (v) => window.PomFolderSelect.onChange?.(v)),
+    ...mountLiveDropdown("folder-select-mount", { id: "folder-select" }, (v) => window.PomFolderSelect.onChange?.(v), CARD_LEVEL),
     onChange: null
   };
   window.PomGithubFolderSelect = {
-    ...mountLiveDropdown("github-folder-select-mount", { id: "github-folder-select" }, (v) => window.PomGithubFolderSelect.onChange?.(v)),
+    ...mountLiveDropdown("github-folder-select-mount", { id: "github-folder-select" }, (v) => window.PomGithubFolderSelect.onChange?.(v), CARD_LEVEL),
     onChange: null
   };
-  function mountFolderList(mountId, bridgeKey, idPrefix) {
+  function mountFolderList(mountId, bridgeKey, idPrefix, level = GROUND) {
     const container = document.getElementById(mountId);
     const root = container ? (0, import_client.createRoot)(container) : null;
     let generation = 0;
@@ -47268,7 +47285,7 @@ html[data-theme=dark] {
       generation += 1;
       const gen = generation;
       root.render(
-        /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(import_jsx_runtime18.Fragment, { children: rows.map((row, idx) => /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)("div", { className: "folder-row", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(import_jsx_runtime18.Fragment, { children: rows.map((row, idx) => /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)("div", { className: "folder-row", children: [
           /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
             PomTextField,
             {
@@ -47300,8 +47317,8 @@ html[data-theme=dark] {
     }
     window[bridgeKey] = { render, onInput: null, onBlur: null, onRemove: null };
   }
-  mountFolderList("folder-list", "PomFolderList", "folder-row-input");
-  mountFolderList("github-folder-list", "PomGithubFolderList", "github-folder-row-input");
+  mountFolderList("folder-list", "PomFolderList", "folder-row-input", CARD_LEVEL);
+  mountFolderList("github-folder-list", "PomGithubFolderList", "github-folder-row-input", CARD_LEVEL);
   (function mountCollectionsAccordion() {
     const container = document.getElementById("collections-list");
     let set = () => {
@@ -47456,20 +47473,21 @@ html[data-theme=dark] {
             onToggle(!checked);
           }
         },
+        "data-level": 1,
         style: {
           display: "flex",
           alignItems: "center",
           gap: 10,
           width: "100%",
           boxSizing: "border-box",
-          background: "var(--app-surface)",
+          background: "var(--background)",
           border: "1px solid " + (checked ? "var(--app-accent)" : "transparent"),
           borderRadius: 16,
           padding: "10px 14px",
           cursor: "pointer"
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { "aria-hidden": "true", style: { display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "var(--app-bg)", color: "var(--app-text-muted)", flexShrink: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "currentColor", children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("path", { d: PROVIDER_LOGO_PATH[which] }) }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { "aria-hidden": "true", "data-level": 2, style: { display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "var(--background)", color: "var(--app-text-muted)", flexShrink: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "currentColor", children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("path", { d: PROVIDER_LOGO_PATH[which] }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { style: { flex: 1, minWidth: 0, fontWeight: 600, color: "var(--app-text)" }, children: label }),
           /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { style: { display: "flex", flexShrink: 0, pointerEvents: "none" }, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Checkbox, { size: "small", labelHidden: true, label, checked, onChange: () => {
           } }) })

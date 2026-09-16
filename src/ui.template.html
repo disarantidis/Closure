@@ -149,16 +149,30 @@
          · the ground is level 1 — the DARKEST rung — set on <html> with
            data-surface="normal" so the darkest ground paints SOLID (a level
            1/3/4 ground without it goes translucent — "the ground is never glass");
-         · a surface that should read as RAISED sets its own data-level, and
-           --app-surface then resolves to whatever rung its element stands on —
-           on the ground it equals the ground, so panels that set no level fall
-           back to being sections (spacing, no bespoke box), which is what
-           LAYOUT-RULES asks for;
          · a field sits ONE rung above its ground for free (fieldLevel), so a
-           field on the L1 ground is L2 with no extra wiring. The one real card
-           is the collections Accordion (level={2}, one rung up from the ground);
-           dialogs are L4. buttons.tsx wraps every mount in a LevelContext
-           provider at the ground (GROUND=1) so the components compute from it. */
+           field on an L1 ground is L2 with no extra wiring, and a field on an
+           L2 card is L3; buttons.tsx threads the right ground into every
+           mount's own LevelContext.Provider (GROUND=1, CARD_LEVEL=2) so this
+           computes correctly instead of being hand-typed.
+
+         --app-bg / --app-surface / --app-surface-soft BELOW ARE NOT LIVE
+         ALIASES — READ THIS BEFORE REACHING FOR THEM ON A NEW SURFACE.
+         They resolve `var(--background)` exactly ONCE, here on :root, against
+         :root's OWN level (1). Custom-property inheritance carries that
+         already-resolved colour down as a plain value — it does not re-run
+         var(--background) per descendant — so a DEEPER element that sets its
+         own data-level (a card at 2, a well at 1 inside an L4 dialog) still
+         inherits :root's frozen colour through --app-surface, NOT its own
+         rung's. This bit exactly this file: .provider-card / .export-panel
+         painted `background: var(--app-surface)` and stayed the ground's
+         colour even after gaining `data-level="2"`, because the alias never
+         saw it. --background itself has no such trap (the DS's own .nd-card
+         paints it directly and tracks every level correctly) — so any
+         element that sets, or may ever set, its own data-level MUST paint
+         `var(--background)` / `var(--background-hover)` directly, never
+         through these three. They stay safe to use only on elements that are
+         guaranteed to remain at the ROOT's level for their whole life
+         (nothing below currently qualifies except body itself). */
       --app-bg: var(--background);
       --app-surface: var(--background);
       --app-surface-soft: var(--background-hover);
@@ -209,7 +223,7 @@
       gap: 10px;
       flex: 1;
       min-width: 0;
-      background: var(--app-surface);
+      background: var(--background);
       border-radius: 24px;
       padding: 10px 14px;
     }
@@ -383,7 +397,7 @@
     .settings-note {
       font-size: 12px;
       color: var(--app-text-muted);
-      background: var(--app-surface-soft);
+      background: var(--background-hover);
       border: 1px solid var(--app-border);
       border-radius: 10px;
       padding: 8px 12px;
@@ -540,7 +554,7 @@
       width: 24px;
       height: 24px;
       border-radius: 50%;
-      background: var(--app-surface);
+      background: var(--background);
       color: var(--app-text-muted);
       flex-shrink: 0;
     }
@@ -551,7 +565,10 @@
        (.provider-add-row). One recipe so the two never drift apart. */
     .provider-card,
     .provider-add-row {
-      background: var(--app-surface);
+      /* --background directly, NOT --app-surface — see the :root comment
+         above. Both carry data-level="2" (set in the markup), and the
+         alias is frozen at :root's own level so it never picked that up. */
+      background: var(--background);
       border-radius: 24px;
       margin-bottom: 24px;
     }
@@ -929,13 +946,10 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      /* --app-surface-soft is a hover-state token (--colours-interaction-
-         states-hover-background-subtle-hover) — too close to a disabled
-         button's own grey, confusing next to Push when it's disabled.
-         --app-surface is the actual neutral/static shade
-         (--colours-basic-background-subtle), not tied to any interaction
-         state. */
-      background: var(--app-surface);
+      /* --background directly, NOT --app-surface — see the :root comment
+         above. This carries data-level="2" (set in the markup); the alias
+         is frozen at :root's own level so it never picked that up. */
+      background: var(--background);
       border-radius: 24px;
       padding: 16px 12px 12px;
     }
@@ -1047,7 +1061,7 @@
     <div class="actions actions-skeleton" id="actions-skeleton"></div>
 
     <div class="actions" id="actions" hidden>
-      <div class="export-panel">
+      <div class="export-panel" data-level="2">
         <!-- One block per provider, each with its own folder path + JSON
              file name (the file name itself is set in Settings — see
              gl-filename-mount/gh-filename-mount — this is a read-only
@@ -1198,7 +1212,7 @@
              Path" list below stays outside it: its rows are already cards
              in their own right, and nesting them would read as a card
              inside a card. -->
-        <div class="provider-card">
+        <div class="provider-card" data-level="2">
           <div class="provider-section-heading">
             <p class="folder-paths-title">
               <span class="provider-logo-badge">
@@ -1227,7 +1241,7 @@
         <!-- Saved paths get their own card, sibling to the connection
              card above — heading, the rows, and the add-a-path row all
              inside it. -->
-        <div class="provider-card">
+        <div class="provider-card" data-level="2">
           <div class="folder-paths-heading">
             <p class="folder-paths-title">Saved Folder Path</p>
             <p class="folder-paths-subtitle">Choose on the main screen</p>
@@ -1241,7 +1255,7 @@
         </div>
       </div>
       <div id="github-fields" hidden>
-        <div class="provider-card">
+        <div class="provider-card" data-level="2">
           <div class="provider-section-heading">
             <p class="folder-paths-title">
               <span class="provider-logo-badge">
@@ -1264,7 +1278,7 @@
           </div>
         </div>
 
-        <div class="provider-card">
+        <div class="provider-card" data-level="2">
           <div class="folder-paths-heading">
             <p class="folder-paths-title">Saved Folder Path</p>
             <p class="folder-paths-subtitle">Choose on the main screen</p>
@@ -1284,7 +1298,7 @@
            logo+name-left / action-right shape AND the same header-style
            card as the already-added heading below (both carry
            .provider-section-heading; see .provider-add-row). -->
-      <div class="provider-section-heading provider-add-row" id="add-gitlab-row" hidden>
+      <div class="provider-section-heading provider-add-row" id="add-gitlab-row" data-level="2" hidden>
         <p class="folder-paths-title">
           <span class="provider-logo-badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -1297,7 +1311,7 @@
       </div>
       <!-- GitHub is optional — add-only until configured, then editable and
            removable just like GitLab, but never required. -->
-      <div class="provider-section-heading provider-add-row" id="add-github-row">
+      <div class="provider-section-heading provider-add-row" id="add-github-row" data-level="2">
         <p class="folder-paths-title">
           <span class="provider-logo-badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

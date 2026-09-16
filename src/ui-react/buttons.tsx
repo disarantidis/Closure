@@ -33,13 +33,20 @@ import { Toast } from '../vendor/pomegranate/panel/node/Toast';
 import { Alert } from '../vendor/pomegranate/panel/node/Alert';
 import { Skeleton } from '../vendor/pomegranate/panel/node/Skeleton';
 import { Tag } from '../vendor/pomegranate/panel/node/Tag';
-import { fieldLevel, useLevel, LevelContext } from '../vendor/pomegranate/panel/node/LevelContext';
+import { fieldLevel, useLevel, LevelContext, type Level } from '../vendor/pomegranate/panel/node/LevelContext';
 
 /* The plugin GROUND is level 1 — the darkest rung. Every mounted subtree is
    wrapped in a LevelContext provider at the ground so the kit's components
    compute their fill ONE rung above it (a field on the L1 ground is L2), per
    the composition rule in docs/knowledge-levels.md. */
-const GROUND = 1 as const;
+const GROUND: Level = 1;
+/* One rung above the ground — the band every provider-card / export-panel
+   island stands on (data-level="2" set on those elements in the template).
+   Every mount mechanically nested inside one of those DOM islands passes
+   this so its own computed fill (data-fill via fieldLevel, a Button's
+   --nd-field-fill / --background-hover) agrees with the DOM's CSS cascade
+   instead of silently assuming it still sits on GROUND. */
+const CARD_LEVEL: Level = 2;
 
 import '../vendor/pomegranate/styles/tokens.css';
 import '../vendor/pomegranate/styles/fonts.css';
@@ -72,10 +79,10 @@ function btnSize(s?: string): 'small' | 'medium' | 'large' {
 }
 
 /* ── mountOnce: render a component once into an existing node, synchronously ── */
-function mountOnce(mountId: string, node: ReactNode) {
+function mountOnce(mountId: string, node: ReactNode, level: Level = GROUND) {
   const container = document.getElementById(mountId);
   if (!container) return;
-  flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}>{node}</LevelContext.Provider>));
+  flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}>{node}</LevelContext.Provider>));
 }
 
 /* ── field adapters: DS-painted, uncontrolled, carry the caller's id ───────── */
@@ -171,7 +178,7 @@ type LiveHandle = {
   setDisabled: (v: boolean) => void; setLoading: (v: boolean) => void;
   setSuccess: (v: boolean) => void; setLabel: (v: string | null) => void;
 };
-function mountLiveButton(mountId: string, base: any, initial: any): LiveHandle {
+function mountLiveButton(mountId: string, base: any, initial: any, level: Level = GROUND): LiveHandle {
   const container = document.getElementById(mountId);
   let set: (u: (s: any) => any) => void = () => {};
   function LiveButton() {
@@ -194,7 +201,7 @@ function mountLiveButton(mountId: string, base: any, initial: any): LiveHandle {
       </Button>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><LiveButton /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><LiveButton /></LevelContext.Provider>));
   return {
     setDisabled: (disabled) => set((s) => ({ ...s, disabled })),
     setLoading: (loading) => set((s) => ({ ...s, loading })),
@@ -204,32 +211,32 @@ function mountLiveButton(mountId: string, base: any, initial: any): LiveHandle {
 }
 
 type LiveIconHandle = { setDisabled: (v: boolean) => void };
-function mountLiveIconButton(mountId: string, base: any, initialDisabled: boolean): LiveIconHandle {
+function mountLiveIconButton(mountId: string, base: any, initialDisabled: boolean, level: Level = GROUND): LiveIconHandle {
   const container = document.getElementById(mountId);
   let set: (v: boolean) => void = () => {};
   function View() {
     const [disabled, setD] = useState(initialDisabled); set = setD;
     return <PomButton {...base} disabled={disabled} />;
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
   return { setDisabled: (v) => set(v) };
 }
 
 type DisabledHandle = { setDisabled: (v: boolean) => void };
-function mountLiveTextArea(mountId: string, base: any, initialDisabled: boolean): DisabledHandle {
+function mountLiveTextArea(mountId: string, base: any, initialDisabled: boolean, level: Level = GROUND): DisabledHandle {
   const container = document.getElementById(mountId);
   let set: (v: boolean) => void = () => {};
   function View() {
     const [disabled, setD] = useState(initialDisabled); set = setD;
     return <PomTextArea {...base} disabled={disabled} />;
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
   return { setDisabled: (v) => set(v) };
 }
 
 /* ── live dropdown (folder pickers) ────────────────────────────────────────── */
 type DropdownHandle = { setItems: (items: any[], selectedValue: string) => void };
-function mountLiveDropdown(mountId: string, base: any, onSelect: (v: string) => void): DropdownHandle {
+function mountLiveDropdown(mountId: string, base: any, onSelect: (v: string) => void, level: Level = GROUND): DropdownHandle {
   const container = document.getElementById(mountId);
   let set: (u: (s: any) => any) => void = () => {};
   function View() {
@@ -251,7 +258,7 @@ function mountLiveDropdown(mountId: string, base: any, onSelect: (v: string) => 
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
   return { setItems: (items, value) => set(() => ({ items, value })) };
 }
 
@@ -297,32 +304,34 @@ window.PomButtons = {
     'push-btn-mount',
     { id: 'push-btn', variant: 'filled', size: 'large', label: 'Push to GitLab', style: { width: '100%' } },
     { disabled: true, loading: false, success: false, label: null },
+    CARD_LEVEL,
   ),
   download: mountLiveIconButton(
     'download-btn-mount',
     { id: 'download-btn', variant: 'tonal', size: 'large', icon: IconDownload(24), label: 'Download', title: 'Download' },
     true,
+    CARD_LEVEL,
   ),
 };
 
 /* ── static buttons / icon buttons ─────────────────────────────────────────── */
-function mountButton(mountId: string, props: any) { mountOnce(mountId, <PomButton {...props} />); }
-function mountIconButton(mountId: string, props: any) { mountOnce(mountId, <PomButton {...props} />); }
+function mountButton(mountId: string, props: any, level?: Level) { mountOnce(mountId, <PomButton {...props} />, level); }
+function mountIconButton(mountId: string, props: any, level?: Level) { mountOnce(mountId, <PomButton {...props} />, level); }
 
 /* These four stand BESIDE a small TextField (band 50: node-kit-test's
    ROW-RULES "medium IS a small field's box"), not beside another button —
    so they take Button's `medium` rung to band-match the field, not `small`
    (band 32), which is the row-mixing-bands defect ROW-RULES.md calls out. */
-mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) });
-mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) });
-mountIconButton('gl-clear-token-btn-mount', { id: 'gl-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitLab token', 'aria-label': 'Clear GitLab token', icon: IconClose(16) });
-mountIconButton('gh-clear-token-btn-mount', { id: 'gh-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitHub token', 'aria-label': 'Clear GitHub token', icon: IconClose(16) });
-mountIconButton('gitlab-empty-add-btn-mount', { id: 'gitlab-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) });
-mountIconButton('github-empty-add-btn-mount', { id: 'github-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) });
-mountButton('add-github-btn-mount', { id: 'add-github-btn', variant: 'tonal', size: 'small', label: 'Add' });
-mountButton('remove-github-btn-mount', { id: 'remove-github-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitHub' });
-mountButton('add-gitlab-btn-mount', { id: 'add-gitlab-btn', variant: 'tonal', size: 'small', label: 'Add' });
-mountButton('remove-gitlab-btn-mount', { id: 'remove-gitlab-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitLab' });
+mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
+mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
+mountIconButton('gl-clear-token-btn-mount', { id: 'gl-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitLab token', 'aria-label': 'Clear GitLab token', icon: IconClose(16) }, CARD_LEVEL);
+mountIconButton('gh-clear-token-btn-mount', { id: 'gh-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitHub token', 'aria-label': 'Clear GitHub token', icon: IconClose(16) }, CARD_LEVEL);
+mountIconButton('gitlab-empty-add-btn-mount', { id: 'gitlab-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
+mountIconButton('github-empty-add-btn-mount', { id: 'github-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
+mountButton('add-github-btn-mount', { id: 'add-github-btn', variant: 'tonal', size: 'small', label: 'Add' }, CARD_LEVEL);
+mountButton('remove-github-btn-mount', { id: 'remove-github-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitHub' }, CARD_LEVEL);
+mountButton('add-gitlab-btn-mount', { id: 'add-gitlab-btn', variant: 'tonal', size: 'small', label: 'Add' }, CARD_LEVEL);
+mountButton('remove-gitlab-btn-mount', { id: 'remove-gitlab-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitLab' }, CARD_LEVEL);
 mountIconButton('back-btn-mount', { id: 'back-btn', variant: 'ghost', size: 'small', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(16) });
 mountIconButton('settings-btn-mount', { id: 'settings-btn', variant: 'ghost', size: 'small', title: 'Git settings', 'aria-label': 'Git settings', icon: IconSettings(16) });
 
@@ -342,33 +351,33 @@ function mountVersionTag(mountId: string) {
 mountVersionTag('version-tag-mount');
 
 /* ── text fields (filenames read-only, folder-new, connection fields) ──────── */
-function mountTextField(mountId: string, props: any) { mountOnce(mountId, <PomTextField {...props} />); }
+function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(mountId, <PomTextField {...props} />, level); }
 
-mountTextField('export-filename-mount', { id: 'export-filename', label: 'File name', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitLab JSON file name (set in Settings)' });
-mountTextField('github-filename-mount', { id: 'github-filename', label: 'File name', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitHub JSON file name (set in Settings)' });
+mountTextField('export-filename-mount', { id: 'export-filename', label: 'File name', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitLab JSON file name (set in Settings)' }, CARD_LEVEL);
+mountTextField('github-filename-mount', { id: 'github-filename', label: 'File name', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitHub JSON file name (set in Settings)' }, CARD_LEVEL);
 
-window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false);
+window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false, CARD_LEVEL);
 
-mountButton('add-repo-settings-btn-mount', { id: 'add-repo-settings-btn', variant: 'outline', size: 'large', label: 'Add Repo Settings', block: true });
-mountButton('gitlab-small-settings-btn-mount', { id: 'gitlab-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) });
-mountButton('github-small-settings-btn-mount', { id: 'github-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) });
-mountIconButton('gitlab-remove-push-btn-mount', { id: 'gitlab-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconRemove(16) });
-mountIconButton('github-remove-push-btn-mount', { id: 'github-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconRemove(16) });
-mountIconButton('gitlab-empty-remove-push-btn-mount', { id: 'gitlab-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconRemove(16) });
-mountIconButton('github-empty-remove-push-btn-mount', { id: 'github-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconRemove(16) });
+mountButton('add-repo-settings-btn-mount', { id: 'add-repo-settings-btn', variant: 'outline', size: 'large', label: 'Add Repo Settings', block: true }, CARD_LEVEL);
+mountButton('gitlab-small-settings-btn-mount', { id: 'gitlab-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
+mountButton('github-small-settings-btn-mount', { id: 'github-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
+mountIconButton('gitlab-remove-push-btn-mount', { id: 'gitlab-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconRemove(16) }, CARD_LEVEL);
+mountIconButton('github-remove-push-btn-mount', { id: 'github-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconRemove(16) }, CARD_LEVEL);
+mountIconButton('gitlab-empty-remove-push-btn-mount', { id: 'gitlab-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconRemove(16) }, CARD_LEVEL);
+mountIconButton('github-empty-remove-push-btn-mount', { id: 'github-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconRemove(16) }, CARD_LEVEL);
 
-mountTextField('folder-new-mount', { id: 'folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' });
-mountTextField('github-folder-new-mount', { id: 'github-folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' });
+mountTextField('folder-new-mount', { id: 'folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' }, CARD_LEVEL);
+mountTextField('github-folder-new-mount', { id: 'github-folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' }, CARD_LEVEL);
 
-mountTextField('gl-token-mount', { id: 'gl-token', type: 'password', label: 'GitLab Token', placeholder: 'glpat-… (stored only on this machine)' });
-mountTextField('gl-host-mount', { id: 'gl-host', label: 'GitLab Host', placeholder: 'https://gitlab.com' });
-mountTextField('gl-project-mount', { id: 'gl-project', label: 'Project (path or ID)', placeholder: 'group/subgroup/project or 1234' });
-mountTextField('gl-branch-mount', { id: 'gl-branch', label: 'Branch', placeholder: 'main' });
-mountTextField('gl-filename-mount', { id: 'gl-filename', label: 'JSON file name', placeholder: 'tokens.json' });
-mountTextField('gh-token-mount', { id: 'gh-token', type: 'password', label: 'GitHub Token', placeholder: 'ghp-… (stored only on this machine)' });
-mountTextField('gh-repo-mount', { id: 'gh-repo', label: 'Repository (owner/repo)', placeholder: 'my-org/my-repo' });
-mountTextField('gh-branch-mount', { id: 'gh-branch', label: 'Branch', placeholder: 'main' });
-mountTextField('gh-filename-mount', { id: 'gh-filename', label: 'JSON file name', placeholder: 'tokens.json' });
+mountTextField('gl-token-mount', { id: 'gl-token', type: 'password', label: 'GitLab Token', placeholder: 'glpat-… (stored only on this machine)' }, CARD_LEVEL);
+mountTextField('gl-host-mount', { id: 'gl-host', label: 'GitLab Host', placeholder: 'https://gitlab.com' }, CARD_LEVEL);
+mountTextField('gl-project-mount', { id: 'gl-project', label: 'Project (path or ID)', placeholder: 'group/subgroup/project or 1234' }, CARD_LEVEL);
+mountTextField('gl-branch-mount', { id: 'gl-branch', label: 'Branch', placeholder: 'main' }, CARD_LEVEL);
+mountTextField('gl-filename-mount', { id: 'gl-filename', label: 'JSON file name', placeholder: 'tokens.json' }, CARD_LEVEL);
+mountTextField('gh-token-mount', { id: 'gh-token', type: 'password', label: 'GitHub Token', placeholder: 'ghp-… (stored only on this machine)' }, CARD_LEVEL);
+mountTextField('gh-repo-mount', { id: 'gh-repo', label: 'Repository (owner/repo)', placeholder: 'my-org/my-repo' }, CARD_LEVEL);
+mountTextField('gh-branch-mount', { id: 'gh-branch', label: 'Branch', placeholder: 'main' }, CARD_LEVEL);
+mountTextField('gh-filename-mount', { id: 'gh-filename', label: 'JSON file name', placeholder: 'tokens.json' }, CARD_LEVEL);
 
 /* ── hidden export-mode segmented control (Native / Token Studio) ───────────── */
 window.PomExportMode = { onChange: null };
@@ -509,16 +518,16 @@ mountOnce('actions-skeleton',
 
 /* ── folder-path dropdowns (main screen) ───────────────────────────────────── */
 window.PomFolderSelect = {
-  ...mountLiveDropdown('folder-select-mount', { id: 'folder-select' }, (v) => window.PomFolderSelect.onChange?.(v)),
+  ...mountLiveDropdown('folder-select-mount', { id: 'folder-select' }, (v) => window.PomFolderSelect.onChange?.(v), CARD_LEVEL),
   onChange: null,
 };
 window.PomGithubFolderSelect = {
-  ...mountLiveDropdown('github-folder-select-mount', { id: 'github-folder-select' }, (v) => window.PomGithubFolderSelect.onChange?.(v)),
+  ...mountLiveDropdown('github-folder-select-mount', { id: 'github-folder-select' }, (v) => window.PomGithubFolderSelect.onChange?.(v), CARD_LEVEL),
   onChange: null,
 };
 
 /* ── folder-path lists (Settings) — rebuilt often, every row remounts ──────── */
-function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithubFolderList', idPrefix: string) {
+function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithubFolderList', idPrefix: string, level: Level = GROUND) {
   const container = document.getElementById(mountId);
   const root = container ? createRoot(container) : null;
   let generation = 0;
@@ -527,7 +536,7 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
     generation += 1;
     const gen = generation;
     root.render(
-      <LevelContext.Provider value={GROUND}><>
+      <LevelContext.Provider value={level}><>
         {rows.map((row, idx) => (
           <div className="folder-row" key={`${gen}-${idx}`}>
             <PomTextField
@@ -556,8 +565,8 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
   }
   (window as any)[bridgeKey] = { render, onInput: null, onBlur: null, onRemove: null };
 }
-mountFolderList('folder-list', 'PomFolderList', 'folder-row-input');
-mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-input');
+mountFolderList('folder-list', 'PomFolderList', 'folder-row-input', CARD_LEVEL);
+mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-input', CARD_LEVEL);
 
 /* ── collections accordion (read-only breakdown) ───────────────────────────── */
 (function mountCollectionsAccordion() {
@@ -699,13 +708,23 @@ function ProviderChoiceCard({ which, label, checked, onToggle }: { which: 'gitla
       role="checkbox" aria-checked={checked} tabIndex={0}
       onClick={() => onToggle(!checked)}
       onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onToggle(!checked); } }}
+      /* This card sits inside the onboarding Dialog, which is hardcoded to
+         data-level={4} (Dialog.tsx). --app-surface/--app-bg both alias
+         var(--background), which is set by the nearest [data-level]
+         ancestor via the DOM/CSS cascade — with none set here it silently
+         inherited the dialog's own L4 fill and read as flat/invisible.
+         base=4 → the composition rule's ascending order for what's above
+         it is 1 → 2 → 3 (docs/knowledge-levels.md), so this well gets L1
+         (a selectable row, one of L1's own named uses) and its badge one
+         rung up at L2, so all three (dialog, card, badge) read apart. */
+      data-level={1}
       style={{
         display: 'flex', alignItems: 'center', gap: 10, width: '100%', boxSizing: 'border-box',
-        background: 'var(--app-surface)', border: '1px solid ' + (checked ? 'var(--app-accent)' : 'transparent'),
+        background: 'var(--background)', border: '1px solid ' + (checked ? 'var(--app-accent)' : 'transparent'),
         borderRadius: 16, padding: '10px 14px', cursor: 'pointer',
       }}
     >
-      <span aria-hidden="true" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: 'var(--app-bg)', color: 'var(--app-text-muted)', flexShrink: 0 }}>
+      <span aria-hidden="true" data-level={2} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: 'var(--background)', color: 'var(--app-text-muted)', flexShrink: 0 }}>
         <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d={PROVIDER_LOGO_PATH[which]} /></svg>
       </span>
       <span style={{ flex: 1, minWidth: 0, fontWeight: 600, color: 'var(--app-text)' }}>{label}</span>
