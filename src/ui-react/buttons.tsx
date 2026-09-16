@@ -538,9 +538,14 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
       // medium, not small: this sits at the top of Repository settings, level
       // with the row of GitLab/GitHub fields it switches between, not with a
       // caption-sized chip — the field-box rung Button/SegmentedControl share.
+      // block: this is a two-option dial governing the whole card stack below
+      // it, so it should read as wide as that stack (like the fields inside
+      // it), not hug its own two labels — see SegmentedControl's own `block`
+      // doc, written for exactly this "governs everything under it" case.
       <SegmentedControl
         label="Repository provider"
         size="medium"
+        block
         value={value}
         options={[{ value: 'github', label: 'GitHub' }, { value: 'gitlab', label: 'GitLab' }]}
         onChange={(v: string) => window.PomRepoTab.onChange?.(v as 'gitlab' | 'github')}
