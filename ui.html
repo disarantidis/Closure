@@ -571,16 +571,15 @@
       background: var(--background);
       border-radius: 24px;
       margin-bottom: 24px;
-      /* Both carry 14px of their own horizontal padding (below), which
-         .settings-page-content's 16px page inset stacks with — so their
-         CONTENT (the "GitLab" heading, the fields) sat 14px further right
-         than "Repository settings" / "Output format" / "Push destination"
-         above them, even though the card's own rounded edge lined up fine.
-         Pulling the box out by exactly that 14px puts the content back at
-         the page's one true left edge without touching the padding that
-         gives the card its own breathing room. */
-      margin-left: -14px;
-      margin-right: -14px;
+      /* NOT a negative margin. The card's own EDGE is one of the things
+         that has to sit on the page's single shared left/right line —
+         same x as the settings gear, "Output format", "Push destination",
+         the Repository-settings tab switcher — same as .settings-page-
+         content's plain 16px inset gives every un-carded heading, with no
+         adjustment here. (A negative margin used to sit here pulling the
+         box OUT to compensate for its own 14px padding and line up the
+         card's CONTENT instead — wrong axis: that put the card's edge
+         outside everything else's line, which is the actual defect.) */
     }
     /* Evenly inset on all four sides: the heading and every field below it
        sit against the same left edge. */
