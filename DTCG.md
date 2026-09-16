@@ -25,7 +25,7 @@ The switch drives `dtcgShape = 'themes'` — **standalone, standards-conformant
 W3C DTCG**, not an intermediate shape that needs another tool to finish:
 
 - **One fully resolved document per `$themes` entry.** Each theme's sets are
-  deep-merged (later sets in `tokenSetOrder` win, matching Tokens Studio), so
+  deep-merged (later sets in `tokenSetOrder` win), so
   every document is self-contained — nothing else to load, nothing else to
   merge.
 - **Renames** `value` / `type` / `description` → `$value` / `$type` /
@@ -50,13 +50,13 @@ W3C DTCG**, not an intermediate shape that needs another tool to finish:
   includeDescriptions: true })`, which the UI sets only for a DTCG export, so
   the default export is unchanged.
 
-`src/dtcg-format.js` has two other shapes — `'partial'` (Tokens Studio's own
+`src/dtcg-format.js` has two other shapes — `'partial'` (a minimally-renamed
 DTCG flavour, `$themes`/`$metadata` left at the document root, proprietary
 types untouched; a downstream `build-dtcg.js` elsewhere finishes it into
-strict DTCG) and `'sets'` (strict type mapping, but organized per Token
-Studio set rather than per resolved theme, so it can still alias across
+strict DTCG) and `'sets'` (strict type mapping, but organized per Legacy
+JSON set rather than per resolved theme, so it can still alias across
 documents). Both remain reachable from `scripts/dtcg-preview.js` for anyone
-who wants Tokens Studio's own partial export instead — the plugin's own
+who wants that partial export instead — the plugin's own
 Settings switch does not use either.
 
 ## Node tools (no Figma needed)
