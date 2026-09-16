@@ -177,6 +177,25 @@
       background: var(--background-hover);
       border-color: var(--background-hover);
     }
+    /* 3) More room around the "Push destination" step's content (the
+       GitLab/GitHub cards) — node.css's .nd-dialog-content defaults to
+       --spacing-component-2 --spacing-component-4 (10px/16px), noticeably
+       tighter than the cards' own now-18px internal padding, so the cards
+       read closer to the dialog's edge than to each other. Bumped to a
+       uniform --spacing-component-5 (18px) to match. Scoped the same way
+       as the two rules above — Dialog.tsx takes no className prop to hang
+       a scoped class on (only `style`, which lands on the dialog root, not
+       its content box), but showModal() doesn't reparent the element, so
+       the mount id still reaches it as a plain descendant selector.
+       (Note for whoever next touches dialog spacing: .token-modal-dialog /
+       .remove-confirm-dialog below both override --PomDialog-SlotContainer*
+       variables that Dialog.tsx never reads — it has no "PomDialog"
+       anything, only nd-dialog-* classes — and neither classname is ever
+       applied to any Dialog in this file. Both rules are dead; left alone,
+       out of scope here.) */
+    #onboarding-dialog-mount .nd-dialog-content {
+      padding: var(--spacing-component-5);
+    }
 
     /* This app's own chrome vars are aliases onto the Pomegranate
        (disarantidis_ReactJS) design tokens from src/vendor/pomegranate
