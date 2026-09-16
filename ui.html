@@ -21463,6 +21463,7 @@ html[data-theme=dark] {
       </div>
       <div class="json-download-fields">
         <span id="json-download-field-skeleton-mount"></span>
+        <span id="json-copy-btn-skeleton-mount"></span>
         <span id="json-download-btn-skeleton-mount"></span>
       </div>
     </div>
@@ -21491,6 +21492,11 @@ html[data-theme=dark] {
       </div>
       <div class="json-download-fields">
         <span id="primary-filename-mount"></span>
+        <!-- Copies the same JSON Download writes to a file, straight to
+             the clipboard instead — see doCopyJson() below. Sits left of
+             Download (secondary action before the primary one, both
+             flush against the field). -->
+        <div id="copy-btn-mount"></div>
         <div id="download-btn-mount"></div>
       </div>
     </div>
@@ -47509,6 +47515,7 @@ html[data-theme=dark] {
   var svg = (d, opts) => (size) => opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d, fillRule: opts.fillRule, clipRule: opts.fillRule }) }) : /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d }) });
   var IconArrowLeft = svg("M19 12H5M12 19l-7-7 7-7");
   var IconDownload = svg("M12 3v11m0 0l-4-4m4 4l4-4M5 20h14");
+  var IconCopy = svg("M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1");
   var IconSettings = svg(
     "m14 1 .5 2.75a.992.992 0 0 0 1.448.71l.102-.06 2.3-1.6 2.85 2.85-1.6 2.3c-.378.567-.087 1.312.537 1.52l.113.03L23 10v4l-2.75.5a.992.992 0 0 0-.71 1.448l.06.102 1.6 2.3-2.85 2.85-2.3-1.6c-.567-.378-1.312-.087-1.52.537l-.03.113L14 23h-4l-.5-2.75c-.142-.661-.863-1.01-1.448-.71l-.102.06-2.3 1.6-2.85-2.85 1.6-2.3c.378-.567.087-1.312-.537-1.52l-.113-.03L1 14v-4l2.75-.5a.992.992 0 0 0 .71-1.448L4.4 7.95l-1.6-2.3L5.65 2.8l2.3 1.6c.567.378 1.312.087 1.52-.537l.03-.113L10 1zm-1.25 1.5h-1.5l-.3 1.5c-.2 1.2-1.25 2.05-2.45 2.05-.437 0-.875-.115-1.246-.345L5.8 4.7 4.75 5.75l.9 1.3c.464.65.584 1.472.318 2.227L5.9 9.45c-.279.743-.902 1.27-1.67 1.462l-.18.038-1.55.3v1.5l1.55.25c.85.15 1.5.7 1.85 1.5a2.43 2.43 0 0 1-.149 2.247l-.101.153-.9 1.3 1.05 1.05 1.3-.9c.4-.3.9-.45 1.4-.45 1.145 0 2.154.774 2.418 1.889l.332 1.711h1.5l.3-1.55c.2-1.2 1.25-2.05 2.45-2.05.438 0 .875.115 1.245.345L18.2 19.25l1.05-1.05-.9-1.3c-.5-.7-.55-1.6-.25-2.3.279-.743.902-1.27 1.67-1.462l.18-.038 1.55-.3v-1.5l-1.55-.3c-.85-.15-1.5-.7-1.85-1.5a2.43 2.43 0 0 1 .149-2.247l.101-.153.9-1.3-1.05-1.05-1.3.9c-.4.3-.9.45-1.4.45a2.474 2.474 0 0 1-2.418-1.889zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6",
     { fill: true, fillRule: "evenodd" }
@@ -47610,6 +47617,7 @@ html[data-theme=dark] {
       id,
       variant,
       size,
+      fieldRung,
       label,
       destructive,
       icon: icon2,
@@ -47628,12 +47636,13 @@ html[data-theme=dark] {
     const leading = iconOnly ? icon2 : leftIcon ? buttonLeftIcon : void 0;
     const extra = {};
     if (destructive) extra["data-scheme"] = "error";
+    if (fieldRung) extra.fieldRung = fieldRung;
+    else extra.size = btnSize(size);
     return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
       Button,
       {
         id,
         variant: btnVariant(variant),
-        size: btnSize(size),
         shape: iconOnly ? "square" : "rect",
         block: !!block,
         disabled,
@@ -47746,10 +47755,26 @@ html[data-theme=dark] {
     // beside those two filled, labeled buttons. leftIcon/buttonLeftIcon (not
     // icon) is what tells PomButton's iconOnly check to render label text
     // instead of collapsing to shape="square" — see PomButton's own comment
-    // on that prop bag split.
+    // on that prop bag split. fieldRung: 'small' (not size: 'large') matches
+    // this button's real height to #primary-filename-mount's own field size
+    // ('small', PomTextField's default) — see PomButton's own comment on why
+    // that's a different, more correct axis than picking a same-numbered
+    // `size`.
     download: mountLiveIconButton(
       "download-btn-mount",
-      { id: "download-btn", variant: "filled", size: "large", leftIcon: true, buttonLeftIcon: IconDownload(24), label: "Download", title: "Download" },
+      { id: "download-btn", variant: "filled", fieldRung: "small", leftIcon: true, buttonLeftIcon: IconDownload(24), label: "Download", title: "Download" },
+      true,
+      CARD_LEVEL
+    ),
+    // Icon-only and tonal — the secondary action beside Download's now-
+    // primary/labeled treatment (same tonal-square shape Download itself
+    // used to have, before that one became "standard"). Copies the exact
+    // same JSON Download/Push already send (doCopyJson(), ui.template.html)
+    // straight to the clipboard, no file involved. Same fieldRung: 'small'
+    // as Download, for the same reason.
+    copy: mountLiveIconButton(
+      "copy-btn-mount",
+      { id: "copy-btn", variant: "tonal", fieldRung: "small", icon: IconCopy(24), label: "Copy JSON", title: "Copy JSON to clipboard" },
       true,
       CARD_LEVEL
     )
@@ -47998,8 +48023,9 @@ html[data-theme=dark] {
   mountOnce("json-download-icon-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "circle", size: 16, label: "Loading" }), TOP_CARD_LEVEL);
   mountOnce("json-download-title-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 80, height: 16, label: "" }), TOP_CARD_LEVEL);
   mountOnce("json-download-tag-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 60, height: 22, label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-field-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", height: 44, width: "100%", label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-btn-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 130, height: 44, label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-field-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", height: 50, width: "100%", label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-btn-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 125, height: 50, label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-copy-btn-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 50, height: 50, label: "" }), TOP_CARD_LEVEL);
   mountOnce(
     "actions-skeleton",
     /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "export-panel", "data-level": TOP_CARD_LEVEL, children: [
@@ -49997,6 +50023,7 @@ react/cjs/react-jsx-runtime.development.js:
         window.PomButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
       }
       window.PomButtons.download.setDisabled(!transformedData);
+      window.PomButtons.copy.setDisabled(!transformedData);
     }
 
     // Shows a provider's dropdown+filename row, or — if it has zero saved
@@ -50391,12 +50418,60 @@ react/cjs/react-jsx-runtime.development.js:
       URL.revokeObjectURL(url);
       parent.postMessage({ pluginMessage: { type: 'notify', message: '✅ JSON downloaded successfully!' } }, '*');
     }
-    
+
+    // navigator.clipboard first — a click handler is a real user gesture,
+    // well within what the Clipboard API requires, so this covers the
+    // normal case. Falls back to the older execCommand('copy') path (a
+    // temporary off-screen textarea, select, copy, remove) only if
+    // navigator.clipboard isn't there at all — some older/more locked-down
+    // embedded webviews still don't expose it, and Figma's plugin UI is
+    // exactly that kind of embedded iframe.
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      return new Promise(function(resolve, reject) {
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          var ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          if (ok) resolve(); else reject(new Error('execCommand(copy) failed'));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }
+
+    // Same export as Download/Push, straight to the clipboard instead of a
+    // file. showToast() (a real working in-app toast — window.PomToast),
+    // not the 'notify' postMessage doDownloadSingle above sends: that type
+    // has no handler in code.js's figma.ui.onmessage, so it's silently a
+    // no-op there. Not fixed here — out of scope for this button — but
+    // worth not copying that same dead pattern into a brand-new feature
+    // that actually needs its confirmation to be seen.
+    function doCopyJson() {
+      var tokens = getTokensToExport();
+      if (!tokens) return;
+      var json = JSON.stringify(tokens, null, 2);
+      copyToClipboard(json).then(function() {
+        showToast('JSON copied to clipboard');
+      }, function() {
+        showToast('Could not copy — try Download instead', true);
+      });
+    }
+
     pushBtn.addEventListener('click', pushToGit);
     // Re-evaluate the Push button as the commit message is typed/cleared.
     document.getElementById('commit-message').addEventListener('input', updateActionUI);
 
     downloadBtn.addEventListener('click', doDownloadSingle);
+    document.getElementById('copy-btn').addEventListener('click', doCopyJson);
     
     window.onmessage = function(event) {
       var msg = event.data.pluginMessage;

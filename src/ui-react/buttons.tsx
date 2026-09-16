@@ -89,6 +89,10 @@ const svg = (d: string, opts?: { fill?: boolean; fillRule?: 'evenodd' }) => (siz
   );
 const IconArrowLeft = svg('M19 12H5M12 19l-7-7 7-7');
 const IconDownload = svg('M12 3v11m0 0l-4-4m4 4l4-4M5 20h14');
+// Lucide's "copy" glyph — two overlapping sheets, the standard "copy to
+// clipboard" mark. Leads the Copy button beside Download (buttons.tsx's
+// window.PomButtons.copy).
+const IconCopy = svg('M20 9h-9a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2Z M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1');
 // The exact gear glyph the Settings page's own header uses (ui.template.html,
 // the decorative .git-logo icon) — same path, so "Settings" reads as one
 // glyph everywhere instead of this button showing sliders and the page it
@@ -203,18 +207,25 @@ function PomTextArea(props: any) {
 /* ── Pomegranate Button, from the prop bag the mounts pass ──────── */
 function PomButton(props: any) {
   const {
-    id, variant, size, label, destructive, icon, leftIcon, buttonLeftIcon,
+    id, variant, size, fieldRung, label, destructive, icon, leftIcon, buttonLeftIcon,
     disabled, loading, active, style, title, onClick, block, flex,
   } = props;
   const iconOnly = !!icon; // the icon-button bag carries `icon`; text buttons carry `label`
   const leading = iconOnly ? icon : (leftIcon ? buttonLeftIcon : undefined);
   const extra: any = {};
   if (destructive) extra['data-scheme'] = 'error';
+  // fieldRung (a TextFieldSize — 'small' | 'large') is Button's OWN sizing
+  // axis for "match a field", not just a same-numbered height: it spends
+  // the field's own label lift/drop so the button's baseline lands on the
+  // field's value row, which matching `size` to the field's box height in
+  // px does not (see Button.tsx's own comment on the two axes). Mutually
+  // exclusive with `size` in the real component's own types — pass one or
+  // the other, never both.
+  if (fieldRung) extra.fieldRung = fieldRung; else extra.size = btnSize(size);
   return (
     <Button
       id={id}
       variant={btnVariant(variant)}
-      size={btnSize(size)}
       shape={iconOnly ? 'square' : 'rect'}
       block={!!block}
       disabled={disabled}
@@ -339,7 +350,7 @@ type FolderSelectBridge = { setItems: (items: any[], selectedValue: string) => v
 type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
 declare global {
   interface Window {
-    PomButtons: { push: LiveHandle; download: LiveIconHandle };
+    PomButtons: { push: LiveHandle; download: LiveIconHandle; copy: LiveIconHandle };
     PomExportMode: { onChange: ((index: number) => void) | null };
     PomToast: { show: (message: string, isError?: boolean) => void };
     PomFolderSelect: FolderSelectBridge;
@@ -379,10 +390,26 @@ window.PomButtons = {
   // beside those two filled, labeled buttons. leftIcon/buttonLeftIcon (not
   // icon) is what tells PomButton's iconOnly check to render label text
   // instead of collapsing to shape="square" — see PomButton's own comment
-  // on that prop bag split.
+  // on that prop bag split. fieldRung: 'small' (not size: 'large') matches
+  // this button's real height to #primary-filename-mount's own field size
+  // ('small', PomTextField's default) — see PomButton's own comment on why
+  // that's a different, more correct axis than picking a same-numbered
+  // `size`.
   download: mountLiveIconButton(
     'download-btn-mount',
-    { id: 'download-btn', variant: 'filled', size: 'large', leftIcon: true, buttonLeftIcon: IconDownload(24), label: 'Download', title: 'Download' },
+    { id: 'download-btn', variant: 'filled', fieldRung: 'small', leftIcon: true, buttonLeftIcon: IconDownload(24), label: 'Download', title: 'Download' },
+    true,
+    CARD_LEVEL,
+  ),
+  // Icon-only and tonal — the secondary action beside Download's now-
+  // primary/labeled treatment (same tonal-square shape Download itself
+  // used to have, before that one became "standard"). Copies the exact
+  // same JSON Download/Push already send (doCopyJson(), ui.template.html)
+  // straight to the clipboard, no file involved. Same fieldRung: 'small'
+  // as Download, for the same reason.
+  copy: mountLiveIconButton(
+    'copy-btn-mount',
+    { id: 'copy-btn', variant: 'tonal', fieldRung: 'small', icon: IconCopy(24), label: 'Copy JSON', title: 'Copy JSON to clipboard' },
     true,
     CARD_LEVEL,
   ),
@@ -692,11 +719,18 @@ mountOnce('skeleton-list',
 mountOnce('json-download-icon-skeleton-mount', <Skeleton shape="circle" size={16} label="Loading" />, TOP_CARD_LEVEL);
 mountOnce('json-download-title-skeleton-mount', <Skeleton shape="block" width={80} height={16} label="" />, TOP_CARD_LEVEL);
 mountOnce('json-download-tag-skeleton-mount', <Skeleton shape="block" width={60} height={22} label="" />, TOP_CARD_LEVEL);
-mountOnce('json-download-field-skeleton-mount', <Skeleton shape="block" height={44} width={'100%'} label="" />, TOP_CARD_LEVEL);
-// 130x44, not the old 44x44 square — the real Download button is a
-// labeled button now (icon + "Download" text, ~151px wide), not an
-// icon-only square, so its skeleton widened to match.
-mountOnce('json-download-btn-skeleton-mount', <Skeleton shape="block" width={130} height={44} label="" />, TOP_CARD_LEVEL);
+// 50px, not 44 — matches fieldRung="small" (Download/Copy below, and the
+// real field itself), confirmed via computed style: field/Copy/Download
+// all render at exactly 50px tall today. Same number in all three
+// skeleton pieces below for that reason, not independently chosen.
+mountOnce('json-download-field-skeleton-mount', <Skeleton shape="block" height={50} width={'100%'} label="" />, TOP_CARD_LEVEL);
+// 125x50 — the real Download button is a labeled button now (icon +
+// "Download" text, ~127px wide at fieldRung="small"), not the old
+// icon-only 44x44 square.
+mountOnce('json-download-btn-skeleton-mount', <Skeleton shape="block" width={125} height={50} label="" />, TOP_CARD_LEVEL);
+// Copy stayed icon-only/square, so its own skeleton keeps that shape —
+// just at fieldRung="small"'s real 50x50, not the old 44x44.
+mountOnce('json-copy-btn-skeleton-mount', <Skeleton shape="block" width={50} height={50} label="" />, TOP_CARD_LEVEL);
 // Mirrors the real push-settings card's current shape: a small icon+title
 // row (whichever provider ends up shown — GitLab or GitHub, not known
 // yet), one full-width folder-path field (the filename field that used to

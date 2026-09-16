@@ -1581,6 +1581,7 @@
       </div>
       <div class="json-download-fields">
         <span id="json-download-field-skeleton-mount"></span>
+        <span id="json-copy-btn-skeleton-mount"></span>
         <span id="json-download-btn-skeleton-mount"></span>
       </div>
     </div>
@@ -1609,6 +1610,11 @@
       </div>
       <div class="json-download-fields">
         <span id="primary-filename-mount"></span>
+        <!-- Copies the same JSON Download writes to a file, straight to
+             the clipboard instead — see doCopyJson() below. Sits left of
+             Download (secondary action before the primary one, both
+             flush against the field). -->
+        <div id="copy-btn-mount"></div>
         <div id="download-btn-mount"></div>
       </div>
     </div>
@@ -3091,6 +3097,7 @@
         window.PomButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
       }
       window.PomButtons.download.setDisabled(!transformedData);
+      window.PomButtons.copy.setDisabled(!transformedData);
     }
 
     // Shows a provider's dropdown+filename row, or — if it has zero saved
@@ -3485,12 +3492,60 @@
       URL.revokeObjectURL(url);
       parent.postMessage({ pluginMessage: { type: 'notify', message: '✅ JSON downloaded successfully!' } }, '*');
     }
-    
+
+    // navigator.clipboard first — a click handler is a real user gesture,
+    // well within what the Clipboard API requires, so this covers the
+    // normal case. Falls back to the older execCommand('copy') path (a
+    // temporary off-screen textarea, select, copy, remove) only if
+    // navigator.clipboard isn't there at all — some older/more locked-down
+    // embedded webviews still don't expose it, and Figma's plugin UI is
+    // exactly that kind of embedded iframe.
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      return new Promise(function(resolve, reject) {
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          var ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          if (ok) resolve(); else reject(new Error('execCommand(copy) failed'));
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }
+
+    // Same export as Download/Push, straight to the clipboard instead of a
+    // file. showToast() (a real working in-app toast — window.PomToast),
+    // not the 'notify' postMessage doDownloadSingle above sends: that type
+    // has no handler in code.js's figma.ui.onmessage, so it's silently a
+    // no-op there. Not fixed here — out of scope for this button — but
+    // worth not copying that same dead pattern into a brand-new feature
+    // that actually needs its confirmation to be seen.
+    function doCopyJson() {
+      var tokens = getTokensToExport();
+      if (!tokens) return;
+      var json = JSON.stringify(tokens, null, 2);
+      copyToClipboard(json).then(function() {
+        showToast('JSON copied to clipboard');
+      }, function() {
+        showToast('Could not copy — try Download instead', true);
+      });
+    }
+
     pushBtn.addEventListener('click', pushToGit);
     // Re-evaluate the Push button as the commit message is typed/cleared.
     document.getElementById('commit-message').addEventListener('input', updateActionUI);
 
     downloadBtn.addEventListener('click', doDownloadSingle);
+    document.getElementById('copy-btn').addEventListener('click', doCopyJson);
     
     window.onmessage = function(event) {
       var msg = event.data.pluginMessage;
