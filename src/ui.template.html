@@ -2320,22 +2320,17 @@
 
       // The Add/Remove pills stay visible and in place at all times now —
       // see .provider-toggle-row's own comment. They just relabel
-      // themselves, and each is disabled in its "Remove" state while it's
-      // the only provider left (same "never remove the last provider"
-      // rule the big card's own Remove button and the confirm dialogs'
-      // onConfirm guards already enforce).
+      // themselves, and are never disabled: removing the last provider is
+      // a real, valid choice now (falls back to noPushDestination —
+      // Download alone is a complete, supported workflow, same as the
+      // onboarding dialog's "skip both"), not a state to block.
       window.PomAddGitlabBtn.setLabel(gitlabAdded ? 'Remove' : 'Add');
-      window.PomAddGitlabBtn.setDisabled(gitlabAdded && !githubAdded);
       window.PomAddGithubBtn.setLabel(githubAdded ? 'Remove' : 'Add');
-      window.PomAddGithubBtn.setDisabled(githubAdded && !gitlabAdded);
 
-      // Each provider's "Remove" is offered only while the OTHER one also
-      // exists — removing the last provider would leave nowhere to push to
-      // (both onConfirm handlers below refuse it outright), and it lives
-      // HERE rather than in refreshSettingsControls() because the remove
-      // handlers call only this function: gating it there left the button
-      // on screen after the other provider was removed, still visible but
-      // inert, since its own guard then swallowed every click.
+      // The big card's OWN inline "Remove ___" button stays a dual-provider-
+      // only affordance — the pill above already covers removal in every
+      // mode, so single-provider mode just has the one entry point instead
+      // of two.
       document.getElementById('remove-gitlab-btn-mount').hidden = !(githubAdded && gitlabAdded);
       document.getElementById('remove-github-btn-mount').hidden = !(githubAdded && gitlabAdded);
     }
@@ -2666,7 +2661,14 @@
       setFieldValue('gh-branch', '');
     }
     window.PomRemoveGithubDialog.onConfirm = function() {
-      if (!gitlabAdded) return; // never remove the only remaining provider
+      // Removing the last provider is a real, valid choice now — see
+      // updateProviderSectionVisibility()'s own comment on the Add/Remove
+      // pills never being disabled. If GitLab isn't added either after
+      // this, the lines below are harmless no-ops: mainProviderTab and
+      // activeSettingsTab both go unused once noPushDestination is true
+      // (computePushReadiness() ignores mainProviderTab entirely then, and
+      // the tab switcher/single-provider block both read gitlabAdded
+      // directly, not activeSettingsTab).
       removeGithub();
       activeSettingsTab = 'gitlab'; // the tab switcher itself is about to disappear, but stay consistent
       window.PomRepoTab.setValue(activeSettingsTab);
@@ -2724,7 +2726,8 @@
       setFieldValue('gl-branch', '');
     }
     window.PomRemoveGitlabDialog.onConfirm = function() {
-      if (!githubAdded) return; // never remove the only remaining provider
+      // See PomRemoveGithubDialog.onConfirm's own comment — same reasoning,
+      // mirrored.
       removeGitlab();
       activeSettingsTab = 'github';
       window.PomRepoTab.setValue(activeSettingsTab);
