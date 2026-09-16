@@ -33,6 +33,7 @@ import { Toast } from '../vendor/pomegranate/panel/node/Toast';
 import { Alert } from '../vendor/pomegranate/panel/node/Alert';
 import { Skeleton } from '../vendor/pomegranate/panel/node/Skeleton';
 import { Tag } from '../vendor/pomegranate/panel/node/Tag';
+import { SelectableCard } from '../vendor/pomegranate/panel/node/SelectableCard';
 import { fieldLevel, useLevel, LevelContext, type Level } from '../vendor/pomegranate/panel/node/LevelContext';
 
 /* The plugin GROUND is level 1 — the darkest rung. Every mounted subtree is
@@ -810,36 +811,38 @@ const PROVIDER_LOGO_PATH: Record<'gitlab' | 'github', string> = {
   gitlab: 'M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024',
   github: 'M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z',
 };
+/* This used to be a hand-rolled <div role="checkbox">, styling itself off
+   var(--app-accent) — a token that is never actually declared anywhere in
+   tokens.css/node.css, only mentioned in prose comments there. Its checked
+   state (border: 1px solid var(--app-accent)) was therefore an INVALID
+   declaration, so the whole shorthand dropped (computed border: 0px none)
+   while the unchecked state's `1px solid transparent` stayed valid at 1px —
+   a 2px height jump on every select/deselect, reported from the real
+   plugin. The vendored kit already has a component built for exactly this
+   ("a card that is a choice rather than a destination", SelectableCard.tsx)
+   — real <button> semantics (Enter/Space for free, no hand-rolled
+   onKeyDown), a selection ring painted from --mark (a real, always-defined
+   token, unlike --app-accent), and the same 1px border at rest and
+   selected (node.css's .nd-selcard: border always present; .is-selected
+   only recolors it via border-color + box-shadow, never adds/removes it —
+   the whole class of "shorthand silently invalidates" bug this hit isn't
+   reachable through it). Swapped to it instead of just patching the color,
+   since the hand-rolled div is *why* this broke in the first place. */
 function ProviderChoiceCard({ which, label, checked, onToggle }: { which: 'gitlab' | 'github'; label: string; checked: boolean; onToggle: (c: boolean) => void }) {
   return (
-    <div
-      role="checkbox" aria-checked={checked} tabIndex={0}
-      onClick={() => onToggle(!checked)}
-      onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onToggle(!checked); } }}
-      /* This card sits inside the onboarding Dialog, which is hardcoded to
-         data-level={4} (Dialog.tsx). --app-surface/--app-bg both alias
-         var(--background), which is set by the nearest [data-level]
-         ancestor via the DOM/CSS cascade — with none set here it silently
-         inherited the dialog's own L4 fill and read as flat/invisible.
-         base=4 → the composition rule's ascending order for what's above
-         it is 1 → 2 → 3 (docs/knowledge-levels.md), so this well gets L1
-         (a selectable row, one of L1's own named uses) and its badge one
-         rung up at L2, so all three (dialog, card, badge) read apart. */
-      data-level={1}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 10, width: '100%', boxSizing: 'border-box',
-        background: 'var(--background)', border: '1px solid ' + (checked ? 'var(--app-accent)' : 'transparent'),
-        borderRadius: 16, padding: '10px 14px', cursor: 'pointer',
-      }}
-    >
-      <span aria-hidden="true" data-level={2} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: 'var(--background)', color: 'var(--app-text-muted)', flexShrink: 0 }}>
-        <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d={PROVIDER_LOGO_PATH[which]} /></svg>
+    // level={1}: same reasoning the old div's data-level={1} comment gave —
+    // this card sits inside the onboarding Dialog (hardcoded data-level={4},
+    // Dialog.tsx), and the composition rule's ascending order above L4 is
+    // 1 → 2 → 3, so a selectable row (one of L1's own named uses) gets L1
+    // and its logo badge one rung up at L2, so all three read apart.
+    <SelectableCard label={label} selected={checked} onSelect={() => onToggle(!checked)} mark="checkbox" level={1}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span aria-hidden="true" data-level={2} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, borderRadius: '50%', background: 'var(--background)', color: 'var(--app-text-muted)', flexShrink: 0 }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d={PROVIDER_LOGO_PATH[which]} /></svg>
+        </span>
+        <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>{label}</span>
       </span>
-      <span style={{ flex: 1, minWidth: 0, fontWeight: 600, color: 'var(--app-text)' }}>{label}</span>
-      <span style={{ display: 'flex', flexShrink: 0, pointerEvents: 'none' }}>
-        <Checkbox size="medium" labelHidden label={label} checked={checked} onChange={() => {}} />
-      </span>
-    </div>
+    </SelectableCard>
   );
 }
 
