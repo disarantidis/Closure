@@ -281,6 +281,42 @@ function mountLiveIconButton(mountId: string, base: any, initialDisabled: boolea
   return { setDisabled: (v) => set(v) };
 }
 
+// Icon-only button that swaps BOTH its glyph and its accessible name
+// between two fixed states — 'add' (plain tonal, plus glyph) and 'remove'
+// (tonal + destructive/error scheme, trash glyph) — rather than just a
+// label like mountLiveButton's setLabel. Built for the Repository settings
+// Add/Remove pills: same control, same position, the icon and its
+// title/aria-label change in place instead of the row disappearing.
+type LiveToggleIconHandle = { setMode: (mode: 'add' | 'remove') => void };
+function mountLiveToggleIconButton(
+  mountId: string,
+  base: any,
+  addIcon: ReactNode,
+  removeIcon: ReactNode,
+  addTitle: string,
+  removeTitle: string,
+  initial: 'add' | 'remove',
+  level: Level = GROUND,
+): LiveToggleIconHandle {
+  const container = document.getElementById(mountId);
+  let set: (mode: 'add' | 'remove') => void = () => {};
+  function View() {
+    const [mode, setMode] = useState<'add' | 'remove'>(initial); set = setMode;
+    const isAdd = mode === 'add';
+    return (
+      <PomButton
+        {...base}
+        icon={isAdd ? addIcon : removeIcon}
+        destructive={!isAdd}
+        title={isAdd ? addTitle : removeTitle}
+        aria-label={isAdd ? addTitle : removeTitle}
+      />
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
+  return { setMode: (mode) => set(mode) };
+}
+
 type DisabledHandle = { setDisabled: (v: boolean) => void };
 function mountLiveTextArea(mountId: string, base: any, initialDisabled: boolean, level: Level = GROUND): DisabledHandle {
   const container = document.getElementById(mountId);
@@ -339,8 +375,8 @@ type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
 declare global {
   interface Window {
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
-    PomAddGitlabBtn: LiveHandle;
-    PomAddGithubBtn: LiveHandle;
+    PomAddGitlabBtn: LiveToggleIconHandle;
+    PomAddGithubBtn: LiveToggleIconHandle;
     PomExportMode: { onChange: ((index: number) => void) | null };
     PomToast: { show: (message: string, isError?: boolean) => void };
     PomFolderSelect: FolderSelectBridge;
@@ -410,20 +446,24 @@ mountIconButton('gitlab-empty-add-btn-mount', { id: 'gitlab-empty-add-btn', vari
 mountIconButton('github-empty-add-btn-mount', { id: 'github-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 // Live (not one-shot mountButton) because this pill no longer disappears
 // once a provider is added — it now stays put side by side with the other
-// provider's, and just relabels itself Add -> Remove in place (see
-// updateProviderSectionVisibility() in ui.template.html, which calls
-// .setLabel() here instead of toggling the row's `hidden`).
-window.PomAddGithubBtn = mountLiveButton(
+// provider's, and just swaps its glyph Add(+) -> Remove(trash) in place
+// (see updateProviderSectionVisibility() in ui.template.html, which calls
+// .setMode() here instead of toggling the row's `hidden`).
+window.PomAddGithubBtn = mountLiveToggleIconButton(
   'add-github-btn-mount',
-  { id: 'add-github-btn', variant: 'tonal', size: 'small', label: 'Add' },
-  { disabled: false, loading: false, success: false, label: null },
+  { id: 'add-github-btn', variant: 'tonal', size: 'small' },
+  IconAdd(16), IconTrash(16),
+  'Add GitHub', 'Remove GitHub',
+  'add',
   CARD_LEVEL,
 );
 mountButton('remove-github-btn-mount', { id: 'remove-github-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitHub' }, CARD_LEVEL);
-window.PomAddGitlabBtn = mountLiveButton(
+window.PomAddGitlabBtn = mountLiveToggleIconButton(
   'add-gitlab-btn-mount',
-  { id: 'add-gitlab-btn', variant: 'tonal', size: 'small', label: 'Add' },
-  { disabled: false, loading: false, success: false, label: null },
+  { id: 'add-gitlab-btn', variant: 'tonal', size: 'small' },
+  IconAdd(16), IconTrash(16),
+  'Add GitLab', 'Remove GitLab',
+  'add',
   CARD_LEVEL,
 );
 mountButton('remove-gitlab-btn-mount', { id: 'remove-gitlab-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitLab' }, CARD_LEVEL);

@@ -1725,12 +1725,13 @@
       </div>
       <!-- Both providers' Add/Remove pills, side by side, ALWAYS visible —
            this row no longer disappears once a provider is added; it just
-           relabels itself in place (window.PomAddGitlabBtn/PomAddGithubBtn
-           .setLabel() in updateProviderSectionVisibility()) and its click
-           handler switches from adding to opening the same remove-confirm
-           dialog the big card's own "Remove ___" button uses. Kept right
-           under the heading, above the tab switcher / connection card(s),
-           as the one place that always shows both providers' state. -->
+           swaps its icon in place, plus -> trash (window.PomAddGitlabBtn/
+           PomAddGithubBtn.setMode() in updateProviderSectionVisibility())
+           and its click handler switches from adding to opening the same
+           remove-confirm dialog the big card's own "Remove ___" button
+           uses. Kept right under the heading, above the tab switcher /
+           connection card(s), as the one place that always shows both
+           providers' state. -->
       <div class="provider-toggle-row">
         <div class="provider-section-heading provider-add-row" id="add-gitlab-row" data-level="4">
           <p class="folder-paths-title">
@@ -2319,13 +2320,14 @@
       document.getElementById('github-fields').hidden = !showGithubBlock;
 
       // The Add/Remove pills stay visible and in place at all times now —
-      // see .provider-toggle-row's own comment. They just relabel
-      // themselves, and are never disabled: removing the last provider is
-      // a real, valid choice now (falls back to noPushDestination —
-      // Download alone is a complete, supported workflow, same as the
-      // onboarding dialog's "skip both"), not a state to block.
-      window.PomAddGitlabBtn.setLabel(gitlabAdded ? 'Remove' : 'Add');
-      window.PomAddGithubBtn.setLabel(githubAdded ? 'Remove' : 'Add');
+      // see .provider-toggle-row's own comment. They just swap their glyph
+      // (plus/trash) and accessible name in place, and are never disabled:
+      // removing the last provider is a real, valid choice now (falls back
+      // to noPushDestination — Download alone is a complete, supported
+      // workflow, same as the onboarding dialog's "skip both"), not a
+      // state to block.
+      window.PomAddGitlabBtn.setMode(gitlabAdded ? 'remove' : 'add');
+      window.PomAddGithubBtn.setMode(githubAdded ? 'remove' : 'add');
 
       // The big card's OWN inline "Remove ___" button stays a dual-provider-
       // only affordance — the pill above already covers removal in every

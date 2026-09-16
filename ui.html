@@ -21607,12 +21607,13 @@ html[data-theme=dark] {
       </div>
       <!-- Both providers' Add/Remove pills, side by side, ALWAYS visible —
            this row no longer disappears once a provider is added; it just
-           relabels itself in place (window.PomAddGitlabBtn/PomAddGithubBtn
-           .setLabel() in updateProviderSectionVisibility()) and its click
-           handler switches from adding to opening the same remove-confirm
-           dialog the big card's own "Remove ___" button uses. Kept right
-           under the heading, above the tab switcher / connection card(s),
-           as the one place that always shows both providers' state. -->
+           swaps its icon in place, plus -> trash (window.PomAddGitlabBtn/
+           PomAddGithubBtn.setMode() in updateProviderSectionVisibility())
+           and its click handler switches from adding to opening the same
+           remove-confirm dialog the big card's own "Remove ___" button
+           uses. Kept right under the heading, above the tab switcher /
+           connection card(s), as the one place that always shows both
+           providers' state. -->
       <div class="provider-toggle-row">
         <div class="provider-section-heading provider-add-row" id="add-gitlab-row" data-level="4">
           <p class="folder-paths-title">
@@ -47572,6 +47573,28 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
+  function mountLiveToggleIconButton(mountId, base, addIcon, removeIcon, addTitle, removeTitle, initial, level = GROUND) {
+    const container = document.getElementById(mountId);
+    let set = () => {
+    };
+    function View() {
+      const [mode, setMode] = (0, import_react14.useState)(initial);
+      set = setMode;
+      const isAdd = mode === "add";
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+        PomButton,
+        {
+          ...base,
+          icon: isAdd ? addIcon : removeIcon,
+          destructive: !isAdd,
+          title: isAdd ? addTitle : removeTitle,
+          "aria-label": isAdd ? addTitle : removeTitle
+        }
+      );
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
+    return { setMode: (mode) => set(mode) };
+  }
   function mountLiveTextArea(mountId, base, initialDisabled, level = GROUND) {
     const container = document.getElementById(mountId);
     let set = () => {
@@ -47649,17 +47672,25 @@ html[data-theme=dark] {
   mountIconButton("gh-clear-token-btn-mount", { id: "gh-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitHub token", "aria-label": "Clear GitHub token", icon: IconTrash(16) }, CARD_LEVEL);
   mountIconButton("gitlab-empty-add-btn-mount", { id: "gitlab-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
   mountIconButton("github-empty-add-btn-mount", { id: "github-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
-  window.PomAddGithubBtn = mountLiveButton(
+  window.PomAddGithubBtn = mountLiveToggleIconButton(
     "add-github-btn-mount",
-    { id: "add-github-btn", variant: "tonal", size: "small", label: "Add" },
-    { disabled: false, loading: false, success: false, label: null },
+    { id: "add-github-btn", variant: "tonal", size: "small" },
+    IconAdd(16),
+    IconTrash(16),
+    "Add GitHub",
+    "Remove GitHub",
+    "add",
     CARD_LEVEL
   );
   mountButton("remove-github-btn-mount", { id: "remove-github-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitHub" }, CARD_LEVEL);
-  window.PomAddGitlabBtn = mountLiveButton(
+  window.PomAddGitlabBtn = mountLiveToggleIconButton(
     "add-gitlab-btn-mount",
-    { id: "add-gitlab-btn", variant: "tonal", size: "small", label: "Add" },
-    { disabled: false, loading: false, success: false, label: null },
+    { id: "add-gitlab-btn", variant: "tonal", size: "small" },
+    IconAdd(16),
+    IconTrash(16),
+    "Add GitLab",
+    "Remove GitLab",
+    "add",
     CARD_LEVEL
   );
   mountButton("remove-gitlab-btn-mount", { id: "remove-gitlab-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitLab" }, CARD_LEVEL);
@@ -49136,13 +49167,14 @@ react/cjs/react-jsx-runtime.development.js:
       document.getElementById('github-fields').hidden = !showGithubBlock;
 
       // The Add/Remove pills stay visible and in place at all times now —
-      // see .provider-toggle-row's own comment. They just relabel
-      // themselves, and are never disabled: removing the last provider is
-      // a real, valid choice now (falls back to noPushDestination —
-      // Download alone is a complete, supported workflow, same as the
-      // onboarding dialog's "skip both"), not a state to block.
-      window.PomAddGitlabBtn.setLabel(gitlabAdded ? 'Remove' : 'Add');
-      window.PomAddGithubBtn.setLabel(githubAdded ? 'Remove' : 'Add');
+      // see .provider-toggle-row's own comment. They just swap their glyph
+      // (plus/trash) and accessible name in place, and are never disabled:
+      // removing the last provider is a real, valid choice now (falls back
+      // to noPushDestination — Download alone is a complete, supported
+      // workflow, same as the onboarding dialog's "skip both"), not a
+      // state to block.
+      window.PomAddGitlabBtn.setMode(gitlabAdded ? 'remove' : 'add');
+      window.PomAddGithubBtn.setMode(githubAdded ? 'remove' : 'add');
 
       // The big card's OWN inline "Remove ___" button stays a dual-provider-
       // only affordance — the pill above already covers removal in every
