@@ -50422,39 +50422,42 @@ react/cjs/react-jsx-runtime.development.js:
       parent.postMessage({ pluginMessage: { type: 'notify', message: '✅ JSON downloaded successfully!' } }, '*');
     }
 
-    // navigator.clipboard first — a click handler is a real user gesture,
-    // well within what the Clipboard API requires, so this covers the
-    // normal case. Falls back to the older execCommand('copy') path (a
-    // temporary off-screen textarea, select, copy, remove) whenever
-    // navigator.clipboard.writeText isn't there OR its call rejects —
-    // Figma's plugin UI iframe exposes the function (it's not undefined)
-    // but its own sandbox Permissions-Policy can still reject the actual
-    // call with NotAllowedError, which a plain existence check does not
-    // catch. legacyCopy() has to run on that rejection too, not only when
-    // the API is missing outright.
-    function legacyCopy(text) {
-      return new Promise(function(resolve, reject) {
-        try {
-          var ta = document.createElement('textarea');
-          ta.value = text;
-          ta.style.position = 'fixed';
-          ta.style.opacity = '0';
-          document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          var ok = document.execCommand('copy');
-          document.body.removeChild(ta);
-          if (ok) resolve(); else reject(new Error('execCommand(copy) failed'));
-        } catch (e) {
-          reject(e);
-        }
-      });
+    // execCommand('copy') FIRST, and SYNCHRONOUSLY — it only counts as
+    // user-initiated when it runs in the exact same call stack as the
+    // click event itself. Chaining it after an awaited/rejected
+    // navigator.clipboard.writeText() (even just one .catch() microtask
+    // away) can lose that association inside a sandboxed iframe like
+    // Figma's plugin UI, which is exactly why that ordering still failed
+    // for real users: navigator.clipboard.writeText() was tried first,
+    // and by the time its rejection reached the execCommand fallback the
+    // gesture no longer carried through, so execCommand failed too and
+    // both paths died silently. Doing the synchronous attempt first (no
+    // async anything before it) is the correct, well-established pattern
+    // (the same one general-purpose clipboard-copy polyfills use) and
+    // gives it the best possible chance inside Figma's sandbox.
+    // navigator.clipboard.writeText() is still tried as a secondary
+    // fallback — Figma's own restrictions can differ by version/platform,
+    // so it's worth attempting even though it's the less reliable path
+    // here.
+    function legacyCopySync(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      return ok;
     }
     function copyToClipboard(text) {
+      if (legacyCopySync(text)) return Promise.resolve();
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(text).catch(function() { return legacyCopy(text); });
+        return navigator.clipboard.writeText(text);
       }
-      return legacyCopy(text);
+      return Promise.reject(new Error('execCommand(copy) failed and Clipboard API unavailable'));
     }
 
     // Same export as Download/Push, straight to the clipboard instead of a
