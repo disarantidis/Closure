@@ -2180,6 +2180,17 @@
     // "Repository settings" — a view preference only, not persisted.
     window.PomRepoTab.onChange = function(value) {
       activeSettingsTab = value;
+      // Every other assignment to activeSettingsTab pairs it with this —
+      // this was the one site that didn't, because it's the one call FROM
+      // the control's own onChange rather than TO it. SegmentedControl is
+      // controlled (value={value} from React state); clicking a segment
+      // only invokes onChange, it doesn't move the highlight itself — that
+      // still needs the state update setValue drives. Without it the
+      // fields underneath correctly swapped (updateProviderSectionVisibility
+      // reads activeSettingsTab directly) but the pill stayed on whichever
+      // segment was clicked first, forever after — reading as "clicking
+      // does nothing" even though the content was actually changing.
+      window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
     };
 
