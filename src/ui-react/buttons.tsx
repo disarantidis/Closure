@@ -317,8 +317,9 @@ declare global {
     PomCollectionsAccordion: {
       setTitle: (title: string) => void;
       setCollections: (collections: { name: string; count: number }[]) => void;
-      setSummary: (tokensLabel: string, sizeLabel: string) => void;
+      setSummary: (tokensLabel: string) => void;
     };
+    PomJsonFileCard: { setSize: (sizeLabel: string) => void };
     PomClosureWarning: { show: (title: string, detail: string) => void; hide: () => void };
     PomCommitMessage: DisabledHandle;
     PomVersionTag: { setLabel: (label: string) => void };
@@ -686,7 +687,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
   const container = document.getElementById('collections-list');
   let set: (u: (s: any) => any) => void = () => {};
   function View() {
-    const [state, setState] = useState<any>({ title: 'Scanned collections', collections: [], summary: { tokens: '', size: '' } });
+    const [state, setState] = useState<any>({ title: 'Scanned collections', collections: [], summary: { tokens: '' } });
     const [open, setOpen] = useState(false);
     set = setState;
     return (
@@ -719,9 +720,12 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
                     (node.css's .nd-tag.v-ghost, background: none), so these
                     rendered as plain muted text with no visible pill —
                     reported from the real plugin as the tags being
-                    "missing" even though the text itself was there. */}
+                    "missing" even though the text itself was there.
+                    The file-size tag that used to sit beside this one moved
+                    to the "Json file" card's own title row instead (see
+                    mountJsonFileCard below) — size describes the JSON file,
+                    which now has a title of its own to sit under. */}
                 {state.summary.tokens ? <Tag variant="tonal" size="small">{state.summary.tokens}</Tag> : null}
-                {state.summary.size ? <Tag variant="tonal" size="small">{state.summary.size}</Tag> : null}
               </div>
             </div>
           </div>
@@ -760,8 +764,27 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
   window.PomCollectionsAccordion = {
     setTitle: (title) => set((s) => ({ ...s, title })),
     setCollections: (collections) => set((s) => ({ ...s, collections })),
-    setSummary: (tokens, size) => set((s) => ({ ...s, summary: { tokens, size } })),
+    setSummary: (tokens) => set((s) => ({ ...s, summary: { tokens } })),
   };
+})();
+
+/* ── "Json file" card title's own file-size tag ──────────────────────────────
+   Same reactive-mount shape as mountVersionTag above: the vanilla script
+   computes the export's byte size (see the 'transformed' handler) and pushes
+   it in here, independent of PomCollectionsAccordion.setSummary's own tokens
+   count next door — this tag used to sit beside that one, but reads as a
+   property of the JSON file itself, so it moved to this card's title row. */
+(function mountJsonFileCard() {
+  const container = document.getElementById('json-file-size-mount');
+  let set: (v: string) => void = () => {};
+  function View() {
+    const [size, setSize] = useState('');
+    set = setSize;
+    if (!size) return null;
+    return <Tag variant="tonal" size="small">{size}</Tag>;
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomJsonFileCard = { setSize: (size) => set(size) };
 })();
 
 /* ── reference-closure warning (inline alert) ──────────────────────────────── */

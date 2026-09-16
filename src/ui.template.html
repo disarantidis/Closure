@@ -1181,19 +1181,41 @@
 
     /* Same subtle-surface language as .export-panel right below it — one
        step of its own between the file-variables card and push settings:
-       name the file, then get it, independent of pushing anywhere. Field
-       takes the row; Download sits fixed-width at the right, same
-       field-plus-button pairing .push-download-row used before Download
-       lived here instead. */
+       name the file, then get it, independent of pushing anywhere. */
     .json-download-card {
       display: flex;
-      align-items: center;
-      gap: 10px;
+      flex-direction: column;
+      gap: 16px;
       background: var(--background);
       border-radius: 24px;
       padding: var(--spacing-component-6);
       margin: 0 16px 16px;
     }
+    /* Title left, file-size tag flush right — same title-row shape as
+       .target-row-header below (title + trailing affordance), 16px gap to
+       its own content below matching that row's own margin-bottom. */
+    .json-download-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    /* Same section-title treatment as .target-row-title ("GitLab"/
+       "GitHub") — this card is another named block on the same screen, so
+       it reads as one family of titles rather than a one-off style. */
+    .json-download-title {
+      font-family: var(--type-body-m-font-family);
+      font-size: var(--type-body-m-size);
+      line-height: var(--type-body-m-line-height);
+      font-weight: 700;
+      letter-spacing: var(--type-body-m-letter-spacing);
+      color: var(--app-text);
+      margin: 0;
+    }
+    /* Field takes the row; Download sits fixed-width at the right, same
+       field-plus-button pairing .push-download-row used before Download
+       lived here instead. */
+    .json-download-fields { display: flex; align-items: center; gap: 10px; }
     #primary-filename-mount { flex: 1; min-width: 0; }
     
     .commit-input-wrap {
@@ -1302,8 +1324,17 @@
          beside it. Pulled out of .export-panel because Download was never
          tied to a push destination in the first place. -->
     <div class="json-download-card" id="json-download-card" data-level="2">
-      <span id="primary-filename-mount"></span>
-      <div id="download-btn-mount"></div>
+      <div class="json-download-header">
+        <p class="json-download-title">Json file</p>
+        <!-- The file-size tag that used to sit on the collections card
+             (beside its token count) — it describes this JSON file, so it
+             reads better here, at the right of this card's own title. -->
+        <span id="json-file-size-mount"></span>
+      </div>
+      <div class="json-download-fields">
+        <span id="primary-filename-mount"></span>
+        <div id="download-btn-mount"></div>
+      </div>
     </div>
 
     <!-- Skeleton twin of the action area, shown while the list loads. -->
@@ -3090,16 +3121,15 @@
         // for a moment and then flipping to "Add commit message".
         setActionsLoading(false);
 
-        // Summary tags on the collections card: collections / tokens
-        // / file size — the exact same JSON.stringify(tokens, null, 2) the
-        // download/push actions actually send, so the MB figure matches the
-        // real file, not just a rough estimate off the raw token count.
+        // Token count tag on the collections card, file-size tag on the
+        // "Json file" card's own title row — the exact same
+        // JSON.stringify(tokens, null, 2) the download/push actions
+        // actually send, so the MB figure matches the real file, not just
+        // a rough estimate off the raw token count.
         var exportJson = JSON.stringify(getTokensToExport(), null, 2);
         var exportMB = (new Blob([exportJson]).size / (1024 * 1024)).toFixed(2);
-        window.PomCollectionsAccordion.setSummary(
-          formatTokenCount(msg.validation.actual.totalTokens) + ' Tokens',
-          exportMB + ' MB'
-        );
+        window.PomCollectionsAccordion.setSummary(formatTokenCount(msg.validation.actual.totalTokens) + ' Tokens');
+        window.PomJsonFileCard.setSize(exportMB + ' MB');
 
         // Reference-closure check: warn when the export ships dangling {refs}
         var closure = msg.validation && msg.validation.closure;
