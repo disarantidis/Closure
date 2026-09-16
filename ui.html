@@ -777,15 +777,32 @@
       padding: var(--spacing-component-4);
       margin-top: var(--spacing-component-5);
     }
-    /* The "Add ___" row sits at the END of the section, after whichever
-       provider(s) are already configured. #add-gitlab-row/#add-github-row
-       can never both be visible at once (gitlabAdded/githubAdded are never
-       both false), so no stacking gap to worry about between them. Tighter
-       vertical padding than .provider-card because it holds one row of
-       content rather than a whole stack, and no margin under its heading
-       (nothing follows it inside the card). Its own margin-bottom is
-       harmless as the last thing on the page — .settings-page-content's
-       padding supplies the real run-out below it. */
+    /* Both providers' Add/Remove pills side by side, right under the
+       "Repository settings" heading — #add-gitlab-row and #add-github-row
+       are ALWAYS both visible now (they used to be mutually exclusive,
+       one hidden whenever its provider was added; see this row's own
+       comment in the markup for why that changed). The wrapper carries
+       the shared card-edge margin both rows used to carry individually
+       (.provider-card/.provider-add-row's own margin-left/right below),
+       so two side-by-side cards don't end up with doubled-up spacing
+       between them on top of the wrapper's own gap. */
+    .provider-toggle-row {
+      display: flex;
+      gap: var(--spacing-component-3);
+      margin-left: var(--spacing-component-3);
+      margin-right: var(--spacing-component-3);
+      margin-bottom: 24px;
+    }
+    .provider-toggle-row .provider-add-row {
+      flex: 1;
+      min-width: 0;
+      margin-left: 0;
+      margin-right: 0;
+      margin-bottom: 0;
+    }
+    /* Tighter vertical padding than .provider-card because it holds one
+       row of content rather than a whole stack, and no margin under its
+       heading (nothing follows it inside the card). */
     .provider-add-row {
       padding: var(--spacing-component-3) var(--spacing-component-5);
       margin-bottom: 24px;
@@ -21653,13 +21670,41 @@ html[data-theme=dark] {
 
       <!-- Always-visible heading for whichever provider's connection fields
            are shown below. The tabs themselves only appear once BOTH
-           providers are added (see updateProviderSectionVisibility()) —
-           with only one, there's nothing to switch between, so that one
-           provider's block just shows directly beneath the title (no
-           tabs), with the other's "Add ___" button standing in for the
-           switcher instead. -->
+           providers are added (see updateProviderSectionVisibility()). -->
       <div class="repo-settings-heading">
         <p class="folder-paths-title">Repository settings</p>
+      </div>
+      <!-- Both providers' Add/Remove pills, side by side, ALWAYS visible —
+           this row no longer disappears once a provider is added; it just
+           relabels itself in place (window.PomAddGitlabBtn/PomAddGithubBtn
+           .setLabel() in updateProviderSectionVisibility()) and its click
+           handler switches from adding to opening the same remove-confirm
+           dialog the big card's own "Remove ___" button uses. Kept right
+           under the heading, above the tab switcher / connection card(s),
+           as the one place that always shows both providers' state. -->
+      <div class="provider-toggle-row">
+        <div class="provider-section-heading provider-add-row" id="add-gitlab-row" data-level="4">
+          <p class="folder-paths-title">
+            <span class="provider-logo-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024"/>
+              </svg>
+            </span>
+            GitLab
+          </p>
+          <span id="add-gitlab-btn-mount"></span>
+        </div>
+        <div class="provider-section-heading provider-add-row" id="add-github-row" data-level="4">
+          <p class="folder-paths-title">
+            <span class="provider-logo-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+              </svg>
+            </span>
+            GitHub
+          </p>
+          <span id="add-github-btn-mount"></span>
+        </div>
       </div>
       <!-- data-level="2": without it this sits at the page's own level (1,
            set on <html>), and .nd-seg's `background: var(--background)`
@@ -21758,41 +21803,6 @@ html[data-theme=dark] {
         </div>
       </div>
 
-      <!-- Whichever provider isn't added yet gets its "Add ___" affordance
-           here, at the END of the section, below whichever provider(s) are
-           already configured — adding a second one is a rarer action than
-           editing the connection you already have, so it comes after it. Same
-           logo+name-left / action-right shape AND the same header-style
-           card as the already-added heading below (both carry
-           .provider-section-heading; see .provider-add-row). data-level="4"
-           on both — same bump/reason as .provider-card above: same shared
-           surface recipe (.provider-card, .provider-add-row), so it needed
-           the same fix to stay consistent with the added-provider card it
-           turns into once a token is entered. -->
-      <div class="provider-section-heading provider-add-row" id="add-gitlab-row" data-level="4" hidden>
-        <p class="folder-paths-title">
-          <span class="provider-logo-badge">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024"/>
-            </svg>
-          </span>
-          GitLab
-        </p>
-        <span id="add-gitlab-btn-mount"></span>
-      </div>
-      <!-- GitHub is optional — add-only until configured, then editable and
-           removable just like GitLab, but never required. -->
-      <div class="provider-section-heading provider-add-row" id="add-github-row" data-level="4">
-        <p class="folder-paths-title">
-          <span class="provider-logo-badge">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-            </svg>
-          </span>
-          GitHub
-        </p>
-        <span id="add-github-btn-mount"></span>
-      </div>
     </div>
   </div>
 
@@ -47772,9 +47782,19 @@ html[data-theme=dark] {
   mountIconButton("gh-clear-token-btn-mount", { id: "gh-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitHub token", "aria-label": "Clear GitHub token", icon: IconTrash(16) }, CARD_LEVEL);
   mountIconButton("gitlab-empty-add-btn-mount", { id: "gitlab-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
   mountIconButton("github-empty-add-btn-mount", { id: "github-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
-  mountButton("add-github-btn-mount", { id: "add-github-btn", variant: "tonal", size: "small", label: "Add" }, CARD_LEVEL);
+  window.PomAddGithubBtn = mountLiveButton(
+    "add-github-btn-mount",
+    { id: "add-github-btn", variant: "tonal", size: "small", label: "Add" },
+    { disabled: false, loading: false, success: false, label: null },
+    CARD_LEVEL
+  );
   mountButton("remove-github-btn-mount", { id: "remove-github-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitHub" }, CARD_LEVEL);
-  mountButton("add-gitlab-btn-mount", { id: "add-gitlab-btn", variant: "tonal", size: "small", label: "Add" }, CARD_LEVEL);
+  window.PomAddGitlabBtn = mountLiveButton(
+    "add-gitlab-btn-mount",
+    { id: "add-gitlab-btn", variant: "tonal", size: "small", label: "Add" },
+    { disabled: false, loading: false, success: false, label: null },
+    CARD_LEVEL
+  );
   mountButton("remove-gitlab-btn-mount", { id: "remove-gitlab-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitLab" }, CARD_LEVEL);
   mountIconButton("back-btn-mount", { id: "back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
   mountIconButton("settings-btn-mount", { id: "settings-btn", variant: "ghost", size: "large", title: "Git settings", "aria-label": "Git settings", icon: IconSettings(24) });
@@ -49284,9 +49304,18 @@ react/cjs/react-jsx-runtime.development.js:
       var showGithubBlock = showTabs ? activeSettingsTab === 'github' : githubAdded;
 
       document.getElementById('gitlab-block').hidden = !showGitlabBlock;
-      document.getElementById('add-gitlab-row').hidden = gitlabAdded;
       document.getElementById('github-fields').hidden = !showGithubBlock;
-      document.getElementById('add-github-row').hidden = githubAdded;
+
+      // The Add/Remove pills stay visible and in place at all times now —
+      // see .provider-toggle-row's own comment. They just relabel
+      // themselves, and each is disabled in its "Remove" state while it's
+      // the only provider left (same "never remove the last provider"
+      // rule the big card's own Remove button and the confirm dialogs'
+      // onConfirm guards already enforce).
+      window.PomAddGitlabBtn.setLabel(gitlabAdded ? 'Remove' : 'Add');
+      window.PomAddGitlabBtn.setDisabled(gitlabAdded && !githubAdded);
+      window.PomAddGithubBtn.setLabel(githubAdded ? 'Remove' : 'Add');
+      window.PomAddGithubBtn.setDisabled(githubAdded && !gitlabAdded);
 
       document.getElementById('push-target-section').hidden = !(githubAdded && gitlabAdded);
 
@@ -49596,7 +49625,15 @@ react/cjs/react-jsx-runtime.development.js:
       setFieldValue('gh-branch', 'main');
       renderGithubFolderList();
     }
+    // Same pill now serves both directions: Add when GitHub isn't
+    // configured, Remove (same confirm dialog the big card's own "Remove
+    // GitHub" button opens) once it is — see updateProviderSectionVisibility()
+    // for the label/disabled swap.
     document.getElementById('add-github-btn').addEventListener('click', function() {
+      if (githubAdded) {
+        window.PomRemoveGithubDialog.open();
+        return;
+      }
       addGithub();
       activeSettingsTab = 'github'; // jump to the tab holding the fields just added
       window.PomRepoTab.setValue(activeSettingsTab);
@@ -49650,7 +49687,13 @@ react/cjs/react-jsx-runtime.development.js:
       glActiveFolder = glFolders[0];
       renderFolderList();
     }
+    // Same pill now serves both directions — see add-github-btn's own
+    // listener above for the reasoning.
     document.getElementById('add-gitlab-btn').addEventListener('click', function() {
+      if (gitlabAdded) {
+        window.PomRemoveGitlabDialog.open();
+        return;
+      }
       addGitlab();
       activeSettingsTab = 'gitlab';
       window.PomRepoTab.setValue(activeSettingsTab);

@@ -340,6 +340,8 @@ type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
 declare global {
   interface Window {
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
+    PomAddGitlabBtn: LiveHandle;
+    PomAddGithubBtn: LiveHandle;
     PomExportMode: { onChange: ((index: number) => void) | null };
     PomToast: { show: (message: string, isError?: boolean) => void };
     PomFolderSelect: FolderSelectBridge;
@@ -408,9 +410,24 @@ mountIconButton('gl-clear-token-btn-mount', { id: 'gl-clear-token-btn', variant:
 mountIconButton('gh-clear-token-btn-mount', { id: 'gh-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitHub token', 'aria-label': 'Clear GitHub token', icon: IconTrash(16) }, CARD_LEVEL);
 mountIconButton('gitlab-empty-add-btn-mount', { id: 'gitlab-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountIconButton('github-empty-add-btn-mount', { id: 'github-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
-mountButton('add-github-btn-mount', { id: 'add-github-btn', variant: 'tonal', size: 'small', label: 'Add' }, CARD_LEVEL);
+// Live (not one-shot mountButton) because this pill no longer disappears
+// once a provider is added — it now stays put side by side with the other
+// provider's, and just relabels itself Add -> Remove in place (see
+// updateProviderSectionVisibility() in ui.template.html, which calls
+// .setLabel() here instead of toggling the row's `hidden`).
+window.PomAddGithubBtn = mountLiveButton(
+  'add-github-btn-mount',
+  { id: 'add-github-btn', variant: 'tonal', size: 'small', label: 'Add' },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
 mountButton('remove-github-btn-mount', { id: 'remove-github-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitHub' }, CARD_LEVEL);
-mountButton('add-gitlab-btn-mount', { id: 'add-gitlab-btn', variant: 'tonal', size: 'small', label: 'Add' }, CARD_LEVEL);
+window.PomAddGitlabBtn = mountLiveButton(
+  'add-gitlab-btn-mount',
+  { id: 'add-gitlab-btn', variant: 'tonal', size: 'small', label: 'Add' },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
 mountButton('remove-gitlab-btn-mount', { id: 'remove-gitlab-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitLab' }, CARD_LEVEL);
 // tonal, not ghost — ghost paints `background: none` at rest (node.css's
 // .nd-btn.v-ghost), so bumping this button's own data-level to sit above
