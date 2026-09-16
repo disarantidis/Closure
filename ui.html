@@ -884,17 +884,19 @@
        painted after them in the stacking order: a positioned descendant
        with no z-index would otherwise paint above ordinary in-flow
        content (the cards) by default; negative z-index is the one level
-       that paints under it instead. left: 46px lines up with the centre
-       of each card's own leading icon (16-18px icons starting at the
-       shared 38px inset — see .target-row-header's own comment on that
-       number — so their centres all land within a pixel or two of each
-       other here), so the wire reads as running straight through each
-       icon rather than floating beside them. */
+       that paints under it instead. left: 50% (with the -1px nudge below
+       to center the line itself, not just its left edge) — not pinned to
+       the leading icon column any more; asked to run through the middle
+       instead. Every card here shares the same symmetric 16px left/right
+       inset (.collections-wrap's padding, .actions's padding, .json-
+       download-card's margin), so the wrapper's own horizontal centre is
+       already exactly the cards' own centre too — no separate offset
+       needed to account for the icon column's own width. */
     .flow-wire {
       position: absolute;
       top: 0;
       bottom: 16px;
-      left: 46px;
+      left: calc(50% - 1px);
       width: 2px;
       background: var(--app-border);
       z-index: -1;
