@@ -47198,10 +47198,21 @@ html[data-theme=dark] {
         setState(next);
         window.PomPushTarget.onChange?.(targetFromCheckboxes(next));
       }
-      return /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)(import_jsx_runtime18.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Checkbox, { size: "large", label: "GitLab", checked: state.gitlab, onChange: (c) => toggle("gitlab", c) }),
-        /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Checkbox, { size: "large", label: "GitHub", checked: state.github, onChange: (c) => toggle("github", c) })
-      ] });
+      return (
+        // medium, not large: .nd-check's size prop scales the ROW's min-height
+        // (24/32/56) far more than the visible mark itself (16/18/22px) — it's
+        // built for a checkbox sitting in a taller row whose caption may wrap
+        // to a second line, so the mark pins to the first line rather than
+        // centering. A standalone checkbox with a one-line caption gets none
+        // of that benefit, only the padding: at 'large' the clickable <label>
+        // ran 34px below the visible mark, into what looked like dead space
+        // next to the next row. 'medium' still grows the mark (16→18px) with
+        // only a 14px gap — most of the "bigger" ask, none of the defect.
+        /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)(import_jsx_runtime18.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Checkbox, { size: "medium", label: "GitLab", checked: state.gitlab, onChange: (c) => toggle("gitlab", c) }),
+          /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Checkbox, { size: "medium", label: "GitHub", checked: state.github, onChange: (c) => toggle("github", c) })
+        ] })
+      );
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     window.PomPushTarget = { onChange: null, setValue: (v) => set(checkboxesFromTarget(v)) };
@@ -47213,17 +47224,26 @@ html[data-theme=dark] {
     function View() {
       const [on, setOn] = (0, import_react13.useState)(false);
       set = setOn;
-      return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
-        Switch,
-        {
-          size: "large",
-          label: "DTCG (W3C)",
-          checked: on,
-          onChange: (c) => {
-            setOn(c);
-            window.PomDtcgFormat.onChange?.(c);
+      return (
+        // medium, not large — see the comment on the push-target checkboxes
+        // above: .nd-check's size mostly grows the clickable row (24/32/56),
+        // not the visible mark (16/18/22px), for a checkbox/switch meant to
+        // sit in a taller wrapping-caption row. Standalone, 'large' left a
+        // 34px dead-but-clickable gap under the track, reading as an
+        // oversized hit area and a "delayed" toggle (the flip is instant;
+        // the eye/cursor just isn't over the part that visibly moves).
+        /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
+          Switch,
+          {
+            size: "medium",
+            label: "DTCG (W3C)",
+            checked: on,
+            onChange: (c) => {
+              setOn(c);
+              window.PomDtcgFormat.onChange?.(c);
+            }
           }
-        }
+        )
       );
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
@@ -47514,7 +47534,7 @@ html[data-theme=dark] {
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { "aria-hidden": "true", "data-level": 2, style: { display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "var(--background)", color: "var(--app-text-muted)", flexShrink: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "currentColor", children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("path", { d: PROVIDER_LOGO_PATH[which] }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { style: { flex: 1, minWidth: 0, fontWeight: 600, color: "var(--app-text)" }, children: label }),
-          /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { style: { display: "flex", flexShrink: 0, pointerEvents: "none" }, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Checkbox, { size: "large", labelHidden: true, label, checked, onChange: () => {
+          /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { style: { display: "flex", flexShrink: 0, pointerEvents: "none" }, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Checkbox, { size: "medium", labelHidden: true, label, checked, onChange: () => {
           } }) })
         ]
       }

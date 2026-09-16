@@ -434,9 +434,18 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
       window.PomPushTarget.onChange?.(targetFromCheckboxes(next));
     }
     return (
+      // medium, not large: .nd-check's size prop scales the ROW's min-height
+      // (24/32/56) far more than the visible mark itself (16/18/22px) — it's
+      // built for a checkbox sitting in a taller row whose caption may wrap
+      // to a second line, so the mark pins to the first line rather than
+      // centering. A standalone checkbox with a one-line caption gets none
+      // of that benefit, only the padding: at 'large' the clickable <label>
+      // ran 34px below the visible mark, into what looked like dead space
+      // next to the next row. 'medium' still grows the mark (16→18px) with
+      // only a 14px gap — most of the "bigger" ask, none of the defect.
       <>
-        <Checkbox size="large" label="GitLab" checked={state.gitlab} onChange={(c: boolean) => toggle('gitlab', c)} />
-        <Checkbox size="large" label="GitHub" checked={state.github} onChange={(c: boolean) => toggle('github', c)} />
+        <Checkbox size="medium" label="GitLab" checked={state.gitlab} onChange={(c: boolean) => toggle('gitlab', c)} />
+        <Checkbox size="medium" label="GitHub" checked={state.github} onChange={(c: boolean) => toggle('github', c)} />
       </>
     );
   }
@@ -452,8 +461,15 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
     const [on, setOn] = useState(false);
     set = setOn;
     return (
+      // medium, not large — see the comment on the push-target checkboxes
+      // above: .nd-check's size mostly grows the clickable row (24/32/56),
+      // not the visible mark (16/18/22px), for a checkbox/switch meant to
+      // sit in a taller wrapping-caption row. Standalone, 'large' left a
+      // 34px dead-but-clickable gap under the track, reading as an
+      // oversized hit area and a "delayed" toggle (the flip is instant;
+      // the eye/cursor just isn't over the part that visibly moves).
       <Switch
-        size="large"
+        size="medium"
         label="DTCG (W3C)"
         checked={on}
         onChange={(c: boolean) => { setOn(c); window.PomDtcgFormat.onChange?.(c); }}
@@ -741,7 +757,7 @@ function ProviderChoiceCard({ which, label, checked, onToggle }: { which: 'gitla
       </span>
       <span style={{ flex: 1, minWidth: 0, fontWeight: 600, color: 'var(--app-text)' }}>{label}</span>
       <span style={{ display: 'flex', flexShrink: 0, pointerEvents: 'none' }}>
-        <Checkbox size="large" labelHidden label={label} checked={checked} onChange={() => {}} />
+        <Checkbox size="medium" labelHidden label={label} checked={checked} onChange={() => {}} />
       </span>
     </div>
   );
