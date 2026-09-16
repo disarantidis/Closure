@@ -21136,7 +21136,13 @@ html[data-theme=dark] {
       <div class="repo-settings-heading">
         <p class="folder-paths-title">Repository settings</p>
       </div>
-      <div id="repo-settings-tabs-row" hidden>
+      <!-- data-level="2": without it this sits at the page's own level (1,
+           set on <html>), and .nd-seg's `background: var(--background)`
+           painted the exact same fill as the page behind it — the track was
+           invisible against its own background. Card level, like the
+           provider cards just below, makes the track read as its own
+           surface. -->
+      <div id="repo-settings-tabs-row" data-level="2" hidden>
         <span id="repo-settings-tab-mount"></span>
       </div>
 
@@ -47288,14 +47294,14 @@ html[data-theme=dark] {
         SegmentedControl,
         {
           label: "Repository provider",
-          size: "small",
+          size: "medium",
           value,
           options: [{ value: "github", label: "GitHub" }, { value: "gitlab", label: "GitLab" }],
           onChange: (v) => window.PomRepoTab.onChange?.(v)
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
   })();
   mountOnce(

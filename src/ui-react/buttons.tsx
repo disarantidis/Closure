@@ -488,16 +488,22 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
     const [value, setValue] = useState<'gitlab' | 'github'>('gitlab');
     set = setValue;
     return (
+      // medium, not small: this sits at the top of Repository settings, level
+      // with the row of GitLab/GitHub fields it switches between, not with a
+      // caption-sized chip — the field-box rung Button/SegmentedControl share.
       <SegmentedControl
         label="Repository provider"
-        size="small"
+        size="medium"
         value={value}
         options={[{ value: 'github', label: 'GitHub' }, { value: 'gitlab', label: 'GitLab' }]}
         onChange={(v: string) => window.PomRepoTab.onChange?.(v as 'gitlab' | 'github')}
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  // CARD_LEVEL, matching the real data-level="2" now set on #repo-settings-tabs-row
+  // in the markup (SegmentedControl doesn't read this context itself yet, but every
+  // other mount here keeps this value truthful to its actual DOM level).
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
 })();
 
