@@ -870,24 +870,30 @@
       position: relative;
     }
     /* One continuous line behind the three stacked containers, reading as
-       a pipeline rather than three unrelated cards. top:0/bottom:0 spans
-       the wrapper's full height so it always reaches from the first
-       card's top to the last card's bottom, however tall any section
-       between them currently is — no measuring needed. z-index: -1 is
-       what keeps it BEHIND the cards despite being painted after them in
-       the stacking order: a positioned descendant with no z-index would
-       otherwise paint above ordinary in-flow content (the cards) by
-       default; negative z-index is the one level that paints under it
-       instead. left: 46px lines up with the centre of each card's own
-       leading icon (16-18px icons starting at the shared 38px inset — see
-       .target-row-header's own comment on that number — so their centres
-       all land within a pixel or two of each other here), so the wire
-       reads as running straight through each icon rather than floating
-       beside them. */
+       a pipeline rather than three unrelated cards. top:0 reaches the
+       first card's top; bottom:16px — NOT 0 — stops it flush at the last
+       card's own bottom edge instead of .actions's trailing 16px bottom
+       padding (padding: 0 16px 16px, below .export-panel/the loading
+       skeleton — see .actions above). bottom:0 left a bare stub of line
+       hanging 16px below the last card into empty space, connected to
+       nothing — reported as the alignment "not continuing" past that
+       card, which is exactly what a dangling loose end reads as. Not an
+       issue at the top: nothing precedes the first card inside this
+       wrapper, so top:0 has no equivalent leading padding to correct for.
+       z-index: -1 is what keeps the line BEHIND the cards despite being
+       painted after them in the stacking order: a positioned descendant
+       with no z-index would otherwise paint above ordinary in-flow
+       content (the cards) by default; negative z-index is the one level
+       that paints under it instead. left: 46px lines up with the centre
+       of each card's own leading icon (16-18px icons starting at the
+       shared 38px inset — see .target-row-header's own comment on that
+       number — so their centres all land within a pixel or two of each
+       other here), so the wire reads as running straight through each
+       icon rather than floating beside them. */
     .flow-wire {
       position: absolute;
       top: 0;
-      bottom: 0;
+      bottom: 16px;
       left: 46px;
       width: 2px;
       background: var(--app-border);
