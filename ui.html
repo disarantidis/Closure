@@ -954,6 +954,20 @@
       display: flex;
       flex-direction: column;
       padding: 0 16px;
+      /* Every OTHER gap between the stacked containers on this screen
+         comes from the card just above it carrying its own trailing
+         margin (.json-download-card's own margin-bottom is what spaces
+         it from the push-settings card below it) — this card was the one
+         exception, carrying no bottom spacing of its own, so it sat flush
+         against whatever came next (the closure warning when shown, or
+         directly the Json file card otherwise): reported as the first two
+         containers touching with no gap between them. margin, not
+         padding — this collapses with the next block's own top margin
+         (none of them set one) rather than stacking on top of it, so it
+         stays a single 16px gap even when the closure warning is showing
+         in between (it carries the same 0 16px 16px shape .json-download-
+         card does), not 32px. */
+      margin-bottom: 16px;
       opacity: 0;
       transition: opacity 200ms ease;
     }
