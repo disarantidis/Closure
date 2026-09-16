@@ -48274,10 +48274,9 @@ html[data-theme=dark] {
         setO(next);
       };
       function toggle(which, checked) {
-        const next = { ...state, [which]: checked };
-        if (!next.gitlab && !next.github) next[which] = true;
-        setState(next);
+        setState((s) => ({ ...s, [which]: checked }));
       }
+      const neitherChecked = !state.gitlab && !state.github;
       return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
         Dialog,
         {
@@ -48285,8 +48284,23 @@ html[data-theme=dark] {
           onClose: () => setO(false),
           size: "small",
           title: step === 1 ? "Push destination" : "Repository settings",
-          description: step === 1 ? "Where do you want to push your tokens? Pick one or both \u2014 you can change this anytime in Settings." : whatsNeeded(state),
-          actions: step === 1 ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "primary", size: "large", block: true, onClick: () => setStep(2), children: "Next" }) : /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
+          description: step === 1 ? "Where do you want to push your tokens? Pick one or both, or skip and just download the JSON \u2014 you can add this anytime in Settings." : whatsNeeded(state),
+          actions: step === 1 ? (
+            // Neither checked has nothing for step 2 to ask about (no
+            // token to collect for a provider that wasn't picked), so it
+            // confirms straight from here instead of advancing —
+            // targetFromCheckboxes() can't express "neither" (it's shared
+            // with mountPushTargetControl, where that's never a valid
+            // state), so 'none' is passed explicitly.
+            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "primary", size: "large", block: true, onClick: () => {
+              if (neitherChecked) {
+                setO(false);
+                window.PomOnboardingDialog.onConfirm?.("none");
+              } else {
+                setStep(2);
+              }
+            }, children: neitherChecked ? "Skip \u2014 just download" : "Next" })
+          ) : /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
             /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setStep(1), children: "Back" }),
             /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, onClick: () => {
               setO(false);
@@ -49413,9 +49427,14 @@ react/cjs/react-jsx-runtime.development.js:
 
         // pushTarget must always point at an actually-available provider —
         // a stale value from before a removal falls back to whichever one
-        // remains (both removed is unreachable: the remove guards never
-        // let the last provider go).
-        if (!gitlabAdded) {
+        // remains. Both false IS reachable now: the onboarding dialog's
+        // "skip both" choice (mountOnboardingDialog.onConfirm) persists
+        // exactly this shape (no gitlab/github saved), and this is what
+        // reconstructs it back to 'none' — not 'gitlab' by the old
+        // catch-all default — on every later load.
+        if (!gitlabAdded && !githubAdded) {
+          pushTarget = 'none';
+        } else if (!gitlabAdded) {
           pushTarget = 'github';
         } else if (!githubAdded) {
           pushTarget = 'gitlab';
@@ -49716,8 +49735,13 @@ react/cjs/react-jsx-runtime.development.js:
       var wantsGitHub = (target === 'github' || target === 'both');
       if (wantsGitLab && !gitlabAdded) addGitlab();
       if (wantsGitHub && !githubAdded) addGithub();
-      // At least one box is always ticked (the dialog's own toggle guard),
-      // so this can never remove both and leave nowhere to push.
+      // target can now genuinely be 'none' (the dialog's own checkboxes no
+      // longer force at least one ticked — see mountOnboardingDialog) —
+      // wantsGitLab/wantsGitHub are both false in that case, so this
+      // removes whichever provider(s) were still sitting at their default
+      // (GitLab starts added), leaving a clean "no push destination"
+      // state. Download alone is a complete workflow; this is not an
+      // error state to route around, it's the third real choice.
       if (!wantsGitLab && gitlabAdded) removeGitlab();
       if (!wantsGitHub && githubAdded) removeGithub();
       activeSettingsTab = wantsGitLab ? 'gitlab' : 'github';
@@ -49727,7 +49751,10 @@ react/cjs/react-jsx-runtime.development.js:
       window.PomPushTarget.setValue(pushTarget);
       updatePushTargetUI();
       persistSettings();
-      goToFirstUnreadyProvider();
+      // Skipped for 'none' — see goToFirstUnreadyProvider()'s own comment
+      // on why forcing Settings open right after "skip" would undo the
+      // point of skipping.
+      if (target !== 'none') goToFirstUnreadyProvider();
     };
 
     gitSettings.setState({}); // render standard defaults immediately
@@ -49877,12 +49904,23 @@ react/cjs/react-jsx-runtime.development.js:
     // push — the other one gets a small "finish setting up" button instead
     // of being hidden outright (mixedReadiness). Only single-provider mode
     // (or 'both' with NEITHER ready) counts as fully blocked (needsBigSetup).
+    //
+    // pushTarget === 'none' is a separate, deliberate third state — not a
+    // flavor of "not set up yet": the onboarding dialog's "skip" choice
+    // (mountOnboardingDialog, buttons.tsx) sets it explicitly when the user
+    // wants neither provider, because Download alone is a complete,
+    // supported workflow. noPushDestination flags that case so callers can
+    // tell "hasn't finished configuring" apart from "chose not to" — they
+    // read the same in most of this UI (both fall back to the same "Add
+    // Repo Settings" slot) but must never collide in wantsGitLab/wantsGitHub
+    // or PUSH_TARGET_LABELS lookups, which have no 'none' entry.
     function computePushReadiness() {
       var wantsGitLab = pushTarget === 'gitlab' || pushTarget === 'both';
       var wantsGitHub = githubAdded && (pushTarget === 'github' || pushTarget === 'both');
       var glReady = isGitLabReady();
       var ghReady = isGitHubReady();
       var bothMode = pushTarget === 'both' && githubAdded;
+      var noPushDestination = pushTarget === 'none';
 
       var effectiveTarget = pushTarget;
       var mixedReadiness = false;
@@ -49909,6 +49947,7 @@ react/cjs/react-jsx-runtime.development.js:
         glReady: glReady, ghReady: ghReady,
         bothMode: bothMode, mixedReadiness: mixedReadiness,
         effectiveTarget: effectiveTarget, needsBigSetup: needsBigSetup,
+        noPushDestination: noPushDestination,
         effectiveWantsGitLab: effectiveTarget === 'gitlab' || effectiveTarget === 'both',
         effectiveWantsGitHub: effectiveTarget === 'github' || effectiveTarget === 'both'
       };
@@ -49924,21 +49963,31 @@ react/cjs/react-jsx-runtime.development.js:
       // visible and enabled in the mixed-readiness case (see
       // computePushReadiness()) — there a commit message still makes
       // sense, since the push goes ahead against whichever provider IS ready.
-      window.PomCommitMessage.setDisabled(r.needsBigSetup);
-      document.getElementById('commit-wrap').hidden = r.needsBigSetup;
-      document.getElementById('push-btn-mount').hidden = r.needsBigSetup;
-      document.getElementById('add-repo-settings-btn-mount').hidden = !r.needsBigSetup;
+      //
+      // noPushDestination (pushTarget === 'none', the onboarding "skip"
+      // choice) folds into this same fallback — Download alone is a fully
+      // supported workflow, so there's nothing to disable-and-explain here,
+      // just nothing to push TO. Same "Add Repo Settings" slot either way;
+      // goToFirstUnreadyProvider() (below) tells the two apart when clicked.
+      var showFallback = r.needsBigSetup || r.noPushDestination;
+      window.PomCommitMessage.setDisabled(showFallback);
+      document.getElementById('commit-wrap').hidden = showFallback;
+      document.getElementById('push-btn-mount').hidden = showFallback;
+      document.getElementById('add-repo-settings-btn-mount').hidden = !showFallback;
 
       // Pushing requires a commit message — no commit without one.
       var hasCommitMsg = !!(document.getElementById('commit-message').value.trim());
-      var blockedByCommitMsg = !r.needsBigSetup && !hasCommitMsg && !!transformedData;
-      window.PomButtons.push.setDisabled(!transformedData || !hasCommitMsg || r.needsBigSetup);
-      if (!r.needsBigSetup) {
+      var blockedByCommitMsg = !showFallback && !hasCommitMsg && !!transformedData;
+      window.PomButtons.push.setDisabled(!transformedData || !hasCommitMsg || showFallback);
+      if (!showFallback) {
         // The button's own baseProps.label ('Push to GitLab', buttons.tsx)
         // is just an initial-render fallback — this always drives the real
         // label once settings have loaded, and follows effectiveTarget (not
         // raw pushTarget) so a mixed-readiness 'both' correctly reads
-        // "Push to GitLab" rather than "Push to Both".
+        // "Push to GitLab" rather than "Push to Both". Guarded by
+        // showFallback, not just needsBigSetup, specifically so this never
+        // runs for pushTarget === 'none' — PUSH_TARGET_LABELS has no 'none'
+        // entry, and the button is hidden in that state anyway.
         window.PomButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
       }
       window.PomButtons.download.setDisabled(!transformedData);
@@ -50035,15 +50084,26 @@ react/cjs/react-jsx-runtime.development.js:
     // Replaces the Push button itself when nothing workable is configured
     // yet (see updateActionUI()) — jumps to whichever wanted provider isn't
     // ready (GitLab first, matching this app's usual gitlab-first default).
-    // Shared by this button and the onboarding dialog's "Add Settings"
-    // (see window.PomOnboardingDialog.onConfirm below) — gitlab-first,
-    // matching this app's usual default precedence.
+    // Shared by this button and the onboarding dialog's "Add Settings" (see
+    // window.PomOnboardingDialog.onConfirm below) for the normal
+    // gitlab/github/both choices — gitlab-first, matching this app's usual
+    // default precedence. NOT called from onConfirm when the user picked
+    // neither (pushTarget === 'none'): there's nothing to jump to yet, and
+    // forcing Settings open right after "skip, just download" would defeat
+    // the point of skipping. It's still reachable from THIS button though —
+    // clicking "Add Repo Settings" from the main screen after declining
+    // both is someone changing their mind, not someone being interrupted,
+    // so it's fine to open Settings generally there (no specific field to
+    // focus, since no provider was ever picked).
     function goToFirstUnreadyProvider() {
       var r = computePushReadiness();
       if (r.wantsGitLab && !r.glReady) {
         goToProviderSettingsField('gitlab', 'gl-token');
       } else if (r.wantsGitHub && !r.ghReady) {
         goToProviderSettingsField('github', 'gh-token');
+      } else {
+        document.getElementById('main-page').classList.add('hidden');
+        document.getElementById('settings-page').classList.add('visible');
       }
     }
     document.getElementById('add-repo-settings-btn').addEventListener('click', goToFirstUnreadyProvider);
@@ -50261,10 +50321,13 @@ react/cjs/react-jsx-runtime.development.js:
       // provider in a mixed-readiness 'both' (see computePushReadiness()),
       // so there's no separate per-provider not-ready check needed here
       // any more; this guard is just defense against the Push button
-      // somehow firing while needsBigSetup is true (it's replaced by
-      // "Add Repo Settings" in that state, so shouldn't be reachable).
+      // somehow firing while there's nothing to push to — either
+      // needsBigSetup (not ready yet) or noPushDestination (pushTarget ===
+      // 'none', the onboarding "skip" choice) — updateActionUI() replaces
+      // Push with "Add Repo Settings" in both cases, so neither should be
+      // reachable here.
       var r = computePushReadiness();
-      if (r.needsBigSetup) {
+      if (r.needsBigSetup || r.noPushDestination) {
         showToast('Configure repository settings first', true);
         document.getElementById('settings-btn').click();
         return;

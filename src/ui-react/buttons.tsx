@@ -330,7 +330,13 @@ type FolderListBridge = {
   onRemove: ((idx: number) => void) | null;
 };
 type FolderSelectBridge = { setItems: (items: any[], selectedValue: string) => void; onChange: ((value: string) => void) | null };
-type PushTarget = 'gitlab' | 'github' | 'both';
+// 'none' is the onboarding dialog's "skip both" choice — Download alone is
+// a complete, supported workflow, not an unfinished state to route past.
+// Only ever reaches window.PomOnboardingDialog.onConfirm; the Settings
+// page's own Push destination control (mountPushTargetControl below) never
+// produces it — that control only shows once BOTH providers are already
+// added, so "neither" isn't a real choice there.
+type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
 declare global {
   interface Window {
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
@@ -1060,21 +1066,37 @@ function ProviderChoiceCard({ which, label, checked, onToggle }: { which: 'gitla
     const [step, setStep] = useState<1 | 2>(1);
     const [state, setState] = useState<PushCheckboxState>({ gitlab: true, github: false });
     setOpen = (next: boolean) => { if (next) setStep(1); setO(next); };
+    // No more "at least one stays checked" guard — declining both is a
+    // real, valid choice (Download alone works fine), not a state to
+    // prevent. See the Next/Skip button below for what neither-checked
+    // actually does.
     function toggle(which: keyof PushCheckboxState, checked: boolean) {
-      const next = { ...state, [which]: checked } as PushCheckboxState;
-      if (!next.gitlab && !next.github) next[which] = true;
-      setState(next);
+      setState((s) => ({ ...s, [which]: checked }));
     }
+    const neitherChecked = !state.gitlab && !state.github;
     return (
       <Dialog
         open={open}
         onClose={() => setO(false)}
         size="small"
         title={step === 1 ? 'Push destination' : 'Repository settings'}
-        description={step === 1 ? 'Where do you want to push your tokens? Pick one or both — you can change this anytime in Settings.' : whatsNeeded(state)}
+        description={step === 1 ? 'Where do you want to push your tokens? Pick one or both, or skip and just download the JSON — you can add this anytime in Settings.' : whatsNeeded(state)}
         actions={
           step === 1 ? (
-            <Button variant="primary" size="large" block onClick={() => setStep(2)}>Next</Button>
+            // Neither checked has nothing for step 2 to ask about (no
+            // token to collect for a provider that wasn't picked), so it
+            // confirms straight from here instead of advancing —
+            // targetFromCheckboxes() can't express "neither" (it's shared
+            // with mountPushTargetControl, where that's never a valid
+            // state), so 'none' is passed explicitly.
+            <Button variant="primary" size="large" block onClick={() => {
+              if (neitherChecked) {
+                setO(false);
+                window.PomOnboardingDialog.onConfirm?.('none');
+              } else {
+                setStep(2);
+              }
+            }}>{neitherChecked ? 'Skip — just download' : 'Next'}</Button>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'row', gap: 12, width: '100%' }}>
               <Button variant="tonal" size="large" style={{ flex: 1 }} onClick={() => setStep(1)}>Back</Button>
