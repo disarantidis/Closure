@@ -47617,7 +47617,6 @@ html[data-theme=dark] {
       id,
       variant,
       size,
-      fieldRung,
       label,
       destructive,
       icon: icon2,
@@ -47636,8 +47635,7 @@ html[data-theme=dark] {
     const leading = iconOnly ? icon2 : leftIcon ? buttonLeftIcon : void 0;
     const extra = {};
     if (destructive) extra["data-scheme"] = "error";
-    if (fieldRung) extra.fieldRung = fieldRung;
-    else extra.size = btnSize(size);
+    extra.size = btnSize(size);
     return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
       Button,
       {
@@ -47755,14 +47753,16 @@ html[data-theme=dark] {
     // beside those two filled, labeled buttons. leftIcon/buttonLeftIcon (not
     // icon) is what tells PomButton's iconOnly check to render label text
     // instead of collapsing to shape="square" — see PomButton's own comment
-    // on that prop bag split. fieldRung: 'small' (not size: 'large') matches
-    // this button's real height to #primary-filename-mount's own field size
-    // ('small', PomTextField's default) — see PomButton's own comment on why
-    // that's a different, more correct axis than picking a same-numbered
-    // `size`.
+    // on that prop bag split. size: 'medium' (not 'large') band-matches this
+    // button to #primary-filename-mount's own field size ('small',
+    // PomTextField's default) — same "medium IS a small field's box" alias
+    // the folder-add/settings icon buttons below already use, not fieldRung:
+    // that axis also borrows the field's label lift/drop as button padding,
+    // which reads right on a field's own value but drops a button's centred
+    // label off-centre for no reason — see the note below folder-add-btn-mount.
     download: mountLiveIconButton(
       "download-btn-mount",
-      { id: "download-btn", variant: "filled", fieldRung: "small", leftIcon: true, buttonLeftIcon: IconDownload(24), label: "Download", title: "Download" },
+      { id: "download-btn", variant: "filled", size: "medium", leftIcon: true, buttonLeftIcon: IconDownload(24), label: "Download", title: "Download" },
       true,
       CARD_LEVEL
     ),
@@ -47770,11 +47770,11 @@ html[data-theme=dark] {
     // primary/labeled treatment (same tonal-square shape Download itself
     // used to have, before that one became "standard"). Copies the exact
     // same JSON Download/Push already send (doCopyJson(), ui.template.html)
-    // straight to the clipboard, no file involved. Same fieldRung: 'small'
-    // as Download, for the same reason.
+    // straight to the clipboard, no file involved. Same size: 'medium' as
+    // Download, for the same reason.
     copy: mountLiveIconButton(
       "copy-btn-mount",
-      { id: "copy-btn", variant: "tonal", fieldRung: "small", icon: IconCopy(24), label: "Copy JSON", title: "Copy JSON to clipboard" },
+      { id: "copy-btn", variant: "tonal", size: "medium", icon: IconCopy(24), label: "Copy JSON", title: "Copy JSON to clipboard" },
       true,
       CARD_LEVEL
     )

@@ -207,21 +207,14 @@ function PomTextArea(props: any) {
 /* ── Pomegranate Button, from the prop bag the mounts pass ──────── */
 function PomButton(props: any) {
   const {
-    id, variant, size, fieldRung, label, destructive, icon, leftIcon, buttonLeftIcon,
+    id, variant, size, label, destructive, icon, leftIcon, buttonLeftIcon,
     disabled, loading, active, style, title, onClick, block, flex,
   } = props;
   const iconOnly = !!icon; // the icon-button bag carries `icon`; text buttons carry `label`
   const leading = iconOnly ? icon : (leftIcon ? buttonLeftIcon : undefined);
   const extra: any = {};
   if (destructive) extra['data-scheme'] = 'error';
-  // fieldRung (a TextFieldSize — 'small' | 'large') is Button's OWN sizing
-  // axis for "match a field", not just a same-numbered height: it spends
-  // the field's own label lift/drop so the button's baseline lands on the
-  // field's value row, which matching `size` to the field's box height in
-  // px does not (see Button.tsx's own comment on the two axes). Mutually
-  // exclusive with `size` in the real component's own types — pass one or
-  // the other, never both.
-  if (fieldRung) extra.fieldRung = fieldRung; else extra.size = btnSize(size);
+  extra.size = btnSize(size);
   return (
     <Button
       id={id}
@@ -390,14 +383,16 @@ window.PomButtons = {
   // beside those two filled, labeled buttons. leftIcon/buttonLeftIcon (not
   // icon) is what tells PomButton's iconOnly check to render label text
   // instead of collapsing to shape="square" — see PomButton's own comment
-  // on that prop bag split. fieldRung: 'small' (not size: 'large') matches
-  // this button's real height to #primary-filename-mount's own field size
-  // ('small', PomTextField's default) — see PomButton's own comment on why
-  // that's a different, more correct axis than picking a same-numbered
-  // `size`.
+  // on that prop bag split. size: 'medium' (not 'large') band-matches this
+  // button to #primary-filename-mount's own field size ('small',
+  // PomTextField's default) — same "medium IS a small field's box" alias
+  // the folder-add/settings icon buttons below already use, not fieldRung:
+  // that axis also borrows the field's label lift/drop as button padding,
+  // which reads right on a field's own value but drops a button's centred
+  // label off-centre for no reason — see the note below folder-add-btn-mount.
   download: mountLiveIconButton(
     'download-btn-mount',
-    { id: 'download-btn', variant: 'filled', fieldRung: 'small', leftIcon: true, buttonLeftIcon: IconDownload(24), label: 'Download', title: 'Download' },
+    { id: 'download-btn', variant: 'filled', size: 'medium', leftIcon: true, buttonLeftIcon: IconDownload(24), label: 'Download', title: 'Download' },
     true,
     CARD_LEVEL,
   ),
@@ -405,11 +400,11 @@ window.PomButtons = {
   // primary/labeled treatment (same tonal-square shape Download itself
   // used to have, before that one became "standard"). Copies the exact
   // same JSON Download/Push already send (doCopyJson(), ui.template.html)
-  // straight to the clipboard, no file involved. Same fieldRung: 'small'
-  // as Download, for the same reason.
+  // straight to the clipboard, no file involved. Same size: 'medium' as
+  // Download, for the same reason.
   copy: mountLiveIconButton(
     'copy-btn-mount',
-    { id: 'copy-btn', variant: 'tonal', fieldRung: 'small', icon: IconCopy(24), label: 'Copy JSON', title: 'Copy JSON to clipboard' },
+    { id: 'copy-btn', variant: 'tonal', size: 'medium', icon: IconCopy(24), label: 'Copy JSON', title: 'Copy JSON to clipboard' },
     true,
     CARD_LEVEL,
   ),
