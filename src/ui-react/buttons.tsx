@@ -60,13 +60,16 @@ const svg = (d: string, opts?: { fill?: boolean }) => (size: number) =>
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
   );
 const IconArrowLeft = svg('M19 12H5M12 19l-7-7 7-7');
-const IconClose = svg('M18 6 6 18M6 6l12 12');
 const IconDownload = svg('M12 3v11m0 0l-4-4m4 4l4-4M5 20h14');
 const IconSettings = svg('M4 21v-6M4 11V3M12 21v-8M12 9V3M20 21v-4M20 13V3M1 15h6M9 9h6M17 17h6');
 const IconCheck = svg('M20 6L9 17l-5-5');
 const IconFolder = svg('M3 7a2 2 0 012-2h3.5l2 2H19a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z');
 const IconAdd = svg('M12 5v14M5 12h14');
-const IconRemove = svg('M5 12h14');
+// Every remove/delete action in this file uses this, not the minus or × it
+// used to — a trash bin reads as "remove" on sight; a minus/× also reads as
+// "collapse" / "dismiss", which is what those glyphs mean everywhere else in
+// the kit (SegmentedControl, Dialog's own close). One shape per meaning.
+const IconTrash = svg('M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M10 11v6 M14 11v6');
 
 /* ── size / variant maps (mount prop shape → Pomegranate) ───────────────────── */
 function btnVariant(v?: string): 'primary' | 'tonal' | 'ghost' {
@@ -324,8 +327,8 @@ function mountIconButton(mountId: string, props: any, level?: Level) { mountOnce
    (band 32), which is the row-mixing-bands defect ROW-RULES.md calls out. */
 mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
-mountIconButton('gl-clear-token-btn-mount', { id: 'gl-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitLab token', 'aria-label': 'Clear GitLab token', icon: IconClose(16) }, CARD_LEVEL);
-mountIconButton('gh-clear-token-btn-mount', { id: 'gh-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitHub token', 'aria-label': 'Clear GitHub token', icon: IconClose(16) }, CARD_LEVEL);
+mountIconButton('gl-clear-token-btn-mount', { id: 'gl-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitLab token', 'aria-label': 'Clear GitLab token', icon: IconTrash(16) }, CARD_LEVEL);
+mountIconButton('gh-clear-token-btn-mount', { id: 'gh-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitHub token', 'aria-label': 'Clear GitHub token', icon: IconTrash(16) }, CARD_LEVEL);
 mountIconButton('gitlab-empty-add-btn-mount', { id: 'gitlab-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountIconButton('github-empty-add-btn-mount', { id: 'github-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountButton('add-github-btn-mount', { id: 'add-github-btn', variant: 'tonal', size: 'small', label: 'Add' }, CARD_LEVEL);
@@ -361,10 +364,10 @@ window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commi
 mountButton('add-repo-settings-btn-mount', { id: 'add-repo-settings-btn', variant: 'outline', size: 'large', label: 'Add Repo Settings', block: true }, CARD_LEVEL);
 mountButton('gitlab-small-settings-btn-mount', { id: 'gitlab-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
 mountButton('github-small-settings-btn-mount', { id: 'github-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
-mountIconButton('gitlab-remove-push-btn-mount', { id: 'gitlab-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconRemove(16) }, CARD_LEVEL);
-mountIconButton('github-remove-push-btn-mount', { id: 'github-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconRemove(16) }, CARD_LEVEL);
-mountIconButton('gitlab-empty-remove-push-btn-mount', { id: 'gitlab-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconRemove(16) }, CARD_LEVEL);
-mountIconButton('github-empty-remove-push-btn-mount', { id: 'github-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconRemove(16) }, CARD_LEVEL);
+mountIconButton('gitlab-remove-push-btn-mount', { id: 'gitlab-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconTrash(16) }, CARD_LEVEL);
+mountIconButton('github-remove-push-btn-mount', { id: 'github-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconTrash(16) }, CARD_LEVEL);
+mountIconButton('gitlab-empty-remove-push-btn-mount', { id: 'gitlab-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconTrash(16) }, CARD_LEVEL);
+mountIconButton('github-empty-remove-push-btn-mount', { id: 'github-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconTrash(16) }, CARD_LEVEL);
 
 mountTextField('folder-new-mount', { id: 'folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' }, CARD_LEVEL);
 mountTextField('github-folder-new-mount', { id: 'github-folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' }, CARD_LEVEL);
@@ -554,7 +557,7 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
               <PomButton
                 variant="tonal" destructive size="medium"
                 title="Remove this path" aria-label="Remove this path"
-                icon={IconClose(16)}
+                icon={IconTrash(16)}
                 onClick={() => (window as any)[bridgeKey].onRemove?.(idx)}
               />
             )}
