@@ -138,10 +138,14 @@
     /* This app's own chrome vars are aliases onto the Pomegranate
        (disarantidis_ReactJS) design tokens from src/vendor/pomegranate
        (tokens.css / node.css, bundled into ui.html), so the plugin's plain
-       CSS and its Pomegranate components resolve to the same palette. The app
-       is dark-only by design (data-theme="dark" is set statically on <html>);
-       Pomegranate's own light palette lives on bare :root but nothing here
-       switches to it. */
+       CSS and its Pomegranate components resolve to the same palette.
+       data-theme="dark" on <html> is just the STARTING attribute value, not
+       a static one: the Settings header's theme toggle (buttons.tsx,
+       mountThemeToggle) flips it to "light" at runtime, which lands on
+       Pomegranate's own light palette on bare :root (the
+       [data-theme='dark'] rules simply stop matching) — no separate light
+       styling exists in this file because none is needed; every var()
+       below re-resolves against whichever theme is current. */
     :root {
       /* Pomegranate's LEVEL model (docs/knowledge-levels.md + LAYOUT-RULES.md):
          the collapse left ONE fill name, --background, moved by [data-level]
@@ -1212,6 +1216,11 @@
           </svg>
         </div>
         <h1 class="title">Settings</h1>
+        <!-- Theme toggle sits directly left of Back, both pushed to the
+             header's right edge by .header-settings .title's flex:1.
+             .header-panel's own `gap: 10px` spaces the two apart — no
+             margin needed on either. -->
+        <span id="theme-toggle-btn-mount"></span>
         <!-- Back sits at the header's right edge, mirroring the main
              screen's own settings button in the same spot of the same
              .header-panel. .header-settings .title's flex:1 is what pushes

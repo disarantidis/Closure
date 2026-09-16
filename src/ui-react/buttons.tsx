@@ -79,6 +79,12 @@ const IconAdd = svg('M12 5v14M5 12h14');
 // "collapse" / "dismiss", which is what those glyphs mean everywhere else in
 // the kit (SegmentedControl, Dialog's own close). One shape per meaning.
 const IconTrash = svg('M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M10 11v6 M14 11v6');
+// Theme toggle pair. The icon shown is the mode a click would SWITCH TO
+// (sun while dark is active, moon while light is active) so it reads
+// together with the button's own "Switch to light/dark mode" label,
+// rather than restating the mode already on screen.
+const IconSun = svg('M12 2v2 M12 20v2 M4.93 4.93 6.34 6.34 M19.07 19.07 17.66 17.66 M2 12h2 M20 12h2 M4.93 19.07 6.34 17.66 M19.07 4.93 17.66 6.34 M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0');
+const IconMoon = svg('M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z');
 
 /* ── size / variant maps (mount prop shape → Pomegranate) ───────────────────── */
 function btnVariant(v?: string): 'primary' | 'tonal' | 'ghost' {
@@ -344,8 +350,49 @@ mountButton('add-github-btn-mount', { id: 'add-github-btn', variant: 'tonal', si
 mountButton('remove-github-btn-mount', { id: 'remove-github-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitHub' }, CARD_LEVEL);
 mountButton('add-gitlab-btn-mount', { id: 'add-gitlab-btn', variant: 'tonal', size: 'small', label: 'Add' }, CARD_LEVEL);
 mountButton('remove-gitlab-btn-mount', { id: 'remove-gitlab-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitLab' }, CARD_LEVEL);
-mountIconButton('back-btn-mount', { id: 'back-btn', variant: 'ghost', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
+// tonal, not ghost — ghost paints `background: none` at rest (node.css's
+// .nd-btn.v-ghost), so bumping this button's own data-level to sit above
+// the header would have changed nothing visible; a ghost button has no
+// fill for any level to apply to. tonal DOES paint one (--nd-field-fill),
+// and Button already self-computes that fill one rung above whatever
+// LevelContext it's mounted in (data-fill={fieldLevel(useLevel())} in
+// Button.tsx) — so switching material alone, with no level change, is
+// what actually gives this a fill distinct from the header behind it.
+mountIconButton('back-btn-mount', { id: 'back-btn', variant: 'tonal', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
 mountIconButton('settings-btn-mount', { id: 'settings-btn', variant: 'ghost', size: 'large', title: 'Git settings', 'aria-label': 'Git settings', icon: IconSettings(24) });
+
+/* ── Settings header: light/dark theme toggle ────────────────────────────── */
+// Flips <html>'s own data-theme attribute directly: every colour in this
+// file already resolves through tokens.css's [data-theme='dark'] overrides
+// (see the :root comment above .header-panel on why --app-bg/--app-text/etc
+// are safe aliases here), so toggling that one attribute recolours the
+// whole page live with no separate light-mode styling to maintain. Same
+// large/tonal treatment as the back button beside it. Session-only, like
+// Output format above it on this same page: nothing in this file persists
+// a UI preference across reopens yet, so this doesn't either.
+(function mountThemeToggle() {
+  const container = document.getElementById('theme-toggle-btn-mount');
+  function View() {
+    const [dark, setDark] = useState(document.documentElement.getAttribute('data-theme') === 'dark');
+    function toggle() {
+      const next = !dark;
+      document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light');
+      setDark(next);
+    }
+    return (
+      <PomButton
+        id="theme-toggle-btn"
+        variant="tonal"
+        size="large"
+        title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        icon={dark ? IconSun(24) : IconMoon(24)}
+        onClick={toggle}
+      />
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+})();
 
 /* ── version tag (custom pill) ─────────────────────────────────────────────── */
 function mountVersionTag(mountId: string) {

@@ -138,10 +138,14 @@
     /* This app's own chrome vars are aliases onto the Pomegranate
        (disarantidis_ReactJS) design tokens from src/vendor/pomegranate
        (tokens.css / node.css, bundled into ui.html), so the plugin's plain
-       CSS and its Pomegranate components resolve to the same palette. The app
-       is dark-only by design (data-theme="dark" is set statically on <html>);
-       Pomegranate's own light palette lives on bare :root but nothing here
-       switches to it. */
+       CSS and its Pomegranate components resolve to the same palette.
+       data-theme="dark" on <html> is just the STARTING attribute value, not
+       a static one: the Settings header's theme toggle (buttons.tsx,
+       mountThemeToggle) flips it to "light" at runtime, which lands on
+       Pomegranate's own light palette on bare :root (the
+       [data-theme='dark'] rules simply stop matching) — no separate light
+       styling exists in this file because none is needed; every var()
+       below re-resolves against whichever theme is current. */
     :root {
       /* Pomegranate's LEVEL model (docs/knowledge-levels.md + LAYOUT-RULES.md):
          the collapse left ONE fill name, --background, moved by [data-level]
@@ -21094,6 +21098,11 @@ html[data-theme=dark] {
           </svg>
         </div>
         <h1 class="title">Settings</h1>
+        <!-- Theme toggle sits directly left of Back, both pushed to the
+             header's right edge by .header-settings .title's flex:1.
+             .header-panel's own `gap: 10px` spaces the two apart — no
+             margin needed on either. -->
+        <span id="theme-toggle-btn-mount"></span>
         <!-- Back sits at the header's right edge, mirroring the main
              screen's own settings button in the same spot of the same
              .header-panel. .header-settings .title's flex:1 is what pushes
@@ -46907,6 +46916,8 @@ html[data-theme=dark] {
   var IconFolder = svg("M3 7a2 2 0 012-2h3.5l2 2H19a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z");
   var IconAdd = svg("M12 5v14M5 12h14");
   var IconTrash = svg("M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M10 11v6 M14 11v6");
+  var IconSun = svg("M12 2v2 M12 20v2 M4.93 4.93 6.34 6.34 M19.07 19.07 17.66 17.66 M2 12h2 M20 12h2 M4.93 19.07 6.34 17.66 M19.07 4.93 17.66 6.34 M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0");
+  var IconMoon = svg("M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z");
   function btnVariant(v) {
     if (v === "filled") return "primary";
     if (v === "ghost") return "ghost";
@@ -47149,8 +47160,32 @@ html[data-theme=dark] {
   mountButton("remove-github-btn-mount", { id: "remove-github-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitHub" }, CARD_LEVEL);
   mountButton("add-gitlab-btn-mount", { id: "add-gitlab-btn", variant: "tonal", size: "small", label: "Add" }, CARD_LEVEL);
   mountButton("remove-gitlab-btn-mount", { id: "remove-gitlab-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitLab" }, CARD_LEVEL);
-  mountIconButton("back-btn-mount", { id: "back-btn", variant: "ghost", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
+  mountIconButton("back-btn-mount", { id: "back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
   mountIconButton("settings-btn-mount", { id: "settings-btn", variant: "ghost", size: "large", title: "Git settings", "aria-label": "Git settings", icon: IconSettings(24) });
+  (function mountThemeToggle() {
+    const container = document.getElementById("theme-toggle-btn-mount");
+    function View() {
+      const [dark, setDark] = (0, import_react13.useState)(document.documentElement.getAttribute("data-theme") === "dark");
+      function toggle() {
+        const next = !dark;
+        document.documentElement.setAttribute("data-theme", next ? "dark" : "light");
+        setDark(next);
+      }
+      return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
+        PomButton,
+        {
+          id: "theme-toggle-btn",
+          variant: "tonal",
+          size: "large",
+          title: dark ? "Switch to light mode" : "Switch to dark mode",
+          "aria-label": dark ? "Switch to light mode" : "Switch to dark mode",
+          icon: dark ? IconSun(24) : IconMoon(24),
+          onClick: toggle
+        }
+      );
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
+  })();
   function mountVersionTag(mountId) {
     const container = document.getElementById(mountId);
     let set = () => {
