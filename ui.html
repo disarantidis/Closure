@@ -824,18 +824,11 @@
     }
 
     .collections-wrap {
-      flex: 1;
       display: flex;
       flex-direction: column;
-      /* No top/bottom padding here on purpose — #collections-list below is
-         the actual overflow-y:auto scroll container, so vertical breathing
-         room belongs on IT (see its own padding) or it never applies once
-         scrolled: this wrap's own edges only bound the unscrolled frame. */
       padding: 0 16px;
       opacity: 0;
       transition: opacity 200ms ease;
-      min-height: 0;
-      overflow: hidden;
     }
     
     .collections-wrap.visible {
@@ -945,25 +938,13 @@
       border: none;
       background: transparent;
       transition: opacity 0.35s ease;
-      flex: 1;
-      overflow-y: auto;
-      min-height: 0;
-      /* Padding lives here, not on .collections-wrap: this is the element
-         that actually scrolls, so this is what needs breathing room at its
-         own top/bottom edges — otherwise a mid-scroll row clips flush
-         against the viewport with no fade/inset. Top is 0: PomAccordion's
-         own header padding (8px) + its title's line-height already provide
-         clearance before the first paint, and adding more on top of that
-         re-opens the too-large header-to-accordion gap. */
+      /* Bottom breathing room before whatever follows in the page's own
+         flow (the export panel — see .actions below) — top is 0:
+         PomAccordion's own header padding (8px) + its title's line-height
+         already provide clearance before the first paint, and adding more
+         on top of that re-opens the too-large header-to-accordion gap. */
       padding: 0 0 12px;
     }
-    /* This is its own scroll container (not .main-page, which just wraps
-       it) — needs the same thin-scrollbar treatment, or it shows the raw
-       OS/browser default instead. */
-    .collections-list::-webkit-scrollbar { width: 8px; }
-    .collections-list::-webkit-scrollbar-track { background: transparent; }
-    .collections-list::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
-    .collections-list::-webkit-scrollbar-thumb:hover { background: var(--app-text-muted); }
 
 
     /* Loading skeleton — mirrors the collection rows while extraction runs. */
