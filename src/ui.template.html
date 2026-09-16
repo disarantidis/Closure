@@ -296,8 +296,17 @@
       flex-shrink: 0;
     }
 
+    /* Shared by the main header (wraps the SVG wordmark now — font-size
+       doesn't visibly affect that one any more, only its layout box) and
+       the Settings header's own "Settings" text. Bumped from 16px to read
+       as a proper page heading, matching the wordmark's own new 30px
+       scale better than the old caption-sized 16px did. color:
+       var(--app-heading) — confirmed this already resolves to the real
+       --text token (rgb(237,237,237) in dark theme, matching --text
+       exactly), NOT --app-text-muted/--text-recessive — this alias was
+       never the recessive one, see the :root comment on --app-heading. */
     .title {
-      font-size: 16px;
+      font-size: 22px;
       font-weight: 600;
       color: var(--app-heading);
     }
