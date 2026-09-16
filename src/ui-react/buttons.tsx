@@ -435,8 +435,8 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
     }
     return (
       <>
-        <Checkbox size="small" label="GitLab" checked={state.gitlab} onChange={(c: boolean) => toggle('gitlab', c)} />
-        <Checkbox size="small" label="GitHub" checked={state.github} onChange={(c: boolean) => toggle('github', c)} />
+        <Checkbox size="large" label="GitLab" checked={state.gitlab} onChange={(c: boolean) => toggle('gitlab', c)} />
+        <Checkbox size="large" label="GitHub" checked={state.github} onChange={(c: boolean) => toggle('github', c)} />
       </>
     );
   }
@@ -453,7 +453,7 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
     set = setOn;
     return (
       <Switch
-        size="small"
+        size="large"
         label="DTCG (W3C)"
         checked={on}
         onChange={(c: boolean) => { setOn(c); window.PomDtcgFormat.onChange?.(c); }}
@@ -741,7 +741,7 @@ function ProviderChoiceCard({ which, label, checked, onToggle }: { which: 'gitla
       </span>
       <span style={{ flex: 1, minWidth: 0, fontWeight: 600, color: 'var(--app-text)' }}>{label}</span>
       <span style={{ display: 'flex', flexShrink: 0, pointerEvents: 'none' }}>
-        <Checkbox size="small" labelHidden label={label} checked={checked} onChange={() => {}} />
+        <Checkbox size="large" labelHidden label={label} checked={checked} onChange={() => {}} />
       </span>
     </div>
   );
