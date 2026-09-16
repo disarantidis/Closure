@@ -707,7 +707,15 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
             </div>
           </div>
         </InteractiveCard>
-        <Dialog open={open} onClose={() => setOpen(false)} title={state.title} size="small">
+        {/* large, not small — a real file's collection list (long names —
+            ".magenta-light", "_restricted" — and four-digit counts) read
+            cramped at 380px (--surface-width-small, tokens.css), reported
+            from the real plugin. large is 760px, but max-inline-size:
+            min(92vw, ...) (node.css's .nd-dialog) clamps it to the plugin
+            panel's own width regardless — so this is "as wide as the panel
+            allows," not a fixed 760px, and scales with however wide the
+            user's own resizable panel (the drag-handle in this file) is. */}
+        <Dialog open={open} onClose={() => setOpen(false)} title={state.title} size="large">
           <div className="collections-readonly-list">
             {state.collections.map((c: any) => (
               <div key={c.name} className="collection-item">

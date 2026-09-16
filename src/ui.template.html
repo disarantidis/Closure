@@ -539,17 +539,19 @@
       justify-content: space-between;
       gap: 8px;
       margin: 0 0 6px;
-      /* Confirmed by the user against the real plugin: the whole title
-       block (logo + text) should sit inset by this amount to read as
-       aligned with the dropdown/text-area content below, not flush with
-       the row's outer edge. (An earlier attempt at this same padding was
-       reverted based on this project's own browser-test measurement of
-       the title text vs. the dropdown's inner value text lining up
-       without it — that measurement wasn't the right proxy for how this
-       actually reads in the real plugin; trust the user's direct visual
-       confirmation here over it.) padding-right pulls the empty-state "+"
-       button in by the same amount on that side. */
-      padding: 0 var(--spacing-component-6);
+      /* This --spacing-component-6 (22px) inset was confirmed against the
+         real plugin back when .export-panel's own padding was a plain
+         12px — this row's outer edge sat 22px inside the field row below
+         it, so the title needed the same 22px to read as one column with
+         it. .export-panel's padding is now --spacing-component-6 itself
+         (matched to the collections card above it, see that rule's own
+         comment), so this row's outer edge already lines up with the
+         field row directly — restating the same 22px here just pushed the
+         title a second 22px past both the fields below it AND the card
+         above it (measured: title at 60px, fields and the card's own
+         title both at 38px). Removed rather than re-tuned: with the
+         panel's own edge doing this job now, the title/fields/card all
+         share one line with no padding needed here at all. */
     }
     .target-row-title {
       display: flex;
@@ -1107,7 +1109,17 @@
          is frozen at :root's own level so it never picked that up. */
       background: var(--background);
       border-radius: 24px;
-      padding: 16px 12px 12px;
+      /* Was a hand-picked 16px 12px 12px, not on the token ladder at all —
+         noticeably tighter than the collections card right above it
+         (InteractiveCard size="large", buttons.tsx), whose own CardBody
+         pads at --nd-card-pad = --spacing-component-6 (22px, node.css's
+         .nd-card.s-large). Both cards' OUTER boxes already share the same
+         16px inset from the panel edge (.actions / .collections-wrap), so
+         the mismatch was purely in each card's OWN internal padding — the
+         folder-path field sat ~10px further left than "ODS Test
+         Foundation" above it. Matched to the same token so both cards'
+         content lines up on one left/right edge. */
+      padding: var(--spacing-component-6);
     }
     .actions-skeleton .sk-row { display: flex; gap: 8px; }
 
