@@ -1200,6 +1200,16 @@
       justify-content: space-between;
       gap: 8px;
     }
+    /* Icon + text as one group, colored together — same shape as
+       .target-row-title (icon and label both read currentColor off this
+       shared color, not the icon separately). */
+    .json-download-title-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--app-text);
+    }
+    .json-download-title-icon { flex-shrink: 0; }
     /* Same section-title treatment as .target-row-title ("GitLab"/
        "GitHub") — this card is another named block on the same screen, so
        it reads as one family of titles rather than a one-off style. */
@@ -1209,7 +1219,6 @@
       line-height: var(--type-body-m-line-height);
       font-weight: 700;
       letter-spacing: var(--type-body-m-letter-spacing);
-      color: var(--app-text);
       margin: 0;
     }
     /* Field takes the row; Download sits fixed-width at the right, same
@@ -21199,15 +21208,30 @@ html[data-theme=dark] {
   <div id="closure-warning-mount"></div>
 
     <!-- Between the file-variables card above and push settings below: the
-         JSON file name Download will actually use (primaryFilename() —
-         gitlab's own name if GitLab is configured, else github's, same
-         fallback the two push destinations used to show separately, see
-         the .filename-row comment above), with Download itself right
-         beside it. Pulled out of .export-panel because Download was never
-         tied to a push destination in the first place. -->
+         one JSON file name, editable here directly (see primary-filename's
+         input listener below) and shared by Download and every push
+         destination alike — no more a per-provider Settings field, see
+         gitlabConfig()/githubConfig() — with Download itself right beside
+         it. Pulled out of .export-panel because Download was never tied to
+         a push destination in the first place. -->
     <div class="json-download-card" id="json-download-card" data-level="2">
       <div class="json-download-header">
-        <p class="json-download-title">Json file</p>
+        <div class="json-download-title-group">
+          <!-- Plain inline SVG, not React-mounted — same reasoning as the
+               GitLab/GitHub logos on .target-row-title below: this card's
+               title row is static markup, not a React root. Lucide's
+               "file-text" glyph — a document, reading as "this is the
+               file" the way the collections card's braces icon reads as
+               "these are the variables". -->
+          <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <path d="M14 2v6h6"/>
+            <path d="M16 13H8"/>
+            <path d="M16 17H8"/>
+            <path d="M10 9H8"/>
+          </svg>
+          <p class="json-download-title">Json file</p>
+        </div>
         <!-- The file-size tag that used to sit on the collections card
              (beside its token count) — it describes this JSON file, so it
              reads better here, at the right of this card's own title. -->
@@ -21408,7 +21432,6 @@ html[data-theme=dark] {
             <span id="gl-host-mount"></span>
             <span id="gl-project-mount"></span>
             <span id="gl-branch-mount"></span>
-            <span id="gl-filename-mount"></span>
           </div>
         </div>
 
@@ -21448,7 +21471,6 @@ html[data-theme=dark] {
             </div>
             <span id="gh-repo-mount"></span>
             <span id="gh-branch-mount"></span>
-            <span id="gh-filename-mount"></span>
           </div>
         </div>
 
@@ -47509,7 +47531,7 @@ html[data-theme=dark] {
   function mountTextField(mountId, props, level) {
     mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PomTextField, { ...props }), level);
   }
-  mountTextField("primary-filename-mount", { id: "primary-filename", label: "File name", readonly: true, defaultValue: "tokens.json", tabIndex: -1, title: "JSON file name (set in Settings)" }, CARD_LEVEL);
+  mountTextField("primary-filename-mount", { id: "primary-filename", label: "File name", defaultValue: "tokens.json", placeholder: "tokens.json", title: "JSON file name \u2014 used for both Download and every push destination" }, CARD_LEVEL);
   window.PomCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false, CARD_LEVEL);
   mountButton("add-repo-settings-btn-mount", { id: "add-repo-settings-btn", variant: "outline", size: "large", label: "Add Repo Settings", block: true }, CARD_LEVEL);
   mountButton("gitlab-small-settings-btn-mount", { id: "gitlab-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
@@ -47524,11 +47546,9 @@ html[data-theme=dark] {
   mountTextField("gl-host-mount", { id: "gl-host", label: "GitLab Host", placeholder: "https://gitlab.com" }, CARD_LEVEL);
   mountTextField("gl-project-mount", { id: "gl-project", label: "Project (path or ID)", placeholder: "group/subgroup/project or 1234" }, CARD_LEVEL);
   mountTextField("gl-branch-mount", { id: "gl-branch", label: "Branch", placeholder: "main" }, CARD_LEVEL);
-  mountTextField("gl-filename-mount", { id: "gl-filename", label: "JSON file name", placeholder: "tokens.json" }, CARD_LEVEL);
   mountTextField("gh-token-mount", { id: "gh-token", type: "password", label: "GitHub Token", placeholder: "ghp-\u2026 (stored only on this machine)" }, CARD_LEVEL);
   mountTextField("gh-repo-mount", { id: "gh-repo", label: "Repository (owner/repo)", placeholder: "my-org/my-repo" }, CARD_LEVEL);
   mountTextField("gh-branch-mount", { id: "gh-branch", label: "Branch", placeholder: "main" }, CARD_LEVEL);
-  mountTextField("gh-filename-mount", { id: "gh-filename", label: "JSON file name", placeholder: "tokens.json" }, CARD_LEVEL);
   window.PomExportMode = { onChange: null };
   (function mountExportMode() {
     const container = document.getElementById("export-mode-control-mount");
@@ -48570,32 +48590,31 @@ react/cjs/react-jsx-runtime.development.js:
     function defaultFilename() {
       return dtcgShape ? dtcgFilename(DEFAULT_FILENAME) : DEFAULT_FILENAME;
     }
-    // Rewrite both providers' file name fields for the format just picked.
-    // Runs off the fields themselves, so a customised name keeps its stem.
+    // Rewrite the one file name field for the format just picked. Runs off
+    // the field itself, so a customised name keeps its stem.
     function applyFilenameForFormat() {
-      ['gl-filename', 'gh-filename'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        var current = el.value.trim();
-        if (!current) return;   // empty = provider not added; leave it alone
-        setFieldValue(id, dtcgShape ? dtcgFilename(current) : plainFilename(current));
-      });
+      var el = document.getElementById('primary-filename');
+      if (!el) return;
+      var current = el.value.trim();
+      if (!current) return;
+      setFieldValue('primary-filename', dtcgShape ? dtcgFilename(current) : plainFilename(current));
     }
 
-    // Full repo path pushed to Git = per-provider folder + per-provider file
-    // name (both set in Settings — see gitlabConfig()/githubConfig()).
+    // Full repo path pushed to Git = per-provider folder + the one shared
+    // file name (see sharedFilename()/gitlabConfig()/githubConfig()).
     function composeFilePath(folder, filename) {
       folder = (folder || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
       var name = (filename || '').trim() || defaultFilename();
       return folder ? folder + '/' + name : name;
     }
 
-    // The plain "Download" action isn't tied to either push destination, so
-    // it needs one name to fall back on — GitLab's own file name when
-    // GitLab is configured, else GitHub's (mirrors the same gitlab-first
-    // fallback pushTarget itself uses elsewhere).
+    // The one JSON file name — edited directly on the main screen's "Json
+    // file" card, not per-provider in Settings any more. Used for Download,
+    // the Output format hint, and (via gitlabConfig()/githubConfig() below)
+    // every push destination alike, kept under its original name since
+    // that's what those other call sites already expect.
     function primaryFilename() {
-      return gitlabAdded ? gitlabConfig().filename : githubConfig().filename;
+      return document.getElementById('primary-filename').value.trim() || defaultFilename();
     }
 
     // ── GitLab settings: baked-in standard defaults + editable overrides ──────
@@ -48711,7 +48730,7 @@ react/cjs/react-jsx-runtime.development.js:
         host: document.getElementById('gl-host').value.trim() || GITLAB_DEFAULTS.host,
         project: document.getElementById('gl-project').value.trim() || GITLAB_DEFAULTS.project,
         branch: document.getElementById('gl-branch').value.trim() || GITLAB_DEFAULTS.branch,
-        filename: document.getElementById('gl-filename').value.trim() || defaultFilename(),
+        filename: primaryFilename(),
         folders: glFolders.slice(),
         folder: glActiveFolder,        // active path used for the push
         activeFolder: glActiveFolder
@@ -48729,7 +48748,7 @@ react/cjs/react-jsx-runtime.development.js:
         token: document.getElementById('gh-token').value.trim(),
         repo: document.getElementById('gh-repo').value.trim(),
         branch: document.getElementById('gh-branch').value.trim() || 'main',
-        filename: document.getElementById('gh-filename').value.trim() || defaultFilename(),
+        filename: primaryFilename(),
         folders: ghFolders.slice(),
         folder: ghActiveFolder,
         activeFolder: ghActiveFolder
@@ -48856,32 +48875,18 @@ react/cjs/react-jsx-runtime.development.js:
 
     // Settings has no view/edit mode: every field is editable the moment
     // the page opens, and changes persist on their own (see the auto-save
-    // listener below). This re-renders the folder lists and re-syncs the
-    // main screen from them. Which provider blocks and buttons are SHOWN
-    // is updateProviderSectionVisibility()'s job, not this one.
+    // listener below). This re-renders the folder lists. Which provider
+    // blocks and buttons are SHOWN is updateProviderSectionVisibility()'s
+    // job, not this one.
     function refreshSettingsControls() {
       updateClearTokenButtons();
       if (gitlabAdded) renderFolderList();
       if (githubAdded) renderGithubFolderList();
-      // The Settings fields are the source of truth — refresh the main
-      // screen's read-only file-name displays to match, same as the folder
-      // dropdowns already do via renderFolderList.
-      syncMainScreenFilenames();
       // Also re-check whether the commit box should be disabled — a token
       // or repo could have just been filled in (or cleared), and
       // updatePushTargetUI() (the other call site for this) only runs on
       // pushTarget/provider changes, not on every Settings edit.
       updateActionUI();
-    }
-
-    // Keeps the main screen's read-only file-name field in sync with
-    // whichever provider's Settings field actually names the file Download
-    // will use (primaryFilename() — same gitlab-then-github fallback used
-    // everywhere else) — called from refreshSettingsControls() and from
-    // the Settings auto-save, rather than wiring a separate onChange for a
-    // field that's never live-typed into from the main screen itself.
-    function syncMainScreenFilenames() {
-      setFieldValue('primary-filename', primaryFilename());
     }
 
     // Shows/hides everything under "Repository settings": the GitLab/GitHub
@@ -48935,20 +48940,24 @@ react/cjs/react-jsx-runtime.development.js:
           // Output format switch. Stored as a plain boolean rather than the
           // shape name so a config saved here stays readable if the converter
           // ever grows more shapes.
-          dtcg: dtcgShape !== null
+          dtcg: dtcgShape !== null,
+          // One JSON file name for both providers now — no longer nested
+          // per-provider below (see gitlabConfig()/githubConfig() and the
+          // migration read in setState()).
+          filename: primaryFilename()
         };
         if (gitlabAdded) {
           var c = gitlabConfig();
           state.gitlab = {
             token: c.token, host: c.host, project: c.project, branch: c.branch,
-            filename: c.filename, folders: c.folders, activeFolder: c.activeFolder
+            folders: c.folders, activeFolder: c.activeFolder
           };
         }
         if (githubAdded) {
           var gc = githubConfig();
           state.github = {
             token: gc.token, repo: gc.repo, branch: gc.branch,
-            filename: gc.filename, folders: gc.folders, activeFolder: gc.activeFolder
+            folders: gc.folders, activeFolder: gc.activeFolder
           };
         }
         return state;
@@ -48978,6 +48987,18 @@ react/cjs/react-jsx-runtime.development.js:
         // re-run, because includeDescriptions is decided over there.
         if (dtcgShape !== previousDtcgShape) requestTransform();
 
+        // One shared file name now, not per-provider — a top-level
+        // `config.filename` in any config saved by this version, falling
+        // back to whichever provider's own filename an older save carried
+        // (gitlab preferred, matching primaryFilename()'s own fallback
+        // order) so an existing install's customised name survives the
+        // upgrade instead of silently resetting to the default.
+        setFieldValue('primary-filename',
+          config.filename ||
+          (config.gitlab && config.gitlab.filename) ||
+          (config.github && config.github.filename) ||
+          defaultFilename());
+
         var gl = config.gitlab;
         // Migrate legacy flat / v2 configs into a gitlab object.
         if (!gl) {
@@ -48990,7 +49011,6 @@ react/cjs/react-jsx-runtime.development.js:
           setFieldValue('gl-host', gl.host || GITLAB_DEFAULTS.host);
           setFieldValue('gl-project', gl.project || GITLAB_DEFAULTS.project);
           setFieldValue('gl-branch', gl.branch || GITLAB_DEFAULTS.branch);
-          setFieldValue('gl-filename', gl.filename || defaultFilename());
           // The baked-in standard paths are only a first-run starting point,
           // not a permanently-enforced floor — every row (standard or custom)
           // can be removed (see renderFolderList), and once a
@@ -49012,7 +49032,6 @@ react/cjs/react-jsx-runtime.development.js:
           setFieldValue('gl-host', '');
           setFieldValue('gl-project', '');
           setFieldValue('gl-branch', '');
-          setFieldValue('gl-filename', '');
           glFolders = [];
           glActiveFolder = '';
         }
@@ -49025,7 +49044,6 @@ react/cjs/react-jsx-runtime.development.js:
           setFieldValue('gh-token', gh.token || '');
           setFieldValue('gh-repo', gh.repo || '');
           setFieldValue('gh-branch', gh.branch || 'main');
-          setFieldValue('gh-filename', gh.filename || defaultFilename());
           ghFolders = Array.isArray(gh.folders) ? gh.folders.map(normFolder).filter(function(f) { return !!f; }) : [];
           ghActiveFolder = (gh.activeFolder && ghFolders.indexOf(normFolder(gh.activeFolder)) >= 0)
             ? normFolder(gh.activeFolder) : (ghFolders[0] || '');
@@ -49033,7 +49051,6 @@ react/cjs/react-jsx-runtime.development.js:
           setFieldValue('gh-token', '');
           setFieldValue('gh-repo', '');
           setFieldValue('gh-branch', '');
-          setFieldValue('gh-filename', '');
           ghFolders = [];
           ghActiveFolder = '';
         }
@@ -49099,12 +49116,14 @@ react/cjs/react-jsx-runtime.development.js:
         persistSettings();
         // A token or repo may have just been filled in, which is what
         // decides whether pushing is possible at all.
-        syncMainScreenFilenames();
         updateActionUI();
       }, 400);
     }
-    ['gl-token', 'gl-host', 'gl-project', 'gl-branch', 'gl-filename',
-     'gh-token', 'gh-repo', 'gh-branch', 'gh-filename'].forEach(function(id) {
+    // Same auto-save, same debounce — 'primary-filename' lives on the main
+    // screen now, not in Settings, but it's persisted the same way as
+    // every other field here (see gitSettings.getState()).
+    ['gl-token', 'gl-host', 'gl-project', 'gl-branch',
+     'gh-token', 'gh-repo', 'gh-branch', 'primary-filename'].forEach(function(id) {
       var el = document.getElementById(id);
       if (el) el.addEventListener('input', scheduleSettingsSave);
     });
@@ -49120,7 +49139,6 @@ react/cjs/react-jsx-runtime.development.js:
       clearTimeout(settingsSaveTimer);
       settingsSaveTimer = null;
       persistSettings();
-      syncMainScreenFilenames();
       updateActionUI();
     }
 

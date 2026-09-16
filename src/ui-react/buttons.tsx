@@ -429,7 +429,7 @@ mountVersionTag('version-tag-mount');
 /* ── text fields (filenames read-only, folder-new, connection fields) ──────── */
 function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(mountId, <PomTextField {...props} />, level); }
 
-mountTextField('primary-filename-mount', { id: 'primary-filename', label: 'File name', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'JSON file name (set in Settings)' }, CARD_LEVEL);
+mountTextField('primary-filename-mount', { id: 'primary-filename', label: 'File name', defaultValue: 'tokens.json', placeholder: 'tokens.json', title: 'JSON file name — used for both Download and every push destination' }, CARD_LEVEL);
 
 window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false, CARD_LEVEL);
 
@@ -448,11 +448,9 @@ mountTextField('gl-token-mount', { id: 'gl-token', type: 'password', label: 'Git
 mountTextField('gl-host-mount', { id: 'gl-host', label: 'GitLab Host', placeholder: 'https://gitlab.com' }, CARD_LEVEL);
 mountTextField('gl-project-mount', { id: 'gl-project', label: 'Project (path or ID)', placeholder: 'group/subgroup/project or 1234' }, CARD_LEVEL);
 mountTextField('gl-branch-mount', { id: 'gl-branch', label: 'Branch', placeholder: 'main' }, CARD_LEVEL);
-mountTextField('gl-filename-mount', { id: 'gl-filename', label: 'JSON file name', placeholder: 'tokens.json' }, CARD_LEVEL);
 mountTextField('gh-token-mount', { id: 'gh-token', type: 'password', label: 'GitHub Token', placeholder: 'ghp-… (stored only on this machine)' }, CARD_LEVEL);
 mountTextField('gh-repo-mount', { id: 'gh-repo', label: 'Repository (owner/repo)', placeholder: 'my-org/my-repo' }, CARD_LEVEL);
 mountTextField('gh-branch-mount', { id: 'gh-branch', label: 'Branch', placeholder: 'main' }, CARD_LEVEL);
-mountTextField('gh-filename-mount', { id: 'gh-filename', label: 'JSON file name', placeholder: 'tokens.json' }, CARD_LEVEL);
 
 /* ── hidden export-mode segmented control (Native / Token Studio) ───────────── */
 window.PomExportMode = { onChange: null };
