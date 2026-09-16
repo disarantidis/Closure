@@ -72,7 +72,7 @@ then hands you to the fields each one still needs.
 `scripts/build-ui.js` bundles `buttons.tsx` with **esbuild** and inlines the JS
 and CSS into the template, because a Figma plugin's `ui` must be **one**
 self-contained file. `buttons.tsx` mounts the Pomegranate components into
-`<span id="…-mount">` placeholders and exposes `window.Radd*` bridges the
+`<span id="…-mount">` placeholders and exposes `window.Pom*` bridges the
 template's vanilla script drives — so `code.js` and the template's logic are
 independent of which design system paints the controls.
 
