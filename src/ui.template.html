@@ -1443,7 +1443,16 @@
          gitlabConfig()/githubConfig() — with Download itself right beside
          it. Pulled out of .export-panel because Download was never tied to
          a push destination in the first place. -->
-    <div class="json-download-card" id="json-download-card" data-level="2">
+    <!-- data-level="4" — bumped from 2, along with every other plain
+         (non-inverted) card on this screen and in Settings: at level 2 in
+         light theme this card's own --background (#D6D6D3) landed almost
+         indistinguishable from the page's own blended level-1 background,
+         reported as the card edge barely being visible. Level 4's
+         --background (rgba(252,252,252,0.5), reading as a bright near-
+         white against the grayer page) is the ladder's own highest/most
+         elevated rung, giving the strongest contrast tokens.css offers
+         without inventing a one-off colour. -->
+    <div class="json-download-card" id="json-download-card" data-level="4">
       <div class="json-download-header">
         <div class="json-download-title-group">
           <!-- Plain inline SVG, not React-mounted — same reasoning as the
@@ -1476,7 +1485,9 @@
     <div class="actions actions-skeleton" id="actions-skeleton"></div>
 
     <div class="actions" id="actions" hidden>
-      <div class="export-panel" data-level="2">
+      <!-- data-level="4", same bump and same reason as .json-download-card
+           right above — see that comment. -->
+      <div class="export-panel" data-level="4">
         <!-- Only meaningful once BOTH providers are actually added (see
              updatePushTargetUI()'s tabMode — same gitlabAdded && githubAdded
              gate the Settings page's own GitLab/GitHub tab switcher uses).
@@ -1651,9 +1662,15 @@
              share ONE card now — the folder paths are this provider's own
              config, not a separate section, so they read as a sub-card
              nested inside GitLab's own card (.provider-subcard, data-
-             level="3" — one rung up from this card's own 2, the DS's usual
-             nested-surface step) rather than a sibling card below it. -->
-        <div class="provider-card" data-level="2">
+             level="3") rather than a sibling card below it. This card
+             itself is data-level="4" — the ladder's highest/most elevated
+             rung, not the "one rung up from GROUND" 2 it used to carry —
+             see .json-download-card's own comment on why; .provider-
+             subcard's own 3 now sits one rung UNDER this card instead of
+             over it, reading as recessed into it rather than raised out of
+             it, which still reads as clearly nested, just the other
+             direction. -->
+        <div class="provider-card" data-level="4">
           <div class="provider-section-heading">
             <p class="folder-paths-title">
               <span class="provider-logo-badge">
@@ -1691,7 +1708,9 @@
         </div>
       </div>
       <div id="github-fields" hidden>
-        <div class="provider-card" data-level="2">
+        <!-- data-level="4" — same bump as the GitLab card above, same
+             reason (see its own comment). -->
+        <div class="provider-card" data-level="4">
           <div class="provider-section-heading">
             <p class="folder-paths-title">
               <span class="provider-logo-badge">
@@ -1731,8 +1750,12 @@
            editing the connection you already have, so it comes after it. Same
            logo+name-left / action-right shape AND the same header-style
            card as the already-added heading below (both carry
-           .provider-section-heading; see .provider-add-row). -->
-      <div class="provider-section-heading provider-add-row" id="add-gitlab-row" data-level="2" hidden>
+           .provider-section-heading; see .provider-add-row). data-level="4"
+           on both — same bump/reason as .provider-card above: same shared
+           surface recipe (.provider-card, .provider-add-row), so it needed
+           the same fix to stay consistent with the added-provider card it
+           turns into once a token is entered. -->
+      <div class="provider-section-heading provider-add-row" id="add-gitlab-row" data-level="4" hidden>
         <p class="folder-paths-title">
           <span class="provider-logo-badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -1745,7 +1768,7 @@
       </div>
       <!-- GitHub is optional — add-only until configured, then editable and
            removable just like GitLab, but never required. -->
-      <div class="provider-section-heading provider-add-row" id="add-github-row" data-level="2">
+      <div class="provider-section-heading provider-add-row" id="add-github-row" data-level="4">
         <p class="folder-paths-title">
           <span class="provider-logo-badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

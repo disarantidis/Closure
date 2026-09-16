@@ -21325,7 +21325,16 @@ html[data-theme=dark] {
          gitlabConfig()/githubConfig() — with Download itself right beside
          it. Pulled out of .export-panel because Download was never tied to
          a push destination in the first place. -->
-    <div class="json-download-card" id="json-download-card" data-level="2">
+    <!-- data-level="4" — bumped from 2, along with every other plain
+         (non-inverted) card on this screen and in Settings: at level 2 in
+         light theme this card's own --background (#D6D6D3) landed almost
+         indistinguishable from the page's own blended level-1 background,
+         reported as the card edge barely being visible. Level 4's
+         --background (rgba(252,252,252,0.5), reading as a bright near-
+         white against the grayer page) is the ladder's own highest/most
+         elevated rung, giving the strongest contrast tokens.css offers
+         without inventing a one-off colour. -->
+    <div class="json-download-card" id="json-download-card" data-level="4">
       <div class="json-download-header">
         <div class="json-download-title-group">
           <!-- Plain inline SVG, not React-mounted — same reasoning as the
@@ -21358,7 +21367,9 @@ html[data-theme=dark] {
     <div class="actions actions-skeleton" id="actions-skeleton"></div>
 
     <div class="actions" id="actions" hidden>
-      <div class="export-panel" data-level="2">
+      <!-- data-level="4", same bump and same reason as .json-download-card
+           right above — see that comment. -->
+      <div class="export-panel" data-level="4">
         <!-- Only meaningful once BOTH providers are actually added (see
              updatePushTargetUI()'s tabMode — same gitlabAdded && githubAdded
              gate the Settings page's own GitLab/GitHub tab switcher uses).
@@ -21533,9 +21544,15 @@ html[data-theme=dark] {
              share ONE card now — the folder paths are this provider's own
              config, not a separate section, so they read as a sub-card
              nested inside GitLab's own card (.provider-subcard, data-
-             level="3" — one rung up from this card's own 2, the DS's usual
-             nested-surface step) rather than a sibling card below it. -->
-        <div class="provider-card" data-level="2">
+             level="3") rather than a sibling card below it. This card
+             itself is data-level="4" — the ladder's highest/most elevated
+             rung, not the "one rung up from GROUND" 2 it used to carry —
+             see .json-download-card's own comment on why; .provider-
+             subcard's own 3 now sits one rung UNDER this card instead of
+             over it, reading as recessed into it rather than raised out of
+             it, which still reads as clearly nested, just the other
+             direction. -->
+        <div class="provider-card" data-level="4">
           <div class="provider-section-heading">
             <p class="folder-paths-title">
               <span class="provider-logo-badge">
@@ -21573,7 +21590,9 @@ html[data-theme=dark] {
         </div>
       </div>
       <div id="github-fields" hidden>
-        <div class="provider-card" data-level="2">
+        <!-- data-level="4" — same bump as the GitLab card above, same
+             reason (see its own comment). -->
+        <div class="provider-card" data-level="4">
           <div class="provider-section-heading">
             <p class="folder-paths-title">
               <span class="provider-logo-badge">
@@ -21613,8 +21632,12 @@ html[data-theme=dark] {
            editing the connection you already have, so it comes after it. Same
            logo+name-left / action-right shape AND the same header-style
            card as the already-added heading below (both carry
-           .provider-section-heading; see .provider-add-row). -->
-      <div class="provider-section-heading provider-add-row" id="add-gitlab-row" data-level="2" hidden>
+           .provider-section-heading; see .provider-add-row). data-level="4"
+           on both — same bump/reason as .provider-card above: same shared
+           surface recipe (.provider-card, .provider-add-row), so it needed
+           the same fix to stay consistent with the added-provider card it
+           turns into once a token is entered. -->
+      <div class="provider-section-heading provider-add-row" id="add-gitlab-row" data-level="4" hidden>
         <p class="folder-paths-title">
           <span class="provider-logo-badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -21627,7 +21650,7 @@ html[data-theme=dark] {
       </div>
       <!-- GitHub is optional — add-only until configured, then editable and
            removable just like GitLab, but never required. -->
-      <div class="provider-section-heading provider-add-row" id="add-github-row" data-level="2">
+      <div class="provider-section-heading provider-add-row" id="add-github-row" data-level="4">
         <p class="folder-paths-title">
           <span class="provider-logo-badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -47350,6 +47373,7 @@ html[data-theme=dark] {
   var import_jsx_runtime21 = __toESM(require_jsx_runtime());
   var GROUND = 1;
   var CARD_LEVEL = 2;
+  var TOP_CARD_LEVEL = 4;
   var svg = (d, opts) => (size) => opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d, fillRule: opts.fillRule, clipRule: opts.fillRule }) }) : /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d }) });
   var IconArrowLeft = svg("M19 12H5M12 19l-7-7 7-7");
   var IconDownload = svg("M12 3v11m0 0l-4-4m4 4l4-4M5 20h14");
@@ -47653,7 +47677,7 @@ html[data-theme=dark] {
   }
   mountTextField("primary-filename-mount", { id: "primary-filename", label: "File name", defaultValue: "tokens.json", placeholder: "tokens.json", title: 'JSON file name \u2014 used for both Download and every push destination. ".json" is added automatically if you leave it out.' }, CARD_LEVEL);
   window.PomCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false, CARD_LEVEL);
-  mountButton("add-repo-settings-btn-mount", { id: "add-repo-settings-btn", variant: "outline", size: "large", label: "Add Repo Settings", block: true }, CARD_LEVEL);
+  mountButton("add-repo-settings-btn-mount", { id: "add-repo-settings-btn", variant: "filled", size: "large", label: "Add Repo Settings", block: true }, CARD_LEVEL);
   mountButton("gitlab-small-settings-btn-mount", { id: "gitlab-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
   mountButton("github-small-settings-btn-mount", { id: "github-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
   mountIconButton("gitlab-remove-push-btn-mount", { id: "gitlab-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitLab from push destination", "aria-label": "Remove GitLab from push destination", icon: IconTrash(16) }, CARD_LEVEL);
@@ -47824,18 +47848,18 @@ html[data-theme=dark] {
   })();
   mountOnce(
     "skeleton-list",
-    /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "skeleton-foundation-card", "data-level": 2, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "skeleton-foundation-card", "data-level": TOP_CARD_LEVEL, children: [
       /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "skeleton-foundation-card-title-group", children: [
         /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "circle", size: 18, label: "Loading" }),
         /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 160, height: 16, label: "" })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 64, height: 22, label: "" })
     ] }),
-    CARD_LEVEL
+    TOP_CARD_LEVEL
   );
   mountOnce(
     "actions-skeleton",
-    /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "export-panel", "data-level": 2, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "export-panel", "data-level": TOP_CARD_LEVEL, children: [
       /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "sk-row", children: [
         /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "circle", size: 14, label: "Loading" }),
         /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 70, height: 16, label: "" })
@@ -47844,7 +47868,7 @@ html[data-theme=dark] {
       /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", height: 68, width: "100%", label: "" }),
       /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", height: 44, width: "100%", label: "" })
     ] }),
-    CARD_LEVEL
+    TOP_CARD_LEVEL
   );
   (function mountToast() {
     const container = document.getElementById("toast-mount");

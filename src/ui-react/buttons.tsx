@@ -48,6 +48,20 @@ const GROUND: Level = 1;
    --nd-field-fill / --background-hover) agrees with the DOM's CSS cascade
    instead of silently assuming it still sits on GROUND. */
 const CARD_LEVEL: Level = 2;
+/* The ladder's highest/most elevated rung — .json-download-card,
+   .export-panel and .provider-card all carry data-level="4" directly in
+   the markup now (bumped from 2 for contrast against the page — see
+   .json-download-card's own HTML comment). Only needed here for the two
+   skeletons that stand in for those cards while loading: recessLevel(2)
+   and recessLevel(4) are NOT the same rung (unlike fieldLevel, which maps
+   both 2 and 4 to 3 by design — see LevelContext.tsx), so Skeleton's own
+   `data-fill={recessLevel(useLevel())}` would compute the wrong rung for
+   bars mounted on what's actually a level-4 island if this weren't
+   threaded through. Every ORDINARY field/button mounted inside those same
+   cards keeps using CARD_LEVEL unchanged and is still correct — Button
+   and TextField both compute their own fill via fieldLevel, where the
+   2-vs-4 distinction doesn't exist. */
+const TOP_CARD_LEVEL: Level = 4;
 
 import '../vendor/pomegranate/styles/tokens.css';
 import '../vendor/pomegranate/styles/fonts.css';
@@ -435,7 +449,13 @@ mountTextField('primary-filename-mount', { id: 'primary-filename', label: 'File 
 
 window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false, CARD_LEVEL);
 
-mountButton('add-repo-settings-btn-mount', { id: 'add-repo-settings-btn', variant: 'outline', size: 'large', label: 'Add Repo Settings', block: true }, CARD_LEVEL);
+// filled/primary — was outline. This replaces the Push button in the exact
+// same slot whenever nothing is configured yet (updateActionUI()), so it's
+// the main screen's one obvious next step at that point, same weight as
+// Push itself gets once something IS configured — an outline button read
+// as a secondary/optional action for what is actually the only path
+// forward.
+mountButton('add-repo-settings-btn-mount', { id: 'add-repo-settings-btn', variant: 'filled', size: 'large', label: 'Add Repo Settings', block: true }, CARD_LEVEL);
 mountButton('gitlab-small-settings-btn-mount', { id: 'gitlab-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
 mountButton('github-small-settings-btn-mount', { id: 'github-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
 mountIconButton('gitlab-remove-push-btn-mount', { id: 'gitlab-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconTrash(16) }, CARD_LEVEL);
@@ -619,22 +639,24 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
 // right beside .export-panel's own skeleton below, so both read as one
 // family of "the container that's coming, in outline" rather than two
 // unrelated placeholder styles.
-// data-level={2}, matching the real cards this stands in for
-// (.json-download-card / .export-panel both carry it in the markup) —
-// without it --background resolves at whatever level this mounts on
-// (GROUND, same as the page itself), painting the "card" the exact same
-// colour as the page behind it: a loading card shape that's there but
-// invisible. Same frozen-alias reasoning as everywhere else in this file
-// that reads --background directly instead of --app-surface.
+// data-level={TOP_CARD_LEVEL}, matching the real card this stands in for
+// (.json-download-card carries the same level in the markup) — without it
+// --background resolves at whatever level this mounts on (GROUND, same as
+// the page itself), painting the "card" the exact same colour as the page
+// behind it: a loading card shape that's there but invisible. Same
+// frozen-alias reasoning as everywhere else in this file that reads
+// --background directly instead of --app-surface. The mountOnce level arg
+// is threaded through too (see TOP_CARD_LEVEL's own comment on why it
+// can't stay CARD_LEVEL here specifically).
 mountOnce('skeleton-list',
-  <div className="skeleton-foundation-card" data-level={2}>
+  <div className="skeleton-foundation-card" data-level={TOP_CARD_LEVEL}>
     <div className="skeleton-foundation-card-title-group">
       <Skeleton shape="circle" size={18} label="Loading" />
       <Skeleton shape="block" width={160} height={16} label="" />
     </div>
     <Skeleton shape="block" width={64} height={22} label="" />
   </div>,
-  CARD_LEVEL,
+  TOP_CARD_LEVEL,
 );
 // Mirrors the real push-settings card's current shape: a small icon+title
 // row (whichever provider ends up shown — GitLab or GitHub, not known
@@ -642,10 +664,12 @@ mountOnce('skeleton-list',
 // sit beside it moved out into its own card — see .filename-row's own
 // comment — so there's only ever one field here now), the commit textarea,
 // and the (now full-width, Download having moved out too) push button.
-// data-level={2} for the same reason as skeleton-list's own card above —
-// the real #actions .export-panel carries it directly in the markup.
+// data-level={TOP_CARD_LEVEL} for the same reason as skeleton-list's own
+// card above — the real #actions .export-panel carries it directly in the
+// markup, and the mountOnce level arg needs to match for the same
+// recessLevel reason (see TOP_CARD_LEVEL's own comment).
 mountOnce('actions-skeleton',
-  <div className="export-panel" data-level={2}>
+  <div className="export-panel" data-level={TOP_CARD_LEVEL}>
     <div className="sk-row">
       <Skeleton shape="circle" size={14} label="Loading" />
       <Skeleton shape="block" width={70} height={16} label="" />
@@ -654,7 +678,7 @@ mountOnce('actions-skeleton',
     <Skeleton shape="block" height={68} width={'100%'} label="" />
     <Skeleton shape="block" height={44} width={'100%'} label="" />
   </div>,
-  CARD_LEVEL,
+  TOP_CARD_LEVEL,
 );
 
 /* ── toast ─────────────────────────────────────────────────────────────────── */
