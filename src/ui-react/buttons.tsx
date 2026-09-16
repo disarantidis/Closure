@@ -23,7 +23,6 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 
 import { Button } from '../vendor/pomegranate/panel/node/Button';
-import { Checkbox } from '../vendor/pomegranate/panel/node/Checkbox';
 import { Switch } from '../vendor/pomegranate/panel/node/Switch';
 import { SegmentedControl } from '../vendor/pomegranate/panel/node/SegmentedControl';
 import { DropDownSelect } from '../vendor/pomegranate/panel/node/DropDownSelect';
@@ -330,12 +329,12 @@ type FolderListBridge = {
   onRemove: ((idx: number) => void) | null;
 };
 type FolderSelectBridge = { setItems: (items: any[], selectedValue: string) => void; onChange: ((value: string) => void) | null };
-// 'none' is the onboarding dialog's "skip both" choice — Download alone is
+// Only ever reaches window.PomOnboardingDialog.onConfirm now — this used to
+// also be the Settings page's own Push destination control's value type
+// (mountPushTargetControl, removed), where 'none' could never occur since
+// that control only showed once both providers were already added. Here it
+// still can: the onboarding dialog's "skip both" choice — Download alone is
 // a complete, supported workflow, not an unfinished state to route past.
-// Only ever reaches window.PomOnboardingDialog.onConfirm; the Settings
-// page's own Push destination control (mountPushTargetControl below) never
-// produces it — that control only shows once BOTH providers are already
-// added, so "neither" isn't a real choice there.
 type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
 declare global {
   interface Window {
@@ -362,7 +361,6 @@ declare global {
     PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
-    PomPushTarget: { onChange: ((value: PushTarget) => void) | null; setValue: (value: PushTarget) => void };
     PomDtcgFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void };
     PomOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
   }
@@ -502,12 +500,6 @@ window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commi
 // as a secondary/optional action for what is actually the only path
 // forward.
 mountButton('add-repo-settings-btn-mount', { id: 'add-repo-settings-btn', variant: 'filled', size: 'large', label: 'Add Repo Settings', block: true }, CARD_LEVEL);
-mountButton('gitlab-small-settings-btn-mount', { id: 'gitlab-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
-mountButton('github-small-settings-btn-mount', { id: 'github-small-settings-btn', variant: 'tonal', size: 'small', label: 'Add Settings', leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
-mountIconButton('gitlab-remove-push-btn-mount', { id: 'gitlab-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconTrash(16) }, CARD_LEVEL);
-mountIconButton('github-remove-push-btn-mount', { id: 'github-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconTrash(16) }, CARD_LEVEL);
-mountIconButton('gitlab-empty-remove-push-btn-mount', { id: 'gitlab-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconTrash(16) }, CARD_LEVEL);
-mountIconButton('github-empty-remove-push-btn-mount', { id: 'github-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconTrash(16) }, CARD_LEVEL);
 
 mountTextField('folder-new-mount', { id: 'folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' }, CARD_LEVEL);
 mountTextField('github-folder-new-mount', { id: 'github-folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' }, CARD_LEVEL);
@@ -540,47 +532,20 @@ window.PomExportMode = { onChange: null };
   flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
 })();
 
-/* ── push destination (GitLab / GitHub checkboxes) ─────────────────────────── */
+/* ── onboarding provider pick (GitLab / GitHub checkboxes) ──────────────────
+   Used only by the onboarding dialog below now — there used to be a second,
+   permanent Settings-page control built on the same PushCheckboxState shape
+   (mountPushTargetControl, a "which provider(s) get pushed to" picker with
+   GitLab/GitHub/Both checkboxes of its own). Removed: the main screen's own
+   provider tab (mountMainProviderTabControl below) is the real push
+   destination now, so a second, separate picker that could disagree with it
+   was redundant — see mainProviderTab's own comment in ui.template.html. */
 type PushCheckboxState = { gitlab: boolean; github: boolean };
 function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   if (s.gitlab && s.github) return 'both';
   if (s.github) return 'github';
   return 'gitlab';
 }
-function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
-  return { gitlab: t !== 'github', github: t === 'github' || t === 'both' };
-}
-(function mountPushTargetControl() {
-  const container = document.getElementById('push-target-control-mount');
-  let set: (s: PushCheckboxState) => void = () => {};
-  function View() {
-    const [state, setState] = useState<PushCheckboxState>({ gitlab: true, github: false });
-    set = setState;
-    function toggle(which: keyof PushCheckboxState, checked: boolean) {
-      const next = { ...state, [which]: checked } as PushCheckboxState;
-      if (!next.gitlab && !next.github) next[which] = true;
-      setState(next);
-      window.PomPushTarget.onChange?.(targetFromCheckboxes(next));
-    }
-    return (
-      // medium, not large: .nd-check's size prop scales the ROW's min-height
-      // (24/32/56) far more than the visible mark itself (16/18/22px) — it's
-      // built for a checkbox sitting in a taller row whose caption may wrap
-      // to a second line, so the mark pins to the first line rather than
-      // centering. A standalone checkbox with a one-line caption gets none
-      // of that benefit, only the padding: at 'large' the clickable <label>
-      // ran 34px below the visible mark, into what looked like dead space
-      // next to the next row. 'medium' still grows the mark (16→18px) with
-      // only a 14px gap — most of the "bigger" ask, none of the defect.
-      <>
-        <Checkbox size="medium" label="GitLab" checked={state.gitlab} onChange={(c: boolean) => toggle('gitlab', c)} />
-        <Checkbox size="medium" label="GitHub" checked={state.github} onChange={(c: boolean) => toggle('github', c)} />
-      </>
-    );
-  }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
-  window.PomPushTarget = { onChange: null, setValue: (v) => set(checkboxesFromTarget(v)) };
-})();
 
 /* ── Settings → Output format switch (Token Studio / DTCG) ──────────────────── */
 (function mountDtcgFormatSwitch() {
@@ -644,13 +609,15 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
   window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
 })();
 
-/* ── main screen: GitLab / GitHub folder-path tab switcher ─────────────────
+/* ── main screen: GitLab / GitHub push destination + folder-path tab ───────
    Same shape as mountRepoTabControl above, one screen over: when both
    providers are added, this replaces showing both provider blocks stacked
    with a single switcher, so only one folder-path picker shows at a time
-   (see updatePushTargetUI()'s tabMode). Independent of the Push destination
-   control (window.PomPushTarget) — that decides where a push actually goes;
-   this is only about which provider's folder path is being looked at. */
+   (see updatePushTargetUI()'s tabMode). This IS the real push destination
+   now too — there used to be a separate Settings-page picker
+   (window.PomPushTarget, removed) that could disagree with whichever tab
+   was selected here; now there's exactly one control for both "which
+   folder path am I looking at" and "where does Push actually send tokens". */
 (function mountMainProviderTabControl() {
   const container = document.getElementById('main-provider-tab-mount');
   let set: (v: 'gitlab' | 'github') => void = () => {};
@@ -659,7 +626,7 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
     set = setValue;
     return (
       <SegmentedControl
-        label="Folder path provider"
+        label="Push destination"
         size="medium"
         block
         value={value}
@@ -1121,9 +1088,9 @@ function ProviderChoiceCard({ which, label, checked, onToggle }: { which: 'gitla
             // Neither checked has nothing for step 2 to ask about (no
             // token to collect for a provider that wasn't picked), so it
             // confirms straight from here instead of advancing —
-            // targetFromCheckboxes() can't express "neither" (it's shared
-            // with mountPushTargetControl, where that's never a valid
-            // state), so 'none' is passed explicitly.
+            // targetFromCheckboxes() can't express "neither" (it's built
+            // for a picker where at least one is always checked), so
+            // 'none' is passed explicitly.
             <Button variant="primary" size="large" block onClick={() => {
               if (neitherChecked) {
                 setO(false);

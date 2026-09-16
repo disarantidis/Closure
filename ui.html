@@ -567,10 +567,10 @@
       justify-content: space-between;
       gap: 8px;
       /* 16px, not 6px — matches the title-to-content gap every other
-         section title on the Settings page uses (.output-format /
-         .push-target > .folder-paths-title, both margin-bottom: 16px);
-         this title reads as the same kind of section title now (see the
-         font rule below), so it gets the same gap before its own content. */
+         section title on the Settings page uses (.output-format's own
+         .folder-paths-title, margin-bottom: 16px); this title reads as the
+         same kind of section title now (see the font rule below), so it
+         gets the same gap before its own content. */
       margin: 0 0 16px;
       /* This --spacing-component-6 (22px) inset was confirmed against the
          real plugin back when .export-panel's own padding was a plain
@@ -627,14 +627,6 @@
       font: var(--microcopy-regular);
       letter-spacing: var(--microcopy-regular-letter-spacing);
       color: var(--app-text-muted);
-    }
-    /* Houses the small "Add ___ Settings" button and its trash-icon
-       neighbor together as one right-aligned group (see .target-row-header's
-       space-between) when a provider isn't ready but the other one is. */
-    .target-row-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
 
     /* Read-only list of saved folder paths in Settings (managed via Edit). */
@@ -737,8 +729,8 @@
       margin-bottom: 24px;
       /* The card's own EDGE follows the section titles' line, not the
          page's plain 16px inset: every title's TEXT and every control
-         beside it (the DTCG switch, the push-target checkboxes, the
-         Repository-settings tab switcher) sits this same extra amount past
+         beside it (the DTCG switch, the Repository-settings tab switcher)
+         sits this same extra amount past
          that plain inset (.folder-paths-title's own padding-left, and each
          control row's own padding — all --spacing-component-3, reduced
          from -6 when the outer margin throughout this page read as too
@@ -813,10 +805,9 @@
 
     /* "Repository settings" — always-visible heading for whichever
        provider's connection fields are shown below (see
-       updateProviderSectionVisibility() in the script). No top margin,
-       same reasoning as .push-target above: the page's own top padding, or
-       .push-target's bottom margin when that section is also visible,
-       already supplies the gap above it. */
+       updateProviderSectionVisibility() in the script). No top margin:
+       .output-format's own bottom margin (immediately above it now) already
+       supplies the gap. */
     .repo-settings-heading {
       margin: 0 0 24px;
     }
@@ -827,8 +818,8 @@
        provider exists (buttons.tsx mounts a segmented control here) — see
        updateProviderSectionVisibility(). margin-bottom only has an effect
        while visible, so it's safe to declare unconditionally. Same
-       padding-left as #dtcg-format-control-mount / #push-target-control-
-       mount below — every section's title gets this indent on itself
+       padding-left as #dtcg-format-control-mount below — every section's
+       title gets this indent on itself
        (.repo-settings-heading > .folder-paths-title) and its control
        needs the same one restated, since a control has no card padding
        of its own to inherit it from. This row was missing it: the
@@ -841,10 +832,10 @@
        padding-right matches it, added once the control gained `block`
        (fills the row's content width): with only padding-left, the
        control's left edge sat 22px in but its right edge sat flush with
-       the row's own edge — 22px on one side, 0 on the other. Every other
-       control this indent applies to (the DTCG switch, the push-target
-       checkboxes) is intrinsically sized, so that asymmetry was invisible
-       until this one started filling its row. (Both sides were 22px —
+       the row's own edge — 22px on one side, 0 on the other. The DTCG
+       switch, the other control this indent applies to, is intrinsically
+       sized, so that asymmetry was invisible until this one started
+       filling its row. (Both sides were 22px —
        --spacing-component-6 — at the time; since reduced to -3 with every
        other use of this same indent, see .provider-card's comment above
        for why.) */
@@ -856,10 +847,12 @@
 
     /* "Output format" — Token Studio JSON vs W3C DTCG. Leads the page, so
        margin (the page's own top padding already spaces it from the header),
-       and the standard 40px bottom rhythm before whatever follows. Same
-       title/control indent as .push-target below: a switch, like a checkbox,
-       has no card padding of its own to push it in from the row edge, so the
-       indent comes from the container. */
+       and the standard 40px bottom rhythm before whatever follows (the
+       "Repository settings" heading right below it — there used to be a
+       separate "Push destination" section between them; removed, see
+       mainProviderTab's own comment in the script). A switch, like a
+       checkbox, has no card padding of its own to push it in from the row
+       edge, so the indent comes from the container. */
     .output-format {
       margin: 0 0 40px;
     }
@@ -875,36 +868,6 @@
        more than .folder-paths-subtitle's default 2px of separation. */
     .output-format > .folder-paths-subtitle {
       margin-top: 8px;
-      padding-left: var(--spacing-component-3);
-    }
-
-    /* Reuses a class that used to have zero matching markup (the historical
-       GitHub/GitLab/Both picker this is reviving was fully removed once
-       before — see pom-migration-progress memory). No top margin —
-       .output-format above it already supplies the 40px rhythm — just a
-       bottom margin to keep that rhythm before the GitLab fields that now
-       follow it. Padding-left on the
-       title is scoped to the title only (not the whole container) so the
-       GitLab/GitHub checkboxes below stay flush with the row edge, same as
-       how the folder-icon alignment above only ever shifts the heading
-       text, never the rows. */
-    .push-target {
-      margin: 0 0 40px;
-    }
-    .push-target > .folder-paths-title {
-      padding-left: var(--spacing-component-3);
-      margin-bottom: 16px;
-    }
-    /* The two checkboxes render as a vertical list (buttons.tsx mounts them
-       as siblings, no wrapping div of their own). Same padding-left as the
-       title above — unlike a folder row, a checkbox has no card padding of
-       its own to push its icon in from the row edge, so the indent has to
-       come from the container instead; the end result is the same column
-       (icon left edge at 36px) as the title and the folder icons share. */
-    #push-target-control-mount {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
       padding-left: var(--spacing-component-3);
     }
 
@@ -21534,8 +21497,8 @@ html[data-theme=dark] {
              now shown once, for whichever file Download actually names, in
              .json-download-card above this card (see primaryFilename()).
              The row-title always
-             shows (which push location a row is for should be clear
-             regardless of how many destinations are active), each with its
+             shows, so which provider a row is for is always clear, each
+             with its
              provider's own logo glyph in front of the text — plain inline
              SVGs (not React-mounted), same reasoning as the settings-page
              header's own decorative icon: inline SVG icons has no
@@ -21559,23 +21522,6 @@ html[data-theme=dark] {
             <div class="target-row-empty" id="gitlab-target-empty" hidden>
               <span class="target-row-empty-label">Add folder path (optional)</span>
               <span id="gitlab-empty-add-btn-mount"></span>
-              <!-- 'both' mode only (see updateTargetRow()'s bothMode param) —
-                   same "uncheck this provider's push box" shortcut as the
-                   trash button below, offered here too since a ready-but-
-                   pathless provider is just as valid a moment to bail out
-                   of pushing to it. -->
-              <span id="gitlab-empty-remove-push-btn-mount" hidden></span>
-            </div>
-            <!-- Shown instead of target-row-empty — 'both' mode only —
-                 when GitLab isn't ready but GitHub is (see
-                 updatePushTargetUI()/updateTargetRow()). Title/logo stay
-                 visible; only the field row below is replaced. The trash
-                 button unchecks GitLab from the push destination entirely
-                 (mirrors unchecking its box in Settings), leaving GitHub —
-                 already confirmed ready here — as the sole target. -->
-            <div class="target-row-actions" id="gitlab-target-actions" hidden>
-              <span id="gitlab-small-settings-btn-mount"></span>
-              <span id="gitlab-remove-push-btn-mount"></span>
             </div>
           </div>
           <div class="filename-row" id="gitlab-filename-row">
@@ -21593,11 +21539,6 @@ html[data-theme=dark] {
             <div class="target-row-empty" id="github-target-empty" hidden>
               <span class="target-row-empty-label">Add folder path (optional)</span>
               <span id="github-empty-add-btn-mount"></span>
-              <span id="github-empty-remove-push-btn-mount" hidden></span>
-            </div>
-            <div class="target-row-actions" id="github-target-actions" hidden>
-              <span id="github-small-settings-btn-mount"></span>
-              <span id="github-remove-push-btn-mount"></span>
             </div>
           </div>
           <div class="filename-row" id="github-filename-row">
@@ -21656,16 +21597,6 @@ html[data-theme=dark] {
         <p class="folder-paths-title">Output format</p>
         <span id="dtcg-format-control-mount"></span>
         <p class="folder-paths-subtitle" id="output-format-hint"></p>
-      </div>
-
-      <!-- Only meaningful — and only shown — once GitHub is configured
-           alongside GitLab; a general Settings-level preference the main
-           screen's Push button just follows (see performPush()). Leads the
-           page (before the GitLab/GitHub connection fields) since it's the
-           setting most users will come back to change. -->
-      <div class="push-target" id="push-target-section" hidden>
-        <p class="folder-paths-title">Push destination</p>
-        <span id="push-target-control-mount"></span>
       </div>
 
       <!-- Always-visible heading for whichever provider's connection fields
@@ -22922,11 +22853,11 @@ html[data-theme=dark] {
             var dispatcher = resolveDispatcher();
             return dispatcher.useReducer(reducer, initialArg, init);
           }
-          function useRef4(initialValue) {
+          function useRef3(initialValue) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useRef(initialValue);
           }
-          function useEffect4(create, deps) {
+          function useEffect3(create, deps) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useEffect(create, deps);
           }
@@ -22964,7 +22895,7 @@ html[data-theme=dark] {
             var dispatcher = resolveDispatcher();
             return dispatcher.useDeferredValue(value);
           }
-          function useId7() {
+          function useId6() {
             var dispatcher = resolveDispatcher();
             return dispatcher.useId();
           }
@@ -23709,14 +23640,14 @@ html[data-theme=dark] {
           exports.useContext = useContext3;
           exports.useDebugValue = useDebugValue;
           exports.useDeferredValue = useDeferredValue;
-          exports.useEffect = useEffect4;
-          exports.useId = useId7;
+          exports.useEffect = useEffect3;
+          exports.useId = useId6;
           exports.useImperativeHandle = useImperativeHandle;
           exports.useInsertionEffect = useInsertionEffect;
           exports.useLayoutEffect = useLayoutEffect;
           exports.useMemo = useMemo;
           exports.useReducer = useReducer;
-          exports.useRef = useRef4;
+          exports.useRef = useRef3;
           exports.useState = useState3;
           exports.useSyncExternalStore = useSyncExternalStore;
           exports.useTransition = useTransition;
@@ -46294,11 +46225,11 @@ html[data-theme=dark] {
               return jsxWithValidation(type, props, key, false);
             }
           }
-          var jsx22 = jsxWithValidationDynamic;
-          var jsxs17 = jsxWithValidationStatic;
+          var jsx21 = jsxWithValidationDynamic;
+          var jsxs16 = jsxWithValidationStatic;
           exports.Fragment = REACT_FRAGMENT_TYPE;
-          exports.jsx = jsx22;
-          exports.jsxs = jsxs17;
+          exports.jsx = jsx21;
+          exports.jsxs = jsxs16;
         })();
       }
     }
@@ -46317,7 +46248,7 @@ html[data-theme=dark] {
   });
 
   // src/ui-react/buttons.tsx
-  var import_react15 = __toESM(require_react());
+  var import_react14 = __toESM(require_react());
   var import_client = __toESM(require_client());
   var import_react_dom = __toESM(require_react_dom());
 
@@ -46493,8 +46424,146 @@ html[data-theme=dark] {
     );
   });
 
-  // src/vendor/pomegranate/panel/node/Checkbox.tsx
+  // src/vendor/pomegranate/panel/node/Switch.tsx
   var import_react3 = __toESM(require_react());
+
+  // src/vendor/pomegranate/panel/node/SwitchMark.tsx
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
+  function SwitchMark({ checked = false, disabled = false, readOnly = false, glass = false, size = "small" }) {
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+      "span",
+      {
+        className: ["nd-switchmark", `s-${size}`, checked ? "is-checked" : "", disabled ? "is-disabled" : "", readOnly ? "is-readonly" : "", glass ? "is-glass" : ""].filter(Boolean).join(" "),
+        "data-tense": checked ? "strong" : void 0,
+        "aria-hidden": true,
+        children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "nd-switchmark-thumb" })
+      }
+    );
+  }
+
+  // src/vendor/pomegranate/panel/node/Switch.tsx
+  var import_jsx_runtime4 = __toESM(require_jsx_runtime());
+  function Switch({
+    checked,
+    onChange,
+    label,
+    labelHidden = false,
+    readOnly = false,
+    disabled = false,
+    size = "small",
+    glass = false,
+    style
+  }) {
+    const id = (0, import_react3.useId)();
+    const Shell = labelHidden ? "span" : "label";
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+      Shell,
+      {
+        className: ["nd-check", "nd-switch", `s-${size}`, disabled ? "is-disabled" : "", readOnly ? "is-readonly" : "", labelHidden ? "is-bare" : ""].filter(Boolean).join(" "),
+        htmlFor: labelHidden ? void 0 : id,
+        style,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "nd-check-control", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+              "input",
+              {
+                id,
+                className: "nd-check-input",
+                type: "checkbox",
+                role: "switch",
+                checked,
+                disabled,
+                "aria-readonly": readOnly && !disabled ? true : void 0,
+                onClick: readOnly ? (e) => e.preventDefault() : void 0,
+                onPointerDown: (e) => e.stopPropagation(),
+                "aria-label": labelHidden ? label : void 0,
+                onChange: (e) => !disabled && onChange(e.target.checked)
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SwitchMark, { size, readOnly, checked, disabled, glass })
+          ] }),
+          !labelHidden && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "nd-check-label", children: label })
+        ]
+      }
+    );
+  }
+
+  // src/vendor/pomegranate/panel/node/SegmentedControl.tsx
+  var import_react4 = __toESM(require_react());
+  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
+  function SegmentedControl({
+    options,
+    value,
+    onChange,
+    label,
+    size = "small",
+    disabled = false,
+    block = false,
+    style
+  }) {
+    const name = (0, import_react4.useId)();
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      "div",
+      {
+        role: "radiogroup",
+        "aria-label": label,
+        className: [
+          "nd-seg",
+          `s-${size}`,
+          /*
+            THE ROW FAMILY'S MARKER — see docs/ROW-RULES.md, and Button, which sets the same class
+            from the same decision. It says: this control stands at a FIELD's box, so every box
+            fact a reader compares along a row (today the corner) is the field's rather than this
+            component's own. `medium` is 50 and `large` is 56 — a small field and a large field
+            exactly — because this control follows Button's ladder: it stands where a row of
+            buttons stands (a strip of button-sized targets under one track), without being made
+            of them.
+          */
+          size === "medium" || size === "large" ? "is-fieldbox" : "",
+          block ? "is-block" : "",
+          disabled ? "is-disabled" : ""
+        ].filter(Boolean).join(" "),
+        style,
+        children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+          "label",
+          {
+            className: [
+              "nd-seg-item",
+              o.value === value ? "is-on" : "",
+              disabled || o.disabled ? "is-disabled" : ""
+            ].filter(Boolean).join(" "),
+            "data-tense": o.value === value ? "inverted" : void 0,
+            title: o.title,
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+                "input",
+                {
+                  className: "nd-seg-input",
+                  type: "radio",
+                  name,
+                  value: o.value,
+                  checked: o.value === value,
+                  disabled: disabled || o.disabled,
+                  onPointerDown: (e) => e.stopPropagation(),
+                  "aria-label": o.labelHidden ? o.label : void 0,
+                  onChange: () => onChange(o.value)
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "nd-seg-face", children: [
+                o.leading != null && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-seg-slot", children: o.leading }),
+                !o.labelHidden && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-seg-text", children: o.label }),
+                o.trailing != null && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-seg-slot", children: o.trailing })
+              ] })
+            ]
+          },
+          o.value
+        ))
+      }
+    );
+  }
+
+  // src/vendor/pomegranate/panel/node/DropDownSelect.tsx
+  var import_react5 = __toESM(require_react());
 
   // src/vendor/pomegranate/panel/node/icons.generated.ts
   var ICON_VIEWBOX = "0 0 24 24";
@@ -46535,7 +46604,7 @@ html[data-theme=dark] {
   };
 
   // src/vendor/pomegranate/panel/node/Icon.tsx
-  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
   function Icon({
     name,
     size = 14,
@@ -46543,7 +46612,7 @@ html[data-theme=dark] {
     className
   }) {
     const art = ICONS[name];
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(IconArt, { paths: art.paths, solid: art.solid, size, color, className });
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(IconArt, { paths: art.paths, solid: art.solid, size, color, className });
   }
   function IconArt({
     paths,
@@ -46552,7 +46621,7 @@ html[data-theme=dark] {
     color,
     className
   }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
       "svg",
       {
         className,
@@ -46565,14 +46634,14 @@ html[data-theme=dark] {
         "aria-hidden": true,
         focusable: "false",
         children: [
-          paths.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d }, `s${i}`)),
-          solid?.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("path", { fill: color ?? "currentColor", stroke: "none", d }, `f${i}`))
+          paths.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d }, `s${i}`)),
+          solid?.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("path", { fill: color ?? "currentColor", stroke: "none", d }, `f${i}`))
         ]
       }
     );
   }
   function icon(name) {
-    const Bound = (props) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Icon, { name, ...props });
+    const Bound = (props) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Icon, { name, ...props });
     Bound.displayName = `Icon(${name})`;
     return Bound;
   }
@@ -46599,234 +46668,8 @@ html[data-theme=dark] {
   var PoundIcon = icon("pound");
   var YenIcon = icon("yen");
 
-  // src/vendor/pomegranate/panel/node/CheckboxMark.tsx
-  var import_jsx_runtime4 = __toESM(require_jsx_runtime());
-  function CheckboxMark({ checked = false, indeterminate = false, disabled = false, readOnly = false, size = "small" }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
-      "span",
-      {
-        className: [
-          "nd-checkmark",
-          `s-${size}`,
-          checked && !indeterminate ? "is-checked" : "",
-          indeterminate ? "is-indeterminate" : "",
-          disabled ? "is-disabled" : "",
-          readOnly ? "is-readonly" : ""
-        ].filter(Boolean).join(" "),
-        "data-tense": checked || indeterminate ? "strong" : void 0,
-        "aria-hidden": true,
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "nd-checkmark-tick", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ConfirmIcon, {}) }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "nd-checkmark-part" })
-        ]
-      }
-    );
-  }
-
-  // src/vendor/pomegranate/panel/node/Checkbox.tsx
-  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
-  function Checkbox({
-    checked,
-    onChange,
-    label,
-    labelHidden = false,
-    indeterminate = false,
-    readOnly = false,
-    disabled = false,
-    invalid = false,
-    describedBy,
-    size = "small",
-    style
-  }) {
-    const id = (0, import_react3.useId)();
-    const Shell = labelHidden ? "span" : "label";
-    const box = (0, import_react3.useRef)(null);
-    (0, import_react3.useEffect)(() => {
-      if (box.current) box.current.indeterminate = indeterminate;
-    }, [indeterminate]);
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
-      Shell,
-      {
-        "data-scheme": invalid ? "error" : void 0,
-        className: [
-          "nd-check",
-          `s-${size}`,
-          disabled ? "is-disabled" : "",
-          readOnly ? "is-readonly" : "",
-          labelHidden ? "is-bare" : "",
-          invalid ? "is-invalid" : ""
-        ].filter(Boolean).join(" "),
-        htmlFor: labelHidden ? void 0 : id,
-        style,
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "nd-check-control", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
-              "input",
-              {
-                ref: box,
-                id,
-                className: "nd-check-input",
-                type: "checkbox",
-                checked,
-                disabled,
-                "aria-readonly": readOnly && !disabled ? true : void 0,
-                onClick: readOnly ? (e) => e.preventDefault() : void 0,
-                "aria-invalid": invalid || void 0,
-                "aria-describedby": describedBy,
-                onPointerDown: (e) => e.stopPropagation(),
-                onChange: (e) => !disabled && onChange(e.target.checked),
-                "aria-label": labelHidden ? label : void 0
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(CheckboxMark, { size, readOnly, checked, indeterminate, disabled })
-          ] }),
-          !labelHidden && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-check-label", children: label })
-        ]
-      }
-    );
-  }
-
-  // src/vendor/pomegranate/panel/node/Switch.tsx
-  var import_react4 = __toESM(require_react());
-
-  // src/vendor/pomegranate/panel/node/SwitchMark.tsx
-  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
-  function SwitchMark({ checked = false, disabled = false, readOnly = false, glass = false, size = "small" }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-      "span",
-      {
-        className: ["nd-switchmark", `s-${size}`, checked ? "is-checked" : "", disabled ? "is-disabled" : "", readOnly ? "is-readonly" : "", glass ? "is-glass" : ""].filter(Boolean).join(" "),
-        "data-tense": checked ? "strong" : void 0,
-        "aria-hidden": true,
-        children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "nd-switchmark-thumb" })
-      }
-    );
-  }
-
-  // src/vendor/pomegranate/panel/node/Switch.tsx
-  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
-  function Switch({
-    checked,
-    onChange,
-    label,
-    labelHidden = false,
-    readOnly = false,
-    disabled = false,
-    size = "small",
-    glass = false,
-    style
-  }) {
-    const id = (0, import_react4.useId)();
-    const Shell = labelHidden ? "span" : "label";
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
-      Shell,
-      {
-        className: ["nd-check", "nd-switch", `s-${size}`, disabled ? "is-disabled" : "", readOnly ? "is-readonly" : "", labelHidden ? "is-bare" : ""].filter(Boolean).join(" "),
-        htmlFor: labelHidden ? void 0 : id,
-        style,
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "nd-check-control", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-              "input",
-              {
-                id,
-                className: "nd-check-input",
-                type: "checkbox",
-                role: "switch",
-                checked,
-                disabled,
-                "aria-readonly": readOnly && !disabled ? true : void 0,
-                onClick: readOnly ? (e) => e.preventDefault() : void 0,
-                onPointerDown: (e) => e.stopPropagation(),
-                "aria-label": labelHidden ? label : void 0,
-                onChange: (e) => !disabled && onChange(e.target.checked)
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(SwitchMark, { size, readOnly, checked, disabled, glass })
-          ] }),
-          !labelHidden && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-check-label", children: label })
-        ]
-      }
-    );
-  }
-
-  // src/vendor/pomegranate/panel/node/SegmentedControl.tsx
-  var import_react5 = __toESM(require_react());
-  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
-  function SegmentedControl({
-    options,
-    value,
-    onChange,
-    label,
-    size = "small",
-    disabled = false,
-    block = false,
-    style
-  }) {
-    const name = (0, import_react5.useId)();
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-      "div",
-      {
-        role: "radiogroup",
-        "aria-label": label,
-        className: [
-          "nd-seg",
-          `s-${size}`,
-          /*
-            THE ROW FAMILY'S MARKER — see docs/ROW-RULES.md, and Button, which sets the same class
-            from the same decision. It says: this control stands at a FIELD's box, so every box
-            fact a reader compares along a row (today the corner) is the field's rather than this
-            component's own. `medium` is 50 and `large` is 56 — a small field and a large field
-            exactly — because this control follows Button's ladder: it stands where a row of
-            buttons stands (a strip of button-sized targets under one track), without being made
-            of them.
-          */
-          size === "medium" || size === "large" ? "is-fieldbox" : "",
-          block ? "is-block" : "",
-          disabled ? "is-disabled" : ""
-        ].filter(Boolean).join(" "),
-        style,
-        children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-          "label",
-          {
-            className: [
-              "nd-seg-item",
-              o.value === value ? "is-on" : "",
-              disabled || o.disabled ? "is-disabled" : ""
-            ].filter(Boolean).join(" "),
-            "data-tense": o.value === value ? "inverted" : void 0,
-            title: o.title,
-            children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                "input",
-                {
-                  className: "nd-seg-input",
-                  type: "radio",
-                  name,
-                  value: o.value,
-                  checked: o.value === value,
-                  disabled: disabled || o.disabled,
-                  onPointerDown: (e) => e.stopPropagation(),
-                  "aria-label": o.labelHidden ? o.label : void 0,
-                  onChange: () => onChange(o.value)
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "nd-seg-face", children: [
-                o.leading != null && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "nd-seg-slot", children: o.leading }),
-                !o.labelHidden && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "nd-seg-text", children: o.label }),
-                o.trailing != null && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "nd-seg-slot", children: o.trailing })
-              ] })
-            ]
-          },
-          o.value
-        ))
-      }
-    );
-  }
-
   // src/vendor/pomegranate/panel/node/DropDownSelect.tsx
-  var import_react6 = __toESM(require_react());
-  var import_jsx_runtime9 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
   var isGroup = (o) => "group" in o;
   function DropDownSelect({
     value,
@@ -46847,8 +46690,8 @@ html[data-theme=dark] {
   }) {
     const flat = options.flatMap((o) => isGroup(o) ? o.options : [o]);
     const current = flat.find((o) => o.value === value);
-    const id = (0, import_react6.useId)();
-    return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+    const id = (0, import_react5.useId)();
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
       "span",
       {
         ref: disabled || !dynamicLight ? void 0 : glassLightRef,
@@ -46868,15 +46711,15 @@ html[data-theme=dark] {
         "data-scheme": invalid ? "error" : void 0,
         title,
         children: [
-          icon2 && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "nd-select-leadbox", "aria-hidden": true, children: icon2 }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("label", { className: "nd-select-float", htmlFor: id, children: label }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("span", { className: "nd-select-face", "aria-hidden": true, children: [
-            current?.swatch && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("i", { className: "nd-select-swatch", style: { background: current.swatch } }),
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "nd-select-label", children: current?.label ?? "" }),
-            current?.hint && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "nd-select-hint", children: current.hint })
+          icon2 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-select-leadbox", "aria-hidden": true, children: icon2 }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("label", { className: "nd-select-float", htmlFor: id, children: label }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "nd-select-face", "aria-hidden": true, children: [
+            current?.swatch && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "nd-select-swatch", style: { background: current.swatch } }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-select-label", children: current?.label ?? "" }),
+            current?.hint && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-select-hint", children: current.hint })
           ] }),
-          !readOnly && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "nd-select-caretbox", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(CaretIcon, { className: "nd-select-caret", size: "100%" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+          !readOnly && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-select-caretbox", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(CaretIcon, { className: "nd-select-caret", size: "100%" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
             "select",
             {
               className: "nd-select-native",
@@ -46894,9 +46737,9 @@ html[data-theme=dark] {
               onPointerDown: (e) => e.stopPropagation(),
               onClick: (e) => e.stopPropagation(),
               children: [
-                placeholder && !current && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("option", { value: "", disabled: true, children: placeholder }),
+                placeholder && !current && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("option", { value: "", disabled: true, children: placeholder }),
                 (readOnly && !disabled ? current ? [current] : [] : options).map(
-                  (o) => isGroup(o) ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("optgroup", { label: o.group, children: o.options.map((opt) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(Opt, { ...opt }, opt.value)) }, o.group) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(Opt, { ...o }, o.value)
+                  (o) => isGroup(o) ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("optgroup", { label: o.group, children: o.options.map((opt) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Opt, { ...opt }, opt.value)) }, o.group) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Opt, { ...o }, o.value)
                 )
               ]
             }
@@ -46906,29 +46749,29 @@ html[data-theme=dark] {
     );
   }
   function Opt({ value, label, hint, disabled }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("option", { value, disabled, children: hint ? `${label} \xB7 ${hint}` : label });
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("option", { value, disabled, children: hint ? `${label} \xB7 ${hint}` : label });
   }
 
   // src/vendor/pomegranate/panel/node/Dialog.tsx
-  var import_react8 = __toESM(require_react());
+  var import_react7 = __toESM(require_react());
 
   // src/vendor/pomegranate/panel/node/FormGrid.tsx
-  var import_react7 = __toESM(require_react());
-  var import_jsx_runtime10 = __toESM(require_jsx_runtime());
-  var FormGrid = (0, import_react7.forwardRef)(function FormGrid2({ layout, onSubmit, children, style }, ref) {
-    const inner = /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: `nd-form l-${layout}`, children });
-    return onSubmit ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("form", { ref, className: "nd-formhost", onSubmit, style, children: inner }) : /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { ref, className: "nd-formhost", style, children: inner });
+  var import_react6 = __toESM(require_react());
+  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
+  var FormGrid = (0, import_react6.forwardRef)(function FormGrid2({ layout, onSubmit, children, style }, ref) {
+    const inner = /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: `nd-form l-${layout}`, children });
+    return onSubmit ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("form", { ref, className: "nd-formhost", onSubmit, style, children: inner }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { ref, className: "nd-formhost", style, children: inner });
   });
-  var FormActionsHostContext = (0, import_react7.createContext)(false);
+  var FormActionsHostContext = (0, import_react6.createContext)(false);
 
   // src/vendor/pomegranate/panel/node/Dialog.tsx
-  var import_jsx_runtime11 = __toESM(require_jsx_runtime());
-  var Dialog = (0, import_react8.forwardRef)(function Dialog2(props, ref) {
+  var import_jsx_runtime9 = __toESM(require_jsx_runtime());
+  var Dialog = (0, import_react7.forwardRef)(function Dialog2(props, ref) {
     const { open, onClose, title, children, actions, modal = true, size = "medium", description, style } = props;
     const dismissible = props.dismissible !== false;
-    const own = (0, import_react8.useRef)(null);
-    const id = (0, import_react8.useId)();
-    (0, import_react8.useEffect)(() => {
+    const own = (0, import_react7.useRef)(null);
+    const id = (0, import_react7.useId)();
+    (0, import_react7.useEffect)(() => {
       const el = own.current;
       if (!el) return;
       if (open && !el.open) {
@@ -46938,7 +46781,7 @@ html[data-theme=dark] {
         el.close();
       }
     }, [open, modal]);
-    (0, import_react8.useEffect)(() => {
+    (0, import_react7.useEffect)(() => {
       const el = own.current;
       if (!el) return;
       const onCancel = (e) => {
@@ -46948,7 +46791,7 @@ html[data-theme=dark] {
       el.addEventListener("cancel", onCancel);
       return () => el.removeEventListener("cancel", onCancel);
     }, [onClose, dismissible]);
-    (0, import_react8.useEffect)(() => {
+    (0, import_react7.useEffect)(() => {
       if (!open || modal || !dismissible) return;
       const onKey = (e) => {
         if (e.key === "Escape") onClose();
@@ -46956,7 +46799,7 @@ html[data-theme=dark] {
       document.addEventListener("keydown", onKey);
       return () => document.removeEventListener("keydown", onKey);
     }, [open, modal, dismissible, onClose]);
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
       "dialog",
       {
         ref: (node) => {
@@ -46976,10 +46819,10 @@ html[data-theme=dark] {
           const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
           if (outside) onClose();
         },
-        children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "nd-dialog-body", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "nd-dialog-head", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h2", { className: "nd-dialog-title", id: `${id}-title`, children: title }),
-            dismissible && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-dialog-close", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "nd-dialog-body", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "nd-dialog-head", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h2", { className: "nd-dialog-title", id: `${id}-title`, children: title }),
+            dismissible && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "nd-dialog-close", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
               Button,
               {
                 variant: "ghost",
@@ -46987,56 +46830,56 @@ html[data-theme=dark] {
                 size: "small",
                 glass: false,
                 label: "Close",
-                leading: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(DismissIcon, {}),
+                leading: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(DismissIcon, {}),
                 onClick: onClose
               }
             ) }),
-            description != null && description !== false && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "nd-dialog-desc", id: `${id}-desc`, children: description })
+            description != null && description !== false && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "nd-dialog-desc", id: `${id}-desc`, children: description })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(FormActionsHostContext.Provider, { value: actions != null && actions !== false, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "nd-dialog-content", children }) }),
-          actions != null && actions !== false && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "nd-dialog-actions", children: actions })
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(FormActionsHostContext.Provider, { value: actions != null && actions !== false, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "nd-dialog-content", children }) }),
+          actions != null && actions !== false && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "nd-dialog-actions", children: actions })
         ] })
       }
     );
   });
 
   // src/vendor/pomegranate/panel/node/InteractiveCard.tsx
-  var import_react10 = __toESM(require_react());
+  var import_react9 = __toESM(require_react());
 
   // src/vendor/pomegranate/panel/node/Card.tsx
-  var import_react9 = __toESM(require_react());
-  var import_jsx_runtime12 = __toESM(require_jsx_runtime());
-  var CardCanvas = ({ edge = "top", children, style }) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: `nd-card-canvas u-canvas-${edge}`, "data-edge": edge, style, children });
+  var import_react8 = __toESM(require_react());
+  var import_jsx_runtime10 = __toESM(require_jsx_runtime());
+  var CardCanvas = ({ edge = "top", children, style }) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: `nd-card-canvas u-canvas-${edge}`, "data-edge": edge, style, children });
   CardCanvas.displayName = "CardCanvas";
-  var CardBody = ({ children, style }) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "nd-card-body", style, children });
+  var CardBody = ({ children, style }) => /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "nd-card-body", style, children });
   CardBody.displayName = "CardBody";
-  var CardHeader = ({ title, icon: icon2, sub, tags, actions, style }) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "nd-card-head", style, children: [
-    icon2 != null && icon2 !== false && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "nd-card-head-icon", "aria-hidden": true, children: icon2 }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "nd-card-head-titles", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h3", { className: "nd-card-head-title", children: title }),
-      sub != null && sub !== false && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "nd-card-head-sub", children: sub })
+  var CardHeader = ({ title, icon: icon2, sub, tags, actions, style }) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "nd-card-head", style, children: [
+    icon2 != null && icon2 !== false && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "nd-card-head-icon", "aria-hidden": true, children: icon2 }),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "nd-card-head-titles", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h3", { className: "nd-card-head-title", children: title }),
+      sub != null && sub !== false && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "nd-card-head-sub", children: sub })
     ] }),
-    tags != null && tags !== false && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "nd-card-head-tags", children: tags }),
-    actions != null && actions !== false && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "nd-card-head-actions", children: actions })
+    tags != null && tags !== false && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "nd-card-head-tags", children: tags }),
+    actions != null && actions !== false && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "nd-card-head-actions", children: actions })
   ] });
   CardHeader.displayName = "CardHeader";
-  var isCardHeader = (node) => (0, import_react9.isValidElement)(node) && node.type?.displayName === "CardHeader";
-  var isCardCanvas = (node) => (0, import_react9.isValidElement)(node) && node.type?.displayName === "CardCanvas";
-  var isCardBody = (node) => (0, import_react9.isValidElement)(node) && node.type?.displayName === "CardBody";
+  var isCardHeader = (node) => (0, import_react8.isValidElement)(node) && node.type?.displayName === "CardHeader";
+  var isCardCanvas = (node) => (0, import_react8.isValidElement)(node) && node.type?.displayName === "CardCanvas";
+  var isCardBody = (node) => (0, import_react8.isValidElement)(node) && node.type?.displayName === "CardBody";
   var resolveCardChildren = (children) => {
-    const kids = import_react9.Children.toArray(children);
+    const kids = import_react8.Children.toArray(children);
     const hasExplicitBody = kids.some(isCardBody);
     if (hasExplicitBody) return kids;
     const heads = kids.filter(isCardHeader);
     const canvases = kids.filter(isCardCanvas);
     const others = kids.filter((k) => !isCardCanvas(k) && !isCardHeader(k));
-    return others.length > 0 ? [...heads, ...canvases, /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(CardBody, { children: others }, "__body")] : [...heads, ...canvases];
+    return others.length > 0 ? [...heads, ...canvases, /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(CardBody, { children: others }, "__body")] : [...heads, ...canvases];
   };
-  var Card = (0, import_react9.forwardRef)(function Card2({ size = "medium", level, blur = false, tense, children, style }, ref) {
+  var Card = (0, import_react8.forwardRef)(function Card2({ size = "medium", level, blur = false, tense, children, style }, ref) {
     const inherited = useLevel();
     const className = ["nd-card", `s-${size}`, level ? `u-${level}` : "", blur ? "is-glass" : ""].filter(Boolean).join(" ");
     const ground = level ?? inherited;
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(LevelContext.Provider, { value: ground, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(LevelContext.Provider, { value: ground, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
       "div",
       {
         ref,
@@ -47050,15 +46893,15 @@ html[data-theme=dark] {
   });
 
   // src/vendor/pomegranate/panel/node/InteractiveCard.tsx
-  var import_jsx_runtime13 = __toESM(require_jsx_runtime());
-  var InteractiveCard = (0, import_react10.forwardRef)(function InteractiveCard2(props, ref) {
+  var import_jsx_runtime11 = __toESM(require_jsx_runtime());
+  var InteractiveCard = (0, import_react9.forwardRef)(function InteractiveCard2(props, ref) {
     const { size = "medium", level, blur = false, tense, children, style, label } = props;
     const inherited = useLevel();
     const onClick = "onClick" in props ? props.onClick : void 0;
     const href = "href" in props ? props.href : void 0;
     const className = ["nd-card", `s-${size}`, level ? `u-${level}` : "", blur ? "is-glass" : "", "is-target"].filter(Boolean).join(" ");
     const ground = level ?? inherited;
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(LevelContext.Provider, { value: ground, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(LevelContext.Provider, { value: ground, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       "div",
       {
         ref,
@@ -47067,7 +46910,7 @@ html[data-theme=dark] {
         "data-tense": tense === "strong" ? "strong" : void 0,
         style,
         children: [
-          href ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("a", { className: "nd-card-hit", href, "aria-label": label, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-card-a11y", children: label }) }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "button", className: "nd-card-hit", onClick, "aria-label": label }),
+          href ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("a", { className: "nd-card-hit", href, "aria-label": label, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-card-a11y", children: label }) }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "nd-card-hit", onClick, "aria-label": label }),
           resolveCardChildren(children)
         ]
       }
@@ -47075,16 +46918,16 @@ html[data-theme=dark] {
   });
 
   // src/vendor/pomegranate/panel/node/Toast.tsx
-  var import_react12 = __toESM(require_react());
+  var import_react11 = __toESM(require_react());
 
   // src/vendor/pomegranate/panel/node/Alert.tsx
-  var import_jsx_runtime14 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime12 = __toESM(require_jsx_runtime());
   var alertRole = (tone) => tone === "error" || tone === "warning" ? "alert" : "status";
   var GLYPH = {
-    info: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(TimerIcon, {}),
-    success: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ConfirmIcon, {}),
-    warning: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(TimerIcon, {}),
-    error: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(DismissIcon, {})
+    info: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(TimerIcon, {}),
+    success: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(ConfirmIcon, {}),
+    warning: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(TimerIcon, {}),
+    error: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(DismissIcon, {})
   };
   function Alert({
     tone = "info",
@@ -47096,7 +46939,7 @@ html[data-theme=dark] {
     glyph,
     style
   }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
       "div",
       {
         className: ["nd-alert", `t-${tone}`].join(" "),
@@ -47106,13 +46949,13 @@ html[data-theme=dark] {
         role: alertRole(tone),
         style,
         children: [
-          glyph !== false && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "nd-alert-glyph", "aria-hidden": true, children: GLYPH[tone] }),
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "nd-alert-body", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("strong", { className: "nd-alert-title", children: title }),
-            children != null && children !== false && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "nd-alert-text", children }),
-            actions && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "nd-alert-actions", children: actions })
+          glyph !== false && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "nd-alert-glyph", "aria-hidden": true, children: GLYPH[tone] }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "nd-alert-body", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("strong", { className: "nd-alert-title", children: title }),
+            children != null && children !== false && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "nd-alert-text", children }),
+            actions && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "nd-alert-actions", children: actions })
           ] }),
-          onDismiss && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "nd-alert-dismiss", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
+          onDismiss && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "nd-alert-dismiss", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             Button,
             {
               size: "small",
@@ -47120,7 +46963,7 @@ html[data-theme=dark] {
               kind: "icon-button",
               label: dismissLabel ?? `Dismiss: ${title}`,
               title: void 0,
-              leading: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(DismissIcon, {}),
+              leading: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(DismissIcon, {}),
               onClick: onDismiss
             }
           ) })
@@ -47130,11 +46973,11 @@ html[data-theme=dark] {
   }
 
   // src/vendor/pomegranate/panel/node/ProgressBar.tsx
-  var import_react11 = __toESM(require_react());
-  var import_jsx_runtime15 = __toESM(require_jsx_runtime());
+  var import_react10 = __toESM(require_react());
+  var import_jsx_runtime13 = __toESM(require_jsx_runtime());
   var percent = (v, m) => `${Math.round(v / m * 100)}%`;
   var slotted = (node) => node != null && node !== false && node !== true && node !== "";
-  var ProgressBar = (0, import_react11.forwardRef)(function ProgressBar2({
+  var ProgressBar = (0, import_react10.forwardRef)(function ProgressBar2({
     label,
     labelHidden = false,
     value,
@@ -47154,11 +46997,11 @@ html[data-theme=dark] {
   }, ref) {
     const indeterminate = value == null;
     const clamped = indeterminate ? void 0 : Math.min(Math.max(value, 0), max);
-    const id = (0, import_react11.useId)();
+    const id = (0, import_react10.useId)();
     const shownValue = showValue && !indeterminate ? formatValue(clamped, max) : null;
     const centred = shape === "ring" && valueAt === "head";
     const ground = useLevel();
-    return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(
       "div",
       {
         ref,
@@ -47176,14 +47019,14 @@ html[data-theme=dark] {
         style: shape === "ring" && !indeterminate ? { ["--nd-progress-pct"]: String(Math.round(clamped / max * 100)), ...style } : style,
         "data-scheme": state === "done" ? "success" : state === "failed" ? "error" : void 0,
         children: [
-          (!labelHidden || shownValue != null && valueAt === "head" && !centred || slotted(head)) && /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { className: "nd-progress-head", children: [
-            !labelHidden && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("label", { className: "nd-progress-label", htmlFor: id, children: label }),
-            slotted(head) && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-progress-slot nd-progress-slot-head", children: head }),
-            shownValue != null && valueAt === "head" && !centred && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-progress-value", children: shownValue })
+          (!labelHidden || shownValue != null && valueAt === "head" && !centred || slotted(head)) && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "nd-progress-head", children: [
+            !labelHidden && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("label", { className: "nd-progress-label", htmlFor: id, children: label }),
+            slotted(head) && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-progress-slot nd-progress-slot-head", children: head }),
+            shownValue != null && valueAt === "head" && !centred && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-progress-value", children: shownValue })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { className: "nd-progress-line", children: [
-            slotted(leading) && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-progress-slot", children: leading }),
-            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "nd-progress-line", children: [
+            slotted(leading) && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-progress-slot", children: leading }),
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
               "progress",
               {
                 className: "nd-progress-track",
@@ -47193,9 +47036,9 @@ html[data-theme=dark] {
                 ...indeterminate ? {} : { value: clamped }
               }
             ),
-            shape === "ring" && /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("svg", { className: "nd-progress-ring", viewBox: "0 0 100 100", "aria-hidden": true, focusable: "false", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("circle", { className: "nd-progress-ring-track", cx: "50", cy: "50", r: "43.75", pathLength: 800 }),
-              /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
+            shape === "ring" && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("svg", { className: "nd-progress-ring", viewBox: "0 0 100 100", "aria-hidden": true, focusable: "false", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("circle", { className: "nd-progress-ring-track", cx: "50", cy: "50", r: "43.75", pathLength: 800 }),
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
                 "circle",
                 {
                   className: "nd-progress-ring-arc",
@@ -47208,13 +47051,13 @@ html[data-theme=dark] {
                 }
               )
             ] }),
-            slotted(trailing) && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-progress-slot", children: trailing }),
-            shownValue != null && valueAt === "inline" && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-progress-value", children: shownValue }),
-            shownValue != null && centred && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-progress-value nd-progress-centre", children: shownValue })
+            slotted(trailing) && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-progress-slot", children: trailing }),
+            shownValue != null && valueAt === "inline" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-progress-value", children: shownValue }),
+            shownValue != null && centred && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-progress-value nd-progress-centre", children: shownValue })
           ] }),
-          (slotted(foot) || shownValue != null && valueAt === "foot") && /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { className: "nd-progress-foot", children: [
-            slotted(foot) && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-progress-footnote", children: foot }),
-            shownValue != null && valueAt === "foot" && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-progress-value", children: shownValue })
+          (slotted(foot) || shownValue != null && valueAt === "foot") && /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "nd-progress-foot", children: [
+            slotted(foot) && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-progress-footnote", children: foot }),
+            shownValue != null && valueAt === "foot" && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-progress-value", children: shownValue })
           ] })
         ]
       }
@@ -47222,7 +47065,7 @@ html[data-theme=dark] {
   });
 
   // src/vendor/pomegranate/panel/node/Toast.tsx
-  var import_jsx_runtime16 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime14 = __toESM(require_jsx_runtime());
   var READING_BASE_MS = 5e3;
   var READING_PER_WORD_MS = 300;
   var READING_CAP_MS = 15e3;
@@ -47241,12 +47084,12 @@ html[data-theme=dark] {
     placement = "bottom-end",
     style
   }) {
-    const ref = (0, import_react12.useRef)(null);
+    const ref = (0, import_react11.useRef)(null);
     const transient = duration != null;
-    const [ms, setMs] = (0, import_react12.useState)(null);
-    const [left, setLeft] = (0, import_react12.useState)(1);
-    const [held, setHeld] = (0, import_react12.useState)(false);
-    (0, import_react12.useEffect)(() => {
+    const [ms, setMs] = (0, import_react11.useState)(null);
+    const [left, setLeft] = (0, import_react11.useState)(1);
+    const [held, setHeld] = (0, import_react11.useState)(false);
+    (0, import_react11.useEffect)(() => {
       const el = ref.current;
       if (!el) return;
       if (open) {
@@ -47256,7 +47099,7 @@ html[data-theme=dark] {
         el.hidePopover();
       }
     }, [open, transient]);
-    (0, import_react12.useEffect)(() => {
+    (0, import_react11.useEffect)(() => {
       if (!open || duration == null) {
         setMs(null);
         return;
@@ -47268,8 +47111,8 @@ html[data-theme=dark] {
       const el = ref.current;
       setMs(readingTime(el?.textContent ?? title));
     }, [open, duration, title, children]);
-    const remaining = (0, import_react12.useRef)(null);
-    (0, import_react12.useEffect)(() => {
+    const remaining = (0, import_react11.useRef)(null);
+    (0, import_react11.useEffect)(() => {
       if (!open || ms == null) return;
       if (remaining.current == null) remaining.current = ms;
       let raf = 0;
@@ -47289,13 +47132,13 @@ html[data-theme=dark] {
       raf = requestAnimationFrame(tick2);
       return () => cancelAnimationFrame(raf);
     }, [open, ms, held, title, onClose]);
-    (0, import_react12.useEffect)(() => {
+    (0, import_react11.useEffect)(() => {
       remaining.current = null;
       setLeft(1);
     }, [open, title, ms]);
-    const hold = (0, import_react12.useCallback)(() => setHeld(true), []);
-    const release = (0, import_react12.useCallback)(() => setHeld(false), []);
-    (0, import_react12.useEffect)(() => {
+    const hold = (0, import_react11.useCallback)(() => setHeld(true), []);
+    const release = (0, import_react11.useCallback)(() => setHeld(false), []);
+    (0, import_react11.useEffect)(() => {
       if (!open || transient) return;
       const onKey = (e) => {
         if (e.key === "Escape") onClose();
@@ -47303,7 +47146,7 @@ html[data-theme=dark] {
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
     }, [open, transient, onClose]);
-    return /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
       "div",
       {
         ref,
@@ -47319,8 +47162,8 @@ html[data-theme=dark] {
         onBlurCapture: release,
         style,
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)("span", { className: "nd-toast-surface", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime16.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("span", { className: "nd-toast-surface", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(
               Alert,
               {
                 tone,
@@ -47332,16 +47175,16 @@ html[data-theme=dark] {
                 children
               }
             ),
-            transient && ms != null && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-toast-clock", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime16.jsx)(ProgressBar, { label: "Time remaining", labelHidden: true, size: "small", value: Math.round(left * 100) }) })
+            transient && ms != null && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "nd-toast-clock", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ProgressBar, { label: "Time remaining", labelHidden: true, size: "small", value: Math.round(left * 100) }) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { hidden: true, "data-toast-live": transient ? alertRole(tone) : "dialog" })
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { hidden: true, "data-toast-live": transient ? alertRole(tone) : "dialog" })
         ]
       }
     );
   }
 
   // src/vendor/pomegranate/panel/node/Skeleton.tsx
-  var import_jsx_runtime17 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime15 = __toESM(require_jsx_runtime());
   function Skeleton({
     shape = "text",
     lines = 3,
@@ -47353,12 +47196,12 @@ html[data-theme=dark] {
     const a11y = label ? { role: "status", "aria-label": label } : { "aria-hidden": true };
     const fill = recessLevel(useLevel());
     if (shape === "circle") {
-      return /* @__PURE__ */ (0, import_jsx_runtime17.jsx)("span", { className: "nd-skeleton nd-skeleton-circle", "data-fill": fill, ...a11y, style: { width: size, height: size } });
+      return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-skeleton nd-skeleton-circle", "data-fill": fill, ...a11y, style: { width: size, height: size } });
     }
     if (shape === "block") {
-      return /* @__PURE__ */ (0, import_jsx_runtime17.jsx)("span", { className: "nd-skeleton nd-skeleton-block", "data-fill": fill, ...a11y, style: { width, height } });
+      return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-skeleton nd-skeleton-block", "data-fill": fill, ...a11y, style: { width, height } });
     }
-    return /* @__PURE__ */ (0, import_jsx_runtime17.jsx)("div", { className: "nd-skeleton-lines", ...a11y, children: Array.from({ length: lines }, (_, i) => /* @__PURE__ */ (0, import_jsx_runtime17.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { className: "nd-skeleton-lines", ...a11y, children: Array.from({ length: lines }, (_, i) => /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
       "span",
       {
         className: "nd-skeleton nd-skeleton-text",
@@ -47375,60 +47218,84 @@ html[data-theme=dark] {
   }
 
   // src/vendor/pomegranate/panel/node/Tag.tsx
-  var import_react13 = __toESM(require_react());
-  var import_jsx_runtime18 = __toESM(require_jsx_runtime());
-  var Tag = (0, import_react13.forwardRef)(function Tag2(props, ref) {
+  var import_react12 = __toESM(require_react());
+  var import_jsx_runtime16 = __toESM(require_jsx_runtime());
+  var Tag = (0, import_react12.forwardRef)(function Tag2(props, ref) {
     const { variant = "tonal", size = "small", leading, style, children } = props;
     const fill = fieldLevel(useLevel());
     const className = ["nd-tag", `v-${variant}`, `s-${size}`].join(" ");
     const slotted2 = (node) => node != null && node !== false && node !== true && node !== "";
-    return /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)("span", { ref, className, "data-fill": fill, "data-tense": variant === "primary" ? "inverted" : void 0, style, "aria-label": typeof children === "string" ? void 0 : props.label, children: [
-      slotted2(leading) && /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "nd-tag-slot", children: leading }),
-      /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "nd-tag-label", children })
+    return /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)("span", { ref, className, "data-fill": fill, "data-tense": variant === "primary" ? "inverted" : void 0, style, "aria-label": typeof children === "string" ? void 0 : props.label, children: [
+      slotted2(leading) && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-tag-slot", children: leading }),
+      /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-tag-label", children })
     ] });
   });
 
   // src/vendor/pomegranate/panel/node/SelectableCard.tsx
-  var import_react14 = __toESM(require_react());
+  var import_react13 = __toESM(require_react());
+
+  // src/vendor/pomegranate/panel/node/CheckboxMark.tsx
+  var import_jsx_runtime17 = __toESM(require_jsx_runtime());
+  function CheckboxMark({ checked = false, indeterminate = false, disabled = false, readOnly = false, size = "small" }) {
+    return /* @__PURE__ */ (0, import_jsx_runtime17.jsxs)(
+      "span",
+      {
+        className: [
+          "nd-checkmark",
+          `s-${size}`,
+          checked && !indeterminate ? "is-checked" : "",
+          indeterminate ? "is-indeterminate" : "",
+          disabled ? "is-disabled" : "",
+          readOnly ? "is-readonly" : ""
+        ].filter(Boolean).join(" "),
+        "data-tense": checked || indeterminate ? "strong" : void 0,
+        "aria-hidden": true,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime17.jsx)("span", { className: "nd-checkmark-tick", children: /* @__PURE__ */ (0, import_jsx_runtime17.jsx)(ConfirmIcon, {}) }),
+          /* @__PURE__ */ (0, import_jsx_runtime17.jsx)("span", { className: "nd-checkmark-part" })
+        ]
+      }
+    );
+  }
 
   // src/vendor/pomegranate/panel/node/RadioMark.tsx
-  var import_jsx_runtime19 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime18 = __toESM(require_jsx_runtime());
   function RadioMark({ checked = false, disabled = false, readOnly = false, glass = false, size = "small" }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
       "span",
       {
         className: ["nd-radiomark", `s-${size}`, checked ? "is-checked" : "", disabled ? "is-disabled" : "", readOnly ? "is-readonly" : "", glass ? "is-glass" : ""].filter(Boolean).join(" "),
         "data-tense": checked ? "strong" : void 0,
         "aria-hidden": true,
-        children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "nd-radiomark-dot" })
+        children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "nd-radiomark-dot" })
       }
     );
   }
 
   // src/vendor/pomegranate/panel/node/SelectableCard.tsx
-  var import_jsx_runtime20 = __toESM(require_jsx_runtime());
-  var SelectableCard = (0, import_react14.forwardRef)(function SelectableCard2({ label, selected, onSelect, group, disabled = false, inert, action, size = "medium", level, blur = false, tense, mark, children, data, style }, ref) {
+  var import_jsx_runtime19 = __toESM(require_jsx_runtime());
+  var SelectableCard = (0, import_react13.forwardRef)(function SelectableCard2({ label, selected, onSelect, group, disabled = false, inert, action, size = "medium", level, blur = false, tense, mark, children, data, style }, ref) {
     const inherited = useLevel();
     const shape = mark ?? (group ? "radio" : "checkbox");
     const role = group ? "radio" : "checkbox";
     const dataAttrs = Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]));
     const effInert = inert ?? (disabled ? "disabled" : void 0);
     const cls = (...extra) => ["nd-selcard", `s-${size}`, `m-${shape}`, level ? `u-${level}` : "", blur ? "is-glass" : "", selected ? "is-selected" : "", ...extra].filter(Boolean).join(" ");
-    const markSpan = shape !== "none" && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+    const markSpan = shape !== "none" && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
       "span",
       {
         className: "nd-selcard-mark",
         "data-tense": shape === "tick" && selected ? "strong" : void 0,
         "aria-hidden": true,
-        children: shape === "checkbox" ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(CheckboxMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : shape === "radio" ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(RadioMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : shape === "switch" ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(SwitchMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : selected ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ConfirmIcon, {}) : null
+        children: shape === "checkbox" ? /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(CheckboxMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : shape === "radio" ? /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(RadioMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : shape === "switch" ? /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(SwitchMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : selected ? /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(ConfirmIcon, {}) : null
       }
     );
     const ground = level ?? inherited;
     const fill = level ? void 0 : fieldLevel(inherited);
-    const island = (tree) => /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: ground, children: tree });
+    const island = (tree) => /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: ground, children: tree });
     if (effInert) {
       return island(
-        /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)(
           "div",
           {
             className: cls("is-inert", effInert === "readonly" ? "is-inert-readonly" : "is-inert-disabled"),
@@ -47445,7 +47312,7 @@ html[data-theme=dark] {
             ...dataAttrs,
             children: [
               markSpan,
-              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "nd-selcard-content", children })
+              /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "nd-selcard-content", children })
             ]
           }
         )
@@ -47454,7 +47321,7 @@ html[data-theme=dark] {
     if (action != null) {
       const stop = (e) => e.stopPropagation();
       return island(
-        /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)(
           "div",
           {
             className: cls("is-target"),
@@ -47463,7 +47330,7 @@ html[data-theme=dark] {
             "data-fill": fill,
             style,
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
                 "button",
                 {
                   ref,
@@ -47478,15 +47345,15 @@ html[data-theme=dark] {
                 }
               ),
               markSpan,
-              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "nd-selcard-content", children }),
-              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "nd-selcard-action", onClick: stop, onPointerDown: stop, children: action })
+              /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "nd-selcard-content", children }),
+              /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "nd-selcard-action", onClick: stop, onPointerDown: stop, children: action })
             ]
           }
         )
       );
     }
     return island(
-      /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)(
         "button",
         {
           ref,
@@ -47504,7 +47371,7 @@ html[data-theme=dark] {
           ...dataAttrs,
           children: [
             markSpan,
-            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "nd-selcard-content", children })
+            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "nd-selcard-content", children })
           ]
         }
       )
@@ -47512,11 +47379,11 @@ html[data-theme=dark] {
   });
 
   // src/ui-react/buttons.tsx
-  var import_jsx_runtime21 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime20 = __toESM(require_jsx_runtime());
   var GROUND = 2;
   var CARD_LEVEL = 2;
   var TOP_CARD_LEVEL = 4;
-  var svg = (d, opts) => (size) => opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d, fillRule: opts.fillRule, clipRule: opts.fillRule }) }) : /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d }) });
+  var svg = (d, opts) => (size) => opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d, fillRule: opts.fillRule, clipRule: opts.fillRule }) }) : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d }) });
   var IconArrowLeft = svg("M19 12H5M12 19l-7-7 7-7");
   var IconDownload = svg("M12 3v11m0 0l-4-4m4 4l4-4M5 20h14");
   var IconSettings = svg(
@@ -47543,7 +47410,7 @@ html[data-theme=dark] {
   function mountOnce(mountId, node, level = GROUND) {
     const container = document.getElementById(mountId);
     if (!container) return;
-    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: level, children: node })));
+    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: level, children: node })));
   }
   function PomTextField(props) {
     const {
@@ -47563,10 +47430,10 @@ html[data-theme=dark] {
     } = props;
     const wrapClass = ["nd-textfield-wrap", `s-${size}`, "is-block", readonly ? "is-readonly" : ""].filter(Boolean).join(" ");
     const fieldClass = ["nd-textfield", `s-${size}`, readonly ? "is-readonly" : ""].filter(Boolean).join(" ");
-    return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("span", { className: wrapClass, "data-fill": fieldLevel(useLevel()), style: { width: "100%", ...style }, children: [
-      icon2 && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "nd-textfield-leadbox", "aria-hidden": true, children: icon2 }),
-      label && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("label", { className: "nd-textfield-float", htmlFor: id, children: label }),
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("span", { className: wrapClass, "data-fill": fieldLevel(useLevel()), style: { width: "100%", ...style }, children: [
+      icon2 && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "nd-textfield-leadbox", "aria-hidden": true, children: icon2 }),
+      label && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("label", { className: "nd-textfield-float", htmlFor: id, children: label }),
+      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
         "input",
         {
           className: fieldClass,
@@ -47591,15 +47458,15 @@ html[data-theme=dark] {
   }
   function PomTextArea(props) {
     const { id, label, placeholder, size = "small", rows = 2, disabled = false, style } = props;
-    return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
       "span",
       {
         className: ["nd-textfield-wrap", `s-${size}`, "is-multi", "is-block", disabled ? "is-disabled" : ""].filter(Boolean).join(" "),
         "data-fill": fieldLevel(useLevel()),
         style: { width: "100%", ...style },
         children: [
-          label && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("label", { className: "nd-textfield-float", htmlFor: id, children: label }),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+          label && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("label", { className: "nd-textfield-float", htmlFor: id, children: label }),
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
             "textarea",
             {
               className: ["nd-textfield", `s-${size}`, "is-multi", disabled ? "is-disabled" : ""].filter(Boolean).join(" "),
@@ -47639,7 +47506,7 @@ html[data-theme=dark] {
     const extra = {};
     if (destructive) extra["data-scheme"] = "error";
     extra.size = btnSize(size);
-    return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
       Button,
       {
         id,
@@ -47665,11 +47532,11 @@ html[data-theme=dark] {
     let set = () => {
     };
     function LiveButton() {
-      const [s, setS] = (0, import_react15.useState)(initial);
+      const [s, setS] = (0, import_react14.useState)(initial);
       set = setS;
       const extra = {};
       if (s.success) extra["data-scheme"] = "success";
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
         Button,
         {
           id: base.id,
@@ -47685,7 +47552,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LiveButton, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LiveButton, {}) })));
     return {
       setDisabled: (disabled) => set((s) => ({ ...s, disabled })),
       setLoading: (loading) => set((s) => ({ ...s, loading })),
@@ -47698,11 +47565,11 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [disabled, setD] = (0, import_react15.useState)(initialDisabled);
+      const [disabled, setD] = (0, import_react14.useState)(initialDisabled);
       set = setD;
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PomButton, { ...base, disabled });
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PomButton, { ...base, disabled });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
   function mountLiveTextArea(mountId, base, initialDisabled, level = GROUND) {
@@ -47710,11 +47577,11 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [disabled, setD] = (0, import_react15.useState)(initialDisabled);
+      const [disabled, setD] = (0, import_react14.useState)(initialDisabled);
       set = setD;
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PomTextArea, { ...base, disabled });
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PomTextArea, { ...base, disabled });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
   function mountLiveDropdown(mountId, base, onSelect, level = GROUND) {
@@ -47722,13 +47589,13 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [s, setS] = (0, import_react15.useState)({ items: [], value: "" });
+      const [s, setS] = (0, import_react14.useState)({ items: [], value: "" });
       set = setS;
       const options = s.items.map((it) => ({
         value: it.value ?? it.label ?? it.primaryText ?? "",
         label: it.label ?? it.primaryText ?? it.value ?? ""
       }));
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
         DropDownSelect,
         {
           label: "Folder path",
@@ -47741,7 +47608,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     return { setItems: (items, value) => set(() => ({ items, value })) };
   }
   window.PomButtons = {
@@ -47771,10 +47638,10 @@ html[data-theme=dark] {
     )
   };
   function mountButton(mountId, props, level) {
-    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PomButton, { ...props }), level);
+    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PomButton, { ...props }), level);
   }
   function mountIconButton(mountId, props, level) {
-    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PomButton, { ...props }), level);
+    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PomButton, { ...props }), level);
   }
   mountIconButton("folder-add-btn-mount", { id: "folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
   mountIconButton("github-folder-add-btn-mount", { id: "github-folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
@@ -47801,13 +47668,13 @@ html[data-theme=dark] {
   (function mountThemeToggle() {
     const container = document.getElementById("theme-toggle-btn-mount");
     function View() {
-      const [dark, setDark] = (0, import_react15.useState)(document.documentElement.getAttribute("data-theme") === "dark");
+      const [dark, setDark] = (0, import_react14.useState)(document.documentElement.getAttribute("data-theme") === "dark");
       function toggle() {
         const next = !dark;
         document.documentElement.setAttribute("data-theme", next ? "dark" : "light");
         setDark(next);
       }
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
         PomButton,
         {
           id: "theme-toggle-btn",
@@ -47820,34 +47687,28 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
   })();
   function mountVersionTag(mountId) {
     const container = document.getElementById(mountId);
     let set = () => {
     };
     function View() {
-      const [label, setLabel] = (0, import_react15.useState)("");
+      const [label, setLabel] = (0, import_react14.useState)("");
       set = setLabel;
       if (!label) return null;
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "version-tag-label", title: "Plugin version", children: label });
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "version-tag-label", title: "Plugin version", children: label });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     window.PomVersionTag = { setLabel: (label) => set(label) };
   }
   mountVersionTag("version-tag-mount");
   function mountTextField(mountId, props, level) {
-    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PomTextField, { ...props }), level);
+    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PomTextField, { ...props }), level);
   }
   mountTextField("primary-filename-mount", { id: "primary-filename", label: "File name", defaultValue: "tokens.json", placeholder: "tokens.json", title: 'JSON file name \u2014 used for both Download and every push destination. ".json" is added automatically if you leave it out.' }, CARD_LEVEL);
   window.PomCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false, CARD_LEVEL);
   mountButton("add-repo-settings-btn-mount", { id: "add-repo-settings-btn", variant: "filled", size: "large", label: "Add Repo Settings", block: true }, CARD_LEVEL);
-  mountButton("gitlab-small-settings-btn-mount", { id: "gitlab-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
-  mountButton("github-small-settings-btn-mount", { id: "github-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
-  mountIconButton("gitlab-remove-push-btn-mount", { id: "gitlab-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitLab from push destination", "aria-label": "Remove GitLab from push destination", icon: IconTrash(16) }, CARD_LEVEL);
-  mountIconButton("github-remove-push-btn-mount", { id: "github-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitHub from push destination", "aria-label": "Remove GitHub from push destination", icon: IconTrash(16) }, CARD_LEVEL);
-  mountIconButton("gitlab-empty-remove-push-btn-mount", { id: "gitlab-empty-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitLab from push destination", "aria-label": "Remove GitLab from push destination", icon: IconTrash(16) }, CARD_LEVEL);
-  mountIconButton("github-empty-remove-push-btn-mount", { id: "github-empty-remove-push-btn", variant: "tonal", destructive: true, size: "small", title: "Remove GitHub from push destination", "aria-label": "Remove GitHub from push destination", icon: IconTrash(16) }, CARD_LEVEL);
   mountTextField("folder-new-mount", { id: "folder-new", label: "Folder path", icon: IconFolder(16), placeholder: "e.g. src/something" }, CARD_LEVEL);
   mountTextField("github-folder-new-mount", { id: "github-folder-new", label: "Folder path", icon: IconFolder(16), placeholder: "e.g. src/something" }, CARD_LEVEL);
   mountTextField("gl-token-mount", { id: "gl-token", type: "password", label: "GitLab Token", placeholder: "glpat-\u2026 (stored only on this machine)" }, CARD_LEVEL);
@@ -47862,8 +47723,8 @@ html[data-theme=dark] {
     const container = document.getElementById("export-mode-control-mount");
     if (!container) return;
     function View() {
-      const [value, setValue] = (0, import_react15.useState)("1");
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+      const [value, setValue] = (0, import_react14.useState)("1");
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
         SegmentedControl,
         {
           label: "Output format",
@@ -47877,54 +47738,19 @@ html[data-theme=dark] {
         }
       );
     }
-    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
   })();
   function targetFromCheckboxes(s) {
     if (s.gitlab && s.github) return "both";
     if (s.github) return "github";
     return "gitlab";
   }
-  function checkboxesFromTarget(t) {
-    return { gitlab: t !== "github", github: t === "github" || t === "both" };
-  }
-  (function mountPushTargetControl() {
-    const container = document.getElementById("push-target-control-mount");
-    let set = () => {
-    };
-    function View() {
-      const [state, setState] = (0, import_react15.useState)({ gitlab: true, github: false });
-      set = setState;
-      function toggle(which, checked) {
-        const next = { ...state, [which]: checked };
-        if (!next.gitlab && !next.github) next[which] = true;
-        setState(next);
-        window.PomPushTarget.onChange?.(targetFromCheckboxes(next));
-      }
-      return (
-        // medium, not large: .nd-check's size prop scales the ROW's min-height
-        // (24/32/56) far more than the visible mark itself (16/18/22px) — it's
-        // built for a checkbox sitting in a taller row whose caption may wrap
-        // to a second line, so the mark pins to the first line rather than
-        // centering. A standalone checkbox with a one-line caption gets none
-        // of that benefit, only the padding: at 'large' the clickable <label>
-        // ran 34px below the visible mark, into what looked like dead space
-        // next to the next row. 'medium' still grows the mark (16→18px) with
-        // only a 14px gap — most of the "bigger" ask, none of the defect.
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Checkbox, { size: "medium", label: "GitLab", checked: state.gitlab, onChange: (c) => toggle("gitlab", c) }),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Checkbox, { size: "medium", label: "GitHub", checked: state.github, onChange: (c) => toggle("github", c) })
-        ] })
-      );
-    }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
-    window.PomPushTarget = { onChange: null, setValue: (v) => set(checkboxesFromTarget(v)) };
-  })();
   (function mountDtcgFormatSwitch() {
     const container = document.getElementById("dtcg-format-control-mount");
     let set = () => {
     };
     function View() {
-      const [on, setOn] = (0, import_react15.useState)(false);
+      const [on, setOn] = (0, import_react14.useState)(false);
       set = setOn;
       return (
         // medium, not large — see the comment on the push-target checkboxes
@@ -47934,7 +47760,7 @@ html[data-theme=dark] {
         // 34px dead-but-clickable gap under the track, reading as an
         // oversized hit area and a "delayed" toggle (the flip is instant;
         // the eye/cursor just isn't over the part that visibly moves).
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
           Switch,
           {
             size: "medium",
@@ -47948,7 +47774,7 @@ html[data-theme=dark] {
         )
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v) };
   })();
   (function mountRepoTabControl() {
@@ -47956,7 +47782,7 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [value, setValue] = (0, import_react15.useState)("gitlab");
+      const [value, setValue] = (0, import_react14.useState)("gitlab");
       set = setValue;
       return (
         // medium, not small: this sits at the top of Repository settings, level
@@ -47966,7 +47792,7 @@ html[data-theme=dark] {
         // it, so it should read as wide as that stack (like the fields inside
         // it), not hug its own two labels — see SegmentedControl's own `block`
         // doc, written for exactly this "governs everything under it" case.
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
           SegmentedControl,
           {
             label: "Repository provider",
@@ -47982,7 +47808,7 @@ html[data-theme=dark] {
         )
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
   })();
   (function mountMainProviderTabControl() {
@@ -47990,12 +47816,12 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [value, setValue] = (0, import_react15.useState)("gitlab");
+      const [value, setValue] = (0, import_react14.useState)("gitlab");
       set = setValue;
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
         SegmentedControl,
         {
-          label: "Folder path provider",
+          label: "Push destination",
           size: "medium",
           block: true,
           value,
@@ -48007,35 +47833,35 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     window.PomMainProviderTab = { onChange: null, setValue: (v) => set(v) };
   })();
   mountOnce(
     "skeleton-list",
-    /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "skeleton-foundation-card", "data-level": TOP_CARD_LEVEL, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "skeleton-foundation-card-title-group", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "circle", size: 18, label: "Loading" }),
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 160, height: 16, label: "" })
+    /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "skeleton-foundation-card", "data-level": TOP_CARD_LEVEL, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "skeleton-foundation-card-title-group", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "circle", size: 18, label: "Loading" }),
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "block", width: 160, height: 16, label: "" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 64, height: 22, label: "" })
+      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "block", width: 64, height: 22, label: "" })
     ] }),
     TOP_CARD_LEVEL
   );
-  mountOnce("json-download-icon-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "circle", size: 16, label: "Loading" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-title-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 80, height: 16, label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-tag-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 60, height: 22, label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-field-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", height: 50, width: "100%", label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-btn-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 125, height: 50, label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-icon-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "circle", size: 16, label: "Loading" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-title-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "block", width: 80, height: 16, label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-tag-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "block", width: 60, height: 22, label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-field-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "block", height: 50, width: "100%", label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-btn-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "block", width: 125, height: 50, label: "" }), TOP_CARD_LEVEL);
   mountOnce(
     "actions-skeleton",
-    /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "export-panel", "data-level": TOP_CARD_LEVEL, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "sk-row", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "circle", size: 14, label: "Loading" }),
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", width: 70, height: 16, label: "" })
+    /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "export-panel", "data-level": TOP_CARD_LEVEL, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "sk-row", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "circle", size: 14, label: "Loading" }),
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "block", width: 70, height: 16, label: "" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", height: 44, width: "100%", label: "" }),
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", height: 68, width: "100%", label: "" }),
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Skeleton, { shape: "block", height: 44, width: "100%", label: "" })
+      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "block", height: 44, width: "100%", label: "" }),
+      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "block", height: 68, width: "100%", label: "" }),
+      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Skeleton, { shape: "block", height: 44, width: "100%", label: "" })
     ] }),
     TOP_CARD_LEVEL
   );
@@ -48044,9 +47870,9 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [s, setS] = (0, import_react15.useState)({ open: false, tone: "success", message: "" });
+      const [s, setS] = (0, import_react14.useState)({ open: false, tone: "success", message: "" });
       set = setS;
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
         Toast,
         {
           open: s.open,
@@ -48058,7 +47884,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) }));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) }));
     window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? "error" : "success", message })) };
   })();
   window.PomFolderSelect = {
@@ -48078,8 +47904,8 @@ html[data-theme=dark] {
       generation += 1;
       const gen = generation;
       root.render(
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(import_jsx_runtime21.Fragment, { children: rows.map((row, idx) => /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "folder-row", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(import_jsx_runtime20.Fragment, { children: rows.map((row, idx) => /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "folder-row", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
             PomTextField,
             {
               id: `${idPrefix}-${idx}`,
@@ -48093,7 +47919,7 @@ html[data-theme=dark] {
           ),
           row.canEdit && // medium, not small: beside a field (band 50), same reasoning
           // as folder-add-btn-mount / gl-clear-token-btn-mount above.
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
             PomButton,
             {
               variant: "tonal",
@@ -48117,23 +47943,23 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [state, setState] = (0, import_react15.useState)({ title: "Scanned collections", collections: [], summary: { tokens: "" } });
-      const [open, setOpen] = (0, import_react15.useState)(false);
+      const [state, setState] = (0, import_react14.useState)({ title: "Scanned collections", collections: [], summary: { tokens: "" } });
+      const [open, setOpen] = (0, import_react14.useState)(false);
       set = setState;
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { "data-tense": "inverted", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(InteractiveCard, { label: `${state.title} \u2014 view scanned collections`, level: 2, size: "large", onClick: () => setOpen(true), children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { className: "collections-header", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "collections-header-top", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "collections-header-icon", "aria-hidden": "true", children: IconVariables(18) }),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "collections-summary", children: state.title }),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { className: "collections-summary-tags", children: state.summary.tokens ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Tag, { variant: "tonal", size: "small", children: state.summary.tokens }) : null })
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_jsx_runtime20.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { "data-tense": "inverted", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(InteractiveCard, { label: `${state.title} \u2014 view scanned collections`, level: 2, size: "large", onClick: () => setOpen(true), children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { className: "collections-header", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "collections-header-top", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "collections-header-icon", "aria-hidden": "true", children: IconVariables(18) }),
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "collections-summary", children: state.title }),
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { className: "collections-summary-tags", children: state.summary.tokens ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Tag, { variant: "tonal", size: "small", children: state.summary.tokens }) : null })
         ] }) }) }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Dialog, { open, onClose: () => setOpen(false), title: state.title, size: "large", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { className: "collections-readonly-list", children: state.collections.map((c) => /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "collection-item", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "collection-item-check", children: IconCheck(14) }),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "name", children: c.name }),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Tag, { variant: "tonal", size: "small", children: c.count })
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Dialog, { open, onClose: () => setOpen(false), title: state.title, size: "large", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { className: "collections-readonly-list", children: state.collections.map((c) => /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "collection-item", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "collection-item-check", children: IconCheck(14) }),
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "name", children: c.name }),
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Tag, { variant: "tonal", size: "small", children: c.count })
         ] }, c.name)) }) })
       ] });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     window.PomCollectionsAccordion = {
       setTitle: (title) => set((s) => ({ ...s, title })),
       setCollections: (collections) => set((s) => ({ ...s, collections })),
@@ -48145,12 +47971,12 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [size, setSize] = (0, import_react15.useState)("");
+      const [size, setSize] = (0, import_react14.useState)("");
       set = setSize;
       if (!size) return null;
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Tag, { variant: "tonal", size: "small", children: size });
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Tag, { variant: "tonal", size: "small", children: size });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     window.PomJsonFileCard = { setSize: (size) => set(size) };
   })();
   (function mountClosureWarning() {
@@ -48158,26 +47984,26 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [s, setS] = (0, import_react15.useState)({ open: false, title: "", groups: [], more: 0 });
+      const [s, setS] = (0, import_react14.useState)({ open: false, title: "", groups: [], more: 0 });
       set = setS;
       if (!s.open) return null;
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(Alert, { tone: "error", title: s.title, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("p", { className: "closure-warning-subtitle", children: "Not present in this export, but referenced by:" }),
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("ul", { className: "closure-warning-list", children: s.groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("li", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { className: "closure-warning-missing", children: g.ref }),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "closure-warning-froms", children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(Alert, { tone: "error", title: s.title, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("p", { className: "closure-warning-subtitle", children: "Not present in this export, but referenced by:" }),
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("ul", { className: "closure-warning-list", children: s.groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("li", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { className: "closure-warning-missing", children: g.ref }),
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "closure-warning-froms", children: [
             "used by ",
             g.froms.join(", ")
           ] })
         ] }, g.ref)) }),
-        s.more > 0 && /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("p", { className: "closure-warning-more", children: [
+        s.more > 0 && /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("p", { className: "closure-warning-more", children: [
           "+",
           s.more,
           " more affected"
         ] })
       ] });
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) }));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) }));
     window.PomClosureWarning = {
       show: (title, groups, more) => set(() => ({ open: true, title, groups, more: more || 0 })),
       hide: () => set((s) => ({ ...s, open: false }))
@@ -48188,9 +48014,9 @@ html[data-theme=dark] {
     let setOpen = () => {
     };
     function View() {
-      const [open, setO] = (0, import_react15.useState)(false);
+      const [open, setO] = (0, import_react14.useState)(false);
       setOpen = setO;
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
         Dialog,
         {
           open,
@@ -48198,9 +48024,9 @@ html[data-theme=dark] {
           size: "small",
           title: cfg.title,
           description: cfg.text,
-          actions: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setO(false), children: "Cancel" }),
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, "data-scheme": "error", onClick: () => {
+          actions: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setO(false), children: "Cancel" }),
+            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, "data-scheme": "error", onClick: () => {
               setO(false);
               cfg.onConfirm();
             }, children: cfg.confirmLabel })
@@ -48209,7 +48035,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) }));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) }));
     register(() => setOpen(true));
   }
   window.PomRemoveGithubDialog = { open: () => {
@@ -48237,12 +48063,12 @@ html[data-theme=dark] {
     let setProvider = () => {
     };
     function View() {
-      const [open, setO] = (0, import_react15.useState)(false);
-      const [provider, setP] = (0, import_react15.useState)("gitlab");
+      const [open, setO] = (0, import_react14.useState)(false);
+      const [provider, setP] = (0, import_react14.useState)("gitlab");
       setOpen = setO;
       setProvider = setP;
       const label = provider === "github" ? "GitHub" : "GitLab";
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
         Dialog,
         {
           open,
@@ -48250,9 +48076,9 @@ html[data-theme=dark] {
           size: "small",
           title: `Clear ${label} token?`,
           description: `The saved ${label} token is removed from this plugin. Everything else \u2014 repository, branch and saved folder paths \u2014 stays as it is, and pushing is paused until you enter a new token.`,
-          actions: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setO(false), children: "Cancel" }),
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, "data-scheme": "error", onClick: () => {
+          actions: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setO(false), children: "Cancel" }),
+            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, "data-scheme": "error", onClick: () => {
               setO(false);
               window.PomClearTokenDialog.onConfirm?.(provider);
             }, children: "Clear" })
@@ -48261,7 +48087,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) }));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) }));
     window.PomClearTokenDialog = {
       open: (provider) => {
         (0, import_react_dom.flushSync)(() => setProvider(provider));
@@ -48281,9 +48107,9 @@ html[data-theme=dark] {
       // Dialog.tsx), and the composition rule's ascending order above L4 is
       // 1 → 2 → 3, so a selectable row (one of L1's own named uses) gets L1
       // and its logo badge one rung up at L2, so all three read apart.
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(SelectableCard, { label, selected: checked, onSelect: () => onToggle(!checked), mark: "checkbox", level: 1, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("span", { style: { display: "flex", alignItems: "center", gap: 10 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { "aria-hidden": "true", "data-level": 2, style: { display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "var(--background)", color: "var(--app-text-muted)", flexShrink: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "currentColor", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d: PROVIDER_LOGO_PATH[which] }) }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { style: { fontWeight: 600, color: "var(--app-text)" }, children: label })
+      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(SelectableCard, { label, selected: checked, onSelect: () => onToggle(!checked), mark: "checkbox", level: 1, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("span", { style: { display: "flex", alignItems: "center", gap: 10 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { "aria-hidden": "true", "data-level": 2, style: { display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "var(--background)", color: "var(--app-text-muted)", flexShrink: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "currentColor", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d: PROVIDER_LOGO_PATH[which] }) }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontWeight: 600, color: "var(--app-text)" }, children: label })
       ] }) })
     );
   }
@@ -48298,9 +48124,9 @@ html[data-theme=dark] {
       return s.github ? gh : gl;
     }
     function View() {
-      const [open, setO] = (0, import_react15.useState)(false);
-      const [step, setStep] = (0, import_react15.useState)(1);
-      const [state, setState] = (0, import_react15.useState)({ gitlab: true, github: false });
+      const [open, setO] = (0, import_react14.useState)(false);
+      const [step, setStep] = (0, import_react14.useState)(1);
+      const [state, setState] = (0, import_react14.useState)({ gitlab: true, github: false });
       setOpen = (next) => {
         if (next) setStep(1);
         setO(next);
@@ -48309,7 +48135,7 @@ html[data-theme=dark] {
         setState((s) => ({ ...s, [which]: checked }));
       }
       const neitherChecked = !state.gitlab && !state.github;
-      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
         Dialog,
         {
           open,
@@ -48321,10 +48147,10 @@ html[data-theme=dark] {
             // Neither checked has nothing for step 2 to ask about (no
             // token to collect for a provider that wasn't picked), so it
             // confirms straight from here instead of advancing —
-            // targetFromCheckboxes() can't express "neither" (it's shared
-            // with mountPushTargetControl, where that's never a valid
-            // state), so 'none' is passed explicitly.
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "primary", size: "large", block: true, onClick: () => {
+            // targetFromCheckboxes() can't express "neither" (it's built
+            // for a picker where at least one is always checked), so
+            // 'none' is passed explicitly.
+            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Button, { variant: "primary", size: "large", block: true, onClick: () => {
               if (neitherChecked) {
                 setO(false);
                 window.PomOnboardingDialog.onConfirm?.("none");
@@ -48332,21 +48158,21 @@ html[data-theme=dark] {
                 setStep(2);
               }
             }, children: neitherChecked ? "Skip \u2014 just download" : "Next" })
-          ) : /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setStep(1), children: "Back" }),
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, onClick: () => {
+          ) : /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setStep(1), children: "Back" }),
+            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, onClick: () => {
               setO(false);
               window.PomOnboardingDialog.onConfirm?.(targetFromCheckboxes(state));
             }, children: "Add Settings" })
           ] }),
-          children: step === 1 ? /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", flexDirection: "column", gap: 8, width: "100%" }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ProviderChoiceCard, { which: "gitlab", label: "GitLab", checked: state.gitlab, onToggle: (c) => toggle("gitlab", c) }),
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ProviderChoiceCard, { which: "github", label: "GitHub", checked: state.github, onToggle: (c) => toggle("github", c) })
+          children: step === 1 ? /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { display: "flex", flexDirection: "column", gap: 8, width: "100%" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ProviderChoiceCard, { which: "gitlab", label: "GitLab", checked: state.gitlab, onToggle: (c) => toggle("gitlab", c) }),
+            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ProviderChoiceCard, { which: "github", label: "GitHub", checked: state.github, onToggle: (c) => toggle("github", c) })
           ] }) : null
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) }));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) }));
     window.PomOnboardingDialog = { open: () => setOpen(true), onConfirm: null };
   })();
 })();
@@ -49037,14 +48863,17 @@ react/cjs/react-jsx-runtime.development.js:
     // Which provider's folder-path block is shown on the main screen's own
     // tab switcher (see updatePushTargetUI()'s tabMode) — only meaningful
     // once both providers are added, same condition as activeSettingsTab
-    // above, but deliberately a separate variable: this is purely which
-    // folder path the user is looking at, independent of pushTarget below
-    // (where a push actually goes). Session-only — always starts back on
-    // 'gitlab' rather than being persisted, same as activeSettingsTab.
+    // above. This is now ALSO the real push destination (there used to be a
+    // separate Settings-page "Push destination" picker with its own
+    // GitLab/GitHub/Both checkboxes and a distinct `pushTarget` variable —
+    // removed: the user picks a destination once, here, by looking at the
+    // provider they want and pushing to it, rather than in two places that
+    // could disagree; 'both' (simultaneous push to two providers) went with
+    // it — see computePushReadiness()'s own comment). Persisted now (see
+    // getState()'s `pushTarget` key, kept under its old name so existing
+    // saved configs still load) since it's a real preference, not a
+    // session-only view toggle any more.
     var mainProviderTab = 'gitlab';
-    // 'gitlab' | 'github' | 'both' — a general Settings-level preference the
-    // main screen's Push button follows; only meaningful once githubAdded.
-    var pushTarget = 'gitlab';
     // null = ship the Token Studio tree as-is; 'themes' runs the DTCG
     // post-transform (src/dtcg-format.js) over it — see getTokensToExport.
     // 'themes' (not 'partial') is what the Output format switch drives: one
@@ -49066,7 +48895,7 @@ react/cjs/react-jsx-runtime.development.js:
     // synchronously reaching updateActionUI on its very first call — a var
     // declared further down would still be hoisted but not yet assigned at
     // that point, reading as undefined and throwing.
-    var PUSH_TARGET_LABELS = { gitlab: 'Push to GitLab', github: 'Push to GitHub', both: 'Push to Both' };
+    var PUSH_TARGET_LABELS = { gitlab: 'Push to GitLab', github: 'Push to GitHub' };
 
     function normFolder(p) {
       return String(p || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
@@ -49256,7 +49085,7 @@ react/cjs/react-jsx-runtime.development.js:
     };
 
     // Main screen: GitHub's own folder dropdown, shown only when relevant
-    // to the current pushTarget (see updatePushTargetUI()).
+    // to the current mainProviderTab (see updatePushTargetUI()).
     function renderGithubFolderSelect() {
       var items = ghFolders.map(function(path) {
         return { label: path || '(repo root)', value: path };
@@ -49276,7 +49105,7 @@ react/cjs/react-jsx-runtime.development.js:
       // Also re-check whether the commit box should be disabled — a token
       // or repo could have just been filled in (or cleared), and
       // updatePushTargetUI() (the other call site for this) only runs on
-      // pushTarget/provider changes, not on every Settings edit.
+      // mainProviderTab/provider changes, not on every Settings edit.
       updateActionUI();
     }
 
@@ -49317,13 +49146,10 @@ react/cjs/react-jsx-runtime.development.js:
       window.PomAddGithubBtn.setLabel(githubAdded ? 'Remove' : 'Add');
       window.PomAddGithubBtn.setDisabled(githubAdded && !gitlabAdded);
 
-      document.getElementById('push-target-section').hidden = !(githubAdded && gitlabAdded);
-
       // Each provider's "Remove" is offered only while the OTHER one also
       // exists — removing the last provider would leave nowhere to push to
-      // (both onConfirm handlers below refuse it outright). Same condition
-      // as the push-destination control right above, and it lives HERE
-      // rather than in refreshSettingsControls() because the remove
+      // (both onConfirm handlers below refuse it outright), and it lives
+      // HERE rather than in refreshSettingsControls() because the remove
       // handlers call only this function: gating it there left the button
       // on screen after the other provider was removed, still visible but
       // inert, since its own guard then swallowed every click.
@@ -49335,7 +49161,7 @@ react/cjs/react-jsx-runtime.development.js:
       getState: function() {
         var state = {
           version: 5,
-          pushTarget: pushTarget,
+          pushTarget: mainProviderTab,
           gitlabAdded: gitlabAdded,
           // Output format switch. Stored as a plain boolean rather than the
           // shape name so a config saved here stays readable if the converter
@@ -49466,23 +49292,22 @@ react/cjs/react-jsx-runtime.development.js:
         window.PomRepoTab.setValue(activeSettingsTab);
         updateProviderSectionVisibility();
 
-        // pushTarget must always point at an actually-available provider —
-        // a stale value from before a removal falls back to whichever one
-        // remains. Both false IS reachable now: the onboarding dialog's
-        // "skip both" choice (mountOnboardingDialog.onConfirm) persists
-        // exactly this shape (no gitlab/github saved), and this is what
-        // reconstructs it back to 'none' — not 'gitlab' by the old
-        // catch-all default — on every later load.
-        if (!gitlabAdded && !githubAdded) {
-          pushTarget = 'none';
-        } else if (!gitlabAdded) {
-          pushTarget = 'github';
+        // mainProviderTab (the real push destination now, see its own
+        // comment above) must always point at an actually-available
+        // provider — a stale saved value from before a removal falls back
+        // to whichever one remains. Its exact value is moot when neither
+        // provider is added (computePushReadiness()'s noPushDestination
+        // covers that case directly from gitlabAdded/githubAdded), so no
+        // 'none' sentinel is needed here any more — just keep it pointed at
+        // something real.
+        if (!gitlabAdded) {
+          mainProviderTab = 'github';
         } else if (!githubAdded) {
-          pushTarget = 'gitlab';
+          mainProviderTab = 'gitlab';
         } else {
-          pushTarget = (config.pushTarget === 'github' || config.pushTarget === 'both') ? config.pushTarget : 'gitlab';
+          mainProviderTab = config.pushTarget === 'github' ? 'github' : 'gitlab';
         }
-        window.PomPushTarget.setValue(pushTarget);
+        window.PomMainProviderTab.setValue(mainProviderTab);
         updatePushTargetUI();
 
         // Last, so it can name the file the seeded fields above actually hold.
@@ -49604,7 +49429,7 @@ react/cjs/react-jsx-runtime.development.js:
     });
 
     // Main-screen GitHub folder dropdown (shown only when relevant to the
-    // current pushTarget) → same behavior as GitLab's own dropdown above.
+    // current mainProviderTab) → same behavior as GitLab's own dropdown above.
     window.PomGithubFolderSelect.onChange = function(value) {
       ghActiveFolder = value;
       renderGithubFolderList();
@@ -49663,9 +49488,9 @@ react/cjs/react-jsx-runtime.development.js:
       activeSettingsTab = 'gitlab'; // the tab switcher itself is about to disappear, but stay consistent
       window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
-      if (pushTarget !== 'gitlab') {
-        pushTarget = 'gitlab';
-        window.PomPushTarget.setValue(pushTarget);
+      if (mainProviderTab !== 'gitlab') {
+        mainProviderTab = 'gitlab';
+        window.PomMainProviderTab.setValue(mainProviderTab);
       }
       updatePushTargetUI();
       persistSettings();
@@ -49721,9 +49546,9 @@ react/cjs/react-jsx-runtime.development.js:
       activeSettingsTab = 'github';
       window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
-      if (pushTarget !== 'github') {
-        pushTarget = 'github';
-        window.PomPushTarget.setValue(pushTarget);
+      if (mainProviderTab !== 'github') {
+        mainProviderTab = 'github';
+        window.PomMainProviderTab.setValue(mainProviderTab);
       }
       updatePushTargetUI();
       persistSettings();
@@ -49748,23 +49573,17 @@ react/cjs/react-jsx-runtime.development.js:
       updateProviderSectionVisibility();
     };
 
-    // Settings-level push-destination preference (GitLab / GitHub / Both) —
-    // the main screen's Push button just follows whatever this is set to.
-    window.PomPushTarget.onChange = function(value) {
-      pushTarget = value;
-      persistSettings();
-      updatePushTargetUI();
-    };
-
     // Switches which provider's folder path is shown on the main screen —
-    // a view preference only, not persisted (same reasoning as
-    // window.PomRepoTab.onChange above, and the same setValue-echo it
-    // needs: SegmentedControl is controlled, so the pill only follows a
-    // click if this writes the new value back to it).
+    // AND, now, the real push destination itself (there's no separate
+    // Settings-page picker any more — see mainProviderTab's own comment).
+    // Persisted (used to be view-only), same setValue-echo reasoning as
+    // window.PomRepoTab.onChange above: SegmentedControl is controlled, so
+    // the pill only follows a click if this writes the new value back to it.
     window.PomMainProviderTab.onChange = function(value) {
       mainProviderTab = value;
       window.PomMainProviderTab.setValue(mainProviderTab);
       updatePushTargetUI();
+      persistSettings();
     };
 
     // First-run nudge (see the GIT_SETTINGS_LOADED handler below for when
@@ -49785,7 +49604,6 @@ react/cjs/react-jsx-runtime.development.js:
     // alongside "Add Repo Settings") then lands on whichever picked
     // provider still needs a token.
     window.PomOnboardingDialog.onConfirm = function(target) {
-      pushTarget = target;
       var wantsGitLab = (target === 'gitlab' || target === 'both');
       var wantsGitHub = (target === 'github' || target === 'both');
       if (wantsGitLab && !gitlabAdded) addGitlab();
@@ -49799,11 +49617,18 @@ react/cjs/react-jsx-runtime.development.js:
       // error state to route around, it's the third real choice.
       if (!wantsGitLab && gitlabAdded) removeGitlab();
       if (!wantsGitHub && githubAdded) removeGithub();
+      // Default push destination follows whichever single provider was
+      // picked; 'both' (add both, no simultaneous push any more) falls
+      // back to GitLab, the same default used everywhere else — the user
+      // can switch the main screen's tab to GitHub afterwards if they'd
+      // rather push there.
+      if (wantsGitLab) mainProviderTab = 'gitlab';
+      else if (wantsGitHub) mainProviderTab = 'github';
+      window.PomMainProviderTab.setValue(mainProviderTab);
       activeSettingsTab = wantsGitLab ? 'gitlab' : 'github';
       window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
       refreshSettingsControls();
-      window.PomPushTarget.setValue(pushTarget);
       updatePushTargetUI();
       persistSettings();
       // Skipped for 'none' — see goToFirstUnreadyProvider()'s own comment
@@ -49953,77 +49778,53 @@ react/cjs/react-jsx-runtime.development.js:
 
     // Single source of truth for "what can actually be pushed right now" —
     // shared by the main-screen UI (updateActionUI/updatePushTargetUI) and
-    // the real push action (pushToGit), so they can never disagree. In
-    // 'both' mode, if exactly one provider is ready, this silently narrows
-    // to just that one (effectiveTarget) instead of blocking the whole
-    // push — the other one gets a small "finish setting up" button instead
-    // of being hidden outright (mixedReadiness). Only single-provider mode
-    // (or 'both' with NEITHER ready) counts as fully blocked (needsBigSetup).
+    // the real push action (pushToGit), so they can never disagree. There
+    // is exactly one target now — mainProviderTab, whichever provider's tab
+    // is selected on the main screen (see its own comment) — so this is
+    // just "is that one provider added, and is it ready", no more mixed-
+    // readiness fallback or 'both'-mode narrowing to reason about.
     //
-    // pushTarget === 'none' is a separate, deliberate third state — not a
-    // flavor of "not set up yet": the onboarding dialog's "skip" choice
-    // (mountOnboardingDialog, buttons.tsx) sets it explicitly when the user
-    // wants neither provider, because Download alone is a complete,
-    // supported workflow. noPushDestination flags that case so callers can
+    // noPushDestination (neither provider added — the onboarding dialog's
+    // "skip" choice, or every provider since removed) is a separate,
+    // deliberate case — not a flavor of "not set up yet": Download alone is
+    // a complete, supported workflow. It flags that case so callers can
     // tell "hasn't finished configuring" apart from "chose not to" — they
     // read the same in most of this UI (both fall back to the same "Add
-    // Repo Settings" slot) but must never collide in wantsGitLab/wantsGitHub
-    // or PUSH_TARGET_LABELS lookups, which have no 'none' entry.
+    // Repo Settings" slot) but PUSH_TARGET_LABELS has no entry for it.
     function computePushReadiness() {
-      var wantsGitLab = pushTarget === 'gitlab' || pushTarget === 'both';
-      var wantsGitHub = githubAdded && (pushTarget === 'github' || pushTarget === 'both');
+      var noPushDestination = !gitlabAdded && !githubAdded;
+      var target = noPushDestination ? null
+        : !gitlabAdded ? 'github'
+        : !githubAdded ? 'gitlab'
+        : mainProviderTab;
+      var wantsGitLab = target === 'gitlab';
+      var wantsGitHub = target === 'github';
       var glReady = isGitLabReady();
       var ghReady = isGitHubReady();
-      var bothMode = pushTarget === 'both' && githubAdded;
-      var noPushDestination = pushTarget === 'none';
-
-      var effectiveTarget = pushTarget;
-      var mixedReadiness = false;
-      if (bothMode) {
-        if (glReady && ghReady) {
-          effectiveTarget = 'both';
-        } else if (glReady) {
-          effectiveTarget = 'gitlab';
-          mixedReadiness = true;
-        } else if (ghReady) {
-          effectiveTarget = 'github';
-          mixedReadiness = true;
-        }
-        // else neither ready — effectiveTarget stays 'both', needsBigSetup covers it.
-      }
-
-      var needsBigSetup =
-        (pushTarget === 'gitlab' && !glReady) ||
-        (pushTarget === 'github' && !ghReady) ||
-        (bothMode && !glReady && !ghReady);
+      var needsBigSetup = !noPushDestination && !(wantsGitLab ? glReady : ghReady);
 
       return {
         wantsGitLab: wantsGitLab, wantsGitHub: wantsGitHub,
         glReady: glReady, ghReady: ghReady,
-        bothMode: bothMode, mixedReadiness: mixedReadiness,
-        effectiveTarget: effectiveTarget, needsBigSetup: needsBigSetup,
-        noPushDestination: noPushDestination,
-        effectiveWantsGitLab: effectiveTarget === 'gitlab' || effectiveTarget === 'both',
-        effectiveWantsGitHub: effectiveTarget === 'github' || effectiveTarget === 'both'
+        effectiveTarget: target, needsBigSetup: needsBigSetup,
+        noPushDestination: noPushDestination
       };
     }
 
     function updateActionUI() {
       var r = computePushReadiness();
-      // No workable destination at all yet (single-provider mode not
-      // ready, or 'both' with neither ready) — the commit box is pointless,
-      // so it's hidden outright (not just disabled — nothing to type
-      // towards yet), and the Push button itself is replaced by "Add Repo
-      // Settings" in its own slot (see goToProviderSettingsField()). Stays
-      // visible and enabled in the mixed-readiness case (see
-      // computePushReadiness()) — there a commit message still makes
-      // sense, since the push goes ahead against whichever provider IS ready.
+      // No workable destination at all yet (the current target isn't
+      // ready) — the commit box is pointless, so it's hidden outright (not
+      // just disabled — nothing to type towards yet), and the Push button
+      // itself is replaced by "Add Repo Settings" in its own slot (see
+      // goToProviderSettingsField()).
       //
-      // noPushDestination (pushTarget === 'none', the onboarding "skip"
-      // choice) folds into this same fallback — Download alone is a fully
-      // supported workflow, so there's nothing to disable-and-explain here,
-      // just nothing to push TO. Same "Add Repo Settings" slot either way;
-      // goToFirstUnreadyProvider() (below) tells the two apart when clicked.
+      // noPushDestination (neither provider added — the onboarding "skip"
+      // choice, or both since removed) folds into this same fallback —
+      // Download alone is a fully supported workflow, so there's nothing to
+      // disable-and-explain here, just nothing to push TO. Same "Add Repo
+      // Settings" slot either way; goToFirstUnreadyProvider() (below) tells
+      // the two apart when clicked.
       var showFallback = r.needsBigSetup || r.noPushDestination;
       window.PomCommitMessage.setDisabled(showFallback);
       document.getElementById('commit-wrap').hidden = showFallback;
@@ -50037,12 +49838,10 @@ react/cjs/react-jsx-runtime.development.js:
       if (!showFallback) {
         // The button's own baseProps.label ('Push to GitLab', buttons.tsx)
         // is just an initial-render fallback — this always drives the real
-        // label once settings have loaded, and follows effectiveTarget (not
-        // raw pushTarget) so a mixed-readiness 'both' correctly reads
-        // "Push to GitLab" rather than "Push to Both". Guarded by
-        // showFallback, not just needsBigSetup, specifically so this never
-        // runs for pushTarget === 'none' — PUSH_TARGET_LABELS has no 'none'
-        // entry, and the button is hidden in that state anyway.
+        // label once settings have loaded. Guarded by showFallback, not
+        // just needsBigSetup, specifically so this never runs for
+        // noPushDestination — PUSH_TARGET_LABELS has no entry for it, and
+        // the button is hidden in that state anyway.
         window.PomButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
       }
       window.PomButtons.download.setDisabled(!transformedData);
@@ -50051,34 +49850,26 @@ react/cjs/react-jsx-runtime.development.js:
     // Shows a provider's dropdown+filename row, or — if it has zero saved
     // folder paths — an explanatory message instead (an empty dropdown
     // with nothing to select reads as broken, not "not configured yet").
-    // Always shows its own title when shown, even outside 'both'. When the
-    // provider isn't ready (no token/project or repo), the whole thing is
-    // replaced by either nothing (single-provider mode, or 'both' with
-    // neither ready — see updateActionUI()'s big "Add Repo Settings"
-    // instead) or, in 'both' mode with the OTHER provider ready, a small
-    // standalone "Add ___ Settings" button (showSmallBtn).
-    function updateTargetRow(prefix, wanted, ready, isEmpty, showSmallBtn, bothMode) {
+    // Always shows its own title when shown. When the provider isn't ready
+    // (no token/project or repo), the whole thing is replaced by nothing —
+    // updateActionUI()'s big "Add Repo Settings" covers that case globally
+    // now that there's only ever one target to be not-ready about.
+    function updateTargetRow(prefix, wanted, ready, isEmpty) {
       var showNormal = wanted && ready;
-      var showSmall = wanted && !ready && showSmallBtn;
-      document.getElementById(prefix + '-target-wrap').hidden = !(showNormal || showSmall);
-      document.getElementById(prefix + '-target-title').hidden = !(showNormal || showSmall);
+      document.getElementById(prefix + '-target-wrap').hidden = !showNormal;
+      document.getElementById(prefix + '-target-title').hidden = !showNormal;
       document.getElementById(prefix + '-filename-row').hidden = !showNormal || isEmpty;
       document.getElementById(prefix + '-target-empty').hidden = !showNormal || !isEmpty;
-      document.getElementById(prefix + '-target-actions').hidden = !showSmall;
-      // Same "uncheck this provider" shortcut as -target-actions' trash
-      // button, offered here too — only in 'both' mode (there's always a
-      // valid other target to fall back to; single-provider mode has none).
-      document.getElementById(prefix + '-empty-remove-push-btn-mount').hidden = !(showNormal && isEmpty && bothMode);
     }
 
     // Once both providers are added, the folder-path blocks below are
-    // driven by mainProviderTab instead of by pushTarget/wanted — the user
-    // can look at (and finish setting up) either provider's folder path
-    // regardless of which one is the current push destination. Same
-    // gitlabAdded && githubAdded gate the Settings page's own tab switcher
-    // uses (updateProviderSectionVisibility's showTabs). Single-provider
-    // mode is untouched: falls straight through to the original
-    // wanted/ready/bothMode logic, exactly as before this switcher existed.
+    // driven by mainProviderTab — the user can look at (and finish setting
+    // up) either provider's folder path, but only the currently-selected
+    // tab is also the real push target (computePushReadiness() above).
+    // Same gitlabAdded && githubAdded gate the Settings page's own tab
+    // switcher uses (updateProviderSectionVisibility's showTabs).
+    // Single-provider mode falls straight through to the one added
+    // provider, with nothing to switch.
     function updatePushTargetUI() {
       var r = computePushReadiness();
       var tabMode = gitlabAdded && githubAdded;
@@ -50087,19 +49878,12 @@ react/cjs/react-jsx-runtime.development.js:
         window.PomMainProviderTab.setValue(mainProviderTab);
         var showGl = mainProviderTab === 'gitlab';
         var showGh = mainProviderTab === 'github';
-        updateTargetRow('gitlab', showGl, r.glReady, glFolders.length === 0, showGl && !r.glReady, false);
-        updateTargetRow('github', showGh, r.ghReady, ghFolders.length === 0, showGh && !r.ghReady, false);
-        // The trash "remove from push destination" affordance belongs to
-        // pushTarget, a different control (Settings' own Push destination
-        // picker) — not to this view-only switcher, so it never shows here
-        // even where updateTargetRow's showSmallBtn branch would otherwise
-        // reveal it alongside the small settings button.
-        document.getElementById('gitlab-remove-push-btn-mount').hidden = true;
-        document.getElementById('github-remove-push-btn-mount').hidden = true;
+        updateTargetRow('gitlab', showGl, r.glReady, glFolders.length === 0);
+        updateTargetRow('github', showGh, r.ghReady, ghFolders.length === 0);
         if (showGh && r.ghReady) renderGithubFolderSelect();
       } else {
-        updateTargetRow('gitlab', r.wantsGitLab, r.glReady, glFolders.length === 0, r.mixedReadiness && r.effectiveTarget === 'github', r.bothMode);
-        updateTargetRow('github', r.wantsGitHub, r.ghReady, ghFolders.length === 0, r.mixedReadiness && r.effectiveTarget === 'gitlab', r.bothMode);
+        updateTargetRow('gitlab', r.wantsGitLab, r.glReady, glFolders.length === 0);
+        updateTargetRow('github', r.wantsGitHub, r.ghReady, ghFolders.length === 0);
         if (r.wantsGitHub && r.ghReady) renderGithubFolderSelect();
       }
       updateActionUI();
@@ -50143,7 +49927,7 @@ react/cjs/react-jsx-runtime.development.js:
     // window.PomOnboardingDialog.onConfirm below) for the normal
     // gitlab/github/both choices — gitlab-first, matching this app's usual
     // default precedence. NOT called from onConfirm when the user picked
-    // neither (pushTarget === 'none'): there's nothing to jump to yet, and
+    // neither (noPushDestination): there's nothing to jump to yet, and
     // forcing Settings open right after "skip, just download" would defeat
     // the point of skipping. It's still reachable from THIS button though —
     // clicking "Add Repo Settings" from the main screen after declining
@@ -50162,40 +49946,6 @@ react/cjs/react-jsx-runtime.development.js:
       }
     }
     document.getElementById('add-repo-settings-btn').addEventListener('click', goToFirstUnreadyProvider);
-    // Small per-row "finish setting up" buttons — only ever shown (see
-    // updateTargetRow()) when the OTHER provider is already ready, so the
-    // push itself isn't blocked on these.
-    document.getElementById('gitlab-small-settings-btn').addEventListener('click', function() {
-      goToProviderSettingsField('gitlab', 'gl-token');
-    });
-    document.getElementById('github-small-settings-btn').addEventListener('click', function() {
-      goToProviderSettingsField('github', 'gh-token');
-    });
-    // Trash icon — unchecks this provider from the push destination
-    // entirely, same effect as unchecking its box on the Settings page's
-    // Push destination control (window.PomPushTarget.setValue keeps that
-    // control in sync). Shared by two placements: next to the small
-    // settings button (only shown when the OTHER provider is ready) and
-    // next to the empty-folder-path "+" button (only shown in 'both' mode
-    // — see updateTargetRow()) — both call sites are only ever reachable
-    // when the OTHER provider is actually added, so this can never leave
-    // pushTarget pointing at nothing.
-    function removeGitlabFromPush() {
-      pushTarget = 'github';
-      window.PomPushTarget.setValue(pushTarget);
-      persistSettings();
-      updatePushTargetUI();
-    }
-    function removeGithubFromPush() {
-      pushTarget = 'gitlab';
-      window.PomPushTarget.setValue(pushTarget);
-      persistSettings();
-      updatePushTargetUI();
-    }
-    document.getElementById('gitlab-remove-push-btn').addEventListener('click', removeGitlabFromPush);
-    document.getElementById('github-remove-push-btn').addEventListener('click', removeGithubFromPush);
-    document.getElementById('gitlab-empty-remove-push-btn').addEventListener('click', removeGitlabFromPush);
-    document.getElementById('github-empty-remove-push-btn').addEventListener('click', removeGithubFromPush);
 
     // Re-run the transform in code.js for the current exportMode / dtcgShape.
     // Needed whenever either changes, because includeDescriptions is decided
@@ -50357,9 +50107,9 @@ react/cjs/react-jsx-runtime.development.js:
       return msg;
     }
 
-    // Push the exported tokens to whichever provider(s) pushTarget names.
-    // Both run sequentially when target is 'both' — one failing doesn't
-    // abort the other; the toast at the end reports each outcome.
+    // Push the exported tokens to whichever single provider mainProviderTab
+    // currently names (see its own comment — there's no simultaneous-push
+    // 'both' mode any more).
     function pushToGit() {
       var tokens = getTokensToExport();
       if (!tokens) return;
@@ -50372,13 +50122,11 @@ react/cjs/react-jsx-runtime.development.js:
       }
 
       // Reuses the exact same readiness computation the main-screen UI
-      // renders from — effectiveWants* already excludes an unready
-      // provider in a mixed-readiness 'both' (see computePushReadiness()),
-      // so there's no separate per-provider not-ready check needed here
-      // any more; this guard is just defense against the Push button
-      // somehow firing while there's nothing to push to — either
-      // needsBigSetup (not ready yet) or noPushDestination (pushTarget ===
-      // 'none', the onboarding "skip" choice) — updateActionUI() replaces
+      // renders from, so this can't disagree with it. This guard is just
+      // defense against the Push button somehow firing while there's
+      // nothing to push to — either needsBigSetup (target not ready yet)
+      // or noPushDestination (neither provider added — the onboarding
+      // "skip" choice, or both since removed) — updateActionUI() replaces
       // Push with "Add Repo Settings" in both cases, so neither should be
       // reachable here.
       var r = computePushReadiness();
@@ -50387,8 +50135,8 @@ react/cjs/react-jsx-runtime.development.js:
         document.getElementById('settings-btn').click();
         return;
       }
-      var wantsGitLab = r.effectiveWantsGitLab;
-      var wantsGitHub = r.effectiveWantsGitHub;
+      var wantsGitLab = r.wantsGitLab;
+      var wantsGitHub = r.wantsGitHub;
 
       pushBusy();
       var results = [];

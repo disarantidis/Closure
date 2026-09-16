@@ -567,10 +567,10 @@
       justify-content: space-between;
       gap: 8px;
       /* 16px, not 6px — matches the title-to-content gap every other
-         section title on the Settings page uses (.output-format /
-         .push-target > .folder-paths-title, both margin-bottom: 16px);
-         this title reads as the same kind of section title now (see the
-         font rule below), so it gets the same gap before its own content. */
+         section title on the Settings page uses (.output-format's own
+         .folder-paths-title, margin-bottom: 16px); this title reads as the
+         same kind of section title now (see the font rule below), so it
+         gets the same gap before its own content. */
       margin: 0 0 16px;
       /* This --spacing-component-6 (22px) inset was confirmed against the
          real plugin back when .export-panel's own padding was a plain
@@ -627,14 +627,6 @@
       font: var(--microcopy-regular);
       letter-spacing: var(--microcopy-regular-letter-spacing);
       color: var(--app-text-muted);
-    }
-    /* Houses the small "Add ___ Settings" button and its trash-icon
-       neighbor together as one right-aligned group (see .target-row-header's
-       space-between) when a provider isn't ready but the other one is. */
-    .target-row-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
 
     /* Read-only list of saved folder paths in Settings (managed via Edit). */
@@ -737,8 +729,8 @@
       margin-bottom: 24px;
       /* The card's own EDGE follows the section titles' line, not the
          page's plain 16px inset: every title's TEXT and every control
-         beside it (the DTCG switch, the push-target checkboxes, the
-         Repository-settings tab switcher) sits this same extra amount past
+         beside it (the DTCG switch, the Repository-settings tab switcher)
+         sits this same extra amount past
          that plain inset (.folder-paths-title's own padding-left, and each
          control row's own padding — all --spacing-component-3, reduced
          from -6 when the outer margin throughout this page read as too
@@ -813,10 +805,9 @@
 
     /* "Repository settings" — always-visible heading for whichever
        provider's connection fields are shown below (see
-       updateProviderSectionVisibility() in the script). No top margin,
-       same reasoning as .push-target above: the page's own top padding, or
-       .push-target's bottom margin when that section is also visible,
-       already supplies the gap above it. */
+       updateProviderSectionVisibility() in the script). No top margin:
+       .output-format's own bottom margin (immediately above it now) already
+       supplies the gap. */
     .repo-settings-heading {
       margin: 0 0 24px;
     }
@@ -827,8 +818,8 @@
        provider exists (buttons.tsx mounts a segmented control here) — see
        updateProviderSectionVisibility(). margin-bottom only has an effect
        while visible, so it's safe to declare unconditionally. Same
-       padding-left as #dtcg-format-control-mount / #push-target-control-
-       mount below — every section's title gets this indent on itself
+       padding-left as #dtcg-format-control-mount below — every section's
+       title gets this indent on itself
        (.repo-settings-heading > .folder-paths-title) and its control
        needs the same one restated, since a control has no card padding
        of its own to inherit it from. This row was missing it: the
@@ -841,10 +832,10 @@
        padding-right matches it, added once the control gained `block`
        (fills the row's content width): with only padding-left, the
        control's left edge sat 22px in but its right edge sat flush with
-       the row's own edge — 22px on one side, 0 on the other. Every other
-       control this indent applies to (the DTCG switch, the push-target
-       checkboxes) is intrinsically sized, so that asymmetry was invisible
-       until this one started filling its row. (Both sides were 22px —
+       the row's own edge — 22px on one side, 0 on the other. The DTCG
+       switch, the other control this indent applies to, is intrinsically
+       sized, so that asymmetry was invisible until this one started
+       filling its row. (Both sides were 22px —
        --spacing-component-6 — at the time; since reduced to -3 with every
        other use of this same indent, see .provider-card's comment above
        for why.) */
@@ -856,10 +847,12 @@
 
     /* "Output format" — Token Studio JSON vs W3C DTCG. Leads the page, so
        margin (the page's own top padding already spaces it from the header),
-       and the standard 40px bottom rhythm before whatever follows. Same
-       title/control indent as .push-target below: a switch, like a checkbox,
-       has no card padding of its own to push it in from the row edge, so the
-       indent comes from the container. */
+       and the standard 40px bottom rhythm before whatever follows (the
+       "Repository settings" heading right below it — there used to be a
+       separate "Push destination" section between them; removed, see
+       mainProviderTab's own comment in the script). A switch, like a
+       checkbox, has no card padding of its own to push it in from the row
+       edge, so the indent comes from the container. */
     .output-format {
       margin: 0 0 40px;
     }
@@ -875,36 +868,6 @@
        more than .folder-paths-subtitle's default 2px of separation. */
     .output-format > .folder-paths-subtitle {
       margin-top: 8px;
-      padding-left: var(--spacing-component-3);
-    }
-
-    /* Reuses a class that used to have zero matching markup (the historical
-       GitHub/GitLab/Both picker this is reviving was fully removed once
-       before — see pom-migration-progress memory). No top margin —
-       .output-format above it already supplies the 40px rhythm — just a
-       bottom margin to keep that rhythm before the GitLab fields that now
-       follow it. Padding-left on the
-       title is scoped to the title only (not the whole container) so the
-       GitLab/GitHub checkboxes below stay flush with the row edge, same as
-       how the folder-icon alignment above only ever shifts the heading
-       text, never the rows. */
-    .push-target {
-      margin: 0 0 40px;
-    }
-    .push-target > .folder-paths-title {
-      padding-left: var(--spacing-component-3);
-      margin-bottom: 16px;
-    }
-    /* The two checkboxes render as a vertical list (buttons.tsx mounts them
-       as siblings, no wrapping div of their own). Same padding-left as the
-       title above — unlike a folder row, a checkbox has no card padding of
-       its own to push its icon in from the row edge, so the indent has to
-       come from the container instead; the end result is the same column
-       (icon left edge at 36px) as the title and the folder icons share. */
-    #push-target-control-mount {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
       padding-left: var(--spacing-component-3);
     }
 
@@ -1652,8 +1615,8 @@
              now shown once, for whichever file Download actually names, in
              .json-download-card above this card (see primaryFilename()).
              The row-title always
-             shows (which push location a row is for should be clear
-             regardless of how many destinations are active), each with its
+             shows, so which provider a row is for is always clear, each
+             with its
              provider's own logo glyph in front of the text — plain inline
              SVGs (not React-mounted), same reasoning as the settings-page
              header's own decorative icon: inline SVG icons has no
@@ -1677,23 +1640,6 @@
             <div class="target-row-empty" id="gitlab-target-empty" hidden>
               <span class="target-row-empty-label">Add folder path (optional)</span>
               <span id="gitlab-empty-add-btn-mount"></span>
-              <!-- 'both' mode only (see updateTargetRow()'s bothMode param) —
-                   same "uncheck this provider's push box" shortcut as the
-                   trash button below, offered here too since a ready-but-
-                   pathless provider is just as valid a moment to bail out
-                   of pushing to it. -->
-              <span id="gitlab-empty-remove-push-btn-mount" hidden></span>
-            </div>
-            <!-- Shown instead of target-row-empty — 'both' mode only —
-                 when GitLab isn't ready but GitHub is (see
-                 updatePushTargetUI()/updateTargetRow()). Title/logo stay
-                 visible; only the field row below is replaced. The trash
-                 button unchecks GitLab from the push destination entirely
-                 (mirrors unchecking its box in Settings), leaving GitHub —
-                 already confirmed ready here — as the sole target. -->
-            <div class="target-row-actions" id="gitlab-target-actions" hidden>
-              <span id="gitlab-small-settings-btn-mount"></span>
-              <span id="gitlab-remove-push-btn-mount"></span>
             </div>
           </div>
           <div class="filename-row" id="gitlab-filename-row">
@@ -1711,11 +1657,6 @@
             <div class="target-row-empty" id="github-target-empty" hidden>
               <span class="target-row-empty-label">Add folder path (optional)</span>
               <span id="github-empty-add-btn-mount"></span>
-              <span id="github-empty-remove-push-btn-mount" hidden></span>
-            </div>
-            <div class="target-row-actions" id="github-target-actions" hidden>
-              <span id="github-small-settings-btn-mount"></span>
-              <span id="github-remove-push-btn-mount"></span>
             </div>
           </div>
           <div class="filename-row" id="github-filename-row">
@@ -1774,16 +1715,6 @@
         <p class="folder-paths-title">Output format</p>
         <span id="dtcg-format-control-mount"></span>
         <p class="folder-paths-subtitle" id="output-format-hint"></p>
-      </div>
-
-      <!-- Only meaningful — and only shown — once GitHub is configured
-           alongside GitLab; a general Settings-level preference the main
-           screen's Push button just follows (see performPush()). Leads the
-           page (before the GitLab/GitHub connection fields) since it's the
-           setting most users will come back to change. -->
-      <div class="push-target" id="push-target-section" hidden>
-        <p class="folder-paths-title">Push destination</p>
-        <span id="push-target-control-mount"></span>
       </div>
 
       <!-- Always-visible heading for whichever provider's connection fields
@@ -2115,14 +2046,17 @@
     // Which provider's folder-path block is shown on the main screen's own
     // tab switcher (see updatePushTargetUI()'s tabMode) — only meaningful
     // once both providers are added, same condition as activeSettingsTab
-    // above, but deliberately a separate variable: this is purely which
-    // folder path the user is looking at, independent of pushTarget below
-    // (where a push actually goes). Session-only — always starts back on
-    // 'gitlab' rather than being persisted, same as activeSettingsTab.
+    // above. This is now ALSO the real push destination (there used to be a
+    // separate Settings-page "Push destination" picker with its own
+    // GitLab/GitHub/Both checkboxes and a distinct `pushTarget` variable —
+    // removed: the user picks a destination once, here, by looking at the
+    // provider they want and pushing to it, rather than in two places that
+    // could disagree; 'both' (simultaneous push to two providers) went with
+    // it — see computePushReadiness()'s own comment). Persisted now (see
+    // getState()'s `pushTarget` key, kept under its old name so existing
+    // saved configs still load) since it's a real preference, not a
+    // session-only view toggle any more.
     var mainProviderTab = 'gitlab';
-    // 'gitlab' | 'github' | 'both' — a general Settings-level preference the
-    // main screen's Push button follows; only meaningful once githubAdded.
-    var pushTarget = 'gitlab';
     // null = ship the Token Studio tree as-is; 'themes' runs the DTCG
     // post-transform (src/dtcg-format.js) over it — see getTokensToExport.
     // 'themes' (not 'partial') is what the Output format switch drives: one
@@ -2144,7 +2078,7 @@
     // synchronously reaching updateActionUI on its very first call — a var
     // declared further down would still be hoisted but not yet assigned at
     // that point, reading as undefined and throwing.
-    var PUSH_TARGET_LABELS = { gitlab: 'Push to GitLab', github: 'Push to GitHub', both: 'Push to Both' };
+    var PUSH_TARGET_LABELS = { gitlab: 'Push to GitLab', github: 'Push to GitHub' };
 
     function normFolder(p) {
       return String(p || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
@@ -2334,7 +2268,7 @@
     };
 
     // Main screen: GitHub's own folder dropdown, shown only when relevant
-    // to the current pushTarget (see updatePushTargetUI()).
+    // to the current mainProviderTab (see updatePushTargetUI()).
     function renderGithubFolderSelect() {
       var items = ghFolders.map(function(path) {
         return { label: path || '(repo root)', value: path };
@@ -2354,7 +2288,7 @@
       // Also re-check whether the commit box should be disabled — a token
       // or repo could have just been filled in (or cleared), and
       // updatePushTargetUI() (the other call site for this) only runs on
-      // pushTarget/provider changes, not on every Settings edit.
+      // mainProviderTab/provider changes, not on every Settings edit.
       updateActionUI();
     }
 
@@ -2395,13 +2329,10 @@
       window.PomAddGithubBtn.setLabel(githubAdded ? 'Remove' : 'Add');
       window.PomAddGithubBtn.setDisabled(githubAdded && !gitlabAdded);
 
-      document.getElementById('push-target-section').hidden = !(githubAdded && gitlabAdded);
-
       // Each provider's "Remove" is offered only while the OTHER one also
       // exists — removing the last provider would leave nowhere to push to
-      // (both onConfirm handlers below refuse it outright). Same condition
-      // as the push-destination control right above, and it lives HERE
-      // rather than in refreshSettingsControls() because the remove
+      // (both onConfirm handlers below refuse it outright), and it lives
+      // HERE rather than in refreshSettingsControls() because the remove
       // handlers call only this function: gating it there left the button
       // on screen after the other provider was removed, still visible but
       // inert, since its own guard then swallowed every click.
@@ -2413,7 +2344,7 @@
       getState: function() {
         var state = {
           version: 5,
-          pushTarget: pushTarget,
+          pushTarget: mainProviderTab,
           gitlabAdded: gitlabAdded,
           // Output format switch. Stored as a plain boolean rather than the
           // shape name so a config saved here stays readable if the converter
@@ -2544,23 +2475,22 @@
         window.PomRepoTab.setValue(activeSettingsTab);
         updateProviderSectionVisibility();
 
-        // pushTarget must always point at an actually-available provider —
-        // a stale value from before a removal falls back to whichever one
-        // remains. Both false IS reachable now: the onboarding dialog's
-        // "skip both" choice (mountOnboardingDialog.onConfirm) persists
-        // exactly this shape (no gitlab/github saved), and this is what
-        // reconstructs it back to 'none' — not 'gitlab' by the old
-        // catch-all default — on every later load.
-        if (!gitlabAdded && !githubAdded) {
-          pushTarget = 'none';
-        } else if (!gitlabAdded) {
-          pushTarget = 'github';
+        // mainProviderTab (the real push destination now, see its own
+        // comment above) must always point at an actually-available
+        // provider — a stale saved value from before a removal falls back
+        // to whichever one remains. Its exact value is moot when neither
+        // provider is added (computePushReadiness()'s noPushDestination
+        // covers that case directly from gitlabAdded/githubAdded), so no
+        // 'none' sentinel is needed here any more — just keep it pointed at
+        // something real.
+        if (!gitlabAdded) {
+          mainProviderTab = 'github';
         } else if (!githubAdded) {
-          pushTarget = 'gitlab';
+          mainProviderTab = 'gitlab';
         } else {
-          pushTarget = (config.pushTarget === 'github' || config.pushTarget === 'both') ? config.pushTarget : 'gitlab';
+          mainProviderTab = config.pushTarget === 'github' ? 'github' : 'gitlab';
         }
-        window.PomPushTarget.setValue(pushTarget);
+        window.PomMainProviderTab.setValue(mainProviderTab);
         updatePushTargetUI();
 
         // Last, so it can name the file the seeded fields above actually hold.
@@ -2682,7 +2612,7 @@
     });
 
     // Main-screen GitHub folder dropdown (shown only when relevant to the
-    // current pushTarget) → same behavior as GitLab's own dropdown above.
+    // current mainProviderTab) → same behavior as GitLab's own dropdown above.
     window.PomGithubFolderSelect.onChange = function(value) {
       ghActiveFolder = value;
       renderGithubFolderList();
@@ -2741,9 +2671,9 @@
       activeSettingsTab = 'gitlab'; // the tab switcher itself is about to disappear, but stay consistent
       window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
-      if (pushTarget !== 'gitlab') {
-        pushTarget = 'gitlab';
-        window.PomPushTarget.setValue(pushTarget);
+      if (mainProviderTab !== 'gitlab') {
+        mainProviderTab = 'gitlab';
+        window.PomMainProviderTab.setValue(mainProviderTab);
       }
       updatePushTargetUI();
       persistSettings();
@@ -2799,9 +2729,9 @@
       activeSettingsTab = 'github';
       window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
-      if (pushTarget !== 'github') {
-        pushTarget = 'github';
-        window.PomPushTarget.setValue(pushTarget);
+      if (mainProviderTab !== 'github') {
+        mainProviderTab = 'github';
+        window.PomMainProviderTab.setValue(mainProviderTab);
       }
       updatePushTargetUI();
       persistSettings();
@@ -2826,23 +2756,17 @@
       updateProviderSectionVisibility();
     };
 
-    // Settings-level push-destination preference (GitLab / GitHub / Both) —
-    // the main screen's Push button just follows whatever this is set to.
-    window.PomPushTarget.onChange = function(value) {
-      pushTarget = value;
-      persistSettings();
-      updatePushTargetUI();
-    };
-
     // Switches which provider's folder path is shown on the main screen —
-    // a view preference only, not persisted (same reasoning as
-    // window.PomRepoTab.onChange above, and the same setValue-echo it
-    // needs: SegmentedControl is controlled, so the pill only follows a
-    // click if this writes the new value back to it).
+    // AND, now, the real push destination itself (there's no separate
+    // Settings-page picker any more — see mainProviderTab's own comment).
+    // Persisted (used to be view-only), same setValue-echo reasoning as
+    // window.PomRepoTab.onChange above: SegmentedControl is controlled, so
+    // the pill only follows a click if this writes the new value back to it.
     window.PomMainProviderTab.onChange = function(value) {
       mainProviderTab = value;
       window.PomMainProviderTab.setValue(mainProviderTab);
       updatePushTargetUI();
+      persistSettings();
     };
 
     // First-run nudge (see the GIT_SETTINGS_LOADED handler below for when
@@ -2863,7 +2787,6 @@
     // alongside "Add Repo Settings") then lands on whichever picked
     // provider still needs a token.
     window.PomOnboardingDialog.onConfirm = function(target) {
-      pushTarget = target;
       var wantsGitLab = (target === 'gitlab' || target === 'both');
       var wantsGitHub = (target === 'github' || target === 'both');
       if (wantsGitLab && !gitlabAdded) addGitlab();
@@ -2877,11 +2800,18 @@
       // error state to route around, it's the third real choice.
       if (!wantsGitLab && gitlabAdded) removeGitlab();
       if (!wantsGitHub && githubAdded) removeGithub();
+      // Default push destination follows whichever single provider was
+      // picked; 'both' (add both, no simultaneous push any more) falls
+      // back to GitLab, the same default used everywhere else — the user
+      // can switch the main screen's tab to GitHub afterwards if they'd
+      // rather push there.
+      if (wantsGitLab) mainProviderTab = 'gitlab';
+      else if (wantsGitHub) mainProviderTab = 'github';
+      window.PomMainProviderTab.setValue(mainProviderTab);
       activeSettingsTab = wantsGitLab ? 'gitlab' : 'github';
       window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
       refreshSettingsControls();
-      window.PomPushTarget.setValue(pushTarget);
       updatePushTargetUI();
       persistSettings();
       // Skipped for 'none' — see goToFirstUnreadyProvider()'s own comment
@@ -3031,77 +2961,53 @@
 
     // Single source of truth for "what can actually be pushed right now" —
     // shared by the main-screen UI (updateActionUI/updatePushTargetUI) and
-    // the real push action (pushToGit), so they can never disagree. In
-    // 'both' mode, if exactly one provider is ready, this silently narrows
-    // to just that one (effectiveTarget) instead of blocking the whole
-    // push — the other one gets a small "finish setting up" button instead
-    // of being hidden outright (mixedReadiness). Only single-provider mode
-    // (or 'both' with NEITHER ready) counts as fully blocked (needsBigSetup).
+    // the real push action (pushToGit), so they can never disagree. There
+    // is exactly one target now — mainProviderTab, whichever provider's tab
+    // is selected on the main screen (see its own comment) — so this is
+    // just "is that one provider added, and is it ready", no more mixed-
+    // readiness fallback or 'both'-mode narrowing to reason about.
     //
-    // pushTarget === 'none' is a separate, deliberate third state — not a
-    // flavor of "not set up yet": the onboarding dialog's "skip" choice
-    // (mountOnboardingDialog, buttons.tsx) sets it explicitly when the user
-    // wants neither provider, because Download alone is a complete,
-    // supported workflow. noPushDestination flags that case so callers can
+    // noPushDestination (neither provider added — the onboarding dialog's
+    // "skip" choice, or every provider since removed) is a separate,
+    // deliberate case — not a flavor of "not set up yet": Download alone is
+    // a complete, supported workflow. It flags that case so callers can
     // tell "hasn't finished configuring" apart from "chose not to" — they
     // read the same in most of this UI (both fall back to the same "Add
-    // Repo Settings" slot) but must never collide in wantsGitLab/wantsGitHub
-    // or PUSH_TARGET_LABELS lookups, which have no 'none' entry.
+    // Repo Settings" slot) but PUSH_TARGET_LABELS has no entry for it.
     function computePushReadiness() {
-      var wantsGitLab = pushTarget === 'gitlab' || pushTarget === 'both';
-      var wantsGitHub = githubAdded && (pushTarget === 'github' || pushTarget === 'both');
+      var noPushDestination = !gitlabAdded && !githubAdded;
+      var target = noPushDestination ? null
+        : !gitlabAdded ? 'github'
+        : !githubAdded ? 'gitlab'
+        : mainProviderTab;
+      var wantsGitLab = target === 'gitlab';
+      var wantsGitHub = target === 'github';
       var glReady = isGitLabReady();
       var ghReady = isGitHubReady();
-      var bothMode = pushTarget === 'both' && githubAdded;
-      var noPushDestination = pushTarget === 'none';
-
-      var effectiveTarget = pushTarget;
-      var mixedReadiness = false;
-      if (bothMode) {
-        if (glReady && ghReady) {
-          effectiveTarget = 'both';
-        } else if (glReady) {
-          effectiveTarget = 'gitlab';
-          mixedReadiness = true;
-        } else if (ghReady) {
-          effectiveTarget = 'github';
-          mixedReadiness = true;
-        }
-        // else neither ready — effectiveTarget stays 'both', needsBigSetup covers it.
-      }
-
-      var needsBigSetup =
-        (pushTarget === 'gitlab' && !glReady) ||
-        (pushTarget === 'github' && !ghReady) ||
-        (bothMode && !glReady && !ghReady);
+      var needsBigSetup = !noPushDestination && !(wantsGitLab ? glReady : ghReady);
 
       return {
         wantsGitLab: wantsGitLab, wantsGitHub: wantsGitHub,
         glReady: glReady, ghReady: ghReady,
-        bothMode: bothMode, mixedReadiness: mixedReadiness,
-        effectiveTarget: effectiveTarget, needsBigSetup: needsBigSetup,
-        noPushDestination: noPushDestination,
-        effectiveWantsGitLab: effectiveTarget === 'gitlab' || effectiveTarget === 'both',
-        effectiveWantsGitHub: effectiveTarget === 'github' || effectiveTarget === 'both'
+        effectiveTarget: target, needsBigSetup: needsBigSetup,
+        noPushDestination: noPushDestination
       };
     }
 
     function updateActionUI() {
       var r = computePushReadiness();
-      // No workable destination at all yet (single-provider mode not
-      // ready, or 'both' with neither ready) — the commit box is pointless,
-      // so it's hidden outright (not just disabled — nothing to type
-      // towards yet), and the Push button itself is replaced by "Add Repo
-      // Settings" in its own slot (see goToProviderSettingsField()). Stays
-      // visible and enabled in the mixed-readiness case (see
-      // computePushReadiness()) — there a commit message still makes
-      // sense, since the push goes ahead against whichever provider IS ready.
+      // No workable destination at all yet (the current target isn't
+      // ready) — the commit box is pointless, so it's hidden outright (not
+      // just disabled — nothing to type towards yet), and the Push button
+      // itself is replaced by "Add Repo Settings" in its own slot (see
+      // goToProviderSettingsField()).
       //
-      // noPushDestination (pushTarget === 'none', the onboarding "skip"
-      // choice) folds into this same fallback — Download alone is a fully
-      // supported workflow, so there's nothing to disable-and-explain here,
-      // just nothing to push TO. Same "Add Repo Settings" slot either way;
-      // goToFirstUnreadyProvider() (below) tells the two apart when clicked.
+      // noPushDestination (neither provider added — the onboarding "skip"
+      // choice, or both since removed) folds into this same fallback —
+      // Download alone is a fully supported workflow, so there's nothing to
+      // disable-and-explain here, just nothing to push TO. Same "Add Repo
+      // Settings" slot either way; goToFirstUnreadyProvider() (below) tells
+      // the two apart when clicked.
       var showFallback = r.needsBigSetup || r.noPushDestination;
       window.PomCommitMessage.setDisabled(showFallback);
       document.getElementById('commit-wrap').hidden = showFallback;
@@ -3115,12 +3021,10 @@
       if (!showFallback) {
         // The button's own baseProps.label ('Push to GitLab', buttons.tsx)
         // is just an initial-render fallback — this always drives the real
-        // label once settings have loaded, and follows effectiveTarget (not
-        // raw pushTarget) so a mixed-readiness 'both' correctly reads
-        // "Push to GitLab" rather than "Push to Both". Guarded by
-        // showFallback, not just needsBigSetup, specifically so this never
-        // runs for pushTarget === 'none' — PUSH_TARGET_LABELS has no 'none'
-        // entry, and the button is hidden in that state anyway.
+        // label once settings have loaded. Guarded by showFallback, not
+        // just needsBigSetup, specifically so this never runs for
+        // noPushDestination — PUSH_TARGET_LABELS has no entry for it, and
+        // the button is hidden in that state anyway.
         window.PomButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
       }
       window.PomButtons.download.setDisabled(!transformedData);
@@ -3129,34 +3033,26 @@
     // Shows a provider's dropdown+filename row, or — if it has zero saved
     // folder paths — an explanatory message instead (an empty dropdown
     // with nothing to select reads as broken, not "not configured yet").
-    // Always shows its own title when shown, even outside 'both'. When the
-    // provider isn't ready (no token/project or repo), the whole thing is
-    // replaced by either nothing (single-provider mode, or 'both' with
-    // neither ready — see updateActionUI()'s big "Add Repo Settings"
-    // instead) or, in 'both' mode with the OTHER provider ready, a small
-    // standalone "Add ___ Settings" button (showSmallBtn).
-    function updateTargetRow(prefix, wanted, ready, isEmpty, showSmallBtn, bothMode) {
+    // Always shows its own title when shown. When the provider isn't ready
+    // (no token/project or repo), the whole thing is replaced by nothing —
+    // updateActionUI()'s big "Add Repo Settings" covers that case globally
+    // now that there's only ever one target to be not-ready about.
+    function updateTargetRow(prefix, wanted, ready, isEmpty) {
       var showNormal = wanted && ready;
-      var showSmall = wanted && !ready && showSmallBtn;
-      document.getElementById(prefix + '-target-wrap').hidden = !(showNormal || showSmall);
-      document.getElementById(prefix + '-target-title').hidden = !(showNormal || showSmall);
+      document.getElementById(prefix + '-target-wrap').hidden = !showNormal;
+      document.getElementById(prefix + '-target-title').hidden = !showNormal;
       document.getElementById(prefix + '-filename-row').hidden = !showNormal || isEmpty;
       document.getElementById(prefix + '-target-empty').hidden = !showNormal || !isEmpty;
-      document.getElementById(prefix + '-target-actions').hidden = !showSmall;
-      // Same "uncheck this provider" shortcut as -target-actions' trash
-      // button, offered here too — only in 'both' mode (there's always a
-      // valid other target to fall back to; single-provider mode has none).
-      document.getElementById(prefix + '-empty-remove-push-btn-mount').hidden = !(showNormal && isEmpty && bothMode);
     }
 
     // Once both providers are added, the folder-path blocks below are
-    // driven by mainProviderTab instead of by pushTarget/wanted — the user
-    // can look at (and finish setting up) either provider's folder path
-    // regardless of which one is the current push destination. Same
-    // gitlabAdded && githubAdded gate the Settings page's own tab switcher
-    // uses (updateProviderSectionVisibility's showTabs). Single-provider
-    // mode is untouched: falls straight through to the original
-    // wanted/ready/bothMode logic, exactly as before this switcher existed.
+    // driven by mainProviderTab — the user can look at (and finish setting
+    // up) either provider's folder path, but only the currently-selected
+    // tab is also the real push target (computePushReadiness() above).
+    // Same gitlabAdded && githubAdded gate the Settings page's own tab
+    // switcher uses (updateProviderSectionVisibility's showTabs).
+    // Single-provider mode falls straight through to the one added
+    // provider, with nothing to switch.
     function updatePushTargetUI() {
       var r = computePushReadiness();
       var tabMode = gitlabAdded && githubAdded;
@@ -3165,19 +3061,12 @@
         window.PomMainProviderTab.setValue(mainProviderTab);
         var showGl = mainProviderTab === 'gitlab';
         var showGh = mainProviderTab === 'github';
-        updateTargetRow('gitlab', showGl, r.glReady, glFolders.length === 0, showGl && !r.glReady, false);
-        updateTargetRow('github', showGh, r.ghReady, ghFolders.length === 0, showGh && !r.ghReady, false);
-        // The trash "remove from push destination" affordance belongs to
-        // pushTarget, a different control (Settings' own Push destination
-        // picker) — not to this view-only switcher, so it never shows here
-        // even where updateTargetRow's showSmallBtn branch would otherwise
-        // reveal it alongside the small settings button.
-        document.getElementById('gitlab-remove-push-btn-mount').hidden = true;
-        document.getElementById('github-remove-push-btn-mount').hidden = true;
+        updateTargetRow('gitlab', showGl, r.glReady, glFolders.length === 0);
+        updateTargetRow('github', showGh, r.ghReady, ghFolders.length === 0);
         if (showGh && r.ghReady) renderGithubFolderSelect();
       } else {
-        updateTargetRow('gitlab', r.wantsGitLab, r.glReady, glFolders.length === 0, r.mixedReadiness && r.effectiveTarget === 'github', r.bothMode);
-        updateTargetRow('github', r.wantsGitHub, r.ghReady, ghFolders.length === 0, r.mixedReadiness && r.effectiveTarget === 'gitlab', r.bothMode);
+        updateTargetRow('gitlab', r.wantsGitLab, r.glReady, glFolders.length === 0);
+        updateTargetRow('github', r.wantsGitHub, r.ghReady, ghFolders.length === 0);
         if (r.wantsGitHub && r.ghReady) renderGithubFolderSelect();
       }
       updateActionUI();
@@ -3221,7 +3110,7 @@
     // window.PomOnboardingDialog.onConfirm below) for the normal
     // gitlab/github/both choices — gitlab-first, matching this app's usual
     // default precedence. NOT called from onConfirm when the user picked
-    // neither (pushTarget === 'none'): there's nothing to jump to yet, and
+    // neither (noPushDestination): there's nothing to jump to yet, and
     // forcing Settings open right after "skip, just download" would defeat
     // the point of skipping. It's still reachable from THIS button though —
     // clicking "Add Repo Settings" from the main screen after declining
@@ -3240,40 +3129,6 @@
       }
     }
     document.getElementById('add-repo-settings-btn').addEventListener('click', goToFirstUnreadyProvider);
-    // Small per-row "finish setting up" buttons — only ever shown (see
-    // updateTargetRow()) when the OTHER provider is already ready, so the
-    // push itself isn't blocked on these.
-    document.getElementById('gitlab-small-settings-btn').addEventListener('click', function() {
-      goToProviderSettingsField('gitlab', 'gl-token');
-    });
-    document.getElementById('github-small-settings-btn').addEventListener('click', function() {
-      goToProviderSettingsField('github', 'gh-token');
-    });
-    // Trash icon — unchecks this provider from the push destination
-    // entirely, same effect as unchecking its box on the Settings page's
-    // Push destination control (window.PomPushTarget.setValue keeps that
-    // control in sync). Shared by two placements: next to the small
-    // settings button (only shown when the OTHER provider is ready) and
-    // next to the empty-folder-path "+" button (only shown in 'both' mode
-    // — see updateTargetRow()) — both call sites are only ever reachable
-    // when the OTHER provider is actually added, so this can never leave
-    // pushTarget pointing at nothing.
-    function removeGitlabFromPush() {
-      pushTarget = 'github';
-      window.PomPushTarget.setValue(pushTarget);
-      persistSettings();
-      updatePushTargetUI();
-    }
-    function removeGithubFromPush() {
-      pushTarget = 'gitlab';
-      window.PomPushTarget.setValue(pushTarget);
-      persistSettings();
-      updatePushTargetUI();
-    }
-    document.getElementById('gitlab-remove-push-btn').addEventListener('click', removeGitlabFromPush);
-    document.getElementById('github-remove-push-btn').addEventListener('click', removeGithubFromPush);
-    document.getElementById('gitlab-empty-remove-push-btn').addEventListener('click', removeGitlabFromPush);
-    document.getElementById('github-empty-remove-push-btn').addEventListener('click', removeGithubFromPush);
 
     // Re-run the transform in code.js for the current exportMode / dtcgShape.
     // Needed whenever either changes, because includeDescriptions is decided
@@ -3435,9 +3290,9 @@
       return msg;
     }
 
-    // Push the exported tokens to whichever provider(s) pushTarget names.
-    // Both run sequentially when target is 'both' — one failing doesn't
-    // abort the other; the toast at the end reports each outcome.
+    // Push the exported tokens to whichever single provider mainProviderTab
+    // currently names (see its own comment — there's no simultaneous-push
+    // 'both' mode any more).
     function pushToGit() {
       var tokens = getTokensToExport();
       if (!tokens) return;
@@ -3450,13 +3305,11 @@
       }
 
       // Reuses the exact same readiness computation the main-screen UI
-      // renders from — effectiveWants* already excludes an unready
-      // provider in a mixed-readiness 'both' (see computePushReadiness()),
-      // so there's no separate per-provider not-ready check needed here
-      // any more; this guard is just defense against the Push button
-      // somehow firing while there's nothing to push to — either
-      // needsBigSetup (not ready yet) or noPushDestination (pushTarget ===
-      // 'none', the onboarding "skip" choice) — updateActionUI() replaces
+      // renders from, so this can't disagree with it. This guard is just
+      // defense against the Push button somehow firing while there's
+      // nothing to push to — either needsBigSetup (target not ready yet)
+      // or noPushDestination (neither provider added — the onboarding
+      // "skip" choice, or both since removed) — updateActionUI() replaces
       // Push with "Add Repo Settings" in both cases, so neither should be
       // reachable here.
       var r = computePushReadiness();
@@ -3465,8 +3318,8 @@
         document.getElementById('settings-btn').click();
         return;
       }
-      var wantsGitLab = r.effectiveWantsGitLab;
-      var wantsGitHub = r.effectiveWantsGitHub;
+      var wantsGitLab = r.wantsGitLab;
+      var wantsGitHub = r.wantsGitHub;
 
       pushBusy();
       var results = [];
