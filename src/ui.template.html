@@ -2030,31 +2030,31 @@
       return ensureJsonExtension(document.getElementById('primary-filename').value.trim() || defaultFilename());
     }
 
-    // ── GitLab settings: baked-in standard defaults + editable overrides ──────
-    // Generic placeholder connection, meant to be overridden per install —
-    // every field below is editable in Settings. The token is NEVER
-    // hardcoded — it is entered in-plugin and stored only in clientStorage.
+    // ── GitLab settings: empty by default, filled in per install ─────────────
+    // No baked-in connection — every field starts blank (the text fields'
+    // own placeholder attributes carry the hint text, same as GitHub's).
+    // The token is NEVER hardcoded — it is entered in-plugin and stored
+    // only in clientStorage.
     var GITLAB_DEFAULTS = {
-      host: 'https://gitlab.com',
-      project: 'group/subgroup/project',
-      branch: 'main',
-      folders: ['src/brand-a', 'src/brand-b', 'src/brand-c']
+      host: '',
+      project: '',
+      branch: '',
+      folders: []
     };
 
     // Whether the GitLab section is configured/shown — like githubAdded
     // below, but defaults true: every config saved before this flag existed
     // (and a brand-new install with no saved config at all) has no
     // gitlabAdded field, and must keep behaving exactly as it always did
-    // (GitLab present, baked-in defaults). Only an explicit `false` (only
+    // (GitLab present by default). Only an explicit `false` (only
     // ever written after a real "Remove GitLab") turns it off — see
     // gitSettings.setState()'s `config.gitlabAdded !== false`.
     var gitlabAdded = true;
     var glFolders = GITLAB_DEFAULTS.folders.slice(); // saved folder paths
-    var glActiveFolder = glFolders[0];               // the picked target
+    var glActiveFolder = glFolders[0] || '';          // the picked target
 
-    // ── GitHub settings: optional, add/remove — no baked-in defaults, no
-    // Figma-filename auto-match (unlike GitLab, there's no company-wide
-    // "standard" GitHub repo).
+    // ── GitHub settings: optional, add/remove — starts empty too, same as
+    // GitLab now.
     var githubAdded = false;    // whether the GitHub section is configured/shown
     var ghFolders = [];         // starts empty; user-managed only
     var ghActiveFolder = '';
@@ -2435,13 +2435,10 @@
           setFieldValue('gl-host', gl.host || GITLAB_DEFAULTS.host);
           setFieldValue('gl-project', gl.project || GITLAB_DEFAULTS.project);
           setFieldValue('gl-branch', gl.branch || GITLAB_DEFAULTS.branch);
-          // The baked-in standard paths are only a first-run starting point,
-          // not a permanently-enforced floor — every row (standard or custom)
-          // can be removed (see renderFolderList), and once a
-          // `folders` array has ever been saved (even shorter than the 4
-          // standards, or empty), it's the complete, authoritative list from
-          // then on. GITLAB_DEFAULTS is only re-seeded for a config that has
-          // genuinely never saved a folders list at all.
+          // Once a `folders` array has ever been saved (even empty), it's
+          // the complete, authoritative list from then on. GITLAB_DEFAULTS
+          // (empty) is only the fallback for a config that has genuinely
+          // never saved a folders list at all.
           if (Array.isArray(gl.folders)) {
             glFolders = gl.folders.map(normFolder).filter(function(f) { return !!f; });
           } else if (gl.folder !== undefined && gl.folder !== null && normFolder(gl.folder)) {
@@ -2450,7 +2447,7 @@
             glFolders = GITLAB_DEFAULTS.folders.slice();
           }
           glActiveFolder = (gl.activeFolder && glFolders.indexOf(normFolder(gl.activeFolder)) >= 0)
-            ? normFolder(gl.activeFolder) : glFolders[0];
+            ? normFolder(gl.activeFolder) : (glFolders[0] || '');
         } else {
           setFieldValue('gl-token', '');
           setFieldValue('gl-host', '');
@@ -2706,15 +2703,12 @@
     // Same split as addGithub() above.
     function addGitlab() {
       gitlabAdded = true;
-      // Unlike GitHub, GitLab has a real company-wide standard to re-seed —
-      // re-adding it should restore the same useful starting point a fresh
-      // install gets, not a blank slate.
+      glFolders = [];
+      glActiveFolder = '';
       setFieldValue('gl-token', '');
-      setFieldValue('gl-host', GITLAB_DEFAULTS.host);
-      setFieldValue('gl-project', GITLAB_DEFAULTS.project);
-      setFieldValue('gl-branch', GITLAB_DEFAULTS.branch);
-      glFolders = GITLAB_DEFAULTS.folders.slice();
-      glActiveFolder = glFolders[0];
+      setFieldValue('gl-host', '');
+      setFieldValue('gl-project', '');
+      setFieldValue('gl-branch', '');
       renderFolderList();
     }
     // Same pill now serves both directions — see add-github-btn's own
