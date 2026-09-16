@@ -50439,6 +50439,13 @@ react/cjs/react-jsx-runtime.development.js:
     // fallback — Figma's own restrictions can differ by version/platform,
     // so it's worth attempting even though it's the less reliable path
     // here.
+    // Two attempts in a row (clipboard-then-execCommand, then execCommand-
+    // then-clipboard) still failed for real users with no way to tell WHY
+    // — "Could not copy" covers every possible cause. Logging both
+    // attempts' actual outcome so the next failure report can name the
+    // real reason (execCommand throwing vs. quietly returning false,
+    // navigator.clipboard missing vs. its writeText rejecting with a
+    // specific error) instead of guessing at another blind fix.
     function legacyCopySync(text) {
       var ta = document.createElement('textarea');
       ta.value = text;
@@ -50448,14 +50455,21 @@ react/cjs/react-jsx-runtime.development.js:
       ta.focus();
       ta.select();
       var ok = false;
-      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      var err = null;
+      try { ok = document.execCommand('copy'); } catch (e) { err = e; }
       document.body.removeChild(ta);
+      console.log('[Closure Copy] execCommand(copy) ->', ok, err ? ('threw: ' + err.name + ': ' + err.message) : '(no exception)');
       return ok;
     }
     function copyToClipboard(text) {
       if (legacyCopySync(text)) return Promise.resolve();
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(text);
+      var hasApi = !!(navigator.clipboard && navigator.clipboard.writeText);
+      console.log('[Closure Copy] navigator.clipboard.writeText available:', hasApi);
+      if (hasApi) {
+        return navigator.clipboard.writeText(text).catch(function(e) {
+          console.log('[Closure Copy] navigator.clipboard.writeText rejected:', e && e.name, e && e.message);
+          throw e;
+        });
       }
       return Promise.reject(new Error('execCommand(copy) failed and Clipboard API unavailable'));
     }
