@@ -1279,26 +1279,48 @@
     #closure-warning-mount { margin: 0 16px 16px; }
     #closure-warning-mount:empty { margin: 0; }
 
-    /* One row per broken reference, "token path → missing target" — see
-       mountClosureWarning's own comment on why this replaced a prose
-       paragraph. Monospace (not used anywhere else in this app,
+    /* Plain sentence naming what the list below actually is — the list
+       itself is just token paths with no label of its own otherwise. */
+    .closure-warning-subtitle {
+      margin: 4px 0 0;
+      font-size: 12px;
+    }
+    /* One group per MISSING target, not one row per broken reference — see
+       mountClosureWarning's own comment on why (the reframe from "here are
+       N broken things" to "here's the one thing that's missing, and who
+       depends on it"). Monospace (not used anywhere else in this app,
        deliberately) so a token path reads as a path — something to go
        find and click on in Figma — rather than as regular copy. Inherits
        .nd-alert-text's own --text-recessive color (Alert.tsx wraps
-       children in that div), so no color rule needed here beyond layout. */
+       children in that div) as its baseline; .closure-warning-missing
+       overrides back to full --text (below) so the actual root cause is
+       the one line in the whole alert that isn't dimmed. */
     .closure-warning-list {
       list-style: none;
       margin: 8px 0 0;
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 8px;
       font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
       font-size: 12px;
       line-height: 1.5;
     }
     .closure-warning-list li {
       overflow-wrap: break-word;
+    }
+    /* The missing target itself — full --text, not the alert's own
+       recessive default, so it reads as the headline of its own group
+       rather than blending in with the "used by" line under it. */
+    .closure-warning-missing {
+      color: var(--text);
+      font-weight: 700;
+    }
+    /* Who depends on it — secondary to the missing target above it, so it
+       stays at the alert's own recessive default rather than repeating
+       the emphasis. */
+    .closure-warning-froms {
+      opacity: .85;
     }
     /* Only shown once the backend's own 15-item sample cap is reached
        (validateReferenceClosure's sampleBroken) — plain text, not
@@ -3498,18 +3520,35 @@
         window.PomJsonFileCard.setSize(exportMB + ' MB');
 
         // Reference-closure check: warn when the export ships dangling {refs}.
-        // validateReferenceClosure() (code.js) already returns the exact
-        // broken token path for every dangling reference as sampleBroken —
-        // {from, ref} pairs, capped at 15 there — so the list itself is the
-        // message now: no need to restate it as a sentence naming which
-        // ROOTS (collections) were affected, when the actual token paths are
-        // right there to go click on.
+        // validateReferenceClosure() (code.js) returns the exact broken
+        // token path for every dangling reference as sampleBroken —
+        // {from, ref} pairs, capped at 15 there. Several tokens can (and
+        // often do) share the exact same missing ref — a color primitive
+        // that got renamed is typically aliased from many places — which
+        // used to render as that many unrelated-looking rows. Regrouped
+        // by ref here (the ACTUAL missing thing), not by from (who happens
+        // to reference it): the title and list now lead with what's
+        // missing, with who depends on it as supporting detail underneath,
+        // rather than presenting N symptoms as N separate problems.
         var closure = msg.validation && msg.validation.closure;
         if (closure && !closure.ok) {
           var sample = closure.sampleBroken || [];
+          var groupsByRef = {};
+          var groups = [];
+          sample.forEach(function(item) {
+            var g = groupsByRef[item.ref];
+            if (!g) {
+              g = { ref: item.ref, froms: [] };
+              groupsByRef[item.ref] = g;
+              groups.push(g);
+            }
+            g.froms.push(item.from);
+          });
+          // Most-depended-on missing token first — the one worth fixing first.
+          groups.sort(function(a, b) { return b.froms.length - a.froms.length; });
           window.PomClosureWarning.show(
-            closure.brokenCount + ' unresolved reference' + (closure.brokenCount === 1 ? '' : 's'),
-            sample,
+            groups.length + ' missing token' + (groups.length === 1 ? '' : 's'),
+            groups,
             Math.max(0, closure.brokenCount - sample.length)
           );
         } else {

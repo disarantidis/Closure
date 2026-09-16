@@ -346,7 +346,7 @@ declare global {
       setSummary: (tokensLabel: string) => void;
     };
     PomJsonFileCard: { setSize: (sizeLabel: string) => void };
-    PomClosureWarning: { show: (title: string, items: { from: string; ref: string }[], more?: number) => void; hide: () => void };
+    PomClosureWarning: { show: (title: string, groups: { ref: string; froms: string[] }[], more?: number) => void; hide: () => void };
     PomCommitMessage: DisabledHandle;
     PomVersionTag: { setLabel: (label: string) => void };
     PomRemoveGithubDialog: { open: () => void; onConfirm: (() => void) | null };
@@ -896,39 +896,42 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
 /* ── reference-closure warning (inline alert) ────────────────────────────────
    Was one long paragraph explaining broken references in the abstract, with
    no way to tell which token was actually broken — the user had to go
-   search the whole export by hand. code.js's validateReferenceClosure()
-   (and dtcg-format.js's validateDtcgClosure()) already compute exactly
-   that, per broken reference, as {from, ref} — from is the token PATH that
-   holds the broken alias (e.g. "Colors.primary.hover"), ref is the missing
-   target it points at — and were already sending it to the UI as
-   closure.sampleBroken; nothing here used to read it. Now the list itself
-   IS the message: one row per broken reference, "from → ref", both in the
-   monospace this app doesn't use anywhere else — deliberately, so a token
-   PATH reads as a path (something to go find in Figma) rather than as
-   prose. */
+   search the whole export by hand. Then briefly a flat "from → ref" row per
+   broken reference — an improvement, but still framed around the SYMPTOM
+   (this token's reference is broken) rather than the CAUSE: a chain where
+   several tokens all ultimately depend on the same one missing/renamed
+   variable read as that many unrelated-looking problems, when there's
+   really only one thing to go fix in Figma. Regrouped here (see
+   ui.template.html's 'transformed' handler) around the MISSING target
+   instead — one heading per actual missing token, with everyone who
+   references it listed underneath — so the list answers "what's missing"
+   first, "what does it break" second, matching how it'd actually get
+   fixed: rename/restore the one variable, not chase N separate reports. */
 (function mountClosureWarning() {
   const container = document.getElementById('closure-warning-mount');
   let set: (u: (s: any) => any) => void = () => {};
   function View() {
-    const [s, setS] = useState<{ open: boolean; title: string; items: { from: string; ref: string }[]; more: number }>({ open: false, title: '', items: [], more: 0 });
+    const [s, setS] = useState<{ open: boolean; title: string; groups: { ref: string; froms: string[] }[]; more: number }>({ open: false, title: '', groups: [], more: 0 });
     set = setS;
     if (!s.open) return null;
     return (
       <Alert tone="error" title={s.title}>
+        <p className="closure-warning-subtitle">Not present in this export, but referenced by:</p>
         <ul className="closure-warning-list">
-          {s.items.map((item) => (
-            <li key={item.from + '→' + item.ref}>
-              <code>{item.from}</code> <span aria-hidden="true">→</span> <code>{item.ref}</code>
+          {s.groups.map((g) => (
+            <li key={g.ref}>
+              <div className="closure-warning-missing">{g.ref}</div>
+              <div className="closure-warning-froms">used by {g.froms.join(', ')}</div>
             </li>
           ))}
         </ul>
-        {s.more > 0 && <p className="closure-warning-more">+{s.more} more</p>}
+        {s.more > 0 && <p className="closure-warning-more">+{s.more} more affected</p>}
       </Alert>
     );
   }
   if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   window.PomClosureWarning = {
-    show: (title, items, more) => set(() => ({ open: true, title, items, more: more || 0 })),
+    show: (title, groups, more) => set(() => ({ open: true, title, groups, more: more || 0 })),
     hide: () => set((s) => ({ ...s, open: false })),
   };
 })();
