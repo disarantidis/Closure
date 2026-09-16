@@ -309,10 +309,14 @@ window.PomButtons = {
 function mountButton(mountId: string, props: any) { mountOnce(mountId, <PomButton {...props} />); }
 function mountIconButton(mountId: string, props: any) { mountOnce(mountId, <PomButton {...props} />); }
 
-mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outline', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) });
-mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) });
-mountIconButton('gl-clear-token-btn-mount', { id: 'gl-clear-token-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Clear GitLab token', 'aria-label': 'Clear GitLab token', icon: IconClose(16) });
-mountIconButton('gh-clear-token-btn-mount', { id: 'gh-clear-token-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Clear GitHub token', 'aria-label': 'Clear GitHub token', icon: IconClose(16) });
+/* These four stand BESIDE a small TextField (band 50: node-kit-test's
+   ROW-RULES "medium IS a small field's box"), not beside another button —
+   so they take Button's `medium` rung to band-match the field, not `small`
+   (band 32), which is the row-mixing-bands defect ROW-RULES.md calls out. */
+mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) });
+mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) });
+mountIconButton('gl-clear-token-btn-mount', { id: 'gl-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitLab token', 'aria-label': 'Clear GitLab token', icon: IconClose(16) });
+mountIconButton('gh-clear-token-btn-mount', { id: 'gh-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitHub token', 'aria-label': 'Clear GitHub token', icon: IconClose(16) });
 mountIconButton('gitlab-empty-add-btn-mount', { id: 'gitlab-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) });
 mountIconButton('github-empty-add-btn-mount', { id: 'github-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) });
 mountButton('add-github-btn-mount', { id: 'add-github-btn', variant: 'tonal', size: 'small', label: 'Add' });
@@ -535,8 +539,10 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
               onBlur={(v: string) => (window as any)[bridgeKey].onBlur?.(idx, v)}
             />
             {row.canEdit && (
+              // medium, not small: beside a field (band 50), same reasoning
+              // as folder-add-btn-mount / gl-clear-token-btn-mount above.
               <PomButton
-                variant="tonal" destructive size="small"
+                variant="tonal" destructive size="medium"
                 title="Remove this path" aria-label="Remove this path"
                 icon={IconClose(16)}
                 onClick={() => (window as any)[bridgeKey].onRemove?.(idx)}

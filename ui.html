@@ -487,6 +487,7 @@
 
     .folder-add {
       display: flex;
+      align-items: center;
       gap: 8px;
       margin-top: 8px;
     }
@@ -47048,10 +47049,10 @@ html[data-theme=dark] {
   function mountIconButton(mountId, props) {
     mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomButton, { ...props }));
   }
-  mountIconButton("folder-add-btn-mount", { id: "folder-add-btn", variant: "outline", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) });
-  mountIconButton("github-folder-add-btn-mount", { id: "github-folder-add-btn", variant: "outline", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) });
-  mountIconButton("gl-clear-token-btn-mount", { id: "gl-clear-token-btn", variant: "tonal", destructive: true, size: "small", title: "Clear GitLab token", "aria-label": "Clear GitLab token", icon: IconClose(16) });
-  mountIconButton("gh-clear-token-btn-mount", { id: "gh-clear-token-btn", variant: "tonal", destructive: true, size: "small", title: "Clear GitHub token", "aria-label": "Clear GitHub token", icon: IconClose(16) });
+  mountIconButton("folder-add-btn-mount", { id: "folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) });
+  mountIconButton("github-folder-add-btn-mount", { id: "github-folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) });
+  mountIconButton("gl-clear-token-btn-mount", { id: "gl-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitLab token", "aria-label": "Clear GitLab token", icon: IconClose(16) });
+  mountIconButton("gh-clear-token-btn-mount", { id: "gh-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitHub token", "aria-label": "Clear GitHub token", icon: IconClose(16) });
   mountIconButton("gitlab-empty-add-btn-mount", { id: "gitlab-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) });
   mountIconButton("github-empty-add-btn-mount", { id: "github-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) });
   mountButton("add-github-btn-mount", { id: "add-github-btn", variant: "tonal", size: "small", label: "Add" });
@@ -47265,12 +47266,14 @@ html[data-theme=dark] {
               onBlur: (v) => window[bridgeKey].onBlur?.(idx, v)
             }
           ),
-          row.canEdit && /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
+          row.canEdit && // medium, not small: beside a field (band 50), same reasoning
+          // as folder-add-btn-mount / gl-clear-token-btn-mount above.
+          /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
             PomButton,
             {
               variant: "tonal",
               destructive: true,
-              size: "small",
+              size: "medium",
               title: "Remove this path",
               "aria-label": "Remove this path",
               icon: IconClose(16),
