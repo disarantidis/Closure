@@ -612,24 +612,49 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
 })();
 
 /* ── loading skeletons ─────────────────────────────────────────────────────── */
+// Mirrors the real "ODS Test Foundation" card (mountCollectionsAccordion
+// above) now that it's one solid InteractiveCard rather than a variable-
+// length row list: icon + title on the left, the token-count tag flush
+// right — same .skeleton-foundation-card shape ui.template.html defines
+// right beside .export-panel's own skeleton below, so both read as one
+// family of "the container that's coming, in outline" rather than two
+// unrelated placeholder styles.
+// data-level={2}, matching the real cards this stands in for
+// (.json-download-card / .export-panel both carry it in the markup) —
+// without it --background resolves at whatever level this mounts on
+// (GROUND, same as the page itself), painting the "card" the exact same
+// colour as the page behind it: a loading card shape that's there but
+// invisible. Same frozen-alias reasoning as everywhere else in this file
+// that reads --background directly instead of --app-surface.
 mountOnce('skeleton-list',
-  <div className="skeleton-item" style={{ minHeight: 48 }}>
-    <Skeleton shape="block" width={180} height={14} />
-    <Skeleton shape="block" width={20} height={20} label="" />
+  <div className="skeleton-foundation-card" data-level={2}>
+    <div className="skeleton-foundation-card-title-group">
+      <Skeleton shape="circle" size={18} label="Loading" />
+      <Skeleton shape="block" width={160} height={16} label="" />
+    </div>
+    <Skeleton shape="block" width={64} height={22} label="" />
   </div>,
+  CARD_LEVEL,
 );
+// Mirrors the real push-settings card's current shape: a small icon+title
+// row (whichever provider ends up shown — GitLab or GitHub, not known
+// yet), one full-width folder-path field (the filename field that used to
+// sit beside it moved out into its own card — see .filename-row's own
+// comment — so there's only ever one field here now), the commit textarea,
+// and the (now full-width, Download having moved out too) push button.
+// data-level={2} for the same reason as skeleton-list's own card above —
+// the real #actions .export-panel carries it directly in the markup.
 mountOnce('actions-skeleton',
-  <div className="export-panel">
+  <div className="export-panel" data-level={2}>
     <div className="sk-row">
-      <Skeleton shape="block" width={90} height={44} />
-      <Skeleton shape="block" height={44} width={'100%'} label="" />
+      <Skeleton shape="circle" size={14} label="Loading" />
+      <Skeleton shape="block" width={70} height={16} label="" />
     </div>
+    <Skeleton shape="block" height={44} width={'100%'} label="" />
     <Skeleton shape="block" height={68} width={'100%'} label="" />
-    <div className="sk-row">
-      <Skeleton shape="block" height={64} width={'100%'} />
-      <Skeleton shape="block" width={64} height={64} label="" />
-    </div>
+    <Skeleton shape="block" height={44} width={'100%'} label="" />
   </div>,
+  CARD_LEVEL,
 );
 
 /* ── toast ─────────────────────────────────────────────────────────────────── */

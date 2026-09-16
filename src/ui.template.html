@@ -902,6 +902,14 @@
       z-index: -1;
       pointer-events: none;
     }
+    /* Hidden for as long as either end is still a skeleton rather than a
+       real container — see updateFlowWireVisibility(), the one place this
+       class is toggled. A line connecting two placeholder shapes reads as
+       "these are related" before that's actually knowable yet (the real
+       shapes haven't arrived), so it waits until both containers are real. */
+    .flow-wrap.is-loading .flow-wire {
+      display: none;
+    }
 
     .collections-wrap {
       display: flex;
@@ -1029,20 +1037,38 @@
     }
 
 
-    /* Loading skeleton — mirrors the collection rows while extraction runs. */
+    /* Loading skeleton for the file-variables card, while extraction runs.
+       Was shaped to mirror individual collection ROWS (a checkbox list this
+       screen used to show directly) — stale since that became one single
+       InteractiveCard (buttons.tsx's mountCollectionsAccordion); redrawn to
+       mirror THAT card's own shape instead (see .skeleton-foundation-card
+       below), now that there's one solid container to match rather than a
+       variable-length list. */
     .skeleton-list {
       display: flex;
       flex-direction: column;
-      gap: 2px;
-      flex: 1;
-      overflow: hidden;
-      min-height: 0;
     }
-    .skeleton-item {
+    .skeleton-list[hidden] { display: none !important; }
+    /* Same subtle-surface card language as .export-panel/.json-download-
+       card — geometry only (padding, radius); the Skeleton bars inside
+       paint their own recessed fill regardless of this container's own
+       color, same as every other skeleton in this file (.actions-skeleton
+       right below), so there's no color to keep in sync with the real
+       card's own (inverted) scheme. */
+    .skeleton-foundation-card {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 10px 0;   /* align the checkbox skeleton with the fields below */
+      justify-content: space-between;
+      gap: 8px;
+      background: var(--background);
+      border-radius: 24px;
+      padding: var(--spacing-component-6);
+    }
+    .skeleton-foundation-card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
     }
     /* Read-only per-collection row, inside the modal Dialog's own content
        (buttons.tsx) — no checkbox, no hover/pointer: nothing here is
@@ -1225,7 +1251,7 @@
          content lines up on one left/right edge. */
       padding: var(--spacing-component-6);
     }
-    .actions-skeleton .sk-row { display: flex; gap: 8px; }
+    .actions-skeleton .sk-row { display: flex; align-items: center; gap: 8px; }
 
     /* Push alone fills the row now — Download moved out into
        .json-download-card below, since it was never tied to either push
@@ -2672,6 +2698,10 @@
     // Reveal the wrap immediately so the loading skeleton is visible while
     // foundations are being read (it starts at opacity:0 until .visible).
     collectionsWrap.classList.add('visible');
+    // Both skeletons start visible (see #skeleton-list/#actions-skeleton's
+    // own markup — neither carries `hidden` in the HTML), so the wire
+    // starts hidden too — see updateFlowWireVisibility().
+    updateFlowWireVisibility();
 
     // Settings → Output format helper line. Spells out what the switch changes,
     // and that it does NOT change where the file goes — same file name either
@@ -2752,6 +2782,20 @@
       var skel = document.getElementById('actions-skeleton');
       if (real) real.hidden = loading;
       if (skel) skel.hidden = !loading;
+      updateFlowWireVisibility();
+    }
+
+    // The connecting wire (.flow-wire) reads as a pipeline linking the
+    // three real containers — while either one is still a skeleton
+    // (#skeleton-list not yet hidden, or #actions-skeleton still showing
+    // in place of #actions), there's no real container on that end for it
+    // to connect to yet, so it stays hidden rather than drawing a line
+    // behind placeholder content. Called from setActionsLoading() and
+    // every call site that hides #skeleton-list, rather than computed
+    // once — either one can finish loading before the other.
+    function updateFlowWireVisibility() {
+      var stillLoading = !skeletonList.hidden || !document.getElementById('actions-skeleton').hidden;
+      document.querySelector('.flow-wrap').classList.toggle('is-loading', stillLoading);
     }
 
     // Single source of truth for "what can actually be pushed right now" —
@@ -3232,7 +3276,8 @@
         applyFileNameMatch(msg.fileName);
 
         loadingState.style.display = 'none';
-        if (skeletonList) skeletonList.style.display = 'none';
+        if (skeletonList) skeletonList.hidden = true;
+        updateFlowWireVisibility();
         emptyState.style.display = 'none';
 
         if (msg.collections.length === 0) {
@@ -3316,7 +3361,7 @@
       }
       
       if (msg.type === 'error') {
-        if (skeletonList) skeletonList.style.display = 'none';
+        if (skeletonList) skeletonList.hidden = true;
         setActionsLoading(false);
         loadingState.style.display = 'flex';
         loadingState.querySelector('p').textContent = 'Error: ' + msg.message;
