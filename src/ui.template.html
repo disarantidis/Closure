@@ -470,6 +470,20 @@
       align-items: center;
       gap: 8px;
     }
+    /* Unlike .token-row / .folder-add, this field has no id'd mount span of
+       its own to carry `flex: 1` — buttons.tsx renders it straight into
+       .folder-row (mountFolderList remounts the whole list on every
+       change). node.css's `.nd-textfield-wrap.is-block` sets `flex: none`
+       + `width: stretch`, which — with nothing to shrink it — claims the
+       row's full width and squeezes the remove button down to its 24px
+       floor on the cross axis, stretched tall by its own block-size (the
+       aspect-ratio-1 square it should have had no room to keep). Beating
+       that rule needs the extra ">" for specificity (is-block alone ties
+       it and loses on source order — node.css loads after this block). */
+    .folder-row > .nd-textfield-wrap.is-block {
+      flex: 1;
+      min-width: 0;
+    }
 
     /* A provider's token field with its Clear button alongside. Same row
        idiom as .folder-add below; the field takes the slack so the button

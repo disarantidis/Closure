@@ -532,6 +532,7 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
           <div className="folder-row" key={`${gen}-${idx}`}>
             <PomTextField
               id={`${idPrefix}-${idx}`}
+              label="Folder path"
               readonly={!row.canEdit}
               icon={IconFolder(16)}
               defaultValue={row.path}
