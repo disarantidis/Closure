@@ -274,16 +274,19 @@ function mountLiveButton(mountId: string, base: any, initial: any, level: Level 
   };
 }
 
-type LiveIconHandle = { setDisabled: (v: boolean) => void };
+type LiveIconHandle = { setDisabled: (v: boolean) => void; setLoading: (v: boolean) => void };
 function mountLiveIconButton(mountId: string, base: any, initialDisabled: boolean, level: Level = GROUND): LiveIconHandle {
   const container = document.getElementById(mountId);
-  let set: (v: boolean) => void = () => {};
+  let set: (u: (s: any) => any) => void = () => {};
   function View() {
-    const [disabled, setD] = useState(initialDisabled); set = setD;
-    return <PomButton {...base} disabled={disabled} />;
+    const [s, setS] = useState({ disabled: initialDisabled, loading: false }); set = setS;
+    return <PomButton {...base} disabled={s.disabled} loading={s.loading} />;
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
-  return { setDisabled: (v) => set(v) };
+  return {
+    setDisabled: (v) => set((s) => ({ ...s, disabled: v })),
+    setLoading: (v) => set((s) => ({ ...s, loading: v })),
+  };
 }
 
 type DisabledHandle = { setDisabled: (v: boolean) => void };

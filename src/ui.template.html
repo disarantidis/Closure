@@ -3496,14 +3496,14 @@
     // navigator.clipboard first — a click handler is a real user gesture,
     // well within what the Clipboard API requires, so this covers the
     // normal case. Falls back to the older execCommand('copy') path (a
-    // temporary off-screen textarea, select, copy, remove) only if
-    // navigator.clipboard isn't there at all — some older/more locked-down
-    // embedded webviews still don't expose it, and Figma's plugin UI is
-    // exactly that kind of embedded iframe.
-    function copyToClipboard(text) {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(text);
-      }
+    // temporary off-screen textarea, select, copy, remove) whenever
+    // navigator.clipboard.writeText isn't there OR its call rejects —
+    // Figma's plugin UI iframe exposes the function (it's not undefined)
+    // but its own sandbox Permissions-Policy can still reject the actual
+    // call with NotAllowedError, which a plain existence check does not
+    // catch. legacyCopy() has to run on that rejection too, not only when
+    // the API is missing outright.
+    function legacyCopy(text) {
       return new Promise(function(resolve, reject) {
         try {
           var ta = document.createElement('textarea');
@@ -3521,6 +3521,12 @@
         }
       });
     }
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).catch(function() { return legacyCopy(text); });
+      }
+      return legacyCopy(text);
+    }
 
     // Same export as Download/Push, straight to the clipboard instead of a
     // file. showToast() (a real working in-app toast — window.PomToast),
@@ -3533,9 +3539,12 @@
       var tokens = getTokensToExport();
       if (!tokens) return;
       var json = JSON.stringify(tokens, null, 2);
+      window.PomButtons.copy.setLoading(true);
       copyToClipboard(json).then(function() {
+        window.PomButtons.copy.setLoading(false);
         showToast('JSON copied to clipboard');
       }, function() {
+        window.PomButtons.copy.setLoading(false);
         showToast('Could not copy — try Download instead', true);
       });
     }
