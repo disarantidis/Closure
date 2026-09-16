@@ -220,7 +220,7 @@ function buildAliasPath(aliasedVar, aliasedVarCollection, currentCollectionName,
   return normalized.replace(/\//g, '.');
 }
 
-// --- TOKEN STUDIO: dimension.N → N*{dimension.base} when divisible (matches the token math layer) ---
+// --- LEGACY JSON: dimension.N → N*{dimension.base} when divisible (matches the token math layer) ---
 function applyDimensionBaseExpressions(core) {
   if (!core || !core.dimension || !core.dimension.base) return core;
   var baseTok = core.dimension.base;
@@ -1311,7 +1311,7 @@ function buildFoundationStyleRefs(rawData, formatStyleId, toTokenCase) {
 }
 
 /** Canonical the token format token set order (Nato reference). */
-var TOKEN_STUDIO_SET_ORDER = [
+var LEGACY_JSON_SET_ORDER = [
   'core',
   'foundation',
   'mode/light',
@@ -1356,8 +1356,8 @@ var TOKEN_STUDIO_SET_ORDER = [
 
 function buildTokenSetOrder(out) {
   var order = [];
-  for (var i = 0; i < TOKEN_STUDIO_SET_ORDER.length; i++) {
-    var k = TOKEN_STUDIO_SET_ORDER[i];
+  for (var i = 0; i < LEGACY_JSON_SET_ORDER.length; i++) {
+    var k = LEGACY_JSON_SET_ORDER[i];
     if (out[k] !== undefined) order.push(k);
   }
   Object.keys(out).forEach(function(k) {
@@ -1954,17 +1954,17 @@ function ensureCoreLineHeightsLetterSpacing(core) {
   return core;
 }
 
-// --- TOKEN STUDIO FORMAT TRANSFORMER ---
+// --- LEGACY JSON FORMAT TRANSFORMER ---
 // Emit leaf / secondary token sets using the RAW Figma variable names, so the
 // token roots (white, white-subtle, secondary-light, magenta-light, …) match the
 // raw alias references buildAliasPath now produces for leaf collections. Values
 // are taken from the already-computed `native` tree (keyed by the stripped path).
-function tsLookupNested(obj, path) {
+function legacyLookupNested(obj, path) {
   var p = path.split('/'); var c = obj;
   for (var i = 0; i < p.length; i++) { if (!c || typeof c !== 'object') return undefined; c = c[p[i]]; }
   return c;
 }
-function tsSetNested(obj, path, val) {
+function legacySetNested(obj, path, val) {
   var p = path.split('/'); var c = obj;
   for (var i = 0; i < p.length - 1; i++) { c[p[i]] = c[p[i]] || {}; c = c[p[i]]; }
   c[p[p.length - 1]] = val;
@@ -1992,9 +1992,9 @@ function emitRawNameSets(out, native, rawData) {
       rawCol.variables.forEach(function(v) {
         if (!v.name) return;
         var stripped = normalizeVariableName(v.name, cfg.col);
-        var val = tsLookupNested(native[cfg.col][modeName], stripped);
+        var val = legacyLookupNested(native[cfg.col][modeName], stripped);
         if (val === undefined) return;
-        tsSetNested(tree, v.name, val); // RAW name → keeps the real token root
+        legacySetNested(tree, v.name, val); // RAW name → keeps the real token root
       });
       out[setName] = tree;
     });
@@ -2281,9 +2281,9 @@ function toTokenFormat(native, rawData) {
   out['$themes'] = buildThemes(rawData, tokenSetNames);
 
   // the token format: Nato-style typography (camel composite refs, kebab standalone, per-scale lineHeight / line-height formula)
-  Object.keys(out).forEach(function(tsKey) {
-    if (tsKey.indexOf('breakpoint/') !== 0 || !out[tsKey].breakpoint) return;
-    var bp = out[tsKey].breakpoint;
+  Object.keys(out).forEach(function(legacyKey) {
+    if (legacyKey.indexOf('breakpoint/') !== 0 || !out[legacyKey].breakpoint) return;
+    var bp = out[legacyKey].breakpoint;
     var core = out['core'];
     syncTypographyCompositeLineHeights(bp);
     alignBreakpointTypographyToNato(core, bp);
@@ -2327,9 +2327,9 @@ function toTokenFormat(native, rawData) {
 
   // Canonical breakpoint typography quirks — run LAST on the final tree so no
   // other normalization overwrites them (letterSpacing.7 + link underline).
-  Object.keys(out).forEach(function(tsKey) {
-    if (tsKey.indexOf('breakpoint/') === 0 && out[tsKey] && out[tsKey].breakpoint) {
-      applyCanonicalBreakpointTypography(out[tsKey].breakpoint);
+  Object.keys(out).forEach(function(legacyKey) {
+    if (legacyKey.indexOf('breakpoint/') === 0 && out[legacyKey] && out[legacyKey].breakpoint) {
+      applyCanonicalBreakpointTypography(out[legacyKey].breakpoint);
     }
   });
 
@@ -2698,14 +2698,14 @@ figma.ui.onmessage = function(msg) {
     var nativeResult = transformToFinalFormat(msg.raw, {
       includeDescriptions: !!msg.includeDescriptions
     });
-    var exportMode = msg.exportMode || 'token-studio';
+    var exportMode = msg.exportMode || 'legacy';
     var finalTokens;
-    if (exportMode === 'token-studio') {
+    if (exportMode === 'legacy') {
       finalTokens = toTokenFormat(nativeResult.tokens, msg.raw);
     } else {
       finalTokens = nativeResult.tokens;
     }
-    var closure = exportMode === 'token-studio'
+    var closure = exportMode === 'legacy'
       ? validateReferenceClosure(finalTokens)
       : { ok: true, brokenCount: 0, totalRefs: 0, byRoot: {}, missingRoots: [], sampleBroken: [] };
     if (!closure.ok) {

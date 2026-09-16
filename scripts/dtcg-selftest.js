@@ -108,7 +108,7 @@ function run() {
   const off = plugin.transformToFinalFormat(raw).tokens['.mode'];
   const on = plugin.transformToFinalFormat(raw, { includeDescriptions: true }).tokens['.mode'];
 
-  check('off by default, so the Token Studio export is unchanged',
+  check('off by default, so the Legacy JSON export is unchanged',
     !('description' in off.light.brand.primary));
   check('includeDescriptions carries the description',
     on.light.brand.primary.description === DESC);
@@ -139,7 +139,7 @@ function run() {
 
   // --- the checked-in fixture ----------------------------------------------
   const sample = JSON.parse(
-    fs.readFileSync(path.join(ROOT, 'scripts/__fixtures__/token-studio-sample.json'), 'utf8')
+    fs.readFileSync(path.join(ROOT, 'scripts/__fixtures__/legacy-sample.json'), 'utf8')
   );
 
   // --- 'partial': the drop-in contract for build-dtcg.js -------------------
@@ -297,7 +297,7 @@ function run() {
   check('typography $value holds only the five DTCG sub-values',
     typo.$type === 'typography' && Object.keys(typo.$value).length === 5);
   check('non-DTCG typography sub-values move to $extensions',
-    !!typo.$extensions['com.radd.tokenStudio'].typography.textCase);
+    !!typo.$extensions['com.radd.legacyJson'].typography.textCase);
 }
 
 try {

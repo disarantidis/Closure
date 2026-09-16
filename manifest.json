@@ -10,7 +10,6 @@
   "networkAccess": {
     "allowedDomains": [
       "https://gitlab.com",
-      "https://gitlab.devops.telekom.de",
       "https://api.github.com"
     ],
     "reasoning": "Pushes exported design token JSON to GitLab (incl. self-hosted / Enterprise) and/or GitHub via their REST APIs. For another self-hosted GitLab, add that instance's origin here too, then re-import the plugin from this manifest."

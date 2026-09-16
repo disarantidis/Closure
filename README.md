@@ -122,7 +122,6 @@ A Figma plugin can only reach domains listed in `manifest.json` →
 ```json
 "allowedDomains": [
   "https://gitlab.com",
-  "https://gitlab.devops.telekom.de",
   "https://api.github.com"
 ]
 ```

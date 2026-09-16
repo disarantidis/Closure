@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 //
-// dtcg-preview.js — run the DTCG conversion over an existing Token Studio export
+// dtcg-preview.js — run the DTCG conversion over an existing Legacy JSON export
 // without opening Figma, so the format can be iterated on against real data.
 //
 //   node scripts/dtcg-preview.js tokens.json
@@ -129,7 +129,7 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.input) {
     console.error(
-      'usage: node scripts/dtcg-preview.js <token-studio.json> [--shape partial|sets|themes]\n' +
+      'usage: node scripts/dtcg-preview.js <legacy.json> [--shape partial|sets|themes]\n' +
       '                                    [-o out.json] [--compare tokens_W3C.json]'
     );
     process.exit(1);

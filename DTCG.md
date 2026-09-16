@@ -31,8 +31,8 @@ W3C DTCG**, not an intermediate shape that needs another tool to finish:
 - **Renames** `value` / `type` / `description` → `$value` / `$type` /
   `$description`, and **strictly maps every type** to its DTCG equivalent
   (`spacing`/`sizing`/`borderRadius`/… → `dimension`, etc. — see `TYPE_MAP` in
-  `src/dtcg-format.js`) rather than passing Token Studio's own proprietary
-  type names through.
+  `src/dtcg-format.js`) rather than passing the Legacy JSON tree's own
+  proprietary type names through.
 - **Aliases stay aliases** — `$value: "{color.blue}"` is valid DTCG (the spec
   defines token references with exactly this syntax; consuming tools resolve
   them). What "resolved" means here is *closure*: every alias is checked to
@@ -40,8 +40,8 @@ W3C DTCG**, not an intermediate shape that needs another tool to finish:
   (`validateDtcgClosure`), never dangling out to a set the document didn't
   merge in — so the output needs no companion file to be complete.
 - **Figma variable descriptions** ride along as `$description` on each token.
-- Vendor/Token-Studio-only metadata (which sets built the document, its
-  `tokenSetOrder`) is confined to a root `$extensions.com.radd.tokenStudio`
+- Vendor/Legacy-JSON-only metadata (which sets built the document, its
+  `tokenSetOrder`) is confined to a root `$extensions.com.radd.legacyJson`
   block, which a strict DTCG consumer can simply ignore.
 - **The file name swaps with the format** so a DTCG export never overwrites the
   default JSON: `tokens.json` → `tokens_dtcg.json`. Suffixing and stripping are

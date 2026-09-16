@@ -858,7 +858,7 @@
       margin-bottom: 16px;
     }
 
-    /* "Output format" — Token Studio JSON vs W3C DTCG. Leads the page, so
+    /* "Output format" — Legacy JSON vs W3C DTCG. Leads the page, so
        margin (the page's own top padding already spaces it from the header),
        and the standard 40px bottom rhythm before whatever follows (the
        "Repository settings" heading right below it — there used to be a
@@ -21360,9 +21360,9 @@ html[data-theme=dark] {
       </div>
     </header>
 
-    <!-- Format toggle hidden: export is locked to Token Studio by default.
+    <!-- Format toggle hidden: export is locked to Legacy JSON by default.
          Kept in the DOM (display:none) so the existing exportMode logic still
-         works. The Token Studio ↔ DTCG choice lives in Settings instead
+         works. The Legacy JSON ↔ DTCG choice lives in Settings instead
          (see #dtcg-format-control-mount). -->
     <div id="export-mode-control-mount" style="display:none;"></div>
 
@@ -21600,7 +21600,7 @@ html[data-theme=dark] {
     <div class="settings-page-content">
       <!-- Output format. Always visible and leads the page: it decides what
            every download and push actually contains, so it outranks the
-           destination settings below it. Off = the Token Studio JSON this
+           destination settings below it. Off = the Legacy JSON this
            plugin has always produced; on = W3C DTCG (design-tokens.org) —
            one fully resolved document per theme, dtcgShape 'themes', not
            the 'partial' shape that still needs an external finishing step
@@ -47781,7 +47781,7 @@ html[data-theme=dark] {
           label: "Output format",
           size: "small",
           value,
-          options: [{ value: "0", label: "Native" }, { value: "1", label: "Token Studio" }],
+          options: [{ value: "0", label: "Native" }, { value: "1", label: "Legacy" }],
           onChange: (v) => {
             setValue(v);
             window.PomExportMode.onChange?.(Number(v));
@@ -48295,27 +48295,26 @@ react/cjs/react-jsx-runtime.development.js:
 */
 </script>
   <!-- src/dtcg-format.js, inlined by scripts/build-ui.js. Defines window.PomDtcg
-       (the DTCG post-transform over the Token Studio tree). -->
+       (the DTCG post-transform over the Legacy JSON tree). -->
   <script>/*
  * dtcg-format.js — DTCG (design-tokens.org) export format.
  *
- * The default 'partial' shape is Tokens Studio's partial DTCG, not strict W3C:
+ * The default 'partial' shape is a partial DTCG conversion, not strict W3C:
  * proprietary type names, composite shapes and embedded math survive it, and
  * build-dtcg.js downstream is what makes the result standards-conformant.
  *
- * EXPLORATORY. This is a pure post-transform over the Token Studio tree that
- * code.js already produces (`toTokenStudioFormat`), so nothing in the existing
- * export path changes: same extraction, same normalization, same composites.
- * Only the final serialization differs.
+ * EXPLORATORY. This is a pure post-transform over the Legacy JSON tree that
+ * code.js already produces, so nothing in the existing export path changes:
+ * same extraction, same normalization, same composites. Only the final
+ * serialization differs.
  *
- *   Figma vars → transformToFinalFormat → toTokenStudioFormat → [this file]
+ *   Figma vars → transformToFinalFormat → Legacy JSON tree → [this file]
  *
  * Three output shapes:
  *
- *   'partial'  — what Tokens Studio's own DTCG export produces, and what
+ *   'partial'  — a minimal rename of value/type/description, matching what
  *                config/normalize/build-dtcg.js consumes downstream as
- *                packages/radd/src/tokens_W3C.json. A minimal rename of
- *                value/type/description; proprietary type names, composite
+ *                packages/radd/src/tokens_W3C.json; proprietary type names, composite
  *                shapes, embedded math and $themes/$metadata all stay put.
  *                This is the production target — build-dtcg.js finishes the
  *                conversion into strict, standards-only DTCG.
@@ -48326,8 +48325,7 @@ react/cjs/react-jsx-runtime.development.js:
  *
  *   'themes'   — one self-contained document per $themes entry, built by
  *                deep-merging that theme's non-disabled sets in tokenSetOrder
- *                (later sets win, matching Tokens Studio). Resolves its own
- *                {a.b.c} references.
+ *                (later sets win). Resolves its own {a.b.c} references.
  *
  * Runs in the plugin UI (inlined into ui.html by scripts/build-ui.js) and in Node
  * (scripts/dtcg-preview.js) from this one source.
@@ -48335,9 +48333,9 @@ react/cjs/react-jsx-runtime.development.js:
 (function (global) {
   'use strict';
 
-  var EXT = 'com.radd.tokenStudio';
+  var EXT = 'com.radd.legacyJson';
 
-  // Token Studio type → DTCG $type. Anything absent here has no DTCG equivalent
+  // Legacy JSON type → DTCG $type. Anything absent here has no DTCG equivalent
   // and is passed through verbatim (and counted in the report) rather than
   // silently dropped or coerced to a type that would lie about the value.
   var TYPE_MAP = {
@@ -48360,7 +48358,7 @@ react/cjs/react-jsx-runtime.development.js:
     typography:       'typography'
   };
 
-  // DTCG's typography composite has exactly these sub-values. Token Studio adds
+  // DTCG's typography composite has exactly these sub-values. Legacy JSON adds
   // textCase / textDecoration / paragraphSpacing / paragraphIndent, which move to
   // $extensions so $value stays spec-shaped without losing them.
   var TYPOGRAPHY_KEYS = ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'lineHeight'];
@@ -48375,9 +48373,9 @@ react/cjs/react-jsx-runtime.development.js:
     return isObject(node) && Object.prototype.hasOwnProperty.call(node, 'value');
   }
 
-  // A Token Studio math expression, e.g. '{dimension.1}*4'. DTCG has no
+  // A Legacy JSON math expression, e.g. '{dimension.1}*4'. DTCG has no
   // arithmetic, so these pass through verbatim and are reported — a consumer
-  // needs a Token Studio-compatible resolver to evaluate them.
+  // needs a Legacy-JSON-compatible resolver to evaluate them.
   function isMathExpression(v) {
     return typeof v === 'string' && v.indexOf('{') !== -1 && /[*/+]/.test(v);
   }
@@ -48400,7 +48398,7 @@ react/cjs/react-jsx-runtime.development.js:
 
   // --- composite value conversion -------------------------------------------
 
-  // Token Studio boxShadow → DTCG shadow. x/y become offsetX/offsetY, the
+  // Legacy JSON boxShadow → DTCG shadow. x/y become offsetX/offsetY, the
   // 'dropShadow' | 'innerShadow' discriminator becomes the `inset` flag.
   function toDtcgShadow(value) {
     if (Array.isArray(value)) {
@@ -48417,7 +48415,7 @@ react/cjs/react-jsx-runtime.development.js:
     return out;
   }
 
-  // Token Studio typography → DTCG typography, plus the non-standard sub-values
+  // Legacy JSON typography → DTCG typography, plus the non-standard sub-values
   // split off for $extensions.
   function toDtcgTypography(value) {
     if (!isObject(value)) return { value: value, extra: null };
@@ -48433,25 +48431,25 @@ react/cjs/react-jsx-runtime.development.js:
   // --- token conversion ------------------------------------------------------
 
   function convertToken(node, path, report) {
-    var tsType = node.type;
-    var dtcgType = TYPE_MAP[tsType];
+    var legacyType = node.type;
+    var dtcgType = TYPE_MAP[legacyType];
     var out = {};
     var extra = null;
 
     if (dtcgType === undefined) {
       // No DTCG equivalent (text, textCase, textDecoration, boolean, asset, …).
-      dtcgType = tsType;
-      if (tsType !== undefined) {
-        report.unmappedTypes[tsType] = (report.unmappedTypes[tsType] || 0) + 1;
+      dtcgType = legacyType;
+      if (legacyType !== undefined) {
+        report.unmappedTypes[legacyType] = (report.unmappedTypes[legacyType] || 0) + 1;
       }
     } else {
-      report.mappedTypes[tsType] = (report.mappedTypes[tsType] || 0) + 1;
+      report.mappedTypes[legacyType] = (report.mappedTypes[legacyType] || 0) + 1;
     }
 
     var value = node.value;
-    if (tsType === 'boxShadow') {
+    if (legacyType === 'boxShadow') {
       value = toDtcgShadow(value);
-    } else if (tsType === 'typography') {
+    } else if (legacyType === 'typography') {
       var split = toDtcgTypography(value);
       value = split.value;
       extra = split.extra;
@@ -48470,10 +48468,10 @@ react/cjs/react-jsx-runtime.development.js:
       report.describedCount++;
     }
 
-    // Everything Token Studio carries that DTCG has no home for is preserved
+    // Everything Legacy JSON carries that DTCG has no home for is preserved
     // under a vendor extension rather than dropped.
     var ext = {};
-    if (tsType !== undefined) ext.type = tsType;
+    if (legacyType !== undefined) ext.type = legacyType;
     if (node.codeSyntax) ext.codeSyntax = node.codeSyntax;
     if (extra) ext.typography = extra;
     Object.keys(node).forEach(function (key) {
@@ -48499,9 +48497,9 @@ react/cjs/react-jsx-runtime.development.js:
     return out;
   }
 
-  // --- Tokens Studio "partial DTCG" ------------------------------------------
+  // --- "partial DTCG" ---------------------------------------------------------
 
-  // Tokens Studio's own DTCG export is a minimal rename: value/type/description
+  // This partial DTCG export is a minimal rename: value/type/description
   // become $value/$type/$description and nothing else changes — proprietary type
   // names (boxShadow, fontSizes, …), composite shapes, embedded math and
   // stringified values all stay. That is what config/normalize/build-dtcg.js
@@ -48569,17 +48567,17 @@ react/cjs/react-jsx-runtime.development.js:
 
   // --- theme resolution ------------------------------------------------------
 
-  // Merge one theme's sets into a single self-contained tree. Token Studio
-  // applies sets in tokenSetOrder and lets later sets win, so 'source' and
+  // Merge one theme's sets into a single self-contained tree. Sets are
+  // applied in tokenSetOrder and later sets win, so 'source' and
   // 'enabled' both contribute and only 'disabled' is skipped.
-  function mergeThemeSets(tsTokens, theme, tokenSetOrder) {
+  function mergeThemeSets(legacyTokens, theme, tokenSetOrder) {
     var selected = theme.selectedTokenSets || {};
     var merged = {};
     tokenSetOrder.forEach(function (setName) {
       var state = selected[setName];
       if (!state || state === 'disabled') return;
-      if (!tsTokens[setName]) return;
-      deepMerge(merged, deepClone(tsTokens[setName]));
+      if (!legacyTokens[setName]) return;
+      deepMerge(merged, deepClone(legacyTokens[setName]));
     });
     return merged;
   }
@@ -48591,16 +48589,16 @@ react/cjs/react-jsx-runtime.development.js:
   // --- public API ------------------------------------------------------------
 
   /**
-   * Convert a Token Studio tree to DTCG.
+   * Convert a Legacy JSON tree to DTCG.
    *
-   * @param {object} tsTokens  output of toTokenStudioFormat (sets + $themes + $metadata)
+   * @param {object} legacyTokens  the Legacy JSON tree that code.js already produces (sets + $themes + $metadata)
    * @param {object} [options]
    * @param {'partial'|'sets'|'themes'} [options.shape='sets']
    * @param {boolean} [options.dedupeDescriptions=true]  'partial' only — hoist each
    *   description to the root map instead of repeating it on every mode's token.
    * @returns {{ tokens: object, report: object }}
    */
-  function toDtcgFormat(tsTokens, options) {
+  function toDtcgFormat(legacyTokens, options) {
     options = options || {};
     var shape = options.shape || 'sets';
 
@@ -48618,9 +48616,9 @@ react/cjs/react-jsx-runtime.development.js:
       themes: []
     };
 
-    var metadata = tsTokens['$metadata'] || {};
-    var themes = tsTokens['$themes'] || [];
-    var tokenSetOrder = metadata.tokenSetOrder || Object.keys(tsTokens).filter(function (k) {
+    var metadata = legacyTokens['$metadata'] || {};
+    var themes = legacyTokens['$themes'] || [];
+    var tokenSetOrder = metadata.tokenSetOrder || Object.keys(legacyTokens).filter(function (k) {
       return !META_KEYS[k];
     });
 
@@ -48631,8 +48629,8 @@ react/cjs/react-jsx-runtime.development.js:
       // instead, for a consumer that cannot read the root map.
       var dedupe = options.dedupeDescriptions !== false;
       tokenSetOrder.forEach(function (setName) {
-        if (!tsTokens[setName]) return;
-        out[setName] = toPartialTree(tsTokens[setName], '', report, dedupe);
+        if (!legacyTokens[setName]) return;
+        out[setName] = toPartialTree(legacyTokens[setName], '', report, dedupe);
         report.sets.push(setName);
       });
       if (dedupe && Object.keys(report.descriptions).length) {
@@ -48640,27 +48638,27 @@ react/cjs/react-jsx-runtime.development.js:
         out['$extensions'][EXT_EXPORTER] = { descriptions: report.descriptions };
       }
       // Native, at the root, exactly where build-dtcg.js looks for them.
-      if (tsTokens['$themes']) out['$themes'] = tsTokens['$themes'];
-      if (tsTokens['$metadata']) out['$metadata'] = tsTokens['$metadata'];
+      if (legacyTokens['$themes']) out['$themes'] = legacyTokens['$themes'];
+      if (legacyTokens['$metadata']) out['$metadata'] = legacyTokens['$metadata'];
       return { tokens: out, report: report };
     }
 
     if (shape === 'themes') {
       themes.forEach(function (theme) {
         var key = themeKey(theme);
-        var merged = mergeThemeSets(tsTokens, theme, tokenSetOrder);
+        var merged = mergeThemeSets(legacyTokens, theme, tokenSetOrder);
         out[key] = convertTree(merged, '', report);
         report.themes.push(key);
       });
     } else {
       tokenSetOrder.forEach(function (setName) {
-        if (!tsTokens[setName]) return;
-        out[setName] = convertTree(tsTokens[setName], '', report);
+        if (!legacyTokens[setName]) return;
+        out[setName] = convertTree(legacyTokens[setName], '', report);
         report.sets.push(setName);
       });
     }
 
-    // Token Studio's own metadata has no DTCG equivalent; keep it at the document
+    // Legacy JSON's own metadata has no DTCG equivalent; keep it at the document
     // root under the vendor extension so the export stays round-trippable.
     out['$extensions'] = {};
     out['$extensions'][EXT] = {
@@ -48797,7 +48795,7 @@ react/cjs/react-jsx-runtime.development.js:
     var DEFAULT_FILENAME = 'tokens.json';
     var DTCG_SUFFIX = '_dtcg';
     // v1.4.0 development builds wrote _W3C before the output was renamed (it is
-    // Tokens Studio's partial DTCG, not strict W3C). Still recognised so a name
+    // a partial DTCG conversion, not strict W3C). Still recognised so a name
     // saved by one of those strips cleanly, and re-suffixes to _dtcg, instead of
     // becoming tokens_W3C_dtcg.json.
     var LEGACY_DTCG_SUFFIXES = ['_W3C'];
@@ -48885,13 +48883,14 @@ react/cjs/react-jsx-runtime.development.js:
     }
 
     // ── GitLab settings: baked-in standard defaults + editable overrides ──────
-    // Non-secret standard connection for this custom plugin. The token is NEVER
+    // Generic placeholder connection, meant to be overridden per install —
+    // every field below is editable in Settings. The token is NEVER
     // hardcoded — it is entered in-plugin and stored only in clientStorage.
     var GITLAB_DEFAULTS = {
-      host: 'https://gitlab.devops.telekom.de',
-      project: 'mdx/ods/design-tokens/design-tokens-json',
+      host: 'https://gitlab.com',
+      project: 'group/subgroup/project',
       branch: 'main',
-      folders: ['src/oneID', 'src/iskon', 'src/spar', 'src/redBull']
+      folders: ['src/brand-a', 'src/brand-b', 'src/brand-c']
     };
 
     // Whether the GitLab section is configured/shown — like githubAdded
@@ -48932,13 +48931,13 @@ react/cjs/react-jsx-runtime.development.js:
     // saved configs still load) since it's a real preference, not a
     // session-only view toggle any more.
     var mainProviderTab = 'gitlab';
-    // null = ship the Token Studio tree as-is; 'themes' runs the DTCG
+    // null = ship the Legacy JSON tree as-is; 'themes' runs the DTCG
     // post-transform (src/dtcg-format.js) over it — see getTokensToExport.
     // 'themes' (not 'partial') is what the Output format switch drives: one
     // fully resolved, self-contained, standards-mapped document per theme —
     // genuinely W3C DTCG on its own, no downstream finishing step required.
     // ('partial' and 'sets' are the converter's other shapes — 'partial' is
-    // Tokens Studio's own DTCG flavour that build-dtcg.js finishes elsewhere;
+    // a minimally-renamed DTCG flavour that build-dtcg.js finishes elsewhere;
     // 'sets' is the strict mapping without the per-theme resolve. Both stay
     // CLI-only, see scripts/dtcg-preview.js.)
     // Driven by the Output format switch in Settings and persisted with the
@@ -48959,46 +48958,14 @@ react/cjs/react-jsx-runtime.development.js:
       return String(p || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
     }
 
-    // Map a Figma foundation file name → a standard folder path. Generous,
-    // case/space/punctuation-insensitive aliases so "ODS Red Bull Foundation",
-    // "Red Bull", "redbull", etc. all resolve to src/redBull.
-    var FOLDER_MATCHERS = [
-      { path: 'src/oneID',   keywords: ['oneid', 'one id', 'one experience id'] },
-      { path: 'src/redBull', keywords: ['redbull', 'red bull'] },
-      { path: 'src/iskon',   keywords: ['iskon'] },
-      { path: 'src/spar',    keywords: ['spar', 'spar budget', 'skar'] }
-    ];
     var lastFigmaFileName = null;
 
-    function normName(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
-
-    function matchFolderFromFileName(fileName) {
-      var norm = normName(fileName);
-      if (!norm) return null;
-      for (var i = 0; i < FOLDER_MATCHERS.length; i++) {
-        var kws = FOLDER_MATCHERS[i].keywords;
-        for (var j = 0; j < kws.length; j++) {
-          var kw = normName(kws[j]);
-          if (kw && norm.indexOf(kw) !== -1) return FOLDER_MATCHERS[i].path;
-        }
-      }
-      return null;
-    }
-
-    // Auto-select the matched folder (if present in the saved paths). Remembers
-    // the last file name so it can re-apply after settings load races the extract.
-    // Also drives the collections card's title — the real Figma file name
-    // (figma.root.name) rather than a fixed label, so both stay in sync off
-    // the same lastFigmaFileName rather than needing two separate call sites.
-    function applyFileNameMatch(fileName) {
+    // Drives the collections card's title — the real Figma file name
+    // (figma.root.name) rather than a fixed label. Remembers the last file
+    // name so it can re-apply after settings load races the extract.
+    function setFigmaFileName(fileName) {
       if (fileName) lastFigmaFileName = fileName;
       if (lastFigmaFileName) window.PomCollectionsAccordion.setTitle(lastFigmaFileName);
-      var path = matchFolderFromFileName(lastFigmaFileName);
-      if (path && glFolders.indexOf(path) !== -1 && path !== glActiveFolder) {
-        glActiveFolder = path;
-        renderFolderList();   // refresh dropdown + settings list
-        persistSettings();    // remember the auto-selected target
-      }
     }
 
     // Read the GitLab settings from the (persisted) inputs + folder list.
@@ -49280,7 +49247,7 @@ react/cjs/react-jsx-runtime.development.js:
         gitlabAdded = config.gitlabAdded !== false;
 
         // Output format. Absent in every config saved before this switch
-        // existed, which must keep exporting Token Studio JSON — so only an
+        // existed, which must keep exporting Legacy JSON — so only an
         // explicit `true` turns DTCG on.
         var previousDtcgShape = dtcgShape;
         dtcgShape = config.dtcg === true ? 'themes' : null;
@@ -49744,7 +49711,7 @@ react/cjs/react-jsx-runtime.development.js:
     
     var pushBtn = document.getElementById('push-btn');
     var downloadBtn = document.getElementById('download-btn');
-    var exportMode = 'token-studio';
+    var exportMode = 'legacy';
     var collectionsList = document.getElementById('collections-list');
     var loadingState = document.getElementById('loading-state');
     var skeletonList = document.getElementById('skeleton-list');
@@ -49760,7 +49727,7 @@ react/cjs/react-jsx-runtime.development.js:
 
     // Settings → Output format helper line. Spells out what the switch changes,
     // and that it does NOT change where the file goes — same file name either
-    // way, so turning this on overwrites the Token Studio JSON at that path.
+    // way, so turning this on overwrites the Legacy JSON at that path.
     function updateOutputFormatHint() {
       var el = document.getElementById('output-format-hint');
       if (!el) return;
@@ -49769,17 +49736,17 @@ react/cjs/react-jsx-runtime.development.js:
       var name = primaryFilename();
       el.textContent = dtcgShape
         ? 'W3C DTCG ($value / $type), one resolved document per theme, exported as ' + name + '.'
-        : 'Token Studio JSON — the format this plugin has always exported — as ' + name + '.';
+        : 'Legacy JSON — the format this plugin has always exported — as ' + name + '.';
     }
 
-    // Convert the Token Studio tree to DTCG and log a conversion report.
+    // Convert the Legacy JSON tree to DTCG and log a conversion report.
     //
     // The switch drives 'themes': one document per $themes entry, deep-merged
     // from that theme's own sets in tokenSetOrder and run through the strict
     // type/composite mapping — genuinely standards-conformant W3C DTCG on its
     // own, every {a.b.c} reference resolved within the document, no
     // downstream finishing step needed. (dtcgShape can still be set to
-    // 'partial' — Tokens Studio's own DTCG flavour, which
+    // 'partial' — a minimally-renamed DTCG flavour, which
     // config/normalize/build-dtcg.js elsewhere finishes into strict DTCG — or
     // 'sets', the strict mapping without the per-theme resolve; both stay
     // reachable only from scripts/dtcg-preview.js, not this switch.)
@@ -49789,7 +49756,7 @@ react/cjs/react-jsx-runtime.development.js:
       console.log('[DTCG] ' + report.tokenCount + ' tokens, ' + report.describedCount +
         ' with $description, shape=' + dtcgShape, report);
       if (report.mathExpressions.length) {
-        console.warn('[DTCG] ' + report.mathExpressions.length + ' Token Studio math expressions preserved verbatim');
+        console.warn('[DTCG] ' + report.mathExpressions.length + ' Legacy JSON math expressions preserved verbatim');
       }
       if (dtcgShape === 'partial') {
         console.log('[DTCG] source $type values left for build-dtcg.js to map', report.sourceTypes);
@@ -49806,9 +49773,9 @@ react/cjs/react-jsx-runtime.development.js:
     function getTokensToExport() {
       if (!transformedData) return null;
       var tokens = transformedData.tokens;
-      // In Token Studio mode the output keys are set names (e.g. 'core', 'mode/light'),
+      // In Legacy JSON mode the output keys are set names (e.g. 'core', 'mode/light'),
       // not raw Figma collection names — skip the collection filter entirely.
-      if (exportMode === 'token-studio') {
+      if (exportMode === 'legacy') {
         return dtcgShape ? toDtcg(tokens) : tokens;
       }
       if (selectedCollections.length > 0 && selectedCollections.length < Object.keys(transformedData.tokens).length) {
@@ -50060,15 +50027,15 @@ react/cjs/react-jsx-runtime.development.js:
 
     // PomSegmentedControl (src/ui-react/buttons.tsx) owns its own selected-
     // segment styling; it just reports the clicked index here. Hidden in the
-    // template — the Token Studio ↔ DTCG choice is the Output format switch in
+    // template — the Legacy JSON ↔ DTCG choice is the Output format switch in
     // Settings now — but left wired so the native mode stays reachable.
     window.PomExportMode.onChange = function(index) {
-      exportMode = index === 0 ? 'native' : 'token-studio';
+      exportMode = index === 0 ? 'native' : 'legacy';
       requestTransform();
     };
 
     // Settings → Output format. The DTCG shapes are a post-transform over the
-    // Token Studio tree, so exportMode stays 'token-studio' either way.
+    // Legacy JSON tree, so exportMode stays 'legacy' either way.
     // 'themes' (not 'partial') — see the note on `var dtcgShape` above and on
     // toDtcg() below: this is the shape that is genuinely standalone W3C
     // DTCG, not the one that still needs an external finishing step.
@@ -50291,17 +50258,17 @@ react/cjs/react-jsx-runtime.development.js:
       if (!msg) return;
       
       // Early, lightweight file-name report (before the heavy extract) so the
-      // target folder is auto-selected as soon as the plugin opens.
+      // collections card's title is set as soon as the plugin opens.
       if (msg.type === 'fileInfo') {
-        applyFileNameMatch(msg.fileName);
+        setFigmaFileName(msg.fileName);
         return;
       }
 
       if (msg.type === 'extracted') {
         rawData = { collections: msg.collections, styles: msg.styles };
         selectedCollections = msg.collections.map(function(col) { return col.name; });
-        // Re-assert the folder match from the file name (kept for robustness).
-        applyFileNameMatch(msg.fileName);
+        // Re-assert the title from the file name (kept for robustness).
+        setFigmaFileName(msg.fileName);
 
         loadingState.style.display = 'none';
         if (skeletonList) skeletonList.hidden = true;
@@ -50425,7 +50392,7 @@ react/cjs/react-jsx-runtime.development.js:
       
       if (msg.type === 'GIT_SETTINGS_LOADED') {
         gitSettings.setState(msg.config || {});
-        applyFileNameMatch();     // re-assert file-name auto-select over the loaded active
+        setFigmaFileName();       // re-assert the title from the last-seen file name
         // No more auto-popup for a missing token here — updateActionUI()
         // (called from within refreshSettingsControls(), which setState() ends with)
         // already disables the commit box and shows an "Add ___ settings"

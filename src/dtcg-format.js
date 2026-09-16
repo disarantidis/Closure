@@ -1,23 +1,22 @@
 /*
  * dtcg-format.js — DTCG (design-tokens.org) export format.
  *
- * The default 'partial' shape is Tokens Studio's partial DTCG, not strict W3C:
+ * The default 'partial' shape is a partial DTCG conversion, not strict W3C:
  * proprietary type names, composite shapes and embedded math survive it, and
  * build-dtcg.js downstream is what makes the result standards-conformant.
  *
- * EXPLORATORY. This is a pure post-transform over the Token Studio tree that
- * code.js already produces (`toTokenStudioFormat`), so nothing in the existing
- * export path changes: same extraction, same normalization, same composites.
- * Only the final serialization differs.
+ * EXPLORATORY. This is a pure post-transform over the Legacy JSON tree that
+ * code.js already produces, so nothing in the existing export path changes:
+ * same extraction, same normalization, same composites. Only the final
+ * serialization differs.
  *
- *   Figma vars → transformToFinalFormat → toTokenStudioFormat → [this file]
+ *   Figma vars → transformToFinalFormat → Legacy JSON tree → [this file]
  *
  * Three output shapes:
  *
- *   'partial'  — what Tokens Studio's own DTCG export produces, and what
+ *   'partial'  — a minimal rename of value/type/description, matching what
  *                config/normalize/build-dtcg.js consumes downstream as
- *                packages/radd/src/tokens_W3C.json. A minimal rename of
- *                value/type/description; proprietary type names, composite
+ *                packages/radd/src/tokens_W3C.json; proprietary type names, composite
  *                shapes, embedded math and $themes/$metadata all stay put.
  *                This is the production target — build-dtcg.js finishes the
  *                conversion into strict, standards-only DTCG.
@@ -28,8 +27,7 @@
  *
  *   'themes'   — one self-contained document per $themes entry, built by
  *                deep-merging that theme's non-disabled sets in tokenSetOrder
- *                (later sets win, matching Tokens Studio). Resolves its own
- *                {a.b.c} references.
+ *                (later sets win). Resolves its own {a.b.c} references.
  *
  * Runs in the plugin UI (inlined into ui.html by scripts/build-ui.js) and in Node
  * (scripts/dtcg-preview.js) from this one source.
@@ -37,9 +35,9 @@
 (function (global) {
   'use strict';
 
-  var EXT = 'com.radd.tokenStudio';
+  var EXT = 'com.radd.legacyJson';
 
-  // Token Studio type → DTCG $type. Anything absent here has no DTCG equivalent
+  // Legacy JSON type → DTCG $type. Anything absent here has no DTCG equivalent
   // and is passed through verbatim (and counted in the report) rather than
   // silently dropped or coerced to a type that would lie about the value.
   var TYPE_MAP = {
@@ -62,7 +60,7 @@
     typography:       'typography'
   };
 
-  // DTCG's typography composite has exactly these sub-values. Token Studio adds
+  // DTCG's typography composite has exactly these sub-values. Legacy JSON adds
   // textCase / textDecoration / paragraphSpacing / paragraphIndent, which move to
   // $extensions so $value stays spec-shaped without losing them.
   var TYPOGRAPHY_KEYS = ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'lineHeight'];
@@ -77,9 +75,9 @@
     return isObject(node) && Object.prototype.hasOwnProperty.call(node, 'value');
   }
 
-  // A Token Studio math expression, e.g. '{dimension.1}*4'. DTCG has no
+  // A Legacy JSON math expression, e.g. '{dimension.1}*4'. DTCG has no
   // arithmetic, so these pass through verbatim and are reported — a consumer
-  // needs a Token Studio-compatible resolver to evaluate them.
+  // needs a Legacy-JSON-compatible resolver to evaluate them.
   function isMathExpression(v) {
     return typeof v === 'string' && v.indexOf('{') !== -1 && /[*/+]/.test(v);
   }
@@ -102,7 +100,7 @@
 
   // --- composite value conversion -------------------------------------------
 
-  // Token Studio boxShadow → DTCG shadow. x/y become offsetX/offsetY, the
+  // Legacy JSON boxShadow → DTCG shadow. x/y become offsetX/offsetY, the
   // 'dropShadow' | 'innerShadow' discriminator becomes the `inset` flag.
   function toDtcgShadow(value) {
     if (Array.isArray(value)) {
@@ -119,7 +117,7 @@
     return out;
   }
 
-  // Token Studio typography → DTCG typography, plus the non-standard sub-values
+  // Legacy JSON typography → DTCG typography, plus the non-standard sub-values
   // split off for $extensions.
   function toDtcgTypography(value) {
     if (!isObject(value)) return { value: value, extra: null };
@@ -135,25 +133,25 @@
   // --- token conversion ------------------------------------------------------
 
   function convertToken(node, path, report) {
-    var tsType = node.type;
-    var dtcgType = TYPE_MAP[tsType];
+    var legacyType = node.type;
+    var dtcgType = TYPE_MAP[legacyType];
     var out = {};
     var extra = null;
 
     if (dtcgType === undefined) {
       // No DTCG equivalent (text, textCase, textDecoration, boolean, asset, …).
-      dtcgType = tsType;
-      if (tsType !== undefined) {
-        report.unmappedTypes[tsType] = (report.unmappedTypes[tsType] || 0) + 1;
+      dtcgType = legacyType;
+      if (legacyType !== undefined) {
+        report.unmappedTypes[legacyType] = (report.unmappedTypes[legacyType] || 0) + 1;
       }
     } else {
-      report.mappedTypes[tsType] = (report.mappedTypes[tsType] || 0) + 1;
+      report.mappedTypes[legacyType] = (report.mappedTypes[legacyType] || 0) + 1;
     }
 
     var value = node.value;
-    if (tsType === 'boxShadow') {
+    if (legacyType === 'boxShadow') {
       value = toDtcgShadow(value);
-    } else if (tsType === 'typography') {
+    } else if (legacyType === 'typography') {
       var split = toDtcgTypography(value);
       value = split.value;
       extra = split.extra;
@@ -172,10 +170,10 @@
       report.describedCount++;
     }
 
-    // Everything Token Studio carries that DTCG has no home for is preserved
+    // Everything Legacy JSON carries that DTCG has no home for is preserved
     // under a vendor extension rather than dropped.
     var ext = {};
-    if (tsType !== undefined) ext.type = tsType;
+    if (legacyType !== undefined) ext.type = legacyType;
     if (node.codeSyntax) ext.codeSyntax = node.codeSyntax;
     if (extra) ext.typography = extra;
     Object.keys(node).forEach(function (key) {
@@ -201,9 +199,9 @@
     return out;
   }
 
-  // --- Tokens Studio "partial DTCG" ------------------------------------------
+  // --- "partial DTCG" ---------------------------------------------------------
 
-  // Tokens Studio's own DTCG export is a minimal rename: value/type/description
+  // This partial DTCG export is a minimal rename: value/type/description
   // become $value/$type/$description and nothing else changes — proprietary type
   // names (boxShadow, fontSizes, …), composite shapes, embedded math and
   // stringified values all stay. That is what config/normalize/build-dtcg.js
@@ -271,17 +269,17 @@
 
   // --- theme resolution ------------------------------------------------------
 
-  // Merge one theme's sets into a single self-contained tree. Token Studio
-  // applies sets in tokenSetOrder and lets later sets win, so 'source' and
+  // Merge one theme's sets into a single self-contained tree. Sets are
+  // applied in tokenSetOrder and later sets win, so 'source' and
   // 'enabled' both contribute and only 'disabled' is skipped.
-  function mergeThemeSets(tsTokens, theme, tokenSetOrder) {
+  function mergeThemeSets(legacyTokens, theme, tokenSetOrder) {
     var selected = theme.selectedTokenSets || {};
     var merged = {};
     tokenSetOrder.forEach(function (setName) {
       var state = selected[setName];
       if (!state || state === 'disabled') return;
-      if (!tsTokens[setName]) return;
-      deepMerge(merged, deepClone(tsTokens[setName]));
+      if (!legacyTokens[setName]) return;
+      deepMerge(merged, deepClone(legacyTokens[setName]));
     });
     return merged;
   }
@@ -293,16 +291,16 @@
   // --- public API ------------------------------------------------------------
 
   /**
-   * Convert a Token Studio tree to DTCG.
+   * Convert a Legacy JSON tree to DTCG.
    *
-   * @param {object} tsTokens  output of toTokenStudioFormat (sets + $themes + $metadata)
+   * @param {object} legacyTokens  the Legacy JSON tree that code.js already produces (sets + $themes + $metadata)
    * @param {object} [options]
    * @param {'partial'|'sets'|'themes'} [options.shape='sets']
    * @param {boolean} [options.dedupeDescriptions=true]  'partial' only — hoist each
    *   description to the root map instead of repeating it on every mode's token.
    * @returns {{ tokens: object, report: object }}
    */
-  function toDtcgFormat(tsTokens, options) {
+  function toDtcgFormat(legacyTokens, options) {
     options = options || {};
     var shape = options.shape || 'sets';
 
@@ -320,9 +318,9 @@
       themes: []
     };
 
-    var metadata = tsTokens['$metadata'] || {};
-    var themes = tsTokens['$themes'] || [];
-    var tokenSetOrder = metadata.tokenSetOrder || Object.keys(tsTokens).filter(function (k) {
+    var metadata = legacyTokens['$metadata'] || {};
+    var themes = legacyTokens['$themes'] || [];
+    var tokenSetOrder = metadata.tokenSetOrder || Object.keys(legacyTokens).filter(function (k) {
       return !META_KEYS[k];
     });
 
@@ -333,8 +331,8 @@
       // instead, for a consumer that cannot read the root map.
       var dedupe = options.dedupeDescriptions !== false;
       tokenSetOrder.forEach(function (setName) {
-        if (!tsTokens[setName]) return;
-        out[setName] = toPartialTree(tsTokens[setName], '', report, dedupe);
+        if (!legacyTokens[setName]) return;
+        out[setName] = toPartialTree(legacyTokens[setName], '', report, dedupe);
         report.sets.push(setName);
       });
       if (dedupe && Object.keys(report.descriptions).length) {
@@ -342,27 +340,27 @@
         out['$extensions'][EXT_EXPORTER] = { descriptions: report.descriptions };
       }
       // Native, at the root, exactly where build-dtcg.js looks for them.
-      if (tsTokens['$themes']) out['$themes'] = tsTokens['$themes'];
-      if (tsTokens['$metadata']) out['$metadata'] = tsTokens['$metadata'];
+      if (legacyTokens['$themes']) out['$themes'] = legacyTokens['$themes'];
+      if (legacyTokens['$metadata']) out['$metadata'] = legacyTokens['$metadata'];
       return { tokens: out, report: report };
     }
 
     if (shape === 'themes') {
       themes.forEach(function (theme) {
         var key = themeKey(theme);
-        var merged = mergeThemeSets(tsTokens, theme, tokenSetOrder);
+        var merged = mergeThemeSets(legacyTokens, theme, tokenSetOrder);
         out[key] = convertTree(merged, '', report);
         report.themes.push(key);
       });
     } else {
       tokenSetOrder.forEach(function (setName) {
-        if (!tsTokens[setName]) return;
-        out[setName] = convertTree(tsTokens[setName], '', report);
+        if (!legacyTokens[setName]) return;
+        out[setName] = convertTree(legacyTokens[setName], '', report);
         report.sets.push(setName);
       });
     }
 
-    // Token Studio's own metadata has no DTCG equivalent; keep it at the document
+    // Legacy JSON's own metadata has no DTCG equivalent; keep it at the document
     // root under the vendor extension so the export stays round-trippable.
     out['$extensions'] = {};
     out['$extensions'][EXT] = {

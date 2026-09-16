@@ -552,7 +552,7 @@ mountTextField('gh-token-mount', { id: 'gh-token', type: 'password', label: 'Git
 mountTextField('gh-repo-mount', { id: 'gh-repo', label: 'Repository (owner/repo)', placeholder: 'my-org/my-repo' }, CARD_LEVEL);
 mountTextField('gh-branch-mount', { id: 'gh-branch', label: 'Branch', placeholder: 'main' }, CARD_LEVEL);
 
-/* ── hidden export-mode segmented control (Native / Token Studio) ───────────── */
+/* ── hidden export-mode segmented control (Native / Legacy) ─────────────────── */
 window.PomExportMode = { onChange: null };
 (function mountExportMode() {
   const container = document.getElementById('export-mode-control-mount');
@@ -564,7 +564,7 @@ window.PomExportMode = { onChange: null };
         label="Output format"
         size="small"
         value={value}
-        options={[{ value: '0', label: 'Native' }, { value: '1', label: 'Token Studio' }]}
+        options={[{ value: '0', label: 'Native' }, { value: '1', label: 'Legacy' }]}
         onChange={(v: string) => { setValue(v); window.PomExportMode.onChange?.(Number(v)); }}
       />
     );
@@ -587,7 +587,7 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   return 'gitlab';
 }
 
-/* ── Settings → Output format switch (Token Studio / DTCG) ──────────────────── */
+/* ── Settings → Output format switch (Legacy JSON / DTCG) ───────────────────── */
 (function mountDtcgFormatSwitch() {
   const container = document.getElementById('dtcg-format-control-mount');
   let set: (on: boolean) => void = () => {};
