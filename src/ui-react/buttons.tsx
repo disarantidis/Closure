@@ -36,17 +36,28 @@ import { Tag } from '../vendor/pomegranate/panel/node/Tag';
 import { SelectableCard } from '../vendor/pomegranate/panel/node/SelectableCard';
 import { fieldLevel, useLevel, LevelContext, type Level } from '../vendor/pomegranate/panel/node/LevelContext';
 
-/* The plugin GROUND is level 1 — the darkest rung. Every mounted subtree is
-   wrapped in a LevelContext provider at the ground so the kit's components
-   compute their fill ONE rung above it (a field on the L1 ground is L2), per
-   the composition rule in docs/knowledge-levels.md. */
-const GROUND: Level = 1;
-/* One rung above the ground — the band every provider-card / export-panel
-   island stands on (data-level="2" set on those elements in the template).
-   Every mount mechanically nested inside one of those DOM islands passes
-   this so its own computed fill (data-fill via fieldLevel, a Button's
-   --nd-field-fill / --background-hover) agrees with the DOM's CSS cascade
-   instead of silently assuming it still sits on GROUND. */
+/* The plugin GROUND is level 2 — bumped from 1 (the ladder's actual
+   darkest/base rung) so the plugin's own page background reads one step
+   more elevated, on request. <html data-level="2"> (ui.template.html) is
+   the DOM half of this same fact — the two values must move together, or
+   a control mounted here would compute a fill for a ground it isn't
+   actually standing on. Every mounted subtree is wrapped in a LevelContext
+   provider at the ground so the kit's components compute their fill ONE
+   rung above it (a field on the L2 ground is L3), per the composition
+   rule in docs/knowledge-levels.md. */
+const GROUND: Level = 2;
+/* Historically "one rung above the ground" and the band .provider-card /
+   .export-panel stood on directly (data-level="2" in the markup, back
+   when GROUND was 1) — both have since moved to data-level="4" (bumped
+   for contrast against the page; see their own comments), but the
+   fields/buttons mounted INSIDE them (gl-token, push-btn, etc.) still
+   pass this unchanged constant, and that's still correct: fieldLevel maps
+   grounds 2 AND 4 to the same field rung (3) by design — the ladder's own
+   top-rung clamp, see LevelContext.tsx — so nothing inside those cards
+   needed to change when either the cards or GROUND moved. Kept under its
+   original name/value since every one of those call sites already
+   expects it; it means "the rung fields inside a level-2-or-4 card
+   compute at" now, not literally "the level those cards paint at". */
 const CARD_LEVEL: Level = 2;
 /* The ladder's highest/most elevated rung — .json-download-card,
    .export-panel and .provider-card all carry data-level="4" directly in
