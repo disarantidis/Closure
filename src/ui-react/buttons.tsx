@@ -678,8 +678,14 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
             <div className="collections-header">
               <span className="collections-summary">{state.title}</span>
               <div className="collections-summary-tags">
-                {state.summary.tokens ? <Tag variant="ghost" size="small">{state.summary.tokens}</Tag> : null}
-                {state.summary.size ? <Tag variant="ghost" size="small">{state.summary.size}</Tag> : null}
+                {/* tonal, not ghost — same fix as the per-row counts below
+                    (.collections-readonly-list): ghost paints no fill
+                    (node.css's .nd-tag.v-ghost, background: none), so these
+                    rendered as plain muted text with no visible pill —
+                    reported from the real plugin as the tags being
+                    "missing" even though the text itself was there. */}
+                {state.summary.tokens ? <Tag variant="tonal" size="small">{state.summary.tokens}</Tag> : null}
+                {state.summary.size ? <Tag variant="tonal" size="small">{state.summary.size}</Tag> : null}
               </div>
             </div>
           }
