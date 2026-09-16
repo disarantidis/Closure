@@ -789,7 +789,13 @@
       gap: var(--spacing-component-3);
       margin-left: var(--spacing-component-3);
       margin-right: var(--spacing-component-3);
-      margin-bottom: 24px;
+      /* 12px, not the 24px every OTHER gap in this section uses (between
+         .repo-settings-heading and this row, and .provider-card/-add-row's
+         own margin-bottom) — this specific gap, between the pills and the
+         provider card right below them, reads tighter on purpose; the
+         pills and that card are one continuous unit (which provider is
+         selected + that provider's own detail), not two separate sections. */
+      margin-bottom: var(--spacing-component-3);
     }
     .provider-toggle-row .provider-add-row {
       flex: 1;
@@ -49144,6 +49150,17 @@ react/cjs/react-jsx-runtime.development.js:
       updateActionUI();
     }
 
+    // Toggles the DS's own data-scheme="inverted" attribute directly on an
+    // element — the foundation-level mechanism (tokens.css), not a
+    // component prop, so it works on a plain div like #add-gitlab-row the
+    // same way it works on Button/Tag/Tooltip internally.
+    function setScheme(elId, inverted) {
+      var el = document.getElementById(elId);
+      if (!el) return;
+      if (inverted) el.setAttribute('data-scheme', 'inverted');
+      else el.removeAttribute('data-scheme');
+    }
+
     // Shows/hides everything under "Repository settings": the GitLab/GitHub
     // tab switcher itself (only meaningful once BOTH providers are actually
     // added — with only one there's nothing left to switch between), each
@@ -49183,6 +49200,18 @@ react/cjs/react-jsx-runtime.development.js:
       // state to block.
       window.PomAddGitlabBtn.setMode(gitlabAdded ? 'remove' : 'add');
       window.PomAddGithubBtn.setMode(githubAdded ? 'remove' : 'add');
+
+      // A pill for a provider that's already added reads as the DS's own
+      // "inverted" scheme (data-scheme="inverted", tokens.css — the same
+      // foundation-level mechanism Tooltip/Button/Tag already use for
+      // their own inverted states) instead of the row's plain default
+      // fill, so "already included" is visible at a glance, not just from
+      // the trash icon. The trash icon itself stays red regardless — its
+      // own data-scheme="error" (set directly on the button, PomButton's
+      // destructive prop) is more specific than the row's inherited
+      // scheme and wins for that element.
+      setScheme('add-gitlab-row', gitlabAdded);
+      setScheme('add-github-row', githubAdded);
 
       // The big card's OWN inline "Remove ___" button stays a dual-provider-
       // only affordance — the pill above already covers removal in every
