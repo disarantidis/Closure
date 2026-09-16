@@ -181,12 +181,20 @@
        GitLab/GitHub cards) — node.css's .nd-dialog-content defaults to
        --spacing-component-2 --spacing-component-4 (10px/16px), noticeably
        tighter than the cards' own now-18px internal padding, so the cards
-       read closer to the dialog's edge than to each other. Bumped to a
-       uniform --spacing-component-5 (18px) to match. Scoped the same way
-       as the two rules above — Dialog.tsx takes no className prop to hang
-       a scoped class on (only `style`, which lands on the dialog root, not
-       its content box), but showModal() doesn't reparent the element, so
-       the mount id still reaches it as a plain descendant selector.
+       read closer to the dialog's edge than to each other. First pass
+       bumped all four sides to a uniform --spacing-component-5 (18px) —
+       wrong call, caught before it looked right: .nd-dialog-content's TOP
+       padding stacks with .nd-dialog-head's own bottom padding
+       (--spacing-component-2, 10px) to form the title-to-content gap, so
+       raising it ALSO pushed the title away from its content, which
+       wasn't asked for and wasn't the problem. Left/right/bottom-only:
+       top stays the untouched default (--spacing-component-2, 10px), so
+       that gap is exactly what it was — only the outer left/right/bottom
+       frame around the content grew. Scoped the same way as the two rules
+       above — Dialog.tsx takes no className prop to hang a scoped class
+       on (only `style`, which lands on the dialog root, not its content
+       box), but showModal() doesn't reparent the element, so the mount id
+       still reaches it as a plain descendant selector.
        (Note for whoever next touches dialog spacing: .token-modal-dialog /
        .remove-confirm-dialog below both override --PomDialog-SlotContainer*
        variables that Dialog.tsx never reads — it has no "PomDialog"
@@ -194,16 +202,15 @@
        applied to any Dialog in this file. Both rules are dead; left alone,
        out of scope here.) */
     #onboarding-dialog-mount .nd-dialog-content {
-      padding: var(--spacing-component-5);
+      padding: var(--spacing-component-2) var(--spacing-component-5) var(--spacing-component-5);
     }
     /* Same treatment, same reasoning, for the "scanned collections" modal
        (buttons.tsx's mountCollectionsAccordion, mounted at #collections-list)
        — node.css's .nd-dialog-content default (10px/16px) read tight around
-       the per-collection rows, so bumped to the same uniform
-       --spacing-component-5 (18px) as the onboarding dialog above, for one
-       consistent modal-padding scale across the app rather than two. */
+       the per-collection rows on left/right/bottom; top is left at its
+       default so the title-to-list gap doesn't move, same fix as above. */
     #collections-list .nd-dialog-content {
-      padding: var(--spacing-component-5);
+      padding: var(--spacing-component-2) var(--spacing-component-5) var(--spacing-component-5);
     }
 
     /* This app's own chrome vars are aliases onto the Pomegranate
