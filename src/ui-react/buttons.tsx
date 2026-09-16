@@ -340,8 +340,8 @@ mountVersionTag('version-tag-mount');
 /* ── text fields (filenames read-only, folder-new, connection fields) ──────── */
 function mountTextField(mountId: string, props: any) { mountOnce(mountId, <PomTextField {...props} />); }
 
-mountTextField('export-filename-mount', { id: 'export-filename', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitLab JSON file name (set in Settings)' });
-mountTextField('github-filename-mount', { id: 'github-filename', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitHub JSON file name (set in Settings)' });
+mountTextField('export-filename-mount', { id: 'export-filename', label: 'File name', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitLab JSON file name (set in Settings)' });
+mountTextField('github-filename-mount', { id: 'github-filename', label: 'File name', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitHub JSON file name (set in Settings)' });
 
 window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false);
 
@@ -353,8 +353,8 @@ mountIconButton('github-remove-push-btn-mount', { id: 'github-remove-push-btn', 
 mountIconButton('gitlab-empty-remove-push-btn-mount', { id: 'gitlab-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitLab from push destination', 'aria-label': 'Remove GitLab from push destination', icon: IconRemove(16) });
 mountIconButton('github-empty-remove-push-btn-mount', { id: 'github-empty-remove-push-btn', variant: 'tonal', destructive: true, size: 'small', title: 'Remove GitHub from push destination', 'aria-label': 'Remove GitHub from push destination', icon: IconRemove(16) });
 
-mountTextField('folder-new-mount', { id: 'folder-new', icon: IconFolder(16), placeholder: 'e.g. src/something' });
-mountTextField('github-folder-new-mount', { id: 'github-folder-new', icon: IconFolder(16), placeholder: 'e.g. src/something' });
+mountTextField('folder-new-mount', { id: 'folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' });
+mountTextField('github-folder-new-mount', { id: 'github-folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' });
 
 mountTextField('gl-token-mount', { id: 'gl-token', type: 'password', label: 'GitLab Token', placeholder: 'glpat-… (stored only on this machine)' });
 mountTextField('gl-host-mount', { id: 'gl-host', label: 'GitLab Host', placeholder: 'https://gitlab.com' });
