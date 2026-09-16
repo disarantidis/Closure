@@ -669,6 +669,19 @@ mountOnce('skeleton-list',
   </div>,
   TOP_CARD_LEVEL,
 );
+// The Json file card's own skeleton pieces — mounted individually into
+// #json-download-skeleton's existing markup (ui.template.html), which
+// already carries the real card's own classes/data-level, rather than one
+// div here the way skeleton-list/actions-skeleton are: this skeleton and
+// the real card share the exact same outer structure, just swapping which
+// one is hidden (see the 'extracted'/'error' handlers), so there's no
+// separate wrapper shape to define. Reads as this card's icon/title/tag/
+// field/button, in outline, same shapes at roughly the real sizes.
+mountOnce('json-download-icon-skeleton-mount', <Skeleton shape="circle" size={16} label="Loading" />, TOP_CARD_LEVEL);
+mountOnce('json-download-title-skeleton-mount', <Skeleton shape="block" width={80} height={16} label="" />, TOP_CARD_LEVEL);
+mountOnce('json-download-tag-skeleton-mount', <Skeleton shape="block" width={60} height={22} label="" />, TOP_CARD_LEVEL);
+mountOnce('json-download-field-skeleton-mount', <Skeleton shape="block" height={44} width={'100%'} label="" />, TOP_CARD_LEVEL);
+mountOnce('json-download-btn-skeleton-mount', <Skeleton shape="block" width={44} height={44} label="" />, TOP_CARD_LEVEL);
 // Mirrors the real push-settings card's current shape: a small icon+title
 // row (whichever provider ends up shown — GitLab or GitHub, not known
 // yet), one full-width folder-path field (the filename field that used to

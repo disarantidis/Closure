@@ -1345,7 +1345,8 @@
        field-plus-button pairing .push-download-row used before Download
        lived here instead. */
     .json-download-fields { display: flex; align-items: center; gap: 10px; }
-    #primary-filename-mount { flex: 1; min-width: 0; }
+    #primary-filename-mount,
+    #json-download-field-skeleton-mount { flex: 1; min-width: 0; }
     
     .commit-input-wrap {
       margin-bottom: 4px;
@@ -1484,7 +1485,31 @@
          white against the grayer page) is the ladder's own highest/most
          elevated rung, giving the strongest contrast tokens.css offers
          without inventing a one-off colour. -->
-    <div class="json-download-card" id="json-download-card" data-level="4">
+    <!-- Skeleton twin, shown until the same moment #skeleton-list hides
+         (the 'extracted' handler, or 'error') — this card's own content
+         (a static filename field + Download) never actually needed to
+         wait on extraction, but showing it fully rendered while the
+         file-variables card AND the push-settings card both still read as
+         skeletons was reported as inconsistent: one of three stacked
+         cards looking "already done" while its neighbours load reads as
+         broken, not as a deliberately-instant card. Synced to the same
+         reveal moment as #skeleton-list now, purely for that consistency
+         — see the 'extracted'/'error' handlers, which toggle this pair
+         together. -->
+    <div class="json-download-card" id="json-download-skeleton" data-level="4">
+      <div class="json-download-header">
+        <div class="json-download-title-group">
+          <span id="json-download-icon-skeleton-mount"></span>
+          <span id="json-download-title-skeleton-mount"></span>
+        </div>
+        <span id="json-download-tag-skeleton-mount"></span>
+      </div>
+      <div class="json-download-fields">
+        <span id="json-download-field-skeleton-mount"></span>
+        <span id="json-download-btn-skeleton-mount"></span>
+      </div>
+    </div>
+    <div class="json-download-card" id="json-download-card" data-level="4" hidden>
       <div class="json-download-header">
         <div class="json-download-title-group">
           <!-- Plain inline SVG, not React-mounted — same reasoning as the
@@ -2869,6 +2894,20 @@
       document.querySelector('.flow-wrap').classList.toggle('is-loading', stillLoading);
     }
 
+    // Swaps the Json file card's skeleton for the real one — synced to the
+    // same moment #skeleton-list hides (both call sites call this right
+    // alongside that), purely so this card doesn't read as "already done"
+    // while its neighbours are still loading (see the HTML comment on
+    // #json-download-skeleton). This card's own content never actually
+    // needed the wait; this is consistency with the other two, not a real
+    // data dependency.
+    function revealJsonDownloadCard() {
+      var skel = document.getElementById('json-download-skeleton');
+      var real = document.getElementById('json-download-card');
+      if (skel) skel.hidden = true;
+      if (real) real.hidden = false;
+    }
+
     // Single source of truth for "what can actually be pushed right now" —
     // shared by the main-screen UI (updateActionUI/updatePushTargetUI) and
     // the real push action (pushToGit), so they can never disagree. In
@@ -3348,6 +3387,7 @@
 
         loadingState.style.display = 'none';
         if (skeletonList) skeletonList.hidden = true;
+        revealJsonDownloadCard();
         updateFlowWireVisibility();
         emptyState.style.display = 'none';
 
@@ -3433,6 +3473,7 @@
       
       if (msg.type === 'error') {
         if (skeletonList) skeletonList.hidden = true;
+        revealJsonDownloadCard();
         setActionsLoading(false);
         loadingState.style.display = 'flex';
         loadingState.querySelector('p').textContent = 'Error: ' + msg.message;
