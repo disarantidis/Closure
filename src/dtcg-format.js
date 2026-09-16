@@ -437,5 +437,18 @@
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  if (global) global.RaddDtcg = api;
+  // PomDtcg, not the pre-Closure-rebrand RaddDtcg this used to be: the UI
+  // (ui.template.html's toDtcg()) reads window.PomDtcg.toDtcgFormat and has
+  // ever since the rebrand, so that global name was always undefined —
+  // window.PomDtcg.toDtcgFormat threw on every single 'transformed'
+  // message, in the browser only (Node consumers all use module.exports
+  // via require(), never this global, so the Node-side self-test/preview
+  // scripts never caught it). That silently killed everything after it in
+  // the same handler, including the accordion's own token/size Tags
+  // (window.PomCollectionsAccordion.setSummary — see ui.template.html's
+  // 'transformed' handler), which is what actually surfaced this: reported
+  // from the real plugin as those tags being permanently missing. Checked
+  // for other consumers of the old name first — none; safe to rename
+  // outright rather than aliasing both.
+  if (global) global.PomDtcg = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
