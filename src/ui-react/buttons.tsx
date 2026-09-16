@@ -33,7 +33,13 @@ import { Toast } from '../vendor/pomegranate/panel/node/Toast';
 import { Alert } from '../vendor/pomegranate/panel/node/Alert';
 import { Skeleton } from '../vendor/pomegranate/panel/node/Skeleton';
 import { Tag } from '../vendor/pomegranate/panel/node/Tag';
-import { fieldLevel, useLevel } from '../vendor/pomegranate/panel/node/LevelContext';
+import { fieldLevel, useLevel, LevelContext } from '../vendor/pomegranate/panel/node/LevelContext';
+
+/* The plugin GROUND is level 1 — the darkest rung. Every mounted subtree is
+   wrapped in a LevelContext provider at the ground so the kit's components
+   compute their fill ONE rung above it (a field on the L1 ground is L2), per
+   the composition rule in docs/knowledge-levels.md. */
+const GROUND = 1 as const;
 
 import '../vendor/pomegranate/styles/tokens.css';
 import '../vendor/pomegranate/styles/fonts.css';
@@ -69,7 +75,7 @@ function btnSize(s?: string): 'small' | 'medium' | 'large' {
 function mountOnce(mountId: string, node: ReactNode) {
   const container = document.getElementById(mountId);
   if (!container) return;
-  flushSync(() => createRoot(container).render(node));
+  flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}>{node}</LevelContext.Provider>));
 }
 
 /* ── field adapters: DS-painted, uncontrolled, carry the caller's id ───────── */
@@ -188,7 +194,7 @@ function mountLiveButton(mountId: string, base: any, initial: any): LiveHandle {
       </Button>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LiveButton />));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><LiveButton /></LevelContext.Provider>));
   return {
     setDisabled: (disabled) => set((s) => ({ ...s, disabled })),
     setLoading: (loading) => set((s) => ({ ...s, loading })),
@@ -205,7 +211,7 @@ function mountLiveIconButton(mountId: string, base: any, initialDisabled: boolea
     const [disabled, setD] = useState(initialDisabled); set = setD;
     return <PomButton {...base} disabled={disabled} />;
   }
-  if (container) flushSync(() => createRoot(container).render(<View />));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   return { setDisabled: (v) => set(v) };
 }
 
@@ -217,7 +223,7 @@ function mountLiveTextArea(mountId: string, base: any, initialDisabled: boolean)
     const [disabled, setD] = useState(initialDisabled); set = setD;
     return <PomTextArea {...base} disabled={disabled} />;
   }
-  if (container) flushSync(() => createRoot(container).render(<View />));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   return { setDisabled: (v) => set(v) };
 }
 
@@ -245,7 +251,7 @@ function mountLiveDropdown(mountId: string, base: any, onSelect: (v: string) => 
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<View />));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   return { setItems: (items, value) => set(() => ({ items, value })) };
 }
 
@@ -326,7 +332,7 @@ function mountVersionTag(mountId: string) {
     if (!label) return null;
     return <span className="version-tag-label" title="Plugin version">{label}</span>;
   }
-  if (container) flushSync(() => createRoot(container).render(<View />));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   window.PomVersionTag = { setLabel: (label) => set(label) };
 }
 mountVersionTag('version-tag-mount');
@@ -377,7 +383,7 @@ window.PomExportMode = { onChange: null };
       />
     );
   }
-  flushSync(() => createRoot(container).render(<View />));
+  flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
 })();
 
 /* ── push destination (GitLab / GitHub checkboxes) ─────────────────────────── */
@@ -409,7 +415,7 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
       </>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<View />));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   window.PomPushTarget = { onChange: null, setValue: (v) => set(checkboxesFromTarget(v)) };
 })();
 
@@ -429,7 +435,7 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<View />));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v) };
 })();
 
@@ -450,7 +456,7 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<View />));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
 })();
 
@@ -493,7 +499,7 @@ mountOnce('actions-skeleton',
       />
     );
   }
-  if (container) createRoot(container).render(<View />);
+  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? 'error' : 'success', message })) };
 })();
 
@@ -517,7 +523,7 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
     generation += 1;
     const gen = generation;
     root.render(
-      <>
+      <LevelContext.Provider value={GROUND}><>
         {rows.map((row, idx) => (
           <div className="folder-row" key={`${gen}-${idx}`}>
             <PomTextField
@@ -538,7 +544,7 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
             )}
           </div>
         ))}
-      </>,
+      </></LevelContext.Provider>,
     );
   }
   (window as any)[bridgeKey] = { render, onInput: null, onBlur: null, onRemove: null };
@@ -554,7 +560,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     const [state, setState] = useState<any>({ title: 'Scanned collections', collections: [], summary: { tokens: '', size: '' } });
     set = setState;
     return (
-      <Accordion label="Scanned collections" size="large" level={3} defaultOpen={['collections']}>
+      <Accordion label="Scanned collections" size="large" level={2} defaultOpen={['collections']}>
         <AccordionItem
           id="collections"
           header={
@@ -580,7 +586,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
       </Accordion>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<View />));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   window.PomCollectionsAccordion = {
     setTitle: (title) => set((s) => ({ ...s, title })),
     setCollections: (collections) => set((s) => ({ ...s, collections })),
@@ -598,7 +604,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     if (!s.open) return null;
     return <Alert tone="error" title={s.title}>{s.detail}</Alert>;
   }
-  if (container) createRoot(container).render(<View />);
+  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   window.PomClosureWarning = {
     show: (title, detail) => set(() => ({ open: true, title, detail })),
     hide: () => set((s) => ({ ...s, open: false })),
@@ -628,7 +634,7 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
       >{null}</Dialog>
     );
   }
-  if (container) createRoot(container).render(<View />);
+  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   register(() => setOpen(true));
 }
 
@@ -668,7 +674,7 @@ confirmDialog('remove-gitlab-dialog-mount',
       >{null}</Dialog>
     );
   }
-  if (container) createRoot(container).render(<View />);
+  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   window.PomClearTokenDialog = {
     open: (provider) => { flushSync(() => setProvider(provider)); setOpen(true); },
     onConfirm: null,
@@ -749,6 +755,6 @@ function ProviderChoiceCard({ which, label, checked, onToggle }: { which: 'gitla
       </Dialog>
     );
   }
-  if (container) createRoot(container).render(<View />);
+  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   window.PomOnboardingDialog = { open: () => setOpen(true), onConfirm: null };
 })();

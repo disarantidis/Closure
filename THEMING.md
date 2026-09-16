@@ -24,9 +24,9 @@ Two layers cooperate:
 
    ```css
    :root {
-     --app-bg:           var(--surface);          /* the ground */
-     --app-surface:      var(--container-3);       /* raised panels */
-     --app-surface-soft: var(--container-3-hover);
+     --app-bg:           var(--background);        /* the ground */
+     --app-surface:      var(--background);         /* resolves per data-level */
+     --app-surface-soft: var(--background-hover);
      --app-border:       var(--stroke);
      --app-border-strong:var(--stroke-subtle);
      --app-text:         var(--text);
@@ -35,6 +35,25 @@ Two layers cooperate:
      /* … */
    }
    ```
+
+   ### Level composition
+
+   Pomegranate has **one** fill name, `--background`, moved by `[data-level]`
+   islands (docs/knowledge-levels.md) — `--surface` / `--container-*` don't
+   exist. Closure's ground is the **darkest** rung:
+
+   ```html
+   <html data-theme="dark" data-mode="dark" data-level="1" data-surface="normal">
+   ```
+
+   `data-surface="normal"` is required alongside a level-1/3/4 ground — without
+   it the ground paints translucent ("the ground is never glass"; only the
+   default level-2 ground is solid without it). Every mounted React subtree in
+   `buttons.tsx` is wrapped in a `LevelContext.Provider value={1}` so the kit's
+   components compute their fill from that same ground. A field sits one rung
+   above its ground for free (`fieldLevel`), so fields read as level 2 with no
+   extra wiring; the collections `Accordion` sets `level={2}` explicitly to
+   read as the one raised card; dialogs are level 4.
 
 ## Dark palette
 

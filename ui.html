@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html data-theme="dark" data-mode="dark">
+<html data-theme="dark" data-mode="dark" data-level="1" data-surface="normal">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -146,15 +146,19 @@
       /* Pomegranate's LEVEL model (docs/knowledge-levels.md + LAYOUT-RULES.md):
          the collapse left ONE fill name, --background, moved by [data-level]
          islands; --surface / --container-* are gone. So:
-         · the ground is level 2 (the default :root island) and paints --background;
+         · the ground is level 1 — the DARKEST rung — set on <html> with
+           data-surface="normal" so the darkest ground paints SOLID (a level
+           1/3/4 ground without it goes translucent — "the ground is never glass");
          · a surface that should read as RAISED sets its own data-level, and
            --app-surface then resolves to whatever rung its element stands on —
-           on the plain L2 ground it equals the ground, so panels that set no
-           level fall back to being sections (spacing, no bespoke box), which is
-           what LAYOUT-RULES asks for;
+           on the ground it equals the ground, so panels that set no level fall
+           back to being sections (spacing, no bespoke box), which is what
+           LAYOUT-RULES asks for;
          · a field sits ONE rung above its ground for free (fieldLevel), so a
-           field on the L2 ground is L3 with no extra wiring. The one real card
-           is the collections Accordion (level={3}); dialogs are L4. */
+           field on the L1 ground is L2 with no extra wiring. The one real card
+           is the collections Accordion (level={2}, one rung up from the ground);
+           dialogs are L4. buttons.tsx wraps every mount in a LevelContext
+           provider at the ground (GROUND=1) so the components compute from it. */
       --app-bg: var(--background);
       --app-surface: var(--background);
       --app-surface-soft: var(--background-hover);
@@ -46804,6 +46808,7 @@ html[data-theme=dark] {
 
   // src/ui-react/buttons.tsx
   var import_jsx_runtime18 = __toESM(require_jsx_runtime());
+  var GROUND = 1;
   var svg = (d, opts) => (size) => opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("path", { d }) }) : /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("path", { d }) });
   var IconArrowLeft = svg("M19 12H5M12 19l-7-7 7-7");
   var IconClose = svg("M18 6 6 18M6 6l12 12");
@@ -46824,7 +46829,7 @@ html[data-theme=dark] {
   function mountOnce(mountId, node) {
     const container = document.getElementById(mountId);
     if (!container) return;
-    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(node));
+    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: node })));
   }
   function PomTextField(props) {
     const {
@@ -46966,7 +46971,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LiveButton, {})));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LiveButton, {}) })));
     return {
       setDisabled: (disabled) => set((s) => ({ ...s, disabled })),
       setLoading: (loading) => set((s) => ({ ...s, loading })),
@@ -46983,7 +46988,7 @@ html[data-theme=dark] {
       set = setD;
       return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomButton, { ...base, disabled });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
   function mountLiveTextArea(mountId, base, initialDisabled) {
@@ -46995,7 +47000,7 @@ html[data-theme=dark] {
       set = setD;
       return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(PomTextArea, { ...base, disabled });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
   function mountLiveDropdown(mountId, base, onSelect) {
@@ -47022,7 +47027,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     return { setItems: (items, value) => set(() => ({ items, value })) };
   }
   window.PomButtons = {
@@ -47065,7 +47070,7 @@ html[data-theme=dark] {
       if (!label) return null;
       return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "version-tag-label", title: "Plugin version", children: label });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     window.PomVersionTag = { setLabel: (label) => set(label) };
   }
   mountVersionTag("version-tag-mount");
@@ -47113,7 +47118,7 @@ html[data-theme=dark] {
         }
       );
     }
-    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
+    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
   })();
   function targetFromCheckboxes(s) {
     if (s.gitlab && s.github) return "both";
@@ -47141,7 +47146,7 @@ html[data-theme=dark] {
         /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Checkbox, { size: "small", label: "GitHub", checked: state.github, onChange: (c) => toggle("github", c) })
       ] });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     window.PomPushTarget = { onChange: null, setValue: (v) => set(checkboxesFromTarget(v)) };
   })();
   (function mountDtcgFormatSwitch() {
@@ -47164,7 +47169,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v) };
   })();
   (function mountRepoTabControl() {
@@ -47185,7 +47190,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
   })();
   mountOnce(
@@ -47228,7 +47233,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) }));
     window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? "error" : "success", message })) };
   })();
   window.PomFolderSelect = {
@@ -47248,7 +47253,7 @@ html[data-theme=dark] {
       generation += 1;
       const gen = generation;
       root.render(
-        /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(import_jsx_runtime18.Fragment, { children: rows.map((row, idx) => /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)("div", { className: "folder-row", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(import_jsx_runtime18.Fragment, { children: rows.map((row, idx) => /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)("div", { className: "folder-row", children: [
           /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
             PomTextField,
             {
@@ -47272,7 +47277,7 @@ html[data-theme=dark] {
               onClick: () => window[bridgeKey].onRemove?.(idx)
             }
           )
-        ] }, `${gen}-${idx}`)) })
+        ] }, `${gen}-${idx}`)) }) })
       );
     }
     window[bridgeKey] = { render, onInput: null, onBlur: null, onRemove: null };
@@ -47286,7 +47291,7 @@ html[data-theme=dark] {
     function View() {
       const [state, setState] = (0, import_react13.useState)({ title: "Scanned collections", collections: [], summary: { tokens: "", size: "" } });
       set = setState;
-      return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Accordion, { label: "Scanned collections", size: "large", level: 3, defaultOpen: ["collections"], children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Accordion, { label: "Scanned collections", size: "large", level: 2, defaultOpen: ["collections"], children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
         AccordionItem,
         {
           id: "collections",
@@ -47305,7 +47310,7 @@ html[data-theme=dark] {
         }
       ) });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {})));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) })));
     window.PomCollectionsAccordion = {
       setTitle: (title) => set((s) => ({ ...s, title })),
       setCollections: (collections) => set((s) => ({ ...s, collections })),
@@ -47322,7 +47327,7 @@ html[data-theme=dark] {
       if (!s.open) return null;
       return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(Alert, { tone: "error", title: s.title, children: s.detail });
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) }));
     window.PomClosureWarning = {
       show: (title, detail) => set(() => ({ open: true, title, detail })),
       hide: () => set((s) => ({ ...s, open: false }))
@@ -47354,7 +47359,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) }));
     register(() => setOpen(true));
   }
   window.PomRemoveGithubDialog = { open: () => {
@@ -47406,7 +47411,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) }));
     window.PomClearTokenDialog = {
       open: (provider) => {
         (0, import_react_dom.flushSync)(() => setProvider(provider));
@@ -47499,7 +47504,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(View, {}) }));
     window.PomOnboardingDialog = { open: () => setOpen(true), onConfirm: null };
   })();
 })();
