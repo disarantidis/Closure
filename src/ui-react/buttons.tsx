@@ -346,7 +346,7 @@ declare global {
       setSummary: (tokensLabel: string) => void;
     };
     PomJsonFileCard: { setSize: (sizeLabel: string) => void };
-    PomClosureWarning: { show: (title: string, detail: string) => void; hide: () => void };
+    PomClosureWarning: { show: (title: string, items: { from: string; ref: string }[], more?: number) => void; hide: () => void };
     PomCommitMessage: DisabledHandle;
     PomVersionTag: { setLabel: (label: string) => void };
     PomRemoveGithubDialog: { open: () => void; onConfirm: (() => void) | null };
@@ -893,19 +893,42 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
   window.PomJsonFileCard = { setSize: (size) => set(size) };
 })();
 
-/* ── reference-closure warning (inline alert) ──────────────────────────────── */
+/* ── reference-closure warning (inline alert) ────────────────────────────────
+   Was one long paragraph explaining broken references in the abstract, with
+   no way to tell which token was actually broken — the user had to go
+   search the whole export by hand. code.js's validateReferenceClosure()
+   (and dtcg-format.js's validateDtcgClosure()) already compute exactly
+   that, per broken reference, as {from, ref} — from is the token PATH that
+   holds the broken alias (e.g. "Colors.primary.hover"), ref is the missing
+   target it points at — and were already sending it to the UI as
+   closure.sampleBroken; nothing here used to read it. Now the list itself
+   IS the message: one row per broken reference, "from → ref", both in the
+   monospace this app doesn't use anywhere else — deliberately, so a token
+   PATH reads as a path (something to go find in Figma) rather than as
+   prose. */
 (function mountClosureWarning() {
   const container = document.getElementById('closure-warning-mount');
   let set: (u: (s: any) => any) => void = () => {};
   function View() {
-    const [s, setS] = useState<{ open: boolean; title: string; detail: string }>({ open: false, title: '', detail: '' });
+    const [s, setS] = useState<{ open: boolean; title: string; items: { from: string; ref: string }[]; more: number }>({ open: false, title: '', items: [], more: 0 });
     set = setS;
     if (!s.open) return null;
-    return <Alert tone="error" title={s.title}>{s.detail}</Alert>;
+    return (
+      <Alert tone="error" title={s.title}>
+        <ul className="closure-warning-list">
+          {s.items.map((item) => (
+            <li key={item.from + '→' + item.ref}>
+              <code>{item.from}</code> <span aria-hidden="true">→</span> <code>{item.ref}</code>
+            </li>
+          ))}
+        </ul>
+        {s.more > 0 && <p className="closure-warning-more">+{s.more} more</p>}
+      </Alert>
+    );
   }
   if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   window.PomClosureWarning = {
-    show: (title, detail) => set(() => ({ open: true, title, detail })),
+    show: (title, items, more) => set(() => ({ open: true, title, items, more: more || 0 })),
     hide: () => set((s) => ({ ...s, open: false })),
   };
 })();

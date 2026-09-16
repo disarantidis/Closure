@@ -1279,6 +1279,36 @@
     #closure-warning-mount { margin: 0 16px 16px; }
     #closure-warning-mount:empty { margin: 0; }
 
+    /* One row per broken reference, "token path → missing target" — see
+       mountClosureWarning's own comment on why this replaced a prose
+       paragraph. Monospace (not used anywhere else in this app,
+       deliberately) so a token path reads as a path — something to go
+       find and click on in Figma — rather than as regular copy. Inherits
+       .nd-alert-text's own --text-recessive color (Alert.tsx wraps
+       children in that div), so no color rule needed here beyond layout. */
+    .closure-warning-list {
+      list-style: none;
+      margin: 8px 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .closure-warning-list li {
+      overflow-wrap: break-word;
+    }
+    /* Only shown once the backend's own 15-item sample cap is reached
+       (validateReferenceClosure's sampleBroken) — plain text, not
+       monospace, since it's a count/sentence, not a path. */
+    .closure-warning-more {
+      margin: 6px 0 0;
+      font-size: 12px;
+      opacity: .8;
+    }
+
     .actions {
       padding: 0 16px 16px;
       flex-shrink: 0;
@@ -3467,18 +3497,20 @@
         window.PomCollectionsAccordion.setSummary(formatTokenCount(msg.validation.actual.totalTokens) + ' Tokens');
         window.PomJsonFileCard.setSize(exportMB + ' MB');
 
-        // Reference-closure check: warn when the export ships dangling {refs}
+        // Reference-closure check: warn when the export ships dangling {refs}.
+        // validateReferenceClosure() (code.js) already returns the exact
+        // broken token path for every dangling reference as sampleBroken —
+        // {from, ref} pairs, capped at 15 there — so the list itself is the
+        // message now: no need to restate it as a sentence naming which
+        // ROOTS (collections) were affected, when the actual token paths are
+        // right there to go click on.
         var closure = msg.validation && msg.validation.closure;
         if (closure && !closure.ok) {
-          var roots = (closure.missingRoots || []).map(function(r) {
-            return r + ' (' + closure.byRoot[r] + ')';
-          }).join(', ');
+          var sample = closure.sampleBroken || [];
           window.PomClosureWarning.show(
-            closure.brokenCount + ' unresolved references',
-            'Some tokens point to references that are not present in this file: ' + roots + '. ' +
-            'This usually means the referenced variable was renamed or deleted in Figma ' +
-            '(an orphaned alias), or its collection is not part of the export. Check those ' +
-            'references in Figma — the plugin exports exactly what the file contains.'
+            closure.brokenCount + ' unresolved reference' + (closure.brokenCount === 1 ? '' : 's'),
+            sample,
+            Math.max(0, closure.brokenCount - sample.length)
           );
         } else {
           window.PomClosureWarning.hide();
