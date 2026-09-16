@@ -47531,7 +47531,7 @@ html[data-theme=dark] {
   function mountTextField(mountId, props, level) {
     mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PomTextField, { ...props }), level);
   }
-  mountTextField("primary-filename-mount", { id: "primary-filename", label: "File name", defaultValue: "tokens.json", placeholder: "tokens.json", title: "JSON file name \u2014 used for both Download and every push destination" }, CARD_LEVEL);
+  mountTextField("primary-filename-mount", { id: "primary-filename", label: "File name", defaultValue: "tokens.json", placeholder: "tokens.json", title: 'JSON file name \u2014 used for both Download and every push destination. ".json" is added automatically if you leave it out.' }, CARD_LEVEL);
   window.PomCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false, CARD_LEVEL);
   mountButton("add-repo-settings-btn-mount", { id: "add-repo-settings-btn", variant: "outline", size: "large", label: "Add Repo Settings", block: true }, CARD_LEVEL);
   mountButton("gitlab-small-settings-btn-mount", { id: "gitlab-small-settings-btn", variant: "tonal", size: "small", label: "Add Settings", leftIcon: true, buttonLeftIcon: IconSettings(16) }, CARD_LEVEL);
@@ -48554,6 +48554,18 @@ react/cjs/react-jsx-runtime.development.js:
       var dot = s.lastIndexOf('.');
       return dot > 0 ? { base: s.slice(0, dot), ext: s.slice(dot) } : { base: s, ext: '' };
     }
+    // The file name field no longer requires typing ".json" — this is where
+    // that's actually enforced, at the point the name is used (push,
+    // download, the Output format hint — see primaryFilename() below), not
+    // by rewriting the field as the user types. A name that already ends in
+    // ".json" (any case) is left alone rather than getting a second one
+    // appended, so a customised "tokens.json" never becomes
+    // "tokens.json.json" just for having been typed out in full.
+    function ensureJsonExtension(name) {
+      var s = String(name || '').trim();
+      if (!s || /\.json$/i.test(s)) return s;
+      return s + '.json';
+    }
     // Which suffix a name currently carries — the live one, a legacy one, or none.
     function matchedDtcgSuffix(name) {
       var base = splitFilename(name).base;
@@ -48612,9 +48624,11 @@ react/cjs/react-jsx-runtime.development.js:
     // file" card, not per-provider in Settings any more. Used for Download,
     // the Output format hint, and (via gitlabConfig()/githubConfig() below)
     // every push destination alike, kept under its original name since
-    // that's what those other call sites already expect.
+    // that's what those other call sites already expect. ensureJsonExtension
+    // is what lets the field itself skip ".json" entirely — this is the one
+    // place every consumer actually goes through.
     function primaryFilename() {
-      return document.getElementById('primary-filename').value.trim() || defaultFilename();
+      return ensureJsonExtension(document.getElementById('primary-filename').value.trim() || defaultFilename());
     }
 
     // ── GitLab settings: baked-in standard defaults + editable overrides ──────

@@ -429,7 +429,7 @@ mountVersionTag('version-tag-mount');
 /* ── text fields (filenames read-only, folder-new, connection fields) ──────── */
 function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(mountId, <PomTextField {...props} />, level); }
 
-mountTextField('primary-filename-mount', { id: 'primary-filename', label: 'File name', defaultValue: 'tokens.json', placeholder: 'tokens.json', title: 'JSON file name — used for both Download and every push destination' }, CARD_LEVEL);
+mountTextField('primary-filename-mount', { id: 'primary-filename', label: 'File name', defaultValue: 'tokens.json', placeholder: 'tokens.json', title: 'JSON file name — used for both Download and every push destination. ".json" is added automatically if you leave it out.' }, CARD_LEVEL);
 
 window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false, CARD_LEVEL);
 
