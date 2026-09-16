@@ -21248,6 +21248,15 @@ html[data-theme=dark] {
 
     <div class="actions" id="actions" hidden>
       <div class="export-panel" data-level="2">
+        <!-- Only meaningful once BOTH providers are actually added (see
+             updatePushTargetUI()'s tabMode — same gitlabAdded && githubAdded
+             gate the Settings page's own GitLab/GitHub tab switcher uses).
+             With just one provider added there's nothing to switch between,
+             so this stays hidden and that provider's block below shows
+             directly, exactly as it always did. -->
+        <div id="main-provider-tabs-row" hidden>
+          <span id="main-provider-tab-mount"></span>
+        </div>
         <!-- One block per provider, each with its own folder path (picked
              here; the saved-path list itself is managed in Settings). The
              JSON file name used to sit beside it as a read-only display —
@@ -21265,7 +21274,9 @@ html[data-theme=dark] {
              GitLab-only, then GitLab's own). When a provider has zero saved
              folder paths, .filename-row hides and .target-row-empty shows
              instead of an empty, nothing-selected dropdown (see
-             updatePushTargetUI()). -->
+             updatePushTargetUI()). Once the tab switcher above is active,
+             only the selected provider's block is ever shown — see
+             updatePushTargetUI(). -->
         <div class="commit-input-wrap target-block" id="gitlab-target-wrap">
           <div class="target-row-header">
             <div class="target-row-title" id="gitlab-target-title" hidden>
@@ -47677,6 +47688,31 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
     window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
   })();
+  (function mountMainProviderTabControl() {
+    const container = document.getElementById("main-provider-tab-mount");
+    let set = () => {
+    };
+    function View() {
+      const [value, setValue] = (0, import_react15.useState)("gitlab");
+      set = setValue;
+      return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+        SegmentedControl,
+        {
+          label: "Folder path provider",
+          size: "medium",
+          block: true,
+          value,
+          options: [
+            { value: "gitlab", label: "GitLab", leading: IconGitLab(16) },
+            { value: "github", label: "GitHub", leading: IconGitHub(16) }
+          ],
+          onChange: (v) => window.PomMainProviderTab.onChange?.(v)
+        }
+      );
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(View, {}) })));
+    window.PomMainProviderTab = { onChange: null, setValue: (v) => set(v) };
+  })();
   mountOnce(
     "skeleton-list",
     /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "skeleton-item", style: { minHeight: 48 }, children: [
@@ -48665,6 +48701,14 @@ react/cjs/react-jsx-runtime.development.js:
     // real default; left alone on later calls (e.g. Cancel) so switching
     // tabs mid-edit doesn't get silently reset out from under the user.
     var activeSettingsTab = null;
+    // Which provider's folder-path block is shown on the main screen's own
+    // tab switcher (see updatePushTargetUI()'s tabMode) — only meaningful
+    // once both providers are added, same condition as activeSettingsTab
+    // above, but deliberately a separate variable: this is purely which
+    // folder path the user is looking at, independent of pushTarget below
+    // (where a push actually goes). Session-only — always starts back on
+    // 'gitlab' rather than being persisted, same as activeSettingsTab.
+    var mainProviderTab = 'gitlab';
     // 'gitlab' | 'github' | 'both' — a general Settings-level preference the
     // main screen's Push button follows; only meaningful once githubAdded.
     var pushTarget = 'gitlab';
@@ -49351,6 +49395,17 @@ react/cjs/react-jsx-runtime.development.js:
       updatePushTargetUI();
     };
 
+    // Switches which provider's folder path is shown on the main screen —
+    // a view preference only, not persisted (same reasoning as
+    // window.PomRepoTab.onChange above, and the same setValue-echo it
+    // needs: SegmentedControl is controlled, so the pill only follows a
+    // click if this writes the new value back to it).
+    window.PomMainProviderTab.onChange = function(value) {
+      mainProviderTab = value;
+      window.PomMainProviderTab.setValue(mainProviderTab);
+      updatePushTargetUI();
+    };
+
     // First-run nudge (see the GIT_SETTINGS_LOADED handler below for when
     // this opens). The pick is authoritative in BOTH directions: Settings
     // ends up showing exactly the provider(s) ticked, nothing else.
@@ -49593,11 +49648,37 @@ react/cjs/react-jsx-runtime.development.js:
       document.getElementById(prefix + '-empty-remove-push-btn-mount').hidden = !(showNormal && isEmpty && bothMode);
     }
 
+    // Once both providers are added, the folder-path blocks below are
+    // driven by mainProviderTab instead of by pushTarget/wanted — the user
+    // can look at (and finish setting up) either provider's folder path
+    // regardless of which one is the current push destination. Same
+    // gitlabAdded && githubAdded gate the Settings page's own tab switcher
+    // uses (updateProviderSectionVisibility's showTabs). Single-provider
+    // mode is untouched: falls straight through to the original
+    // wanted/ready/bothMode logic, exactly as before this switcher existed.
     function updatePushTargetUI() {
       var r = computePushReadiness();
-      updateTargetRow('gitlab', r.wantsGitLab, r.glReady, glFolders.length === 0, r.mixedReadiness && r.effectiveTarget === 'github', r.bothMode);
-      updateTargetRow('github', r.wantsGitHub, r.ghReady, ghFolders.length === 0, r.mixedReadiness && r.effectiveTarget === 'gitlab', r.bothMode);
-      if (r.wantsGitHub && r.ghReady) renderGithubFolderSelect();
+      var tabMode = gitlabAdded && githubAdded;
+      document.getElementById('main-provider-tabs-row').hidden = !tabMode;
+      if (tabMode) {
+        window.PomMainProviderTab.setValue(mainProviderTab);
+        var showGl = mainProviderTab === 'gitlab';
+        var showGh = mainProviderTab === 'github';
+        updateTargetRow('gitlab', showGl, r.glReady, glFolders.length === 0, showGl && !r.glReady, false);
+        updateTargetRow('github', showGh, r.ghReady, ghFolders.length === 0, showGh && !r.ghReady, false);
+        // The trash "remove from push destination" affordance belongs to
+        // pushTarget, a different control (Settings' own Push destination
+        // picker) — not to this view-only switcher, so it never shows here
+        // even where updateTargetRow's showSmallBtn branch would otherwise
+        // reveal it alongside the small settings button.
+        document.getElementById('gitlab-remove-push-btn-mount').hidden = true;
+        document.getElementById('github-remove-push-btn-mount').hidden = true;
+        if (showGh && r.ghReady) renderGithubFolderSelect();
+      } else {
+        updateTargetRow('gitlab', r.wantsGitLab, r.glReady, glFolders.length === 0, r.mixedReadiness && r.effectiveTarget === 'github', r.bothMode);
+        updateTargetRow('github', r.wantsGitHub, r.ghReady, ghFolders.length === 0, r.mixedReadiness && r.effectiveTarget === 'gitlab', r.bothMode);
+        if (r.wantsGitHub && r.ghReady) renderGithubFolderSelect();
+      }
       updateActionUI();
     }
 

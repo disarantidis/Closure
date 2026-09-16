@@ -327,6 +327,7 @@ declare global {
     PomRemoveGitlabDialog: { open: () => void; onConfirm: (() => void) | null };
     PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
+    PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomPushTarget: { onChange: ((value: PushTarget) => void) | null; setValue: (value: PushTarget) => void };
     PomDtcgFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void };
     PomOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
@@ -574,6 +575,39 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
   // other mount here keeps this value truthful to its actual DOM level).
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
+})();
+
+/* ── main screen: GitLab / GitHub folder-path tab switcher ─────────────────
+   Same shape as mountRepoTabControl above, one screen over: when both
+   providers are added, this replaces showing both provider blocks stacked
+   with a single switcher, so only one folder-path picker shows at a time
+   (see updatePushTargetUI()'s tabMode). Independent of the Push destination
+   control (window.PomPushTarget) — that decides where a push actually goes;
+   this is only about which provider's folder path is being looked at. */
+(function mountMainProviderTabControl() {
+  const container = document.getElementById('main-provider-tab-mount');
+  let set: (v: 'gitlab' | 'github') => void = () => {};
+  function View() {
+    const [value, setValue] = useState<'gitlab' | 'github'>('gitlab');
+    set = setValue;
+    return (
+      <SegmentedControl
+        label="Folder path provider"
+        size="medium"
+        block
+        value={value}
+        options={[
+          { value: 'gitlab', label: 'GitLab', leading: IconGitLab(16) },
+          { value: 'github', label: 'GitHub', leading: IconGitHub(16) },
+        ]}
+        onChange={(v: string) => window.PomMainProviderTab.onChange?.(v as 'gitlab' | 'github')}
+      />
+    );
+  }
+  // CARD_LEVEL, matching the real data-level="2" .export-panel already sets
+  // on the markup this mounts inside.
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomMainProviderTab = { onChange: null, setValue: (v) => set(v) };
 })();
 
 /* ── loading skeletons ─────────────────────────────────────────────────────── */
