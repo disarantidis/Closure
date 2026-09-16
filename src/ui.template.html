@@ -864,6 +864,37 @@
       flex-shrink: 0;
     }
 
+    /* The anchor .flow-wire measures itself against — see the HTML comment
+       above .flow-wrap's opening tag for what this wraps and why. */
+    .flow-wrap {
+      position: relative;
+    }
+    /* One continuous line behind the three stacked containers, reading as
+       a pipeline rather than three unrelated cards. top:0/bottom:0 spans
+       the wrapper's full height so it always reaches from the first
+       card's top to the last card's bottom, however tall any section
+       between them currently is — no measuring needed. z-index: -1 is
+       what keeps it BEHIND the cards despite being painted after them in
+       the stacking order: a positioned descendant with no z-index would
+       otherwise paint above ordinary in-flow content (the cards) by
+       default; negative z-index is the one level that paints under it
+       instead. left: 46px lines up with the centre of each card's own
+       leading icon (16-18px icons starting at the shared 38px inset — see
+       .target-row-header's own comment on that number — so their centres
+       all land within a pixel or two of each other here), so the wire
+       reads as running straight through each icon rather than floating
+       beside them. */
+    .flow-wire {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 46px;
+      width: 2px;
+      background: var(--app-border);
+      z-index: -1;
+      pointer-events: none;
+    }
+
     .collections-wrap {
       display: flex;
       flex-direction: column;
@@ -1057,11 +1088,23 @@
     /* Icon, title, tags — one row. No justify-content needed to push the
        tags to the end: .collections-summary's own flex:1 (below) already
        fills every pixel between the icon and the tags, which is what
-       leaves the tags flush at the row's end. */
+       leaves the tags flush at the row's end — PROVIDED this row itself
+       reaches the card's own right edge in the first place. It didn't:
+       .collections-header (this row's parent) is itself a flex container
+       with this as its only child, and a flex item's default flex-grow is
+       0 — without flex:1 here, this row only ever grew as wide as its own
+       content (icon + title text + tags), leaving the tags flush against
+       THIS row's short right edge rather than the card's real one, a gap
+       of several dozen pixels reported from the real plugin. flex:1 makes
+       this row fill .collections-header the same way .collections-summary
+       already fills this row, so the tags land flush against the card's
+       actual edge, matching every other title-row-with-a-trailing-tag on
+       this screen (.target-row-header, .json-download-header). */
     .collections-header-top {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex: 1;
       min-width: 0;
     }
 
@@ -1287,7 +1330,18 @@
          (see #dtcg-format-control-mount). -->
     <div id="export-mode-control-mount" style="display:none;"></div>
 
-    
+    <!-- Wraps the three stacked containers a Figma file's tokens pass
+         through on their way out — the file-variables card, the Json file
+         card, and the push-settings card — with one continuous vertical
+         line behind them (see .flow-wire), reading as a single pipeline
+         rather than three unrelated cards. position:relative here is what
+         gives .flow-wire's position:absolute something to measure against;
+         its own top:0/bottom:0 then spans this wrapper's full height
+         (first card's top to last card's bottom) regardless of how tall
+         any one section is (loading skeletons, the closure warning, a
+         grown commit textarea — all still inside this same wrapper). -->
+    <div class="flow-wrap">
+      <div class="flow-wire" aria-hidden="true"></div>
     <div class="collections-wrap" id="collections-wrap">
     <!-- Skeleton placeholder shown while foundations are read in the background. -->
     <div class="skeleton-list" id="skeleton-list" aria-hidden="true"></div>
@@ -1466,8 +1520,9 @@
         </div>
       </div>
     </div>
+    </div>
   </div>
-  
+
   <div class="page settings-page" id="settings-page">
     <header class="header-settings">
       <div class="header-panel">
