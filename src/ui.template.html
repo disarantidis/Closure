@@ -135,6 +135,49 @@
       --PomDialog-SlotContainer3-padding--stickyButton: var(--spacing-component-4) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
     }
 
+    /* Two app-level overrides on top of the vendored SelectableCard
+       (ProviderChoiceCard, buttons.tsx) — both scoped to this one mount
+       rather than touching src/vendor/pomegranate, since neither is this
+       app's call to make for every future SelectableCard, only this one's
+       known, measured behaviour.
+
+       1) node.css's .nd-selcard-mark is `position: absolute;
+          inset-block-start: var(--nd-card-pad)` — a fixed offset from the
+          card's own top edge, not a true vertical center. It only lands on
+          center for whatever single-line content height the token math
+          assumes; measured against this card's actual content (a 24px logo
+          badge + label, not the bare microcopy row it was tuned for), the
+          mark's own centerY sat 3px above the logo/label's — visible as a
+          slight vertical misalignment between the checkbox and the row it
+          belongs to. True-centered with top/transform instead of the fixed
+          inset. */
+    #onboarding-dialog-mount .nd-selcard-mark {
+      inset-block-start: 50%;
+      transform: translateY(-50%);
+    }
+    /* 2) A checked mark's REST colour comes from .nd-checkmark.is-checked's
+       own base rule (`background: var(--background)`, node.css) — dark at
+       this card's level (#494949, confirmed via computed style). Its HOVER
+       colour comes from a *different* token family entirely
+       (`background: var(--mark-hover)`, the SelectableCard-specific hover
+       rule) — and in this exact context (dark theme, data-tense="strong",
+       level 1) --mark and --mark-hover both resolve to #FFFFFF. The two
+       rules were never authored to agree with each other; they just
+       happened to here. Result: hovering a checked card flashes its mark
+       from dark to solid white, and the tick's own ink
+       (.nd-checkmark-tick { color: var(--text) }, unconditional, no hover
+       variant) stays white throughout — a white tick on a white mark,
+       genuinely invisible. This is a token-authoring gap in the vendored
+       kit for this specific level/theme/tense combination, not a misuse
+       here (mark="checkbox", level={1} are exactly the documented props);
+       worked around at the app level by keeping the SAME token family
+       (--background-hover, not --mark-hover) the rest state already uses,
+       so hovering only steps one rung darker instead of jumping families. */
+    #onboarding-dialog-mount .nd-selcard:not(.is-inert):hover .nd-selcard-mark > .nd-checkmark.is-checked {
+      background: var(--background-hover);
+      border-color: var(--background-hover);
+    }
+
     /* This app's own chrome vars are aliases onto the Pomegranate
        (disarantidis_ReactJS) design tokens from src/vendor/pomegranate
        (tokens.css / node.css, bundled into ui.html), so the plugin's plain
