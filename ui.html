@@ -538,7 +538,12 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      margin: 0 0 6px;
+      /* 16px, not 6px — matches the title-to-content gap every other
+         section title on the Settings page uses (.output-format /
+         .push-target > .folder-paths-title, both margin-bottom: 16px);
+         this title reads as the same kind of section title now (see the
+         font rule below), so it gets the same gap before its own content. */
+      margin: 0 0 16px;
       /* This --spacing-component-6 (22px) inset was confirmed against the
          real plugin back when .export-panel's own padding was a plain
          12px — this row's outer edge sat 22px inside the field row below
@@ -557,9 +562,28 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      font: var(--microcopy-bold);
-      letter-spacing: var(--microcopy-bold-letter-spacing);
-      color: var(--app-text-muted);
+      /* Was `font: var(--microcopy-bold); letter-spacing:
+         var(--microcopy-bold-letter-spacing);` — --microcopy-bold and its
+         letter-spacing pair are not defined ANYWHERE in tokens.css/
+         node.css, only referenced here, the exact same "undefined custom
+         property invalidates the whole shorthand" bug already fixed on
+         .folder-paths-title (--body-m-bold) and .folder-paths-subtitle
+         (--microcopy-regular) earlier in this file's history — so this
+         text was silently falling back to the page's plain inherited
+         font this whole time, not any deliberate microcopy style.
+         Reported from the real plugin as reading too small and too muted
+         to work as a section title. This IS a section title — "GitLab" /
+         "GitHub" here is the exact same heading .provider-section-heading
+         .folder-paths-title already renders on the Settings page's own
+         connection cards — so it gets that class's real, working
+         treatment instead: --type-body-m-* at 700 weight, --app-text
+         (not --app-text-muted — a section title isn't recessive copy). */
+      font-family: var(--type-body-m-font-family);
+      font-size: var(--type-body-m-size);
+      line-height: var(--type-body-m-line-height);
+      font-weight: 700;
+      letter-spacing: var(--type-body-m-letter-spacing);
+      color: var(--app-text);
     }
     .target-row-title-icon { flex-shrink: 0; }
     /* Shown instead of the dropdown+filename row when a provider has zero
@@ -1020,27 +1044,29 @@
 
     /* InteractiveCard's own content slot (auto-wrapped in a CardBody, which
        supplies the card's real padding — see Card.tsx's resolveCardChildren):
-       title row + tags, stacked. No flex:1/text-align:left here any more —
-       those were for sharing a native <button> header row with the
-       accordion's own chevron; InteractiveCard's hit target is a separate,
-       empty, absolutely-stretched sibling (its own "hit layer" pattern), so
-       this is free to just be its natural content width. */
+       one row now (icon, title, tags — see .collections-header-top). No
+       flex:1/text-align:left here any more — those were for sharing a
+       native <button> header row with the accordion's own chevron;
+       InteractiveCard's hit target is a separate, empty,
+       absolutely-stretched sibling (its own "hit layer" pattern), so this
+       is free to just be its natural content width. */
     .collections-header {
       display: flex;
-      flex-direction: column;
-      gap: 6px;
       min-width: 0;
     }
 
-    /* Title + the "opens a modal" chevron, on one row. */
+    /* Icon, title, tags — one row. No justify-content needed to push the
+       tags to the end: .collections-summary's own flex:1 (below) already
+       fills every pixel between the icon and the tags, which is what
+       leaves the tags flush at the row's end. */
     .collections-header-top {
       display: flex;
       align-items: center;
-      justify-content: space-between;
       gap: 8px;
+      min-width: 0;
     }
 
-    .collections-header-chevron {
+    .collections-header-icon {
       display: flex;
       color: var(--app-text-muted);
       flex-shrink: 0;
@@ -1052,6 +1078,7 @@
       font: var(--subtitle);
       letter-spacing: var(--subtitle-letter-spacing);
       color: var(--app-heading);
+      flex: 1;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1061,6 +1088,7 @@
     .collections-summary-tags {
       display: flex;
       flex-wrap: wrap;
+      flex-shrink: 0;
       gap: 6px;
     }
 
@@ -47113,7 +47141,7 @@ html[data-theme=dark] {
   var IconMoon = svg("M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z");
   var IconGitLab = svg("M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024", { fill: true });
   var IconGitHub = svg("M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z", { fill: true });
-  var IconChevronRight = svg("m9 18 6-6-6-6");
+  var IconVariables = svg("M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1 M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1");
   function btnVariant(v) {
     if (v === "filled") return "primary";
     if (v === "ghost") return "ghost";
@@ -47651,16 +47679,14 @@ html[data-theme=dark] {
       const [open, setOpen] = (0, import_react15.useState)(false);
       set = setState;
       return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(InteractiveCard, { label: `${state.title} \u2014 view scanned collections`, level: 2, size: "large", onClick: () => setOpen(true), children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "collections-header", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "collections-header-top", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "collections-summary", children: state.title }),
-            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "collections-header-chevron", "aria-hidden": "true", children: IconChevronRight(16) })
-          ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(InteractiveCard, { label: `${state.title} \u2014 view scanned collections`, level: 2, size: "large", onClick: () => setOpen(true), children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { className: "collections-header", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "collections-header-top", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "collections-header-icon", "aria-hidden": "true", children: IconVariables(18) }),
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "collections-summary", children: state.title }),
           /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "collections-summary-tags", children: [
             state.summary.tokens ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Tag, { variant: "tonal", size: "small", children: state.summary.tokens }) : null,
             state.summary.size ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Tag, { variant: "tonal", size: "small", children: state.summary.size }) : null
           ] })
-        ] }) }),
+        ] }) }) }),
         /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Dialog, { open, onClose: () => setOpen(false), title: state.title, size: "large", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { className: "collections-readonly-list", children: state.collections.map((c) => /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "collection-item", children: [
           /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "collection-item-check", children: IconCheck(14) }),
           /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "name", children: c.name }),
