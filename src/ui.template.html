@@ -1068,16 +1068,38 @@
 
     .collections-header-icon {
       display: flex;
-      color: var(--app-text-muted);
+      /* --text-recessive directly, NOT --app-text-muted — this card now
+         wraps in data-tense="inverted" (see buttons.tsx), and --app-*
+         aliases are frozen at :root's own level/tense (see the :root
+         comment above): they never pick up a descendant's own tense any
+         more than they pick up its own data-level. Painted invisible
+         (barely-there light-on-light) against the inverted card until
+         switched to the real token, which does react. */
+      color: var(--text-recessive);
       flex-shrink: 0;
     }
 
-    /* Pomegranate's own "subtitle" text style, same token used for the token-modal
-       dialog's title earlier in this migration — not a hand-picked size. */
+    /* Was `font: var(--subtitle); letter-spacing: var(--subtitle-letter-
+       spacing); color: var(--app-heading);` — --subtitle is not defined
+       ANYWHERE in tokens.css/node.css, the same "undefined custom property
+       invalidates the whole shorthand" bug fixed repeatedly elsewhere in
+       this file (.folder-paths-title, .folder-paths-subtitle,
+       .target-row-title) — so this, the plugin's single most prominent
+       piece of text (the Figma file name), was silently rendering at
+       whatever default inherited font applied, never a deliberate style.
+       Spelled out in real tokens instead: --type-title-s-*, the same
+       family node.css's own .nd-dialog-title uses (20px/600) — this card
+       is a collapsed view of the same heading the modal shows expanded,
+       so it reads as the same heading at both sizes. color: var(--text)
+       directly, not --app-heading, for the same frozen-alias reason as
+       the icon above. */
     .collections-summary {
-      font: var(--subtitle);
-      letter-spacing: var(--subtitle-letter-spacing);
-      color: var(--app-heading);
+      font-family: var(--type-title-s-font-family);
+      font-size: var(--type-title-s-size);
+      line-height: var(--type-title-s-line-height);
+      font-weight: var(--type-title-s-weight);
+      letter-spacing: var(--type-title-s-letter-spacing);
+      color: var(--text);
       flex: 1;
       min-width: 0;
       overflow: hidden;

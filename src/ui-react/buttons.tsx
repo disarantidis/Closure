@@ -692,6 +692,19 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     set = setState;
     return (
       <>
+        {/* data-tense="inverted", not InteractiveCard's own `tense` prop —
+            that prop is typed 'tonal' | 'strong' only (Card.tsx and
+            InteractiveCard.tsx both), so the kit's cards never expose
+            "inverted" through their public API — it's wired for chip-like
+            elements instead (Tag, Button, SegmentedControl's chosen
+            segment, node.css's [data-tense='inverted'] block), not full
+            card surfaces. The underlying CSS still supports it generically
+            via [data-tense='inverted'] [data-level] though (tokens.css's
+            "pole axis"), and InteractiveCard's own root sets data-level on
+            itself regardless of who's asking for it — so a plain wrapper
+            reaches the exact same cascade without fighting the type
+            system or editing the vendored component. */}
+        <div data-tense="inverted">
         <InteractiveCard label={`${state.title} — view scanned collections`} level={2} size="large" onClick={() => setOpen(true)}>
           <div className="collections-header">
             {/* One row now, not title-then-tags stacked: icon leads the
@@ -714,6 +727,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
             </div>
           </div>
         </InteractiveCard>
+        </div>
         {/* large, not small — a real file's collection list (long names —
             ".magenta-light", "_restricted" — and four-digit counts) read
             cramped at 380px (--surface-width-small, tokens.css), reported
