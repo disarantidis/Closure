@@ -634,7 +634,7 @@
       margin-bottom: 24px;
     }
 
-    /* "Output format" — Token Studio vs Tokens Studio DTCG. Leads the page, so
+    /* "Output format" — Token Studio JSON vs W3C DTCG. Leads the page, so
        margin (the page's own top padding already spaces it from the header),
        and the standard 40px bottom rhythm before whatever follows. Same
        title/control indent as .push-target below: a switch, like a checkbox,
@@ -1195,8 +1195,11 @@
       <!-- Output format. Always visible and leads the page: it decides what
            every download and push actually contains, so it outranks the
            destination settings below it. Off = the Token Studio JSON this
-           plugin has always produced; on = Tokens Studio DTCG, written to a
-           _dtcg file name so the two never overwrite each other. -->
+           plugin has always produced; on = W3C DTCG (design-tokens.org) —
+           one fully resolved document per theme, dtcgShape 'themes', not
+           the 'partial' shape that still needs an external finishing step
+           (see the note on toDtcg() below) — written to a _dtcg file name
+           so the two never overwrite each other. -->
       <div class="output-format">
         <p class="folder-paths-title">Output format</p>
         <span id="dtcg-format-control-mount"></span>
@@ -1523,16 +1526,21 @@
     // 'gitlab' | 'github' | 'both' — a general Settings-level preference the
     // main screen's Push button follows; only meaningful once githubAdded.
     var pushTarget = 'gitlab';
-    // null = ship the Token Studio tree as-is; 'partial' runs the DTCG
+    // null = ship the Token Studio tree as-is; 'themes' runs the DTCG
     // post-transform (src/dtcg-format.js) over it — see getTokensToExport.
+    // 'themes' (not 'partial') is what the Output format switch drives: one
+    // fully resolved, self-contained, standards-mapped document per theme —
+    // genuinely W3C DTCG on its own, no downstream finishing step required.
+    // ('partial' and 'sets' are the converter's other shapes — 'partial' is
+    // Tokens Studio's own DTCG flavour that build-dtcg.js finishes elsewhere;
+    // 'sets' is the strict mapping without the per-theme resolve. Both stay
+    // CLI-only, see scripts/dtcg-preview.js.)
     // Driven by the Output format switch in Settings and persisted with the
     // rest of the config, so it is declared up here with the other persisted
     // settings state: gitSettings.setState({}) runs near the top of this
     // script and reads it (via defaultFilename()), and a var declared further
     // down would be hoisted but still unassigned at that point — and worse,
     // would reset it when its own line was finally reached.
-    // ('sets' and 'themes' are the converter's other shapes; they stay
-    // CLI-only, see scripts/dtcg-preview.js.)
     var dtcgShape = null;
     // Declared this early (not just above updateActionUI, where it's used)
     // because gitSettings.setState({}) runs near the top of this script,
@@ -1848,7 +1856,7 @@
         // existed, which must keep exporting Token Studio JSON — so only an
         // explicit `true` turns DTCG on.
         var previousDtcgShape = dtcgShape;
-        dtcgShape = config.dtcg === true ? 'partial' : null;
+        dtcgShape = config.dtcg === true ? 'themes' : null;
         window.PomDtcgFormat.setValue(dtcgShape !== null);
         // No filename rewrite here: a config saved with dtcg on already stored
         // the suffixed name, and defaultFilename() (read below when a provider
@@ -2275,19 +2283,21 @@
       // visible here and not only in the file name field further down.
       var name = primaryFilename();
       el.textContent = dtcgShape
-        ? 'Tokens Studio DTCG ($value / $type), exported as ' + name + '.'
+        ? 'W3C DTCG ($value / $type), one resolved document per theme, exported as ' + name + '.'
         : 'Token Studio JSON — the format this plugin has always exported — as ' + name + '.';
     }
 
     // Convert the Token Studio tree to DTCG and log a conversion report.
     //
-    // 'partial' is the production target: Tokens Studio's own DTCG shape, which
-    // config/normalize/build-dtcg.js consumes as tokens_W3C.json and finishes
-    // into strict DTCG. Nothing is rewritten here, so there is no closure check
-    // to run — $themes/$metadata stay at the root for the downstream resolver.
-    //
-    // 'themes' previews the strict form: each document is merged from its own
-    // sets and should therefore resolve every {a.b.c} reference it contains.
+    // The switch drives 'themes': one document per $themes entry, deep-merged
+    // from that theme's own sets in tokenSetOrder and run through the strict
+    // type/composite mapping — genuinely standards-conformant W3C DTCG on its
+    // own, every {a.b.c} reference resolved within the document, no
+    // downstream finishing step needed. (dtcgShape can still be set to
+    // 'partial' — Tokens Studio's own DTCG flavour, which
+    // config/normalize/build-dtcg.js elsewhere finishes into strict DTCG — or
+    // 'sets', the strict mapping without the per-theme resolve; both stay
+    // reachable only from scripts/dtcg-preview.js, not this switch.)
     function toDtcg(tokens) {
       var result = window.PomDtcg.toDtcgFormat(tokens, { shape: dtcgShape });
       var report = result.report;
@@ -2562,8 +2572,11 @@
 
     // Settings → Output format. The DTCG shapes are a post-transform over the
     // Token Studio tree, so exportMode stays 'token-studio' either way.
+    // 'themes' (not 'partial') — see the note on `var dtcgShape` above and on
+    // toDtcg() below: this is the shape that is genuinely standalone W3C
+    // DTCG, not the one that still needs an external finishing step.
     window.PomDtcgFormat.onChange = function(on) {
-      dtcgShape = on ? 'partial' : null;
+      dtcgShape = on ? 'themes' : null;
       // Rewrite the file names BEFORE persisting, so the saved config and the
       // fields on screen never disagree about where the export lands.
       applyFilenameForFormat();

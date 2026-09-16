@@ -30,7 +30,7 @@ function loadPluginCode() {
   const expose = `
     return {
       transformToFinalFormat: transformToFinalFormat,
-      toTokenStudioFormat: toTokenStudioFormat,
+      toTokenFormat: toTokenFormat,
       fixBreakpointTypes: fixBreakpointTypes,
       fixLayoutColumnTypes: fixLayoutColumnTypes,
     };
@@ -130,7 +130,7 @@ function run() {
   check('fixLayoutColumnTypes keeps the description', lay.c.description === 'kept');
 
   // --- end to end into DTCG ------------------------------------------------
-  const ts = plugin.toTokenStudioFormat(
+  const ts = plugin.toTokenFormat(
     plugin.transformToFinalFormat(raw, { includeDescriptions: true }).tokens,
     raw
   );

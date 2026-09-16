@@ -454,7 +454,7 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
     return (
       <Switch
         size="small"
-        label="Tokens Studio DTCG"
+        label="DTCG (W3C)"
         checked={on}
         onChange={(c: boolean) => { setOn(c); window.PomDtcgFormat.onChange?.(c); }}
       />

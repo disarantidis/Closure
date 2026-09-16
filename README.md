@@ -12,10 +12,12 @@ The UI is built from a React source with our own **Pomegranate
 - Exports design tokens from Figma variable collections, including extended/aliased collections.
 - **Portable design-token JSON**: `$themes`, `$metadata.tokenSetOrder`, `$figmaVariableReferences`, semantic token types — a widely-supported structure downstream token tooling (Style Dictionary and similar) can consume.
 - **Two output formats**, chosen with the **Output format** switch in Settings:
-  the default token JSON, or **DTCG** (`$value` / `$type` / `$description`, with
-  `$themes`/`$metadata` at the document root). DTCG exports to its own file name
-  (`tokens_dtcg.json`) so it never overwrites the default JSON. See [`DTCG.md`](./DTCG.md).
-- **Figma variable descriptions** are exported as DTCG `$description`, de-duplicated once per variable in a root `$extensions` map rather than repeated on every mode's token.
+  the default token JSON, or **W3C DTCG** (`$value` / `$type` / `$description`,
+  strict type mapping, one fully resolved, self-contained document per theme —
+  standards-conformant on its own, no downstream finishing step). DTCG exports
+  to its own file name (`tokens_dtcg.json`) so it never overwrites the default
+  JSON. See [`DTCG.md`](./DTCG.md).
+- **Figma variable descriptions** are exported as DTCG `$description` on each token.
 - **Typography parity**: backfills `core.lineHeights` / `core.letterSpacing` so composite references like `{lineHeights.*}` / `{letterSpacing.*}` resolve instead of dangling (see `ensureCoreLineHeightsLetterSpacing` in `code.js`).
 - **Per-breakpoint typography** and a **dimension math layer** (`N*{dimension.base}`).
 - **Reference-closure validation**: flags any dangling `{token.references}` before you ship the JSON — this is what the plugin is named for.

@@ -21,20 +21,43 @@ reimplementing it. `src/dtcg-format.js` runs both inlined in the plugin UI
 
 ## What it does
 
+The switch drives `dtcgShape = 'themes'` — **standalone, standards-conformant
+W3C DTCG**, not an intermediate shape that needs another tool to finish:
+
+- **One fully resolved document per `$themes` entry.** Each theme's sets are
+  deep-merged (later sets in `tokenSetOrder` win, matching Tokens Studio), so
+  every document is self-contained — nothing else to load, nothing else to
+  merge.
 - **Renames** `value` / `type` / `description` → `$value` / `$type` /
-  `$description`, keeping `$themes` and `$metadata` at the document root (the
-  "partial" shape a downstream strict-DTCG generator consumes).
-- **Figma variable descriptions** ride along as `$description`, and are
-  **de-duplicated**: a description belongs to the variable, so instead of
-  repeating it on every mode's token it is hoisted once to a root
-  `$extensions` map keyed by the token path. `scripts/dtcg-descriptions.js`
-  is the reference reader that rehydrates it.
+  `$description`, and **strictly maps every type** to its DTCG equivalent
+  (`spacing`/`sizing`/`borderRadius`/… → `dimension`, etc. — see `TYPE_MAP` in
+  `src/dtcg-format.js`) rather than passing Token Studio's own proprietary
+  type names through.
+- **Aliases stay aliases** — `$value: "{color.blue}"` is valid DTCG (the spec
+  defines token references with exactly this syntax; consuming tools resolve
+  them). What "resolved" means here is *closure*: every alias is checked to
+  resolve to something inside that same theme document
+  (`validateDtcgClosure`), never dangling out to a set the document didn't
+  merge in — so the output needs no companion file to be complete.
+- **Figma variable descriptions** ride along as `$description` on each token.
+- Vendor/Token-Studio-only metadata (which sets built the document, its
+  `tokenSetOrder`) is confined to a root `$extensions.com.radd.tokenStudio`
+  block, which a strict DTCG consumer can simply ignore.
 - **The file name swaps with the format** so a DTCG export never overwrites the
   default JSON: `tokens.json` → `tokens_dtcg.json`. Suffixing and stripping are
   exact inverses, so toggling round-trips.
 - Descriptions are opt-in at the source: `transformToFinalFormat(raw, {
   includeDescriptions: true })`, which the UI sets only for a DTCG export, so
   the default export is unchanged.
+
+`src/dtcg-format.js` has two other shapes — `'partial'` (Tokens Studio's own
+DTCG flavour, `$themes`/`$metadata` left at the document root, proprietary
+types untouched; a downstream `build-dtcg.js` elsewhere finishes it into
+strict DTCG) and `'sets'` (strict type mapping, but organized per Token
+Studio set rather than per resolved theme, so it can still alias across
+documents). Both remain reachable from `scripts/dtcg-preview.js` for anyone
+who wants Tokens Studio's own partial export instead — the plugin's own
+Settings switch does not use either.
 
 ## Node tools (no Figma needed)
 
