@@ -428,8 +428,7 @@ mountVersionTag('version-tag-mount');
 /* ── text fields (filenames read-only, folder-new, connection fields) ──────── */
 function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(mountId, <PomTextField {...props} />, level); }
 
-mountTextField('export-filename-mount', { id: 'export-filename', label: 'File name', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitLab JSON file name (set in Settings)' }, CARD_LEVEL);
-mountTextField('github-filename-mount', { id: 'github-filename', label: 'File name', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'GitHub JSON file name (set in Settings)' }, CARD_LEVEL);
+mountTextField('primary-filename-mount', { id: 'primary-filename', label: 'File name', readonly: true, defaultValue: 'tokens.json', tabIndex: -1, title: 'JSON file name (set in Settings)' }, CARD_LEVEL);
 
 window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false, CARD_LEVEL);
 

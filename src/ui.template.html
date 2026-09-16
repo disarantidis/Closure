@@ -514,16 +514,15 @@
       margin-bottom: 14px;
     }
 
-    /* Folder / path row on the main screen: [ folder dropdown ][ file name ].
-       A grid (not flex) so both columns are always exactly equal width —
-       flex sizing here left the dropdown hugging its own content (a
-       PomDropdownSelect isn't stretched internally), so an empty GitHub
-       dropdown rendered narrower than GitLab's filled one right above it;
-       1fr/1fr columns fix both the dropdown-vs-filename split AND the
-       gitlab-row-vs-github-row match, in one rule shared by both rows. */
-    .filename-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    #folder-select-mount, #github-folder-select-mount,
-    #export-filename-mount, #github-filename-mount { min-width: 0; }
+    /* Folder path row on the main screen: just the folder dropdown now —
+       the file name field that used to sit beside it (one per provider)
+       moved out into its own .json-download-card between this card and the
+       file-variables card above it, since Download was never tied to
+       either push destination anyway (see primaryFilename()). Still a grid
+       of its own (not flex) so the GitLab and GitHub rows keep matching
+       widths, same reasoning as when this held two columns. */
+    .filename-row { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    #folder-select-mount, #github-folder-select-mount { min-width: 0; }
     /* One block per provider (header + its filename-row) — see the HTML
        comment above .gitlab-target-wrap. Only needs its own top margin
        when a second block can follow it; .commit-input-wrap's own 4px is
@@ -1173,9 +1172,29 @@
     }
     .actions-skeleton .sk-row { display: flex; gap: 8px; }
 
-    /* Push fills the row; Download is a fixed-size icon button beside it. */
+    /* Push alone fills the row now — Download moved out into
+       .json-download-card below, since it was never tied to either push
+       destination (primaryFilename() falls back gitlab-then-github on its
+       own, independent of which one is actually being pushed to). */
     .push-download-row { display: flex; gap: 10px; align-items: center; }
     #push-btn-mount, #add-repo-settings-btn-mount { flex: 1; min-width: 0; }
+
+    /* Same subtle-surface language as .export-panel right below it — one
+       step of its own between the file-variables card and push settings:
+       name the file, then get it, independent of pushing anywhere. Field
+       takes the row; Download sits fixed-width at the right, same
+       field-plus-button pairing .push-download-row used before Download
+       lived here instead. */
+    .json-download-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--background);
+      border-radius: 24px;
+      padding: var(--spacing-component-6);
+      margin: 0 16px 16px;
+    }
+    #primary-filename-mount { flex: 1; min-width: 0; }
     
     .commit-input-wrap {
       margin-bottom: 4px;
@@ -1274,17 +1293,30 @@
   </div>
   
   <div id="closure-warning-mount"></div>
-  
+
+    <!-- Between the file-variables card above and push settings below: the
+         JSON file name Download will actually use (primaryFilename() —
+         gitlab's own name if GitLab is configured, else github's, same
+         fallback the two push destinations used to show separately, see
+         the .filename-row comment above), with Download itself right
+         beside it. Pulled out of .export-panel because Download was never
+         tied to a push destination in the first place. -->
+    <div class="json-download-card" id="json-download-card" data-level="2">
+      <span id="primary-filename-mount"></span>
+      <div id="download-btn-mount"></div>
+    </div>
+
     <!-- Skeleton twin of the action area, shown while the list loads. -->
     <div class="actions actions-skeleton" id="actions-skeleton"></div>
 
     <div class="actions" id="actions" hidden>
       <div class="export-panel" data-level="2">
-        <!-- One block per provider, each with its own folder path + JSON
-             file name (the file name itself is set in Settings — see
-             gl-filename-mount/gh-filename-mount — this is a read-only
-             display, same as the folder path is picked here but the
-             saved-path list is managed in Settings). The row-title always
+        <!-- One block per provider, each with its own folder path (picked
+             here; the saved-path list itself is managed in Settings). The
+             JSON file name used to sit beside it as a read-only display —
+             now shown once, for whichever file Download actually names, in
+             .json-download-card above this card (see primaryFilename()).
+             The row-title always
              shows (which push location a row is for should be clear
              regardless of how many destinations are active), each with its
              provider's own logo glyph in front of the text — plain inline
@@ -1329,7 +1361,6 @@
           </div>
           <div class="filename-row" id="gitlab-filename-row">
             <span id="folder-select-mount"></span>
-            <span id="export-filename-mount"></span>
           </div>
         </div>
         <div class="commit-input-wrap target-block" id="github-target-wrap" hidden>
@@ -1352,7 +1383,6 @@
           </div>
           <div class="filename-row" id="github-filename-row">
             <span id="github-folder-select-mount"></span>
-            <span id="github-filename-mount"></span>
           </div>
         </div>
         <div class="commit-input-wrap" id="commit-wrap">
@@ -1363,7 +1393,6 @@
           <!-- Replaces the Push button in this same slot whenever no
                active destination is workable yet (see updateActionUI()). -->
           <span id="add-repo-settings-btn-mount" hidden></span>
-          <div id="download-btn-mount"></div>
         </div>
       </div>
     </div>
@@ -1974,14 +2003,14 @@
       updateActionUI();
     }
 
-    // Keeps the main screen's read-only file-name fields in sync with each
-    // provider's own Settings field — called from refreshSettingsControls()
-    // and from the Settings auto-save, rather than wiring a separate
-    // onChange for a field that's never live-typed into from the main
-    // screen itself.
+    // Keeps the main screen's read-only file-name field in sync with
+    // whichever provider's Settings field actually names the file Download
+    // will use (primaryFilename() — same gitlab-then-github fallback used
+    // everywhere else) — called from refreshSettingsControls() and from
+    // the Settings auto-save, rather than wiring a separate onChange for a
+    // field that's never live-typed into from the main screen itself.
     function syncMainScreenFilenames() {
-      if (gitlabAdded) setFieldValue('export-filename', gitlabConfig().filename);
-      if (githubAdded) setFieldValue('github-filename', githubConfig().filename);
+      setFieldValue('primary-filename', primaryFilename());
     }
 
     // Shows/hides everything under "Repository settings": the GitLab/GitHub
