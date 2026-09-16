@@ -615,38 +615,53 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
 })();
 
 /* ── GitHub / GitLab repo-settings tab switcher ────────────────────────────── */
+// Lives INSIDE each provider's own .provider-card now (see the markup's
+// own comment) rather than as one separate row above both — so it's
+// mounted TWICE, once per card (#repo-settings-tab-mount inside GitLab's,
+// #repo-settings-tab-mount-github inside GitHub's), each its own React
+// root. Only one is ever visible at a time (whichever card is showing —
+// updateProviderSectionVisibility()), but both need to report the same
+// value, so window.PomRepoTab.setValue fans out to both instead of one.
 (function mountRepoTabControl() {
-  const container = document.getElementById('repo-settings-tab-mount');
-  let set: (v: 'gitlab' | 'github') => void = () => {};
-  function View() {
-    const [value, setValue] = useState<'gitlab' | 'github'>('gitlab');
-    set = setValue;
-    return (
-      // medium, not small: this sits at the top of Repository settings, level
-      // with the row of GitLab/GitHub fields it switches between, not with a
-      // caption-sized chip — the field-box rung Button/SegmentedControl share.
-      // block: this is a two-option dial governing the whole card stack below
-      // it, so it should read as wide as that stack (like the fields inside
-      // it), not hug its own two labels — see SegmentedControl's own `block`
-      // doc, written for exactly this "governs everything under it" case.
-      <SegmentedControl
-        label="Repository provider"
-        size="medium"
-        block
-        value={value}
-        options={[
-          { value: 'github', label: 'GitHub', leading: IconGitHub(16) },
-          { value: 'gitlab', label: 'GitLab', leading: IconGitLab(16) },
-        ]}
-        onChange={(v: string) => window.PomRepoTab.onChange?.(v as 'gitlab' | 'github')}
-      />
-    );
-  }
-  // CARD_LEVEL, matching the real data-level="2" now set on #repo-settings-tabs-row
-  // in the markup (SegmentedControl doesn't read this context itself yet, but every
-  // other mount here keeps this value truthful to its actual DOM level).
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
-  window.PomRepoTab = { onChange: null, setValue: (v) => set(v) };
+  const mountIds = ['repo-settings-tab-mount', 'repo-settings-tab-mount-github'];
+  const setters: Array<(v: 'gitlab' | 'github') => void> = [];
+  mountIds.forEach((mountId) => {
+    const container = document.getElementById(mountId);
+    if (!container) return;
+    let set: (v: 'gitlab' | 'github') => void = () => {};
+    function View() {
+      const [value, setValue] = useState<'gitlab' | 'github'>('gitlab');
+      set = setValue;
+      return (
+        // medium, not small: this sits at the top of each provider's own
+        // card, level with the fields it switches between, not with a
+        // caption-sized chip — the field-box rung Button/SegmentedControl
+        // share. block: this is a two-option dial governing the whole
+        // card's fields below it, so it should read as wide as that card
+        // (like the fields inside it), not hug its own two labels — see
+        // SegmentedControl's own `block` doc, written for exactly this
+        // "governs everything under it" case.
+        <SegmentedControl
+          label="Repository provider"
+          size="medium"
+          block
+          value={value}
+          options={[
+            { value: 'github', label: 'GitHub', leading: IconGitHub(16) },
+            { value: 'gitlab', label: 'GitLab', leading: IconGitLab(16) },
+          ]}
+          onChange={(v: string) => window.PomRepoTab.onChange?.(v as 'gitlab' | 'github')}
+        />
+      );
+    }
+    // CARD_LEVEL — SegmentedControl doesn't read this React context for its
+    // own fill at all (only the plain data-level="3" HTML attribute on the
+    // wrapping div does that now); kept only so this mount's own context
+    // stays consistent with every other mount in this file.
+    flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+    setters.push((v) => set(v));
+  });
+  window.PomRepoTab = { onChange: null, setValue: (v) => setters.forEach((s) => s(v)) };
 })();
 
 /* ── main screen: GitLab / GitHub push destination + folder-path tab ───────
