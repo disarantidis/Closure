@@ -1086,18 +1086,22 @@
        .target-row-title) — so this, the plugin's single most prominent
        piece of text (the Figma file name), was silently rendering at
        whatever default inherited font applied, never a deliberate style.
-       Spelled out in real tokens instead: --type-title-s-*, the same
-       family node.css's own .nd-dialog-title uses (20px/600) — this card
-       is a collapsed view of the same heading the modal shows expanded,
-       so it reads as the same heading at both sizes. color: var(--text)
+       Was then briefly matched to --type-title-s-* (20px/600, .nd-dialog-
+       title's own size) since this card is a collapsed view of the same
+       heading the modal shows expanded — asked instead to read at the
+       same size as every OTHER title on this screen ("GitLab"/"GitHub",
+       "Json file"), so now spelled out in the same --type-body-m-* family
+       those use (.target-row-title / .json-download-title), at their same
+       700 weight, for one consistent title size across the whole app
+       rather than this one card alone reading larger. color: var(--text)
        directly, not --app-heading, for the same frozen-alias reason as
        the icon above. */
     .collections-summary {
-      font-family: var(--type-title-s-font-family);
-      font-size: var(--type-title-s-size);
-      line-height: var(--type-title-s-line-height);
-      font-weight: var(--type-title-s-weight);
-      letter-spacing: var(--type-title-s-letter-spacing);
+      font-family: var(--type-body-m-font-family);
+      font-size: var(--type-body-m-size);
+      line-height: var(--type-body-m-line-height);
+      font-weight: 700;
+      letter-spacing: var(--type-body-m-letter-spacing);
       color: var(--text);
       flex: 1;
       min-width: 0;
