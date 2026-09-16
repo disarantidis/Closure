@@ -344,7 +344,7 @@ mountButton('add-github-btn-mount', { id: 'add-github-btn', variant: 'tonal', si
 mountButton('remove-github-btn-mount', { id: 'remove-github-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitHub' }, CARD_LEVEL);
 mountButton('add-gitlab-btn-mount', { id: 'add-gitlab-btn', variant: 'tonal', size: 'small', label: 'Add' }, CARD_LEVEL);
 mountButton('remove-gitlab-btn-mount', { id: 'remove-gitlab-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitLab' }, CARD_LEVEL);
-mountIconButton('back-btn-mount', { id: 'back-btn', variant: 'ghost', size: 'small', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(16) });
+mountIconButton('back-btn-mount', { id: 'back-btn', variant: 'ghost', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
 mountIconButton('settings-btn-mount', { id: 'settings-btn', variant: 'ghost', size: 'large', title: 'Git settings', 'aria-label': 'Git settings', icon: IconSettings(24) });
 
 /* ── version tag (custom pill) ─────────────────────────────────────────────── */
