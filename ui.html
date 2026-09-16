@@ -381,8 +381,22 @@
     }
     .folder-paths-subtitle {
       margin: 2px 0 0;
-      font: var(--microcopy-regular);
-      letter-spacing: var(--microcopy-regular-letter-spacing);
+      /* --microcopy-regular / --microcopy-regular-letter-spacing (used here
+         until now) are not defined anywhere — not in the vendored kit, not
+         in this file's own :root — so `font: var(--microcopy-regular)`
+         silently failed and this text was inheriting the PAGE's default
+         (16px/400), never the intended 12px microcopy size. Spelled out in
+         the DS's own granular tokens instead, which are real. font-weight
+         is a deliberate 300, not a token: --type-microcopy-weight (400) is
+         already the lightest weight anywhere in this kit's whole type
+         ladder (display 700 down to microcopy 400 — see tokens.css), so
+         "a little lighter" than that has no token to reach for. 300 is a
+         standard light cut most of this stack's font families ship. */
+      font-family: var(--type-microcopy-font-family);
+      font-size: var(--type-microcopy-size);
+      line-height: var(--type-microcopy-line-height);
+      font-weight: 300;
+      letter-spacing: var(--type-microcopy-letter-spacing);
       color: var(--app-text-muted);
       opacity: .7;
     }
