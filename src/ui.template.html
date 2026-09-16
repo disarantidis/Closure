@@ -618,8 +618,19 @@
     /* The GitLab/GitHub tab switcher itself only renders once a second
        provider exists (buttons.tsx mounts a segmented control here) — see
        updateProviderSectionVisibility(). margin-bottom only has an effect
-       while visible, so it's safe to declare unconditionally. */
+       while visible, so it's safe to declare unconditionally. Same
+       padding-left as #dtcg-format-control-mount / #push-target-control-
+       mount below — every section's title gets this indent on itself
+       (.repo-settings-heading > .folder-paths-title) and its control
+       needs the same one restated, since a control has no card padding
+       of its own to inherit it from. This row was missing it: the
+       segmented control sat flush with the row edge (padding-left: 0)
+       while "Repository settings" above it — like every other title on
+       this page — renders its TEXT 22px in from that same edge, so the
+       two never lined up despite the row's own box being correctly
+       positioned. */
     #repo-settings-tabs-row {
+      padding-left: var(--spacing-component-6);
       margin-bottom: 24px;
     }
 
