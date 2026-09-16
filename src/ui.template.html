@@ -714,6 +714,20 @@
       color: var(--app-text-muted);
       flex-shrink: 0;
     }
+    /* data-tense="strong" (the Add/Remove pills' own "already added" look
+       — see updateProviderSectionVisibility()) flattens --background to
+       the accent pole fill on every nested level, which happened to land
+       on the exact same value as --app-text-muted here — the badge's own
+       circle and its icon rendered as one solid colour, the icon
+       vanishing outright. Standing directly on the pole fill instead
+       (background: none) and using --text-on-accent — the tone this DS's
+       own strong/pole system pairs WITH that fill for guaranteed contrast,
+       unlike --app-text-muted which isn't part of that pairing at all —
+       fixes it without guessing at a second grey. */
+    [data-tense='strong'] .provider-logo-badge {
+      background: none;
+      color: var(--text-on-accent);
+    }
     /* Shared header-style card surface — same surface/radius recipe as
        .header-panel. Two users: an added provider's whole connection block
        (.provider-card — heading AND its fields in one container), and the
@@ -2296,15 +2310,19 @@
       updateActionUI();
     }
 
-    // Toggles the DS's own data-scheme="inverted" attribute directly on an
-    // element — the foundation-level mechanism (tokens.css), not a
-    // component prop, so it works on a plain div like #add-gitlab-row the
-    // same way it works on Button/Tag/Tooltip internally.
-    function setScheme(elId, inverted) {
+    // Toggles the DS's own data-tense="strong" attribute directly on an
+    // element — the "standing on the accent/pole colour" axis
+    // (tokens.css), the same one RadioMark/CheckboxMark/SwitchMark already
+    // use for their own checked state, not a component prop, so it works
+    // on a plain div like #add-gitlab-row the same way it works on those
+    // internally. (Tried data-scheme="inverted" first — a plain light/dark
+    // flip, not the bolder accent-coloured fill this was actually asking
+    // for.)
+    function setTense(elId, strong) {
       var el = document.getElementById(elId);
       if (!el) return;
-      if (inverted) el.setAttribute('data-scheme', 'inverted');
-      else el.removeAttribute('data-scheme');
+      if (strong) el.setAttribute('data-tense', 'strong');
+      else el.removeAttribute('data-tense');
     }
 
     // Shows/hides everything under "Repository settings": the GitLab/GitHub
@@ -2347,17 +2365,16 @@
       window.PomAddGitlabBtn.setMode(gitlabAdded ? 'remove' : 'add');
       window.PomAddGithubBtn.setMode(githubAdded ? 'remove' : 'add');
 
-      // A pill for a provider that's already added reads as the DS's own
-      // "inverted" scheme (data-scheme="inverted", tokens.css — the same
-      // foundation-level mechanism Tooltip/Button/Tag already use for
-      // their own inverted states) instead of the row's plain default
-      // fill, so "already included" is visible at a glance, not just from
-      // the trash icon. The trash icon itself stays red regardless — its
-      // own data-scheme="error" (set directly on the button, PomButton's
-      // destructive prop) is more specific than the row's inherited
-      // scheme and wins for that element.
-      setScheme('add-gitlab-row', gitlabAdded);
-      setScheme('add-github-row', githubAdded);
+      // A pill for a provider that's already added stands on the DS's own
+      // accent/pole fill now (data-tense="strong", tokens.css — the same
+      // "checked" look RadioMark/CheckboxMark/SwitchMark already use)
+      // instead of the row's plain default fill, so "already included"
+      // reads at a glance, not just from the trash icon. The trash icon
+      // itself stays red regardless — its own data-scheme="error" (set
+      // directly on the button, PomButton's destructive prop) is more
+      // specific than the row's inherited tense and wins for that element.
+      setTense('add-gitlab-row', gitlabAdded);
+      setTense('add-github-row', githubAdded);
 
       // The big card's OWN inline "Remove ___" button stays a dual-provider-
       // only affordance — the pill above already covers removal in every
