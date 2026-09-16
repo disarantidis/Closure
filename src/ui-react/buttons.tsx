@@ -85,6 +85,12 @@ const IconTrash = svg('M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2
 // rather than restating the mode already on screen.
 const IconSun = svg('M12 2v2 M12 20v2 M4.93 4.93 6.34 6.34 M19.07 19.07 17.66 17.66 M2 12h2 M20 12h2 M4.93 19.07 6.34 17.66 M19.07 4.93 17.66 6.34 M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0');
 const IconMoon = svg('M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z');
+// Same two brand marks as .provider-logo-badge in ui.template.html (the
+// GitLab/GitHub headings on the connection cards below) — identical paths,
+// so the mark reading "GitLab" here is the same tanuki reading "GitLab"
+// two rows down, not a lookalike.
+const IconGitLab = svg('M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024', { fill: true });
+const IconGitHub = svg('M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z', { fill: true });
 
 /* ── size / variant maps (mount prop shape → Pomegranate) ───────────────────── */
 function btnVariant(v?: string): 'primary' | 'tonal' | 'ghost' {
@@ -547,7 +553,10 @@ function checkboxesFromTarget(t: PushTarget): PushCheckboxState {
         size="medium"
         block
         value={value}
-        options={[{ value: 'github', label: 'GitHub' }, { value: 'gitlab', label: 'GitLab' }]}
+        options={[
+          { value: 'github', label: 'GitHub', leading: IconGitHub(16) },
+          { value: 'gitlab', label: 'GitLab', leading: IconGitLab(16) },
+        ]}
         onChange={(v: string) => window.PomRepoTab.onChange?.(v as 'gitlab' | 'github')}
       />
     );
