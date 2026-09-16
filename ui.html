@@ -374,9 +374,23 @@
          (16px/700) also happens to land at the page's own <h1> size (also
          16px, just 600 weight) — was previously scoped to just "Push
          destination" alone; now shared by every section title for a
-         consistent hierarchy across the whole page. */
-      font: var(--body-m-bold);
-      letter-spacing: var(--body-m-bold-letter-spacing);
+         consistent hierarchy across the whole page.
+         --body-m-bold / --body-m-bold-letter-spacing (used here until now)
+         are not defined anywhere — not in the vendored kit, not in this
+         file's own :root — so `font: var(--body-m-bold)` silently failed
+         and every section title was inheriting the PAGE's default
+         (16px/400), never the intended 16px/700. Identical bug to the one
+         fixed on .folder-paths-subtitle just above (flagged there as a
+         follow-up rather than fixed in that commit). Spelled out in the
+         DS's own granular tokens instead, which are real. font-weight is a
+         deliberate 700, not a token: --type-body-m-weight is 400 and this
+         kit has no bold variant of the body-m rung (see tokens.css), so
+         "bold" has no token to reach for here either. */
+      font-family: var(--type-body-m-font-family);
+      font-size: var(--type-body-m-size);
+      line-height: var(--type-body-m-line-height);
+      font-weight: 700;
+      letter-spacing: var(--type-body-m-letter-spacing);
       color: var(--app-text);
     }
     .folder-paths-subtitle {
