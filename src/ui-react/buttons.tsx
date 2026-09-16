@@ -374,9 +374,15 @@ window.PomButtons = {
     { disabled: true, loading: false, success: false, label: null },
     CARD_LEVEL,
   ),
+  // Standard button now, matching Push/"Add Repo Settings" — was icon-only
+  // (icon: IconDownload(...), no visible text) and tonal, the odd one out
+  // beside those two filled, labeled buttons. leftIcon/buttonLeftIcon (not
+  // icon) is what tells PomButton's iconOnly check to render label text
+  // instead of collapsing to shape="square" — see PomButton's own comment
+  // on that prop bag split.
   download: mountLiveIconButton(
     'download-btn-mount',
-    { id: 'download-btn', variant: 'tonal', size: 'large', icon: IconDownload(24), label: 'Download', title: 'Download' },
+    { id: 'download-btn', variant: 'filled', size: 'large', leftIcon: true, buttonLeftIcon: IconDownload(24), label: 'Download', title: 'Download' },
     true,
     CARD_LEVEL,
   ),
@@ -687,7 +693,10 @@ mountOnce('json-download-icon-skeleton-mount', <Skeleton shape="circle" size={16
 mountOnce('json-download-title-skeleton-mount', <Skeleton shape="block" width={80} height={16} label="" />, TOP_CARD_LEVEL);
 mountOnce('json-download-tag-skeleton-mount', <Skeleton shape="block" width={60} height={22} label="" />, TOP_CARD_LEVEL);
 mountOnce('json-download-field-skeleton-mount', <Skeleton shape="block" height={44} width={'100%'} label="" />, TOP_CARD_LEVEL);
-mountOnce('json-download-btn-skeleton-mount', <Skeleton shape="block" width={44} height={44} label="" />, TOP_CARD_LEVEL);
+// 130x44, not the old 44x44 square — the real Download button is a
+// labeled button now (icon + "Download" text, ~151px wide), not an
+// icon-only square, so its skeleton widened to match.
+mountOnce('json-download-btn-skeleton-mount', <Skeleton shape="block" width={130} height={44} label="" />, TOP_CARD_LEVEL);
 // Mirrors the real push-settings card's current shape: a small icon+title
 // row (whichever provider ends up shown — GitLab or GitHub, not known
 // yet), one full-width folder-path field (the filename field that used to
