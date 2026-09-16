@@ -603,15 +603,21 @@
       background: var(--background);
       border-radius: 24px;
       margin-bottom: 24px;
-      /* NOT a negative margin. The card's own EDGE is one of the things
-         that has to sit on the page's single shared left/right line —
-         same x as the settings gear, "Output format", "Push destination",
-         the Repository-settings tab switcher — same as .settings-page-
-         content's plain 16px inset gives every un-carded heading, with no
-         adjustment here. (A negative margin used to sit here pulling the
-         box OUT to compensate for its own 14px padding and line up the
-         card's CONTENT instead — wrong axis: that put the card's edge
-         outside everything else's line, which is the actual defect.) */
+      /* The card's own EDGE follows the section titles' line, not the
+         page's plain 16px inset: every title's TEXT and every control
+         beside it (the DTCG switch, the push-target checkboxes, the
+         Repository-settings tab switcher) sits an extra 22px past that
+         plain inset (.folder-paths-title's own padding-left, and each
+         control row's own padding). The card used to stop at the plain
+         16px line instead, so it read wider on both sides than the
+         title/control it visually belongs to — asked to follow the
+         titles, whole box and not just its content, once that mismatch
+         became visible next to the now-block-filled tab switcher above
+         it. margin, not padding: the card's own 14px/10px padding below
+         still positions its CONTENT; this shifts the whole box in
+         equally on both sides. */
+      margin-left: var(--spacing-component-6);
+      margin-right: var(--spacing-component-6);
     }
     /* Evenly inset on all four sides: the heading and every field below it
        sit against the same left edge. */
