@@ -985,17 +985,15 @@
       gap: 6px;
     }
 
-    /* More breathing room than the vendored Tag's own small-rung default
-       (--spacing-component-0 --spacing-component-2, node.css's
-       .nd-tag.s-small) — mainly top/bottom, so the chip doesn't read as
-       cramped against its bold label text. Targeted a .PomTagStatic
-       class/variable before, from an earlier (pre-Pomegranate) Tag
-       component — the vendored one renders .nd-tag with no such hook, so
-       this never actually applied; caught while making these tags visible
-       (ghost → tonal, buttons.tsx) for the same "missing tags" report. */
-    .collections-summary-tags .nd-tag.s-small {
-      padding: var(--spacing-component-3) var(--spacing-component-4);
-    }
+    /* Tag's own small-rung default (node.css's .nd-tag.s-small:
+       --spacing-component-0/-2 padding) — no override. There used to be
+       one here asking for more breathing room, restored from a dead
+       .PomTagStatic hook that never actually matched the vendored
+       component (see git history); once these tags were actually visible
+       for the first time (ghost → tonal, plus the window.PomDtcg fix),
+       that padding read as too large in the real plugin. Dropped rather
+       than tuned smaller still, so these match the per-row count tags
+       below (.collection-item .nd-tag), which never had an override. */
 
     /* contentSlot: the read-only per-collection rows, revealed on expand. */
     .collections-readonly-list {
