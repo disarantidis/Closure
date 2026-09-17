@@ -48573,6 +48573,12 @@ react/cjs/react-jsx-runtime.development.js:
     if (typeof value !== 'string') return null;
     var trimmed = value.trim();
     if (/^-?[\d.]+$/.test(trimmed)) return parseFloat(trimmed); // a plain numeric literal
+    // A referenced token can itself be a 'number'-type percentage literal
+    // (line-heights.100 -> '100%') rather than a dimension — same % ->
+    // /100 rule toDtcgNumber uses below, so a reference chain can freely
+    // cross between dimension and number tokens.
+    var pct = /^(-?[\d.]+)%$/.exec(trimmed);
+    if (pct) return parseFloat(pct[1]) / 100;
     if (trimmed.indexOf('{') === -1) return null; // no reference — not a math expression at all
     return evaluateDimensionMath(root, trimmed, depth || 0);
   }
@@ -48591,16 +48597,23 @@ react/cjs/react-jsx-runtime.development.js:
   // Legacy JSON 'number' (lineHeights/opacity/number — everything TYPE_MAP
   // maps to DTCG's plain 'number' type) is the one dimension-family type
   // that ISN'T a composite — DTCG just wants a real number. Legacy JSON
-  // carries it two ways: a percentage string ('130%', Figma's own line-
+  // carries it three ways: a percentage string ('130%', Figma's own line-
   // height-as-percent convention — divide by 100 to match the reference
-  // file's own 1.3) or a plain numeric string ('24'). A reference ('{ref}')
-  // is left exactly as it is, same convention as every other type here —
-  // number has no arithmetic layer of its own to resolve one against.
-  function toDtcgNumber(value) {
+  // file's own 1.3), a plain numeric string ('24'), or the same math-
+  // expression grammar dimension uses — e.g. a computed line-height,
+  // '({breakpoint.typography.display.size} / 100) * {line-heights.100}' —
+  // resolved with the exact same evaluator (resolveDimensionNumber, which
+  // also knows how to read a referenced number token's own '%' literal).
+  // A reference this can't fully resolve is left exactly as it is, same
+  // convention as every other type here.
+  function toDtcgNumber(value, root) {
     if (typeof value === 'number') return value;
     if (typeof value !== 'string') return value;
     var trimmed = value.trim();
-    if (trimmed.indexOf('{') !== -1) return value;
+    if (trimmed.indexOf('{') !== -1) {
+      var resolved = root ? resolveDimensionNumber(root, trimmed, 0) : null;
+      return resolved === null ? value : resolved;
+    }
     var pct = /^(-?[\d.]+)%$/.exec(trimmed);
     if (pct) return parseFloat(pct[1]) / 100;
     if (/^-?[\d.]+$/.test(trimmed)) return parseFloat(trimmed);
@@ -48705,7 +48718,7 @@ react/cjs/react-jsx-runtime.development.js:
     } else if (dtcgType === 'color') {
       value = toDtcgColor(value);
     } else if (dtcgType === 'number') {
-      value = toDtcgNumber(value);
+      value = toDtcgNumber(value, root);
     }
 
     // Only what's STILL a math expression after the dimension resolver above
