@@ -3,9 +3,9 @@
  * dtcg-descriptions.js — read the deduplicated description map.
  *
  * The exporter stores each description once, at the document root, keyed by the
- * token path (see "Descriptions are stored once, at the root" in DTCG_FORMAT.md).
- * This is the reference reader for that, meant to be copied into — or required
- * by — config/normalize/build-dtcg.js in the RADD design-tokens repo.
+ * token path (see the description-dedupe note in DTCG.md). This is the
+ * reference reader for that, meant to be copied into — or required by —
+ * a downstream build-dtcg.js step that finishes the DTCG conversion.
  *
  * Integration is one line. Call inlineDescriptions() on the parsed document
  * before anything else touches it, and every token carries its own
@@ -24,7 +24,7 @@
  */
 'use strict';
 
-var EXT_EXPORTER = 'com.desquared.radd.json-exporter';
+var EXT_EXPORTER = 'com.closure.json-exporter';
 
 function isObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);

@@ -14,12 +14,10 @@
  *
  * Three output shapes:
  *
- *   'partial'  — a minimal rename of value/type/description, matching what
- *                config/normalize/build-dtcg.js consumes downstream as
- *                packages/radd/src/tokens_W3C.json; proprietary type names, composite
- *                shapes, embedded math and $themes/$metadata all stay put.
- *                This is the production target — build-dtcg.js finishes the
- *                conversion into strict, standards-only DTCG.
+ *   'partial'  — a minimal rename of value/type/description; proprietary
+ *                type names, composite shapes, embedded math and
+ *                $themes/$metadata all stay put, for a downstream build step
+ *                that finishes the conversion into strict, standards-only DTCG.
  *
  *   'sets'     — like 'partial' but with the strict type mapping and composite
  *                rewriting applied, and $themes/$metadata moved into
@@ -35,7 +33,7 @@
 (function (global) {
   'use strict';
 
-  var EXT = 'com.radd.legacyJson';
+  var EXT = 'com.closure.legacyJson';
 
   // Legacy JSON type → DTCG $type. Anything absent here has no DTCG equivalent
   // and is passed through verbatim (and counted in the report) rather than
@@ -204,9 +202,8 @@
   // This partial DTCG export is a minimal rename: value/type/description
   // become $value/$type/$description and nothing else changes — proprietary type
   // names (boxShadow, fontSizes, …), composite shapes, embedded math and
-  // stringified values all stay. That is what config/normalize/build-dtcg.js
-  // consumes downstream (packages/radd/src/tokens_W3C.json), which finishes the
-  // conversion into strict DTCG.
+  // stringified values all stay, for a downstream build-dtcg.js step that
+  // finishes the conversion into strict DTCG.
   //
   // Crucially $themes and $metadata stay at the document root in their native
   // form: build-dtcg.js resolves per theme and reads selectedTokenSets from them.
@@ -225,7 +222,7 @@
   // Precedence for a consumer: an inline $description on a token always wins
   // over the map. Two variables sharing a path with different text is the only
   // case that produces one, and it keeps that export lossless.
-  var EXT_EXPORTER = 'com.desquared.radd.json-exporter';
+  var EXT_EXPORTER = 'com.closure.json-exporter';
 
   function toPartialToken(node, path, report, dedupe) {
     var out = {};

@@ -41,7 +41,7 @@ W3C DTCG**, not an intermediate shape that needs another tool to finish:
   merge in — so the output needs no companion file to be complete.
 - **Figma variable descriptions** ride along as `$description` on each token.
 - Vendor/Legacy-JSON-only metadata (which sets built the document, its
-  `tokenSetOrder`) is confined to a root `$extensions.com.radd.legacyJson`
+  `tokenSetOrder`) is confined to a root `$extensions.com.closure.legacyJson`
   block, which a strict DTCG consumer can simply ignore.
 - **The file name swaps with the format** so a DTCG export never overwrites the
   default JSON: `tokens.json` → `tokens_dtcg.json`. Suffixing and stripping are

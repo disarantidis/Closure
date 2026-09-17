@@ -169,7 +169,7 @@ function run() {
     partial.report.sourceTypes.boxShadow === 1);
 
   // --- description dedupe ---------------------------------------------------
-  const DESC_MAP = 'com.desquared.radd.json-exporter';
+  const DESC_MAP = 'com.closure.json-exporter';
   const descriptions = pt.$extensions && pt.$extensions[DESC_MAP] &&
     pt.$extensions[DESC_MAP].descriptions;
 
@@ -235,7 +235,7 @@ function run() {
 
     check('switching on suffixes the name', on.dtcgFilename('tokens.json') === 'tokens_dtcg.json');
     check('switching off strips it again', on.plainFilename('tokens_dtcg.json') === 'tokens.json');
-    check('a customised name keeps its stem', on.dtcgFilename('radd.json') === 'radd_dtcg.json');
+    check('a customised name keeps its stem', on.dtcgFilename('custom.json') === 'custom_dtcg.json');
     check('suffixing twice is a no-op', on.dtcgFilename('tokens_dtcg.json') === 'tokens_dtcg.json');
     check('stripping a plain name is a no-op', on.plainFilename('tokens.json') === 'tokens.json');
     check('round-trips exactly', on.plainFilename(on.dtcgFilename('a.b.json')) === 'a.b.json');
@@ -252,7 +252,7 @@ function run() {
     check('a legacy _W3C name migrates to _dtcg, not tokens_W3C_dtcg',
       on.dtcgFilename('tokens_W3C.json') === 'tokens_dtcg.json');
     check('a legacy suffix on a customised stem migrates too',
-      on.dtcgFilename('radd_W3C.json') === 'radd_dtcg.json');
+      on.dtcgFilename('custom_W3C.json') === 'custom_dtcg.json');
   }
 
   // --- the reader build-dtcg.js will use --------------------------------------
@@ -297,7 +297,7 @@ function run() {
   check('typography $value holds only the five DTCG sub-values',
     typo.$type === 'typography' && Object.keys(typo.$value).length === 5);
   check('non-DTCG typography sub-values move to $extensions',
-    !!typo.$extensions['com.radd.legacyJson'].typography.textCase);
+    !!typo.$extensions['com.closure.legacyJson'].typography.textCase);
 }
 
 try {

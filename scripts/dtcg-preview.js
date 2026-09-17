@@ -7,12 +7,12 @@
 //   node scripts/dtcg-preview.js tokens.json --shape themes -o dtcg.json
 //   node scripts/dtcg-preview.js tokens.json --compare path/to/tokens_W3C.json
 //
-// `tokens.json` is whatever the plugin currently downloads/pushes (the Token
-// Studio tree with its $themes / $metadata).
+// `tokens.json` is whatever the plugin currently downloads/pushes (the Legacy
+// JSON tree with its $themes / $metadata).
 //
-// --compare structurally diffs the 'partial' output against a real Tokens Studio
-// DTCG export, to confirm it is a drop-in replacement for the file that
-// config/normalize/build-dtcg.js consumes.
+// --compare structurally diffs the 'partial' output against a reference DTCG
+// export, to confirm it is a drop-in replacement for the file a downstream
+// build-dtcg.js step consumes.
 //
 const fs = require('fs');
 const path = require('path');
@@ -77,9 +77,9 @@ function compare(mineTree, theirsPath) {
   // so every line below would differ by design and the report would be noise.
   if (!b.hasThemes) {
     console.log('  NOTE: this file has no $themes, so it looks like a build-dtcg.js');
-    console.log('        OUTPUT (radd.tokens.json / a per-theme document) rather than');
-    console.log('        its input. Compare against packages/radd/src/tokens_W3C.json');
-    console.log('        instead — differences below are expected and not actionable.\n');
+    console.log('        OUTPUT (a per-theme document) rather than its input.');
+    console.log('        Compare against that step\'s own input file instead —');
+    console.log('        differences below are expected and not actionable.\n');
   }
   console.log(`    ${''.padEnd(28)} ${'plugin'.padEnd(22)} reference`);
   line('token nodes', a.tokens, b.tokens);
