@@ -128,19 +128,21 @@
   // resolve the math form into, so wrapping either in { value, unit } would
   // turn a real reference into a broken literal instead of leaving it as
   // the reference/math-expression report already surfaces it to be.
-  // Resolves ONLY the documented shape of this kit's own dimension math
-  // layer — a single number and a single {path.to.token} reference joined
-  // by one operator, either order ('5*{dimension.base}', matching code.js's
-  // own "dimension.N -> N*{dimension.base} when divisible" comment, or
-  // '{dimension.1}*0.25', found the same way the composite bugs were: by
-  // diffing a real export against a known-correct reference and sampling
-  // what was still left unresolved) — never arbitrary arithmetic. `root` is
-  // the same tree convertTree is walking (a theme's merged sets, or one set
-  // for 'sets' shape); the reference path is relative to it, exactly as
-  // Legacy JSON already writes it. Recurses through a chain of references
-  // (one dimension math expression pointing at another) with a depth guard
-  // against a cycle; returns null on anything it cannot fully resolve to a
-  // number, so the caller can fall back to leaving the expression as-is.
+  // Resolves this kit's own dimension math layer to a number — from the
+  // single documented shape ('5*{dimension.base}', code.js's own
+  // "dimension.N -> N*{dimension.base} when divisible" comment) up through
+  // a real small arithmetic grammar (+ - * / , parentheses, unary minus,
+  // and the one function call a real export was found to use: roundTo),
+  // because a real expression was found that needed it:
+  // '(roundTo({breakpoint.stretch-grid.column-width} * 4) + {dimension.2})'.
+  // `root` is the same tree convertTree is walking (a theme's merged sets,
+  // or one set for 'sets' shape); every {path.to.token} reference is
+  // relative to it, exactly as Legacy JSON already writes it, and resolves
+  // recursively — a referenced token that is itself a math expression
+  // resolves too — with a depth guard against a reference cycle. Returns
+  // null on anything outside this grammar or any reference it can't fully
+  // resolve, so the caller always has a safe "leave it as the original
+  // string" fallback: this must never partially resolve or guess.
   function resolveDimensionRef(root, refPath, depth) {
     if (depth > 10) return null;
     var parts = refPath.split('.');
@@ -153,14 +155,145 @@
     return resolveDimensionNumber(root, node.value, depth + 1);
   }
 
-  var DIMENSION_MATH_NUM_FIRST_RE = /^(-?[\d.]+)\s*([*/+-])\s*\{([^{}]+)\}$/;
-  var DIMENSION_MATH_REF_FIRST_RE = /^\{([^{}]+)\}\s*([*/+-])\s*(-?[\d.]+)$/;
+  function DimensionMathError(message) {
+    this.message = message;
+  }
 
-  function applyOp(op, a, b) {
-    if (op === '*') return a * b;
-    if (op === '/') return b === 0 ? null : a / b;
-    if (op === '+') return a + b;
-    return a - b;
+  function tokenizeDimensionMath(src) {
+    var tokens = [];
+    var i = 0;
+    while (i < src.length) {
+      var c = src.charAt(i);
+      if (/\s/.test(c)) { i++; continue; }
+      if (c === '{') {
+        var end = src.indexOf('}', i);
+        if (end === -1) throw new DimensionMathError('unterminated reference');
+        tokens.push({ type: 'ref', value: src.slice(i + 1, end) });
+        i = end + 1;
+        continue;
+      }
+      if (/[\d.]/.test(c)) {
+        var j = i;
+        while (j < src.length && /[\d.]/.test(src.charAt(j))) j++;
+        tokens.push({ type: 'num', value: parseFloat(src.slice(i, j)) });
+        i = j;
+        continue;
+      }
+      if (/[a-zA-Z_]/.test(c)) {
+        var k = i;
+        while (k < src.length && /[a-zA-Z0-9_]/.test(src.charAt(k))) k++;
+        tokens.push({ type: 'ident', value: src.slice(i, k) });
+        i = k;
+        continue;
+      }
+      if ('+-*/(),'.indexOf(c) !== -1) {
+        tokens.push({ type: c });
+        i++;
+        continue;
+      }
+      throw new DimensionMathError('unexpected character: ' + c);
+    }
+    return tokens;
+  }
+
+  // Deliberately just the one function a real export was found to use —
+  // not a general math-function library. roundTo(x) rounds to the nearest
+  // integer; roundTo(x, n) rounds to n decimal places, matching the
+  // conventional meaning of the name (Tokens Studio's own math layer).
+  function callDimensionMathFn(name, args) {
+    if (name === 'roundTo') {
+      var x = args[0];
+      var n = args.length > 1 ? args[1] : 0;
+      var factor = Math.pow(10, n);
+      return Math.round(x * factor) / factor;
+    }
+    throw new DimensionMathError('unsupported function: ' + name);
+  }
+
+  // A small recursive-descent parser that evaluates as it goes — this
+  // grammar is small and only ever walked once per token, so building a
+  // separate AST first would be pure overhead. Standard precedence:
+  // + / - bind loosest, * // bind tighter, unary minus tightest before a
+  // parenthesised group or a call.
+  function parseDimensionMath(tokens, resolveRef) {
+    var pos = 0;
+    function peek() { return tokens[pos]; }
+    function next() { return tokens[pos++]; }
+    function expect(type) {
+      var t = next();
+      if (!t || t.type !== type) throw new DimensionMathError('expected ' + type);
+      return t;
+    }
+    function parseExpression() {
+      var value = parseTerm();
+      while (peek() && (peek().type === '+' || peek().type === '-')) {
+        var op = next().type;
+        var rhs = parseTerm();
+        value = op === '+' ? value + rhs : value - rhs;
+      }
+      return value;
+    }
+    function parseTerm() {
+      var value = parseUnary();
+      while (peek() && (peek().type === '*' || peek().type === '/')) {
+        var op = next().type;
+        var rhs = parseUnary();
+        if (op === '/') {
+          if (rhs === 0) throw new DimensionMathError('division by zero');
+          value = value / rhs;
+        } else {
+          value = value * rhs;
+        }
+      }
+      return value;
+    }
+    function parseUnary() {
+      if (peek() && peek().type === '-') { next(); return -parseUnary(); }
+      if (peek() && peek().type === '+') { next(); return parseUnary(); }
+      return parsePrimary();
+    }
+    function parsePrimary() {
+      var t = peek();
+      if (!t) throw new DimensionMathError('unexpected end of expression');
+      if (t.type === 'num') { next(); return t.value; }
+      if (t.type === 'ref') { next(); return resolveRef(t.value); }
+      if (t.type === '(') {
+        next();
+        var v = parseExpression();
+        expect(')');
+        return v;
+      }
+      if (t.type === 'ident') {
+        next();
+        expect('(');
+        var args = [parseExpression()];
+        while (peek() && peek().type === ',') { next(); args.push(parseExpression()); }
+        expect(')');
+        return callDimensionMathFn(t.value, args);
+      }
+      throw new DimensionMathError('unexpected token: ' + t.type);
+    }
+    var result = parseExpression();
+    if (pos !== tokens.length) throw new DimensionMathError('trailing input');
+    return result;
+  }
+
+  // The one entry point into the grammar above: evaluate a Legacy JSON
+  // dimension math expression to a number, or null if it isn't one / can't
+  // be fully resolved. Catches everything, not just DimensionMathError —
+  // one malformed or unexpected token must never crash the whole export,
+  // only fail to resolve that one value.
+  function evaluateDimensionMath(root, src, depth) {
+    try {
+      var tokens = tokenizeDimensionMath(src);
+      return parseDimensionMath(tokens, function (refPath) {
+        var v = resolveDimensionRef(root, refPath, depth);
+        if (v === null) throw new DimensionMathError('unresolved reference: ' + refPath);
+        return v;
+      });
+    } catch (e) {
+      return null;
+    }
   }
 
   function resolveDimensionNumber(root, value, depth) {
@@ -168,20 +301,8 @@
     if (typeof value !== 'string') return null;
     var trimmed = value.trim();
     if (/^-?[\d.]+$/.test(trimmed)) return parseFloat(trimmed); // a plain numeric literal
-
-    var m = DIMENSION_MATH_NUM_FIRST_RE.exec(trimmed);
-    if (m) {
-      var refVal = resolveDimensionRef(root, m[3], depth || 0);
-      return refVal === null ? null : applyOp(m[2], parseFloat(m[1]), refVal);
-    }
-
-    m = DIMENSION_MATH_REF_FIRST_RE.exec(trimmed);
-    if (m) {
-      var refVal2 = resolveDimensionRef(root, m[1], depth || 0);
-      return refVal2 === null ? null : applyOp(m[2], refVal2, parseFloat(m[3]));
-    }
-
-    return null;
+    if (trimmed.indexOf('{') === -1) return null; // no reference — not a math expression at all
+    return evaluateDimensionMath(root, trimmed, depth || 0);
   }
 
   function toDtcgDimension(value, root) {
@@ -193,6 +314,25 @@
     var n = typeof value === 'number' ? value : parseFloat(value);
     if (isNaN(n)) return value; // not actually numeric — leave it rather than guess
     return { value: n, unit: 'px' };
+  }
+
+  // Legacy JSON 'number' (lineHeights/opacity/number — everything TYPE_MAP
+  // maps to DTCG's plain 'number' type) is the one dimension-family type
+  // that ISN'T a composite — DTCG just wants a real number. Legacy JSON
+  // carries it two ways: a percentage string ('130%', Figma's own line-
+  // height-as-percent convention — divide by 100 to match the reference
+  // file's own 1.3) or a plain numeric string ('24'). A reference ('{ref}')
+  // is left exactly as it is, same convention as every other type here —
+  // number has no arithmetic layer of its own to resolve one against.
+  function toDtcgNumber(value) {
+    if (typeof value === 'number') return value;
+    if (typeof value !== 'string') return value;
+    var trimmed = value.trim();
+    if (trimmed.indexOf('{') !== -1) return value;
+    var pct = /^(-?[\d.]+)%$/.exec(trimmed);
+    if (pct) return parseFloat(pct[1]) / 100;
+    if (/^-?[\d.]+$/.test(trimmed)) return parseFloat(trimmed);
+    return value; // not a recognised numeric shape — leave it rather than guess
   }
 
   // code.js's own formatValue() is what colors already look like by the time
@@ -292,6 +432,8 @@
       value = toDtcgDimension(value, root);
     } else if (dtcgType === 'color') {
       value = toDtcgColor(value);
+    } else if (dtcgType === 'number') {
+      value = toDtcgNumber(value);
     }
 
     // Only what's STILL a math expression after the dimension resolver above
