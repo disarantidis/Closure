@@ -158,6 +158,22 @@ letting the loss pass silently:
     it has no level for: .secondary, .section, .card
 ```
 
+### Descriptions
+
+A Figma variable description is carried through as `$description`, the same as
+in the shipped export. It is never mandatory: a token without one has **no
+`$description` key at all** rather than an empty one, and the CLI flags it as a
+bug if any empty ones appear.
+
+A token carries its **own** description, not the one belonging to whatever it
+resolves to — a semantic token and the primitive under it describe different
+things, and inheriting would attribute the primitive's note to every token
+routed through it.
+
+```
+$description 119996 (93% of tokens)
+```
+
 ### Token types
 
 In descending order of authority: a `typeHints` answer, then the variable's own

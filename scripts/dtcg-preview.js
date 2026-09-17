@@ -187,6 +187,21 @@ function countTokens(node) {
   return n;
 }
 
+// Tokens carrying a Figma description. A token without one has no $description
+// key at all rather than an empty one, so an empty count above zero is a bug.
+function countDescribed(node) {
+  let described = 0, empty = 0;
+  (function walk(x) {
+    if (!x || typeof x !== 'object') return;
+    if ('$value' in x || 'value' in x) {
+      if ('$description' in x) { if (x.$description) described++; else empty++; }
+      return;
+    }
+    Object.keys(x).forEach((k) => { if (k.charAt(0) !== '$') walk(x[k]); });
+  })(node);
+  return { described: described, empty: empty };
+}
+
 function previewResolved(source, args) {
   if (!Array.isArray(source)) {
     console.error(
@@ -245,6 +260,20 @@ function previewResolved(source, args) {
   console.log(`\n${branchTotal} real branches` +
     (naive > 1 ? ` (a naive product of the ${cls.axes.length} axes would be ${naive})` : '') +
     `, ${emitted} tokens emitted`);
+
+  let described = 0, emptyDesc = 0, totalTok = 0;
+  Object.keys(res.primitives).forEach((k) => {
+    const d = countDescribed(res.primitives[k]);
+    described += d.described; emptyDesc += d.empty; totalTok += countTokens(res.primitives[k]);
+  });
+  Object.keys(res.groups).forEach((k) => res.groups[k].branches.forEach((b) => {
+    const d = countDescribed(b.tokens);
+    described += d.described; emptyDesc += d.empty; totalTok += countTokens(b.tokens);
+  }));
+  const dpct = totalTok ? Math.round((described / totalTok) * 100) : 0;
+  console.log(`$description ${described} (${dpct}% of tokens)` +
+    (described === 0 ? '  — the graph carries none, or was captured before descriptions were exported' : ''));
+  if (emptyDesc) console.log(`  ! ${emptyDesc} tokens carry an EMPTY $description — it should be absent instead`);
 
   // Ragged paths are the point, so say so when they occur rather than look wrong.
   const depths = new Set();

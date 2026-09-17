@@ -66,6 +66,18 @@
     node[parts[parts.length - 1]] = value;
   }
 
+  /*
+    A legacy token node. `description` is carried only when the variable has
+    one: dtcg-format.js renames a truthy description to $description and skips
+    it otherwise, so an undescribed token stays exactly as it was rather than
+    gaining an empty field.
+  */
+  function tokenNode(value, type, description) {
+    var node = { value: value, type: type };
+    if (description) node.description = description;
+    return node;
+  }
+
   function lookupDotted(tree, path) {
     var parts = path.split('.');
     var node = tree;
@@ -391,7 +403,7 @@
       var modeId = (coll.modes[0] || {}).modeId;
       var tree = {};
       (coll.variables || []).forEach(function (v) {
-        setDeep(tree, v.name, { value: fmt(v.valuesByMode[modeId]), type: typeOf(v) });
+        setDeep(tree, v.name, tokenNode(fmt(v.valuesByMode[modeId]), typeOf(v), v.description));
       });
       primitives[name] = tree;
     });
@@ -419,10 +431,17 @@
         var tree = {};
         members.forEach(function (plan) {
           var nm = rename(plan.variable.name, key, prefix);
-          setDeep(tree, nm, {
-            value: refOrValue(plan.variable, full),
-            type: typeOf(plan.variable)
-          });
+          /*
+            The token's OWN description, not the one on whatever it resolves
+            to. A semantic token and the primitive under it describe different
+            things, and inheriting would attribute the primitive's note to
+            every token that routes through it.
+          */
+          setDeep(tree, nm, tokenNode(
+            refOrValue(plan.variable, full),
+            typeOf(plan.variable),
+            plan.variable.description
+          ));
         });
 
         return {
