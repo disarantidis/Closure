@@ -85,8 +85,12 @@ function loadFilenameHelpers() {
   const uiPath = path.join(ROOT, 'ui.html');
   if (!fs.existsSync(uiPath)) return null;
   const html = fs.readFileSync(uiPath, 'utf8');
+  // Anchored on declarations rather than on prose: the previous end marker was
+  // a comment ('// Rewrite both providers'), it was reworded, and the block
+  // silently stopped being found — which skipped every file-name check below
+  // while the suite still reported a near-perfect count.
   const start = html.indexOf("var DEFAULT_FILENAME = 'tokens.json';");
-  const end = html.indexOf('// Rewrite both providers');
+  const end = html.indexOf('function applyFilenameForFormat');
   if (start < 0 || end < 0 || end <= start) return null;
   const block = html.slice(start, end);
   // defaultFilename() closes over dtcgShape in the real UI; inject it here.
@@ -229,6 +233,10 @@ function run() {
   // --- the _dtcg file-name swap ---------------------------------------------
   const makeHelpers = loadFilenameHelpers();
   check('file-name helpers found in the built ui.html', !!makeHelpers);
+  if (!makeHelpers) {
+    // Say what was lost. A silently shorter run is worse than a failing one.
+    check('...and therefore the 13 file-name checks below actually ran', false);
+  }
   if (makeHelpers) {
     const off = makeHelpers(null);
     const on = makeHelpers('partial');

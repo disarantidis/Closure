@@ -2624,6 +2624,12 @@ figma.ui.onmessage = function(msg) {
                 resolvedValuesByMode: resolvedValuesByMode,
                 aliasInfo: aliasInfo,
                 codeSyntax: variable.codeSyntax,
+                // Where Figma allows this variable to be used (CORNER_RADIUS, GAP,
+                // FONT_SIZE, ...). It is the same semantic distinction the token
+                // types key off, stated as metadata rather than inferred from a
+                // name, so the resolved shape can derive types instead of being
+                // handed a naming table. Nothing in the default export reads it.
+                scopes: variable.scopes || [],
                 description: variable.description || ''
               });
             });
@@ -2633,6 +2639,10 @@ figma.ui.onmessage = function(msg) {
                 id: col.id,
                 name: col.name,
                 modes: col.modes,
+                // Which mode answers when nothing has chosen one. Resolving a
+                // graph without it has to guess modes[0], which is the only
+                // answer for a single-mode collection and a guess for the rest.
+                defaultModeId: col.defaultModeId,
                 variables: variables
               };
             });

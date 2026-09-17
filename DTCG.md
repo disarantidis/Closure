@@ -69,6 +69,129 @@ npm run dtcg:preview -- <export.json>   # convert an existing export + report
 npm run dtcg:selftest                   # format / description-dedupe / file-name checks
 ```
 
+## The resolved shape (`--shape resolved`)
+
+An experimental fourth shape, reachable **only** from the CLI — the plugin's
+Settings switch does not offer it and no shipped export changes.
+
+Where the three shapes above mirror how a file is *authored* (one document per
+collection x mode, alias hops kept as cross-document references), this one
+mirrors how it is *consumed*: the routing resolved away, each token sitting
+under exactly the choices it actually varies with, referencing the primitive
+collection rather than inlining values.
+
+```bash
+node scripts/dtcg-preview.js <graph.json> --shape resolved \
+     [--config scripts/resolved-config.example.js] [-o out.json]
+```
+
+### It takes a raw variable graph, not a token tree
+
+`<graph.json>` is the array of collections `extractVariables()` produces in
+`code.js`, with `valuesByMode` and `{ type: 'VARIABLE_ALIAS', id }` intact.
+A Legacy JSON or DTCG export **cannot** stand in: both have already collapsed
+the alias hops this shape exists to resolve. Hand it one and it says so and
+exits 1.
+
+To get one out of the plugin, run an extract and press **Cmd/Ctrl + Shift + G**.
+That downloads `<file name>.graph.json` — the raw extraction the UI is already
+holding. It is bound to a chord rather than given a button because it is for
+working on the exporter, not for exporting: nothing in the UI advertises it and
+no product flow depends on it.
+
+The extraction carries two fields only this shape reads:
+
+| field | why |
+|---|---|
+| `scopes` | where Figma allows a variable to be used (`CORNER_RADIUS`, `GAP`, `FONT_SIZE`) — the same semantic distinction token types key off, as metadata instead of a name |
+| `defaultModeId` | which mode answers when nothing has chosen one; without it a resolver has to guess `modes[0]` |
+
+Both are additive and the default export ignores them.
+
+### Nothing about the shape is configured
+
+`src/resolve-architecture.js` and `src/emit-resolved.js` measure every
+structural fact from the graph: which collection holds raw values (out-degree
+0), which variables are consumed (per-variable in-degree 0), what the axes are
+(multi-mode collections), what order to nest them in (observed precedence,
+topologically sorted), which axes each token varies with (resolve it and see
+what the walk entered), and which branches actually exist.
+
+Verified on two unrelated systems. One has 11 collections and 5 axes; the other
+has 14 and 7, including two the first does not have at all:
+
+```
+axis order   .breakpoint > .scheme > .mode > _restricted > .secondary
+44 real branches (a naive product of the 5 axes would be 3600)
+
+axis order   .breakpoint > .scheme > _restricted > .mode > .section > .card > .secondary
+670 real branches (a naive product of the 7 axes would be 36000)
+```
+
+Branch paths are **ragged on purpose**: a branch records only the questions its
+walk asked, so a scheme that never routes through the light/dark switch is one
+branch, not two identical ones.
+
+### What `--config` supplies is vocabulary
+
+See `scripts/resolved-config.example.js`. It carries only what is true of one
+design system and unknowable from its graph:
+
+| key | what it is for |
+|---|---|
+| `pin` | axes to hold at one mode rather than branch over |
+| `renameMode` | what to call a mode in the output path |
+| `renameToken` | namespaces implied by the group, removed from the leaf |
+| `typeHints` | semantic types a file's names carry but its metadata does not |
+| `toDocument` | optional: reshape the derived groups into a house layout |
+
+Without a config the emitter still runs and reports the derived shape.
+
+`toDocument` maps branches onto fixed nesting levels, so it can only carry the
+axes it has somewhere to put. Point a layout at a file with an axis it was not
+written for and the surplus branches collide; the CLI counts the derived total
+against what the layout kept and names the axes it had no level for rather than
+letting the loss pass silently:
+
+```
+  ! the layout kept 9182 of 129646 derived tokens (120464 collapsed onto paths already taken).
+    it has no level for: .secondary, .section, .card
+```
+
+### Descriptions
+
+A Figma variable description is carried through as `$description`, the same as
+in the shipped export. It is never mandatory: a token without one has **no
+`$description` key at all** rather than an empty one, and the CLI flags it as a
+bug if any empty ones appear.
+
+A token carries its **own** description, not the one belonging to whatever it
+resolves to — a semantic token and the primitive under it describe different
+things, and inheriting would attribute the primitive's note to every token
+routed through it.
+
+```
+$description 119996 (93% of tokens)
+```
+
+### Token types
+
+In descending order of authority: a `typeHints` answer, then the variable's own
+Figma `scopes`, then what its consumers resolved to (propagated along alias
+edges), then its Figma type.
+
+Only ~3% of variables carry a narrowing scope, but they are almost exactly the
+consumption layer, and propagation carries that down — measured on a real file,
+**scopes plus propagation alone reproduce 95% of a hand-written name table's
+answers from 215 scoped variables out of 7,984.** That is why the primitive
+collection needs no name table of its own.
+
+Hints outrank both deliberately. Propagation is an *inference* — a primitive is
+typed by whatever happens to consume it — so a plain number consumed through an
+effect slot propagates as a dimension. Where a house document says otherwise,
+`typeHints` states it and wins; inference only fills silence. (`shadows/` and
+`grids/` in the example config are exactly this case.)
+
 ## Diagnostics
 
 Every extract logs `Figma descriptions: N of M variables (P%)` to the console,
