@@ -83,7 +83,15 @@ npm run ui:build       # regenerate ui.html from its sources
 npm run ui:typecheck   # tsc --noEmit over src/ui-react (optional)
 npm run dtcg:preview   # convert an export to DTCG outside Figma + report
 npm run dtcg:selftest  # DTCG format / description-dedupe checks
+
+# experimental, CLI only — no plugin surface, no change to shipped exports
+node scripts/dtcg-preview.js <graph.json> --shape resolved \
+     --config scripts/resolved-config.example.js
 ```
+
+`--shape resolved` re-shapes a raw Figma variable graph the way a consumer
+reads it rather than the way it is authored, deriving the architecture from the
+file instead of being told it — see [`DTCG.md`](./DTCG.md#the-resolved-shape---shape-resolved).
 
 ## Technical architecture
 
@@ -142,9 +150,12 @@ Closure/
 ├── src/
 │   ├── ui.template.html    # UI source: markup, CSS, vanilla-JS logic
 │   ├── dtcg-format.js       # DTCG conversion (inlined into ui.html, also runs in Node)
+│   ├── resolve-architecture.js # Mode-vector resolver over the variable graph (CLI only)
+│   ├── emit-resolved.js    # Consumption-shaped emit, derived from the graph (CLI only)
 │   ├── ui-react/buttons.tsx # Pomegranate components mounted into the template
 │   └── vendor/pomegranate/  # Vendored Pomegranate kit (components + tokens.css/node.css)
-├── scripts/                # build-ui.js, dtcg-preview/selftest/descriptions
+├── scripts/                # build-ui.js, dtcg-preview/selftest/descriptions,
+│                           # resolved-config.example.js
 ├── README.md               # This file
 ├── TYPOGRAPHY.md           # Typography parity (lineHeights / letterSpacing)
 ├── DTCG.md                 # DTCG output format
