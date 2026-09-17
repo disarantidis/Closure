@@ -792,6 +792,25 @@
       padding: var(--spacing-component-4);
       margin-top: var(--spacing-component-5);
     }
+    /* Before any folder path is saved, there's nothing to nest yet — the
+       "Saved Folder Path" heading and the sub-card surface/padding both
+       exist to set a LIST of rows apart from the connection fields above
+       it, and with zero rows that framing is just an empty box. Flattened
+       instead: no surface, no padding, margin-top matched to #gitlab-fields
+       / #github-connection-fields's own 16px inter-field gap so the (still
+       always-visible) folder-path input reads as one more field in that
+       same list, exactly like GitLab Host / Project / Branch above it.
+       renderFolderList()/renderGithubFolderList() toggle this once a path
+       actually gets added, at which point the sub-card framing earns its
+       keep. */
+    .provider-subcard.is-flat {
+      background: none;
+      border-radius: 0;
+      padding: 0;
+      margin-top: var(--spacing-component-4);
+    }
+    .provider-subcard.is-flat .folder-paths-heading { display: none; }
+    .provider-subcard.is-flat .folder-add { margin-top: 0; }
     /* Both providers' Add/Remove pills side by side, right under the
        "Repository settings" heading — #add-gitlab-row and #add-github-row
        are ALWAYS both visible now (they used to be mutually exclusive,
@@ -21713,7 +21732,7 @@ html[data-theme=dark] {
             <span id="gl-project-mount"></span>
             <span id="gl-branch-mount"></span>
           </div>
-          <div class="provider-subcard" data-level="3">
+          <div class="provider-subcard" id="gitlab-folder-subcard" data-level="3">
             <div class="folder-paths-heading">
               <p class="folder-paths-title">Saved Folder Path</p>
               <p class="folder-paths-subtitle">Choose on the main screen</p>
@@ -21755,7 +21774,7 @@ html[data-theme=dark] {
             <span id="gh-repo-mount"></span>
             <span id="gh-branch-mount"></span>
           </div>
-          <div class="provider-subcard" data-level="3">
+          <div class="provider-subcard" id="github-folder-subcard" data-level="3">
             <div class="folder-paths-heading">
               <p class="folder-paths-title">Saved Folder Path</p>
               <p class="folder-paths-subtitle">Choose on the main screen</p>
@@ -49038,6 +49057,8 @@ react/cjs/react-jsx-runtime.development.js:
     // value instead of picking up the new path at that index.
     function renderFolderList() {
       if (glActiveFolder && glFolders.indexOf(glActiveFolder) === -1) glActiveFolder = glFolders[0] || '';
+      var subcard = document.getElementById('gitlab-folder-subcard');
+      if (subcard) subcard.classList.toggle('is-flat', glFolders.length === 0);
       var rows = glFolders.map(function(path) {
         // Every row — standard (baked-in) or user-added — can be modified or
         // deleted. See gitSettings.setState(): a saved
@@ -49092,6 +49113,8 @@ react/cjs/react-jsx-runtime.development.js:
     // baked-in, so every row is always removable).
     function renderGithubFolderList() {
       if (ghActiveFolder && ghFolders.indexOf(ghActiveFolder) === -1) ghActiveFolder = ghFolders[0] || '';
+      var subcard = document.getElementById('github-folder-subcard');
+      if (subcard) subcard.classList.toggle('is-flat', ghFolders.length === 0);
       var rows = ghFolders.map(function(path) {
         return { path: path, canEdit: true };
       });
