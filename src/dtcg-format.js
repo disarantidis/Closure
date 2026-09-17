@@ -135,6 +135,61 @@
     return { value: n, unit: 'px' };
   }
 
+  // code.js's own formatValue() is what colors already look like by the time
+  // this file sees them — never Figma's raw 0-1 float object, that's already
+  // gone: '#RRGGBB' (uppercase, alpha 1) or 'rgba(r,g,b,a)' (alpha < 1, r/g/b
+  // 0-255 ints). Parses either back into channels rather than re-deriving
+  // them, so this stays a straight reshape with no precision loss beyond
+  // what code.js already rounded to.
+  function parseColorChannels(value) {
+    if (typeof value !== 'string') return null;
+    var hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.exec(value);
+    if (hex) {
+      var h = hex[1];
+      if (h.length === 3) h = h.replace(/./g, function (c) { return c + c; });
+      return {
+        r: parseInt(h.slice(0, 2), 16),
+        g: parseInt(h.slice(2, 4), 16),
+        b: parseInt(h.slice(4, 6), 16),
+        a: h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1
+      };
+    }
+    var rgba = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(value);
+    if (rgba) {
+      return {
+        r: parseFloat(rgba[1]), g: parseFloat(rgba[2]), b: parseFloat(rgba[3]),
+        a: rgba[4] !== undefined ? parseFloat(rgba[4]) : 1
+      };
+    }
+    return null;
+  }
+
+  function round5(n) {
+    return Math.round(n * 100000) / 100000;
+  }
+
+  // Legacy JSON color ('#RRGGBB' / 'rgba(r,g,b,a)') → DTCG's color
+  // composite, { colorSpace, components, alpha, hex }. hex is always the
+  // plain RRGGBB triplet, lowercase, with alpha carried separately — never
+  // baked into an 8-digit hex, matching the composite's own shape. A
+  // reference ('{ref}', same convention as toDtcgDimension above) stays a
+  // string; a value that isn't a recognised color string is left alone
+  // rather than guessed at.
+  function toDtcgColor(value) {
+    if (typeof value === 'string' && value.indexOf('{') !== -1) return value;
+    var c = parseColorChannels(value);
+    if (!c) return value;
+    var hex = '#' + [c.r, c.g, c.b].map(function (n) {
+      return Math.round(n).toString(16).padStart(2, '0');
+    }).join('');
+    return {
+      colorSpace: 'srgb',
+      components: [round5(c.r / 255), round5(c.g / 255), round5(c.b / 255)],
+      alpha: round5(c.a),
+      hex: hex
+    };
+  }
+
   // Legacy JSON typography → DTCG typography, plus the non-standard sub-values
   // split off for $extensions.
   function toDtcgTypography(value) {
@@ -175,6 +230,8 @@
       extra = split.extra;
     } else if (dtcgType === 'dimension') {
       value = toDtcgDimension(value);
+    } else if (dtcgType === 'color') {
+      value = toDtcgColor(value);
     }
 
     if (isMathExpression(node.value)) {
