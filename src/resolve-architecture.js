@@ -251,11 +251,193 @@
     };
   }
 
+  /*
+    The same answer as enumerate(), reached by exploring only what's reachable.
+
+    enumerate() evaluates the whole product and folds afterwards, which is fine
+    for one token and wasteful for a file: five axes of 6/2/4/15/5 is 3,600
+    vectors per token, nearly all of them collapsing into each other.
+
+    This instead grows the vector as the walk demands it. Resolve with what is
+    fixed so far; if the walk entered an axis nobody has pinned yet, that is
+    precisely the decision that matters here, so branch on that axis's modes
+    and recurse. Re-resolving after each choice is what keeps it correct when
+    the choice changes the route — picking a scheme that bypasses the light/dark
+    switch simply never asks the light/dark question, and picking one that
+    routes into a palette collection then asks which palette.
+
+    So the recursion walks the real dependency tree and lands on exactly the
+    branches enumerate() would have folded to: 22 for a token whose product is
+    180, reached in ~22 resolutions instead of 180.
+
+    `pin` pre-seeds the vector for axes that should not become branches at all
+    (a permission layer you only want the unrestricted reading of, say).
+  */
+  function enumerateAdaptive(index, variable, axes, options) {
+    options = options || {};
+    var axisByName = {};
+    axes.forEach(function (a) { axisByName[a.name] = a; });
+
+    var branches = {};
+    var resolutions = 0;
+
+    function explore(vector) {
+      var result = resolve(index, variable, vector, options);
+      resolutions++;
+
+      // An axis the walk entered that nothing has decided yet is the next question.
+      var open = null;
+      for (var i = 0; i < result.visited.length; i++) {
+        var name = result.visited[i];
+        if (axisByName[name] && vector[name] === undefined) { open = axisByName[name]; break; }
+      }
+
+      if (!open) {
+        var fixed = Object.keys(vector).filter(function (n) { return result.visited.indexOf(n) !== -1; });
+        var key = axes.map(function (a) {
+          return a.name + '=' + (fixed.indexOf(a.name) !== -1 ? vector[a.name] : '*');
+        }).join(',');
+        if (!branches[key]) {
+          branches[key] = {
+            key: key,
+            vector: vector,
+            dependsOn: fixed,
+            visited: result.visited,
+            value: result.value,
+            error: result.error
+          };
+        }
+        return;
+      }
+
+      open.modes.forEach(function (mode) {
+        var next = {};
+        Object.keys(vector).forEach(function (k) { next[k] = vector[k]; });
+        next[open.name] = mode;
+        explore(next);
+      });
+    }
+
+    var seed = {};
+    if (options.pin) {
+      Object.keys(options.pin).forEach(function (k) { seed[k] = options.pin[k]; });
+    }
+    explore(seed);
+
+    return {
+      resolutions: resolutions,
+      branches: branches,
+      branchCount: Object.keys(branches).length
+    };
+  }
+
+  // --- emitting a resolved tree ----------------------------------------------
+
+  function setDeep(root, path, value) {
+    var parts = path.split('/');
+    var node = root;
+    for (var i = 0; i < parts.length - 1; i++) {
+      if (!node[parts[i]] || typeof node[parts[i]] !== 'object') node[parts[i]] = {};
+      node = node[parts[i]];
+    }
+    node[parts[parts.length - 1]] = value;
+  }
+
+  /*
+    Which output branches to emit: the product of the axes being pivoted, with
+    `pin` holding any axis at one mode so it never becomes a branch at all.
+
+    Unlike enumerateAdaptive's per-token folding, this is deliberately the full
+    product: the branches are the OUTPUT's shape, and that has to be uniform
+    across tokens — one token ignoring the light/dark axis can't be allowed to
+    delete `dark` from a document other tokens need. Per-token dependencies
+    still show up, in each branch's `dependsOn`, which is what tells a caller
+    that two branches carry identical values and could be collapsed by a
+    shaping step that wants RADD's 20 schemes rather than 6x15.
+  */
+  function branchVectors(axes, options) {
+    options = options || {};
+    var pin = options.pin || {};
+    var pivot = axes.filter(function (a) { return pin[a.name] === undefined; });
+    if (options.pivot) {
+      pivot = pivot.filter(function (a) { return options.pivot.indexOf(a.name) !== -1; });
+    }
+    return cartesian(pivot).map(function (vector) {
+      var full = {};
+      Object.keys(pin).forEach(function (k) { full[k] = pin[k]; });
+      Object.keys(vector).forEach(function (k) { full[k] = vector[k]; });
+      return {
+        key: pivot.map(function (a) { return a.name + '=' + vector[a.name]; }).join(','),
+        vector: full
+      };
+    });
+  }
+
+  /*
+    Resolve every token in the consumption layer under every output branch.
+
+    `roots` defaults to the collections classify() found nothing aliasing into
+    — the consumption layer — because those are the only ones a component ever
+    references; the routing collections exist to be walked THROUGH, and
+    emitting them would re-export the plumbing this is supposed to resolve away.
+
+    Values come back raw (Figma's own {r,g,b,a} objects, numbers, strings).
+    Shaping them into DTCG composites is dtcg-format.js's job, not this one —
+    keeping the two apart is what lets this resolve a graph without owning an
+    output format.
+  */
+  function buildResolvedTree(collections, options) {
+    options = options || {};
+    var index = buildIndex(collections);
+    var cls = classify(collections);
+    var roots = options.roots || cls.consumption;
+    var vectors = branchVectors(cls.axes, options);
+
+    var branches = {};
+    var stats = { tokens: 0, resolutions: 0, errors: 0 };
+
+    vectors.forEach(function (branch) {
+      var tree = {};
+      roots.forEach(function (collName) {
+        var coll = index.collsByName[collName];
+        if (!coll) return;
+        (coll.variables || []).forEach(function (v) {
+          var result = resolve(index, v, branch.vector, options);
+          stats.resolutions++;
+          if (result.error) stats.errors++;
+          setDeep(tree, v.name, {
+            value: result.value,
+            type: v.type,
+            description: v.description || undefined,
+            error: result.error
+          });
+        });
+      });
+      branches[branch.key] = { vector: branch.vector, tokens: tree };
+    });
+
+    stats.tokens = roots.reduce(function (n, name) {
+      var c = index.collsByName[name];
+      return n + ((c && c.variables) ? c.variables.length : 0);
+    }, 0);
+
+    return {
+      classification: cls,
+      roots: roots,
+      branchCount: vectors.length,
+      branches: branches,
+      stats: stats
+    };
+  }
+
   var api = {
     buildIndex: buildIndex,
     classify: classify,
     resolve: resolve,
-    enumerate: enumerate
+    enumerate: enumerate,
+    enumerateAdaptive: enumerateAdaptive,
+    branchVectors: branchVectors,
+    buildResolvedTree: buildResolvedTree
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
