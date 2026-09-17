@@ -124,19 +124,26 @@
   }
 
   /*
-    A type for every variable, in descending order of how much the file itself
-    states it:
+    A type for every variable, in descending order of authority:
 
-      1  its own narrowing scope
-      2  a caller hint, for the names a file uses that its metadata does not
+      1  a caller hint — a deliberate statement about THIS file
+      2  the variable's own narrowing scope — Figma metadata about itself
       3  what its consumers resolved to — a primitive reached only by tokens
          scoped CORNER_RADIUS is a radius, and the graph says so
       4  its Figma type
 
-    Step 3 is why the primitive collection does not need a name table: the
-    consumption layer is where scopes are set, and the alias edges carry that
-    downwards. Where consumers disagree the majority wins, ties by name so a
-    rerun agrees with itself.
+    Steps 2 and 3 are why the primitive collection does not need a name table:
+    the consumption layer is where scopes are set, and the alias edges carry
+    that downwards. Measured on a real file, scopes plus propagation alone
+    reproduce 95% of a hand-written table's answers from 215 scoped variables
+    out of 7,984.
+
+    Hints outrank both on purpose. Step 3 is an INFERENCE — a primitive is
+    typed by what happens to consume it — and a file can consume a plain
+    number through an effect slot, which propagation would then call a
+    dimension. When the caller has said otherwise about that path, the caller
+    is right; inference only fills silence. Where consumers disagree among
+    themselves the majority wins, ties by name so a rerun agrees with itself.
   */
   function deriveTypes(index, plans, options) {
     var hint = options.typeHints || function () { return null; };
@@ -145,7 +152,7 @@
 
     Object.keys(index.varsById).forEach(function (id) {
       var v = index.varsById[id];
-      var t = typeFromScopes(v) || hint(v.name, v.type, v);
+      var t = hint(v.name, v.type, v) || typeFromScopes(v);
       if (t) byId[id] = t;
     });
 
@@ -154,6 +161,7 @@
       if (!t) return;
       Object.keys(plan.branches).forEach(function (key) {
         var terminal = plan.branches[key].terminal;
+        // stated beats inferred: never vote over a hint or a real scope
         if (!terminal || byId[terminal.id]) return;
         votes[terminal.id] = votes[terminal.id] || {};
         votes[terminal.id][t] = (votes[terminal.id][t] || 0) + 1;
@@ -169,7 +177,7 @@
     });
 
     return function typeOf(v) {
-      return byId[v.id] || hint(v.name, v.type, v) || typeFromResolved(v.type);
+      return byId[v.id] || typeFromResolved(v.type);
     };
   }
 

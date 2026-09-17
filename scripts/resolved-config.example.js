@@ -60,6 +60,14 @@ module.exports = {
     if (ns === 'spacing') return 'spacing';
     if (ns === 'sizing' || ns === 'strokes') return 'sizing';
     if (ns === 'radius') return 'borderRadius';
+    /*
+      These primitives feed shadow offsets and grid gaps, so their consumers
+      carry EFFECT_FLOAT / GAP scopes and propagation would type them
+      'dimension'. The house document calls the raw values plain numbers and
+      only the composite parts dimensions. A hint outranks propagation, which
+      is what makes stating that here enough.
+    */
+    if (ns === 'shadows' || ns === 'grids') return 'number';
     return null;
   },
 

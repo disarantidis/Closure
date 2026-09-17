@@ -3412,6 +3412,44 @@
       parent.postMessage({ pluginMessage: { type: 'notify', message: '✅ JSON downloaded successfully!' } }, '*');
     }
 
+    /*
+      Developer affordance, deliberately not a control.
+
+      scripts/dtcg-preview.js --shape resolved needs the RAW variable graph:
+      collections with valuesByMode and alias targets intact. code.js already
+      sends exactly that and rawData is holding it — the transformed tree the
+      Download button produces has collapsed the alias hops that shape exists to
+      resolve, so it cannot stand in.
+
+      This is bound to a chord rather than given a button because it is for
+      working on the exporter, not for exporting. Nothing in the UI advertises
+      it and no product flow depends on it.
+
+        Cmd/Ctrl + Shift + G   ->  <file name>.graph.json
+    */
+    function doDownloadGraph() {
+      if (!rawData || !rawData.collections) {
+        showToast('No graph yet — run an extract first.', true);
+        return;
+      }
+      var json = JSON.stringify(rawData.collections, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (lastFigmaFileName || 'tokens').replace(/[\\/:*?"<>|]/g, '-') + '.graph.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Raw variable graph downloaded (' + rawData.collections.length + ' collections).');
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'G' || e.key === 'g')) {
+        e.preventDefault();
+        doDownloadGraph();
+      }
+    });
+
     pushBtn.addEventListener('click', pushToGit);
     // Re-evaluate the Push button as the commit message is typed/cleared.
     document.getElementById('commit-message').addEventListener('input', updateActionUI);

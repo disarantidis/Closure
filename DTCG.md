@@ -93,9 +93,20 @@ A Legacy JSON or DTCG export **cannot** stand in: both have already collapsed
 the alias hops this shape exists to resolve. Hand it one and it says so and
 exits 1.
 
-> Producing that dump still needs a plugin-side hook — the plugin currently
-> only hands the UI its transformed tree. Until that exists the flag is
-> driven from a graph captured by other means.
+To get one out of the plugin, run an extract and press **Cmd/Ctrl + Shift + G**.
+That downloads `<file name>.graph.json` — the raw extraction the UI is already
+holding. It is bound to a chord rather than given a button because it is for
+working on the exporter, not for exporting: nothing in the UI advertises it and
+no product flow depends on it.
+
+The extraction carries two fields only this shape reads:
+
+| field | why |
+|---|---|
+| `scopes` | where Figma allows a variable to be used (`CORNER_RADIUS`, `GAP`, `FONT_SIZE`) — the same semantic distinction token types key off, as metadata instead of a name |
+| `defaultModeId` | which mode answers when nothing has chosen one; without it a resolver has to guess `modes[0]` |
+
+Both are additive and the default export ignores them.
 
 ### Nothing about the shape is configured
 
@@ -149,12 +160,21 @@ letting the loss pass silently:
 
 ### Token types
 
-Figma's own `scopes` where a variable narrows them, then propagated along alias
-edges to the primitives — a primitive reached only by tokens scoped
-`CORNER_RADIUS` is a radius, and the graph says so. Only ~3% of variables carry
-a narrowing scope, but they are almost exactly the consumption layer, which is
-why the primitive collection needs no name table. `typeHints` covers whatever
-nothing consumes.
+In descending order of authority: a `typeHints` answer, then the variable's own
+Figma `scopes`, then what its consumers resolved to (propagated along alias
+edges), then its Figma type.
+
+Only ~3% of variables carry a narrowing scope, but they are almost exactly the
+consumption layer, and propagation carries that down — measured on a real file,
+**scopes plus propagation alone reproduce 95% of a hand-written name table's
+answers from 215 scoped variables out of 7,984.** That is why the primitive
+collection needs no name table of its own.
+
+Hints outrank both deliberately. Propagation is an *inference* — a primitive is
+typed by whatever happens to consume it — so a plain number consumed through an
+effect slot propagates as a dimension. Where a house document says otherwise,
+`typeHints` states it and wins; inference only fills silence. (`shadows/` and
+`grids/` in the example config are exactly this case.)
 
 ## Diagnostics
 
