@@ -877,10 +877,23 @@
       display: block;
       padding-left: var(--spacing-component-3);
     }
-    /* Sits under the switch rather than directly under a title, so it needs
-       more than .folder-paths-subtitle's default 2px of separation. */
+    /* The active format's own name (e.g. "Legacy JSON"), sitting under the
+       switch — a short label, not the explanatory sentence below it, so it
+       reads at normal body weight/color rather than the muted microcopy
+       .folder-paths-subtitle uses. Sits under the switch rather than
+       directly under a title, so it needs more than .folder-paths-subtitle's
+       default 2px of separation. */
+    .output-format-name {
+      margin: 8px 0 0;
+      padding-left: var(--spacing-component-3);
+      font-family: var(--type-body-s-font-family);
+      font-size: var(--type-body-s-size);
+      line-height: var(--type-body-s-line-height);
+      font-weight: 600;
+      letter-spacing: var(--type-body-s-letter-spacing);
+      color: var(--app-text);
+    }
     .output-format > .folder-paths-subtitle {
-      margin-top: 8px;
       padding-left: var(--spacing-component-3);
     }
 
@@ -21609,6 +21622,7 @@ html[data-theme=dark] {
       <div class="output-format">
         <p class="folder-paths-title">Output format</p>
         <span id="dtcg-format-control-mount"></span>
+        <p class="output-format-name" id="output-format-name"></p>
         <p class="folder-paths-subtitle" id="output-format-hint"></p>
       </div>
 
@@ -49720,14 +49734,16 @@ react/cjs/react-jsx-runtime.development.js:
     // and that it does NOT change where the file goes — same file name either
     // way, so turning this on overwrites the Legacy JSON at that path.
     function updateOutputFormatHint() {
+      var nameEl = document.getElementById('output-format-name');
       var el = document.getElementById('output-format-hint');
       if (!el) return;
       // Names the file it will actually be written to, so the _dtcg swap is
       // visible here and not only in the file name field further down.
       var name = primaryFilename();
+      if (nameEl) nameEl.textContent = dtcgShape ? 'W3C DTCG' : 'Legacy JSON';
       el.textContent = dtcgShape
-        ? 'W3C DTCG ($value / $type), one resolved document per theme, exported as ' + name + '.'
-        : 'Legacy JSON — the format this plugin has always exported — as ' + name + '.';
+        ? '$value / $type, one resolved document per theme, exported as ' + name + '.'
+        : 'The format this plugin has always exported, as ' + name + '.';
     }
 
     // Convert the Legacy JSON tree to DTCG and log a conversion report.
