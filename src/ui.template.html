@@ -892,28 +892,16 @@
       padding-left: var(--spacing-component-3);
       margin-bottom: 16px;
     }
+    /* The control itself is a ListControlItem now (buttons.tsx) — title +
+       subtitle + a labelHidden Switch in its trailing slot, the kit's own
+       built-in composition for this (see that file's own comment). .nd-item
+       already carries --spacing-component-1 (8px) of its own inline
+       padding, so only the remaining 4px is added here to reach the same
+       12px inset .folder-paths-title above uses — a plain <p> with no
+       padding of its own. */
     #dtcg-format-control-mount {
       display: block;
-      padding-left: var(--spacing-component-3);
-    }
-    /* The active format's own name (e.g. "Legacy JSON"), sitting under the
-       switch — a short label, not the explanatory sentence below it, so it
-       reads at normal body weight/color rather than the muted microcopy
-       .folder-paths-subtitle uses. Sits under the switch rather than
-       directly under a title, so it needs more than .folder-paths-subtitle's
-       default 2px of separation. */
-    .output-format-name {
-      margin: 8px 0 0;
-      padding-left: var(--spacing-component-3);
-      font-family: var(--type-body-s-font-family);
-      font-size: var(--type-body-s-size);
-      line-height: var(--type-body-s-line-height);
-      font-weight: 600;
-      letter-spacing: var(--type-body-s-letter-spacing);
-      color: var(--app-text);
-    }
-    .output-format > .folder-paths-subtitle {
-      padding-left: var(--spacing-component-3);
+      padding-left: var(--spacing-component-0);
     }
 
     /* Outer spacing wrapper only, same padding as .header on the main
@@ -1759,8 +1747,6 @@
       <div class="output-format">
         <p class="folder-paths-title">Output format</p>
         <span id="dtcg-format-control-mount"></span>
-        <p class="output-format-name" id="output-format-name"></p>
-        <p class="folder-paths-subtitle" id="output-format-hint"></p>
       </div>
 
       <!-- Always-visible heading for whichever provider's connection fields
@@ -2908,16 +2894,14 @@
     // and that it does NOT change where the file goes — same file name either
     // way, so turning this on overwrites the Legacy JSON at that path.
     function updateOutputFormatHint() {
-      var nameEl = document.getElementById('output-format-name');
-      var el = document.getElementById('output-format-hint');
-      if (!el) return;
       // Names the file it will actually be written to, so the _dtcg swap is
       // visible here and not only in the file name field further down.
       var name = primaryFilename();
-      if (nameEl) nameEl.textContent = dtcgShape ? 'W3C DTCG' : 'Legacy JSON';
-      el.textContent = dtcgShape
+      var formatName = dtcgShape ? 'W3C DTCG' : 'Legacy JSON';
+      var hint = dtcgShape
         ? '$value / $type, one resolved document per theme, exported as ' + name + '.'
         : 'The format this plugin has always exported, as ' + name + '.';
+      window.PomDtcgFormat.setLabels(formatName, hint);
     }
 
     // Convert the Legacy JSON tree to DTCG and log a conversion report.

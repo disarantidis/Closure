@@ -33,6 +33,7 @@ import { Alert } from '../vendor/pomegranate/panel/node/Alert';
 import { Skeleton } from '../vendor/pomegranate/panel/node/Skeleton';
 import { Tag } from '../vendor/pomegranate/panel/node/Tag';
 import { SelectableCard } from '../vendor/pomegranate/panel/node/SelectableCard';
+import { ListControlItem } from '../vendor/pomegranate/panel/node/ListControlItem';
 import { fieldLevel, useLevel, LevelContext, type Level } from '../vendor/pomegranate/panel/node/LevelContext';
 
 /* The plugin GROUND is level 2 — bumped from 1 (the ladder's actual
@@ -397,7 +398,7 @@ declare global {
     PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
-    PomDtcgFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void };
+    PomDtcgFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void; setLabels: (name: string, hint: string) => void };
     PomOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
   }
 }
@@ -587,31 +588,51 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   return 'gitlab';
 }
 
-/* ── Settings → Output format switch (Legacy JSON / DTCG) ───────────────────── */
+/* ── Settings → Output format row (Legacy JSON / DTCG) ───────────────────────
+   ListControlItem, not a bare Switch — Switch deliberately carries no
+   subtitle (see its own file: "the caption belongs to the subject"), and
+   the active format's name + explanation is exactly a subtitle's job. This
+   is the kit's own intended composition for "title + subtitle + trailing
+   toggle" (see ListControlItem's own header comment), not a workaround.
+   labelHidden on the Switch is required by that same contract: the ROW is
+   the <label> now (press the subtitle, the empty space, anywhere — it
+   toggles), so the control must not bring a second one of its own. */
 (function mountDtcgFormatSwitch() {
   const container = document.getElementById('dtcg-format-control-mount');
   let set: (on: boolean) => void = () => {};
+  let setLabels: (name: string, hint: string) => void = () => {};
   function View() {
     const [on, setOn] = useState(false);
+    const [name, setName] = useState('Legacy JSON');
+    const [hint, setHint] = useState('');
     set = setOn;
+    setLabels = (n, h) => { setName(n); setHint(h); };
     return (
-      // medium, not large — see the comment on the push-target checkboxes
-      // above: .nd-check's size mostly grows the clickable row (24/32/56),
-      // not the visible mark (16/18/22px), for a checkbox/switch meant to
-      // sit in a taller wrapping-caption row. Standalone, 'large' left a
-      // 34px dead-but-clickable gap under the track, reading as an
-      // oversized hit area and a "delayed" toggle (the flip is instant;
-      // the eye/cursor just isn't over the part that visibly moves).
-      <Switch
+      <ListControlItem
         size="medium"
-        label="DTCG (W3C)"
-        checked={on}
-        onChange={(c: boolean) => { setOn(c); window.PomDtcgFormat.onChange?.(c); }}
+        title="DTCG (W3C)"
+        subtitle={<><strong>{name}</strong>{hint ? <br /> : null}{hint}</>}
+        trailing={
+          // medium, not large — see the comment on the push-target checkboxes
+          // above: .nd-check's size mostly grows the clickable row (24/32/56),
+          // not the visible mark (16/18/22px), for a checkbox/switch meant to
+          // sit in a taller wrapping-caption row. Standalone, 'large' left a
+          // 34px dead-but-clickable gap under the track, reading as an
+          // oversized hit area and a "delayed" toggle (the flip is instant;
+          // the eye/cursor just isn't over the part that visibly moves).
+          <Switch
+            size="medium"
+            label="DTCG (W3C)"
+            labelHidden
+            checked={on}
+            onChange={(c: boolean) => { setOn(c); window.PomDtcgFormat.onChange?.(c); }}
+          />
+        }
       />
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
-  window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v) };
+  window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v), setLabels: (n, h) => setLabels(n, h) };
 })();
 
 /* ── GitHub / GitLab repo-settings tab switcher ────────────────────────────── */
