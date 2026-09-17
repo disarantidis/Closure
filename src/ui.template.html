@@ -882,9 +882,7 @@
        and the standard 40px bottom rhythm before whatever follows (the
        "Repository settings" heading right below it — there used to be a
        separate "Push destination" section between them; removed, see
-       mainProviderTab's own comment in the script). A switch, like a
-       checkbox, has no card padding of its own to push it in from the row
-       edge, so the indent comes from the container. */
+       mainProviderTab's own comment in the script). */
     .output-format {
       margin: 0 0 40px;
     }
@@ -892,16 +890,18 @@
       padding-left: var(--spacing-component-3);
       margin-bottom: 16px;
     }
-    /* The control itself is a ListControlItem now (buttons.tsx) — title +
-       subtitle + a labelHidden Switch in its trailing slot, the kit's own
-       built-in composition for this (see that file's own comment). .nd-item
-       already carries --spacing-component-1 (8px) of its own inline
-       padding, so only the remaining 4px is added here to reach the same
-       12px inset .folder-paths-title above uses — a plain <p> with no
-       padding of its own. */
+    /* The control itself is a SelectableCard now (buttons.tsx) — a real
+       card, with its own border/background/padding on every side (node.css's
+       .nd-selcard-content), not a bare row that needs the container to
+       supply its indent. So this gets the same edge treatment
+       .provider-card/.provider-add-row use below: margin, not padding,
+       insetting the whole card box from the panel edge to align with
+       .folder-paths-title's text above — the card's own padding positions
+       its CONTENT. */
     #dtcg-format-control-mount {
       display: block;
-      padding-left: var(--spacing-component-0);
+      margin-left: var(--spacing-component-3);
+      margin-right: var(--spacing-component-3);
     }
 
     /* Outer spacing wrapper only, same padding as .header on the main
