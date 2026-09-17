@@ -68,6 +68,10 @@ module.exports = {
       is what makes stating that here enough.
     */
     if (ns === 'shadows' || ns === 'grids') return 'number';
+    // A font size is a length. The kebab 'font-sizes/' namespace is already
+    // caught above; the camel one a file may also carry is not, and without
+    // this it falls through to Figma's FLOAT and ships as a bare number.
+    if (ns === 'fontSize' || ns === 'fontSizes') return 'dimension';
     return null;
   },
 

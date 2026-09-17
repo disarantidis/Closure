@@ -405,6 +405,16 @@
       (coll.variables || []).forEach(function (v) {
         setDeep(tree, v.name, tokenNode(fmt(v.valuesByMode[modeId]), typeOf(v), v.description));
       });
+      /*
+        Typography composites reference {lineHeights.*} / {letterSpacing.*},
+        which a file may only carry under its kebab spelling. code.js already
+        backfills the camel forms so those references resolve rather than
+        dangle; borrow it rather than keep a second copy, and only when the
+        caller supplies it.
+      */
+      if (hooks.ensureCoreLineHeightsLetterSpacing) {
+        hooks.ensureCoreLineHeightsLetterSpacing(tree);
+      }
       primitives[name] = tree;
     });
 
