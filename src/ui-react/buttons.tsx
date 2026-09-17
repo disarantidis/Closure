@@ -4,8 +4,8 @@
   template's vanilla JS drives them through.
 
   DESIGN SYSTEM: this is the Pomegranate (disarantidis_ReactJS) build. Every
-  component below is the vendored Pomegranate kit (src/vendor/pomegranate) —
-  no @desquared kit anywhere. The window.Pom* bridge names and every rendered
+  component below is the vendored Pomegranate kit (src/vendor/pomegranate),
+  no other kit anywhere. The window.Pom* bridge names and every rendered
   element `id` are preserved verbatim, so ui.template.html's vanilla script keeps
   working unchanged against the same contract.
 

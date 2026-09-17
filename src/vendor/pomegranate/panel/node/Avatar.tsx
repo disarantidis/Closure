@@ -135,8 +135,8 @@ export type AvatarProps = {
 
   THE ONE-TOKEN CASE IS THE ONLY PLACE `kind` CHANGES ANYTHING, and it is why the prop exists
   (DIM-24). "Dimitris" is a person whose SURNAME IS MISSING, so `D` is honest: a second letter
-  would invent precision the name does not carry. "Desquared" is an organisation, which has no
-  second word to be missing — the single token IS the whole name, so `D` is not a shortened
+  would invent precision the name does not carry. "Vertex" is an organisation, which has no
+  second word to be missing — the single token IS the whole name, so `V` is not a shortened
   name but a shortened WORD, and it is also the weakest mark available: Stripe, Shopify and
   Square all draw `S`, in a component whose entire job is telling one row from the next.
 
