@@ -155,7 +155,8 @@ Closure/
 │   ├── ui-react/buttons.tsx # Pomegranate components mounted into the template
 │   └── vendor/pomegranate/  # Vendored Pomegranate kit (components + tokens.css/node.css)
 ├── scripts/                # build-ui.js, dtcg-preview/selftest/descriptions,
-│                           # resolved-config.example.js
+│   │                       # resolved-config.example.js
+│   └── __fixtures__/       # legacy-sample.json — the selftest's checked-in input
 ├── README.md               # This file
 ├── TYPOGRAPHY.md           # Typography parity (lineHeights / letterSpacing)
 ├── DTCG.md                 # DTCG output format
