@@ -11,7 +11,7 @@ The UI is built from a React source with our own **Pomegranate
 
 - Exports design tokens from Figma variable collections, including extended/aliased collections.
 - **Portable design-token JSON**: `$themes`, `$metadata.tokenSetOrder`, `$figmaVariableReferences`, semantic token types — a widely-supported structure downstream token tooling (Style Dictionary and similar) can consume.
-- **Two output formats**, chosen with the **Output format** switch in Settings:
+- **Two output formats**, chosen with the **Output format** toggle in Settings:
   the default token JSON, or **W3C DTCG** (`$value` / `$type` / `$description`,
   strict type mapping, one fully resolved, self-contained document per theme —
   standards-conformant on its own, no downstream finishing step). DTCG exports
@@ -21,8 +21,8 @@ The UI is built from a React source with our own **Pomegranate
 - **Typography parity**: backfills `core.lineHeights` / `core.letterSpacing` so composite references like `{lineHeights.*}` / `{letterSpacing.*}` resolve instead of dangling (see `ensureCoreLineHeightsLetterSpacing` in `code.js`).
 - **Per-breakpoint typography** and a **dimension math layer** (`N*{dimension.base}`).
 - **Reference-closure validation**: flags any dangling `{token.references}` before you ship the JSON — this is what the plugin is named for.
-- **Download** locally, or **push to GitLab** (incl. self-hosted / Enterprise), **GitHub**, or **both**. Settings persist in `figma.clientStorage`.
-- Each provider keeps its **own** repository/project, branch, saved folder paths and file name — all editable in Settings; a token can be **cleared** without tearing down the rest.
+- **Download** locally, or **push to GitLab** (incl. self-hosted / Enterprise) **and/or GitHub** — add both and switch which one Push actually targets from the main screen. Settings persist in `figma.clientStorage`.
+- Each provider keeps its **own** repository/project, branch and saved folder paths — all editable in Settings; a token can be **cleared** without tearing down the rest. The JSON file name is shared across Download and every push destination, edited once on the main screen.
 - A **commit message is required** to push (the Push button stays disabled until you enter one).
 - Export runs with validation stats (collection count + token count).
 - **Dark UI** built to the **Pomegranate** design system (`src/vendor/pomegranate`).
@@ -38,16 +38,18 @@ Details: [`TYPOGRAPHY.md`](./TYPOGRAPHY.md) · [`DTCG.md`](./DTCG.md) · [`THEMI
 │  ▸ <Figma file name>   1k Tokens · 18MB │   ← collections accordion + summary
 ├────────────────────────────────────────┤
 │  ⬢ GitLab                               │
-│  [ folder ▾ ]  [ tokens.json ]          │   ← per push destination
+│  [ folder ▾ ]  [ tokens.json ]          │   ← folder is per-provider, file name shared
 │  [ commit message ]  (required)         │
 │  [ Push to GitLab ]              ⬇       │   ← push + download
 └────────────────────────────────────────┘
 ```
 
-Settings holds the **Output format** switch, the **push destination** (GitLab /
-GitHub / both), and each provider's token / repo / branch / filename / saved
-folder paths. On first run a two-step dialog asks which destination(s) you want,
-then hands you to the fields each one still needs.
+Settings holds the **Output format** toggle and, for each provider you've added
+(GitLab and/or GitHub — either can be added or removed independently), its own
+token / repo / branch / saved folder paths. The main screen's own GitLab/GitHub
+tab is what actually picks which one Push targets when both are added. On first
+run a two-step dialog asks which provider(s) you want, then hands you to the
+fields each one still needs.
 
 ## Installation
 
@@ -109,10 +111,11 @@ network calls. The export reads Figma variables directly through the plugin API
 ## Push to GitLab / GitHub
 
 The ⚙ button opens **Settings**, where you add GitLab, GitHub, or both; each
-keeps its own saved folder paths (picked on the main screen) and file name, so
-the pushed path is `folder + filename` per destination. A "both" push runs the
-two sequentially and reports each outcome, so one failing does not abort the
-other. Each provider's token field has a **Clear** button (confirmed).
+keeps its own saved folder paths (picked on the main screen), so the pushed
+path is `folder + filename` per destination — the file name itself is shared.
+With both added, the main screen's own GitLab/GitHub tab picks which one is
+the active push target; Push always sends to exactly one destination at a
+time. Each provider's token field has a **Clear** button (confirmed).
 
 ### Network allowlist (important for Enterprise)
 
