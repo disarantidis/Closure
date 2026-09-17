@@ -95,11 +95,20 @@
   /*
     Walk from `variable` to a raw value under `vector`.
 
-    Returns { value, visited, error } — `visited` is every collection the walk
-    passed through, in order, and is what enumerate() uses to tell which axes
-    actually mattered. `error` is set (and value null) for a cycle, a dangling
-    or external alias target, or a chain longer than maxHops; the caller
-    decides what to do about it rather than getting a silently wrong value.
+    Returns { value, terminal, visited, error }.
+
+    `visited` is every collection the walk passed through, in order, and is
+    what enumerate() uses to tell which axes actually mattered.
+
+    `terminal` is the variable the walk ENDED on — the one actually holding
+    the value. A consumer that wants to emit a reference rather than inline a
+    primitive needs to know which token it landed on, not just what was
+    there: "this resolves to core's white" and "this is #ffffff" are different
+    outputs, and only the former survives a later change to that primitive.
+
+    `error` is set (and value null) for a cycle, a dangling or external alias
+    target, or a chain longer than maxHops; the caller decides what to do
+    about it rather than getting a silently wrong value.
   */
   function resolve(index, variable, vector, options) {
     var maxHops = (options && options.maxHops) || 24;
@@ -108,28 +117,28 @@
     var v = variable;
 
     for (var hop = 0; hop < maxHops; hop++) {
-      if (!v) return { value: null, visited: visited, error: 'missing-variable' };
-      if (seen[v.id]) return { value: null, visited: visited, error: 'cycle' };
+      if (!v) return { value: null, terminal: null, visited: visited, error: 'missing-variable' };
+      if (seen[v.id]) return { value: null, terminal: v, visited: visited, error: 'cycle' };
       seen[v.id] = true;
 
       var collection = index.collectionOfVar[v.id];
-      if (!collection) return { value: null, visited: visited, error: 'orphan-variable' };
+      if (!collection) return { value: null, terminal: v, visited: visited, error: 'orphan-variable' };
       if (visited.indexOf(collection.name) === -1) visited.push(collection.name);
 
       var value = (v.valuesByMode || {})[modeIdFor(collection, vector)];
       if (!isAlias(value)) {
-        return { value: value === undefined ? null : value, visited: visited };
+        return { value: value === undefined ? null : value, terminal: v, visited: visited };
       }
 
       var next = index.varsById[value.id];
       if (!next) {
         // Published from another library — its value isn't in this extraction.
-        return { value: null, visited: visited, error: 'external-alias' };
+        return { value: null, terminal: v, visited: visited, error: 'external-alias' };
       }
       v = next;
     }
 
-    return { value: null, visited: visited, error: 'max-hops' };
+    return { value: null, terminal: v, visited: visited, error: 'max-hops' };
   }
 
   // --- classification --------------------------------------------------------
