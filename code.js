@@ -1,5 +1,5 @@
 // Closure — Figma plugin (design-token JSON export)
-figma.showUI(__html__, { width: 380, height: 740, themeColors: true });
+figma.showUI(__html__, { width: 420, height: 740, themeColors: true });
 
 function normalizeVariableName(name, collectionName) {
   if (!name) return '';
@@ -97,7 +97,7 @@ function formatValue(value, type) {
   if (type === 'COLOR' && value && typeof value === 'object' && value.r !== undefined) {
     var r = Math.round(value.r * 255), g = Math.round(value.g * 255), b = Math.round(value.b * 255);
     var a = value.a !== undefined ? value.a : 1;
-    // uppercase hex, no spaces in rgba — matches the reference format
+    // uppercase hex, no spaces in rgba — matches the reference token file format
     return a === 1
       ? '#' + [r, g, b].map(function(x) { return x.toString(16).padStart(2, '0').toUpperCase(); }).join('')
       : 'rgba(' + r + ',' + g + ',' + b + ',' + parseFloat(a.toFixed(2)) + ')';
@@ -220,7 +220,7 @@ function buildAliasPath(aliasedVar, aliasedVarCollection, currentCollectionName,
   return normalized.replace(/\//g, '.');
 }
 
-// --- TOKEN MATH: dimension.N → N*{dimension.base} when divisible (matches the token math layer) ---
+// --- LEGACY JSON: dimension.N → N*{dimension.base} when divisible (matches the token math layer) ---
 function applyDimensionBaseExpressions(core) {
   if (!core || !core.dimension || !core.dimension.base) return core;
   var baseTok = core.dimension.base;
@@ -598,7 +598,7 @@ function walkAndFinalizeNatoTypographyComposites(core, obj) {
 // scale in this system ({letterSpacing.7}). The source stores 0 letter-spacing
 // for all scales, but the composite builder defaulted to index 0 (-5%); force
 // the correct index. (Underline is NOT applied: the Figma source has no
-// text-decoration on links — that underline only exists in the design-token app
+// text-decoration on links — that underline only exists in the the token format app
 // export, so emitting it would invent data not present in the file.)
 function applyCanonicalBreakpointTypography(breakpointContent) {
   if (!breakpointContent || !breakpointContent.typography) return;
@@ -680,7 +680,11 @@ function coerceBreakpointSpacingSizingToDimensionExpressions(breakpointContent, 
 }
 
 // --- TRANSFORMATION ENGINE ---
-function transformToFinalFormat(rawData) {
+// options.includeDescriptions — carry each variable's Figma description onto its
+// tokens. Off by default so the the token format export stays byte-identical to what
+// it has always produced; the DTCG formats turn it on to populate $description.
+function transformToFinalFormat(rawData, options) {
+  var includeDescriptions = !!(options && options.includeDescriptions);
   var output = {};
   var tokenCounter = 0;
   console.log('[Closure v8] transformToFinalFormat — collections:', rawData.collections.length);
@@ -756,6 +760,11 @@ function transformToFinalFormat(rawData) {
         }
 
         var token = { type: finalType, value: tokenValue };
+
+        // Figma's per-variable description. Carried on every mode's token (the
+        // description belongs to the variable, not the mode) and surfaced as
+        // DTCG's $description.
+        if (includeDescriptions && v.description) token.description = v.description;
 
         if (!(aliasData && aliasData.isAlias) && tokenValue !== undefined && tokenValue !== null) {
           if (tokenPath.indexOf('font-weights/') !== -1 || /(^|\/)weight$/i.test(tokenPath)) {
@@ -864,6 +873,15 @@ function fixFoundationTokens(obj, pathParts) {
     out[keys[j]] = fixFoundationTokens(obj[keys[j]], pathParts.concat([keys[j]]));
   }
   return out;
+}
+
+// Three fixups below rebuild token nodes from scratch, dropping every key beyond
+// value/type. Carry the description across so it survives to $description.
+// Deliberately narrow: those same rebuilds also drop codeSyntax, and preserving
+// that as well would change the existing the token format export.
+function carryDescription(target, source) {
+  if (source && source.description) target.description = source.description;
+  return target;
 }
 
 // Fix 7: Reorder all token nodes so `value` comes before `type`
@@ -1002,7 +1020,7 @@ function fixCoreTokens(obj, pathParts) {
     else if (first === 'font-weights')        cType = 'number';         // dash group
     else if (first === 'paragraphSpacing')    cType = 'paragraphSpacing'; // camelCase group
     else if (first === 'paragraph-spacing')   cType = 'number';           // dash group
-    else if (first === 'paragraphIndent')     cType = 'paragraphIndent';  // semantic type
+    else if (first === 'paragraphIndent')     cType = 'paragraphIndent';  // the token format semantic type
     else if (first === 'paragraph-indents')   cType = 'number';           // dash group
     else if (first && first.startsWith('viewport-')) cType = 'sizing';    // viewport-* tokens
     if (first === 'font-weights' && cValue !== undefined && cValue !== null) {
@@ -1064,7 +1082,7 @@ function fixBreakpointTypes(obj, pathParts) {
     if (t === 'number' && typeof v === 'number') {
       v = formatFloatForExport(v);
     }
-    return { value: v, type: t };
+    return carryDescription({ value: v, type: t }, obj);
   }
 
   var result = {};
@@ -1113,10 +1131,10 @@ function addTypographyComposite(scaleObj, scaleName) {
   if (!rebuilt['text-decoration'] && scaleObj.textDecoration) rebuilt['text-decoration'] = scaleObj.textDecoration;
 
   if (rebuilt.weight && rebuilt.weight.value !== undefined) {
-    rebuilt.weight = {
+    rebuilt.weight = carryDescription({
       value: normalizeFontWeightLiteral(rebuilt.weight.value),
       type: 'number'
-    };
+    }, rebuilt.weight);
   }
 
   if (!rebuilt['font-family'] && cv.fontFamily) {
@@ -1151,7 +1169,7 @@ function fixBreakpointTypography(typObj) {
 function fixLayoutColumnTypes(obj) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
   if (Object.prototype.hasOwnProperty.call(obj, 'value') && Object.prototype.hasOwnProperty.call(obj, 'type')) {
-    return { value: obj.value, type: 'sizing' };
+    return carryDescription({ value: obj.value, type: 'sizing' }, obj);
   }
   var result = {};
   Object.keys(obj).forEach(function(k) { result[k] = fixLayoutColumnTypes(obj[k]); });
@@ -1220,7 +1238,7 @@ function stripVariableIdPrefix(id) {
 }
 
 /**
- * the reference token file: foundation $figmaStyleReferences uses
+ * the reference reference: foundation $figmaStyleReferences uses
  * (1) short keys elevation.level-1 … level-6 only,
  * (2) typography.*.* ,
  * (3) long keys elevation.level-0.level-0 … level-6.level-6 ,
@@ -1292,8 +1310,8 @@ function buildFoundationStyleRefs(rawData, formatStyleId, toTokenCase) {
   return refs;
 }
 
-/** Canonical token set order (Nato reference). */
-var TOKEN_STUDIO_SET_ORDER = [
+/** Canonical the token format token set order (Nato reference). */
+var LEGACY_JSON_SET_ORDER = [
   'core',
   'foundation',
   'mode/light',
@@ -1338,8 +1356,8 @@ var TOKEN_STUDIO_SET_ORDER = [
 
 function buildTokenSetOrder(out) {
   var order = [];
-  for (var i = 0; i < TOKEN_STUDIO_SET_ORDER.length; i++) {
-    var k = TOKEN_STUDIO_SET_ORDER[i];
+  for (var i = 0; i < LEGACY_JSON_SET_ORDER.length; i++) {
+    var k = LEGACY_JSON_SET_ORDER[i];
     if (out[k] !== undefined) order.push(k);
   }
   Object.keys(out).forEach(function(k) {
@@ -1811,7 +1829,7 @@ function ensureCoreTextCaseAndDecorationPrimitives(core) {
   return core;
 }
 
-/** Nato_8-4-26_3: semantic line-height scale (composite refs {lineHeights.0}…{lineHeights.3}). */
+/** Nato_8-4-26_3 / the token format: semantic line-height scale (composite refs {lineHeights.0}…{lineHeights.3}). */
 var NATO_TS_DEFAULT_LINE_HEIGHTS = {
   '0': { value: '100%', type: 'lineHeights' },
   '1': { value: '130%', type: 'lineHeights' },
@@ -1827,7 +1845,7 @@ var NATO_LINE_HEIGHT_KEBAB_TO_SEMANTIC = {
   '125': '3'
 };
 
-/** Nato_8-4-26_3: letterSpacing.0…8 (composite refs {letterSpacing.N}). */
+/** Nato_8-4-26_3 / the token format: letterSpacing.0…8 (composite refs {letterSpacing.N}). */
 var NATO_TS_DEFAULT_LETTER_SPACING = {
   '0': { value: '-5%', type: 'letterSpacing' },
   '1': { value: '-4%', type: 'letterSpacing' },
@@ -1897,7 +1915,7 @@ function mergeLetterSpacingSemantic(partial, defaults) {
 }
 
 /**
- * Ensures the camelCase groups core.lineHeights and core.letterSpacing exist so
+ * Ensures the token format camelCase groups core.lineHeights and core.letterSpacing exist so
  * composite typography refs like {lineHeights.0} and {letterSpacing.7} resolve (Nato_8-4-26_3).
  */
 function ensureCoreLineHeightsLetterSpacing(core) {
@@ -1936,17 +1954,17 @@ function ensureCoreLineHeightsLetterSpacing(core) {
   return core;
 }
 
-// --- TOKEN STUDIO FORMAT TRANSFORMER ---
+// --- LEGACY JSON FORMAT TRANSFORMER ---
 // Emit leaf / secondary token sets using the RAW Figma variable names, so the
 // token roots (white, white-subtle, secondary-light, magenta-light, …) match the
 // raw alias references buildAliasPath now produces for leaf collections. Values
 // are taken from the already-computed `native` tree (keyed by the stripped path).
-function tsLookupNested(obj, path) {
+function legacyLookupNested(obj, path) {
   var p = path.split('/'); var c = obj;
   for (var i = 0; i < p.length; i++) { if (!c || typeof c !== 'object') return undefined; c = c[p[i]]; }
   return c;
 }
-function tsSetNested(obj, path, val) {
+function legacySetNested(obj, path, val) {
   var p = path.split('/'); var c = obj;
   for (var i = 0; i < p.length - 1; i++) { c[p[i]] = c[p[i]] || {}; c = c[p[i]]; }
   c[p[p.length - 1]] = val;
@@ -1974,9 +1992,9 @@ function emitRawNameSets(out, native, rawData) {
       rawCol.variables.forEach(function(v) {
         if (!v.name) return;
         var stripped = normalizeVariableName(v.name, cfg.col);
-        var val = tsLookupNested(native[cfg.col][modeName], stripped);
+        var val = legacyLookupNested(native[cfg.col][modeName], stripped);
         if (val === undefined) return;
-        tsSetNested(tree, v.name, val); // RAW name → keeps the real token root
+        legacySetNested(tree, v.name, val); // RAW name → keeps the real token root
       });
       out[setName] = tree;
     });
@@ -2263,9 +2281,9 @@ function toTokenFormat(native, rawData) {
   out['$themes'] = buildThemes(rawData, tokenSetNames);
 
   // the token format: Nato-style typography (camel composite refs, kebab standalone, per-scale lineHeight / line-height formula)
-  Object.keys(out).forEach(function(tsKey) {
-    if (tsKey.indexOf('breakpoint/') !== 0 || !out[tsKey].breakpoint) return;
-    var bp = out[tsKey].breakpoint;
+  Object.keys(out).forEach(function(legacyKey) {
+    if (legacyKey.indexOf('breakpoint/') !== 0 || !out[legacyKey].breakpoint) return;
+    var bp = out[legacyKey].breakpoint;
     var core = out['core'];
     syncTypographyCompositeLineHeights(bp);
     alignBreakpointTypographyToNato(core, bp);
@@ -2296,7 +2314,7 @@ function toTokenFormat(native, rawData) {
   // mode, Level 1-6). These are fixed raw boxShadow values that are NOT stored as
   // Figma variables (shadows aren't variables) and don't resolve from the effect
   // styles (which read zero on the neutral path), so they are emitted verbatim to
-  // match the canonical reference export exactly.
+  // match the canonical the token format export exactly.
   if (!out['core']) out['core'] = {};
   out['core']['Elevation'] = buildCoreElevationReference();
 
@@ -2309,9 +2327,9 @@ function toTokenFormat(native, rawData) {
 
   // Canonical breakpoint typography quirks — run LAST on the final tree so no
   // other normalization overwrites them (letterSpacing.7 + link underline).
-  Object.keys(out).forEach(function(tsKey) {
-    if (tsKey.indexOf('breakpoint/') === 0 && out[tsKey] && out[tsKey].breakpoint) {
-      applyCanonicalBreakpointTypography(out[tsKey].breakpoint);
+  Object.keys(out).forEach(function(legacyKey) {
+    if (legacyKey.indexOf('breakpoint/') === 0 && out[legacyKey] && out[legacyKey].breakpoint) {
+      applyCanonicalBreakpointTypography(out[legacyKey].breakpoint);
     }
   });
 
@@ -2345,7 +2363,7 @@ function validateReferenceClosure(tokens) {
     })(tokens[setName], '');
   });
 
-  // Extract genuine token references from a value. A real reference is
+  // Extract genuine the reference token files from a value. A real reference is
   // {dotted.path} with no quotes/colons — this skips literal composite shadow
   // value objects like {"color":"#000","type":"dropShadow",...}.
   function refsOf(v) {
@@ -2407,7 +2425,14 @@ var GIT_CONFIG_KEY = 'json-exporter-git-config';
 // --- MESSAGE HANDLER ---
 figma.ui.onmessage = function(msg) {
   if (msg.type === 'resize') {
-    figma.ui.resize(380, msg.height);
+    figma.ui.resize(420, msg.height);
+    return;
+  }
+
+  // Lightweight: report the current file name immediately, without waiting for
+  // the (slow) variable extraction — used to auto-select the target folder.
+  if (msg.type === 'GET_FILE_INFO') {
+    figma.ui.postMessage({ type: 'fileInfo', fileName: (figma.root && figma.root.name) || '' });
     return;
   }
 
@@ -2427,13 +2452,6 @@ figma.ui.onmessage = function(msg) {
       figma.ui.postMessage({ type: 'GIT_SETTINGS_SAVED' });
     }).catch(function(e) {
       figma.ui.postMessage({ type: 'GIT_SETTINGS_SAVED', error: e.message });
-    });
-    return;
-  }
-
-  if (msg.type === 'CLEAR_GIT_SETTINGS') {
-    figma.clientStorage.deleteAsync(GIT_CONFIG_KEY).then(function() {
-      figma.ui.postMessage({ type: 'GIT_SETTINGS_CLEARED' });
     });
     return;
   }
@@ -2624,6 +2642,27 @@ figma.ui.onmessage = function(msg) {
         return Promise.all(promises);
       });
     }).then(function(result) {
+      // How many variables actually carry a Figma description, counted on the RAW
+      // extraction — upstream of transformToFinalFormat, the the token format fixups
+      // and the DTCG conversion. If this says 0, the descriptions are not in the
+      // file; if it says N > 0 but the export has none, the loss is ours.
+      (function logDescriptionCoverage() {
+        var total = 0, described = 0;
+        result.forEach(function(col) {
+          col.variables.forEach(function(v) {
+            total++;
+            if (v.description) described++;
+          });
+        });
+        var pct = total ? Math.round((described / total) * 100) : 0;
+        console.log('[Closure] Figma descriptions: ' + described + ' of ' +
+          total + ' variables (' + pct + '%)');
+        if (!described && total) {
+          console.log('[Closure] No variable in this file has a description — ' +
+            'nothing for the DTCG export to carry into $description.');
+        }
+      })();
+
       // Also extract local styles (text styles and effect styles) for $figmaStyleReferences
       var textStyles = figma.getLocalTextStyles().map(function(style) {
         return {
@@ -2640,9 +2679,10 @@ figma.ui.onmessage = function(msg) {
         };
       });
       
-      figma.ui.postMessage({ 
-        type: 'extracted', 
+      figma.ui.postMessage({
+        type: 'extracted',
         collections: result,
+        fileName: (figma.root && figma.root.name) || '',
         styles: {
           textStyles: textStyles,
           effectStyles: effectStyles
@@ -2655,15 +2695,17 @@ figma.ui.onmessage = function(msg) {
   }
 
   if (msg.type === 'transform') {
-    var nativeResult = transformToFinalFormat(msg.raw);
-    var exportMode = msg.exportMode || 'token-studio';
+    var nativeResult = transformToFinalFormat(msg.raw, {
+      includeDescriptions: !!msg.includeDescriptions
+    });
+    var exportMode = msg.exportMode || 'legacy';
     var finalTokens;
-    if (exportMode === 'token-studio') {
+    if (exportMode === 'legacy') {
       finalTokens = toTokenFormat(nativeResult.tokens, msg.raw);
     } else {
       finalTokens = nativeResult.tokens;
     }
-    var closure = exportMode === 'token-studio'
+    var closure = exportMode === 'legacy'
       ? validateReferenceClosure(finalTokens)
       : { ok: true, brokenCount: 0, totalRefs: 0, byRoot: {}, missingRoots: [], sampleBroken: [] };
     if (!closure.ok) {
