@@ -313,6 +313,7 @@
             dependsOn: fixed,
             visited: result.visited,
             value: result.value,
+            terminal: result.terminal,
             error: result.error
           };
         }
@@ -338,6 +339,109 @@
       branches: branches,
       branchCount: Object.keys(branches).length
     };
+  }
+
+  /*
+    Which VARIABLES are consumed, as opposed to which collections are.
+
+    classify() answers at collection granularity, which is the right grain for
+    "what are the axes" and the wrong one for "what should be emitted". A
+    multi-mode collection is usually routing — the consumption layer aliases
+    into it — but it can also hold tokens of its own that nothing aliases into:
+    grid definitions living in the breakpoint collection, say. Those have
+    in-degree 0 as variables while their collection has in-degree 12,000, so a
+    collection-level answer drops them silently.
+
+    So: a variable no other variable aliases to is a leaf a consumer reads,
+    wherever it lives. Primitives are excluded — they are leaves in the other
+    direction, and emitted as the raw-value group instead.
+  */
+  function consumptionVariables(index, cls) {
+    var isPrimitive = {};
+    (cls || classify(index.collections)).primitive.forEach(function (n) {
+      isPrimitive[n] = true;
+    });
+
+    var aliased = {};
+    index.collections.forEach(function (c) {
+      (c.variables || []).forEach(function (v) {
+        Object.keys(v.valuesByMode || {}).forEach(function (modeId) {
+          var value = v.valuesByMode[modeId];
+          if (isAlias(value)) aliased[value.id] = true;
+        });
+      });
+    });
+
+    var out = [];
+    index.collections.forEach(function (c) {
+      if (isPrimitive[c.name]) return;
+      (c.variables || []).forEach(function (v) {
+        if (!aliased[v.id]) out.push({ collection: c.name, variable: v });
+      });
+    });
+    return out;
+  }
+
+  /*
+    The order to nest axes in, derived rather than declared.
+
+    Nesting has to put the outer question first: you pick a breakpoint before
+    you pick which scheme, because the scheme layer is reached THROUGH nothing
+    the breakpoint decided. The file already states that ordering — a walk that
+    meets `.scheme` and later `.mode` is a file saying `.scheme` is the outer of
+    the two — so collect those observed precedences and topologically sort them.
+
+    Sampling matters: the default-mode walk never enters an axis no default
+    selects, so a palette collection reached only when scheme=secondary would
+    pick up no constraints at all. Sample every branch enumerateAdaptive
+    actually explores instead, which by construction enters each reachable axis.
+
+    Axes that never co-occur on any walk are genuinely unordered; they are
+    broken by name so the result is stable across runs and across files.
+    Returns { order, cyclic } — cyclic names any axes a cycle left unplaced.
+  */
+  function axisOrder(index, cls, options) {
+    var axes = cls.axes;
+    var isAxis = {};
+    axes.forEach(function (a) { isAxis[a.name] = true; });
+
+    var names = axes.map(function (a) { return a.name; });
+    var edge = {};
+    var indeg = {};
+    names.forEach(function (n) { edge[n] = {}; indeg[n] = 0; });
+
+    var roots = (options && options.roots) || cls.consumption;
+    roots.forEach(function (rootName) {
+      var coll = index.collsByName[rootName];
+      if (!coll) return;
+      (coll.variables || []).forEach(function (v) {
+        var explored = enumerateAdaptive(index, v, axes, options).branches;
+        Object.keys(explored).forEach(function (key) {
+          var seq = (explored[key].visited || []).filter(function (n) { return isAxis[n]; });
+          for (var i = 0; i < seq.length; i++) {
+            for (var j = i + 1; j < seq.length; j++) {
+              if (seq[i] === seq[j] || edge[seq[i]][seq[j]]) continue;
+              edge[seq[i]][seq[j]] = true;
+              indeg[seq[j]]++;
+            }
+          }
+        });
+      });
+    });
+
+    // Kahn, with the ready set kept sorted so ties resolve the same way twice.
+    var order = [];
+    var ready = names.filter(function (n) { return indeg[n] === 0; }).sort();
+    while (ready.length) {
+      var n = ready.shift();
+      order.push(n);
+      Object.keys(edge[n]).sort().forEach(function (m) {
+        if (--indeg[m] === 0) { ready.push(m); ready.sort(); }
+      });
+    }
+
+    var cyclic = names.filter(function (n) { return order.indexOf(n) === -1; });
+    return { order: order.concat(cyclic), cyclic: cyclic };
   }
 
   // --- emitting a resolved tree ----------------------------------------------
@@ -445,6 +549,8 @@
     resolve: resolve,
     enumerate: enumerate,
     enumerateAdaptive: enumerateAdaptive,
+    axisOrder: axisOrder,
+    consumptionVariables: consumptionVariables,
     branchVectors: branchVectors,
     buildResolvedTree: buildResolvedTree
   };
