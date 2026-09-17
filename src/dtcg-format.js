@@ -129,13 +129,16 @@
   // turn a real reference into a broken literal instead of leaving it as
   // the reference/math-expression report already surfaces it to be.
   // Resolves ONLY the documented shape of this kit's own dimension math
-  // layer — '<number><op>{path.to.token}', e.g. '5*{dimension.base}' (see
-  // code.js's own "dimension.N -> N*{dimension.base} when divisible"
-  // comment) — never arbitrary arithmetic. `root` is the same tree
-  // convertTree is walking (a theme's merged sets, or one set for 'sets'
-  // shape); the reference path is relative to it, exactly as Legacy JSON
-  // already writes it. Recurses through a chain of references (one
-  // dimension math expression pointing at another) with a depth guard
+  // layer — a single number and a single {path.to.token} reference joined
+  // by one operator, either order ('5*{dimension.base}', matching code.js's
+  // own "dimension.N -> N*{dimension.base} when divisible" comment, or
+  // '{dimension.1}*0.25', found the same way the composite bugs were: by
+  // diffing a real export against a known-correct reference and sampling
+  // what was still left unresolved) — never arbitrary arithmetic. `root` is
+  // the same tree convertTree is walking (a theme's merged sets, or one set
+  // for 'sets' shape); the reference path is relative to it, exactly as
+  // Legacy JSON already writes it. Recurses through a chain of references
+  // (one dimension math expression pointing at another) with a depth guard
   // against a cycle; returns null on anything it cannot fully resolve to a
   // number, so the caller can fall back to leaving the expression as-is.
   function resolveDimensionRef(root, refPath, depth) {
@@ -150,23 +153,35 @@
     return resolveDimensionNumber(root, node.value, depth + 1);
   }
 
-  var DIMENSION_MATH_RE = /^(-?[\d.]+)\s*([*/+-])\s*\{([^{}]+)\}$/;
+  var DIMENSION_MATH_NUM_FIRST_RE = /^(-?[\d.]+)\s*([*/+-])\s*\{([^{}]+)\}$/;
+  var DIMENSION_MATH_REF_FIRST_RE = /^\{([^{}]+)\}\s*([*/+-])\s*(-?[\d.]+)$/;
+
+  function applyOp(op, a, b) {
+    if (op === '*') return a * b;
+    if (op === '/') return b === 0 ? null : a / b;
+    if (op === '+') return a + b;
+    return a - b;
+  }
 
   function resolveDimensionNumber(root, value, depth) {
     if (typeof value === 'number') return value;
     if (typeof value !== 'string') return null;
     var trimmed = value.trim();
     if (/^-?[\d.]+$/.test(trimmed)) return parseFloat(trimmed); // a plain numeric literal
-    var m = DIMENSION_MATH_RE.exec(trimmed);
-    if (!m) return null;
-    var lhs = parseFloat(m[1]);
-    var op = m[2];
-    var refVal = resolveDimensionRef(root, m[3], depth || 0);
-    if (refVal === null) return null;
-    if (op === '*') return lhs * refVal;
-    if (op === '/') return refVal === 0 ? null : lhs / refVal;
-    if (op === '+') return lhs + refVal;
-    return lhs - refVal;
+
+    var m = DIMENSION_MATH_NUM_FIRST_RE.exec(trimmed);
+    if (m) {
+      var refVal = resolveDimensionRef(root, m[3], depth || 0);
+      return refVal === null ? null : applyOp(m[2], parseFloat(m[1]), refVal);
+    }
+
+    m = DIMENSION_MATH_REF_FIRST_RE.exec(trimmed);
+    if (m) {
+      var refVal2 = resolveDimensionRef(root, m[1], depth || 0);
+      return refVal2 === null ? null : applyOp(m[2], refVal2, parseFloat(m[3]));
+    }
+
+    return null;
   }
 
   function toDtcgDimension(value, root) {
