@@ -48400,8 +48400,53 @@ react/cjs/react-jsx-runtime.development.js:
   // resolve the math form into, so wrapping either in { value, unit } would
   // turn a real reference into a broken literal instead of leaving it as
   // the reference/math-expression report already surfaces it to be.
-  function toDtcgDimension(value) {
-    if (typeof value === 'string' && value.indexOf('{') !== -1) return value;
+  // Resolves ONLY the documented shape of this kit's own dimension math
+  // layer — '<number><op>{path.to.token}', e.g. '5*{dimension.base}' (see
+  // code.js's own "dimension.N -> N*{dimension.base} when divisible"
+  // comment) — never arbitrary arithmetic. `root` is the same tree
+  // convertTree is walking (a theme's merged sets, or one set for 'sets'
+  // shape); the reference path is relative to it, exactly as Legacy JSON
+  // already writes it. Recurses through a chain of references (one
+  // dimension math expression pointing at another) with a depth guard
+  // against a cycle; returns null on anything it cannot fully resolve to a
+  // number, so the caller can fall back to leaving the expression as-is.
+  function resolveDimensionRef(root, refPath, depth) {
+    if (depth > 10) return null;
+    var parts = refPath.split('.');
+    var node = root;
+    for (var i = 0; i < parts.length; i++) {
+      if (!node || typeof node !== 'object') return null;
+      node = node[parts[i]];
+    }
+    if (!isTokenNode(node)) return null;
+    return resolveDimensionNumber(root, node.value, depth + 1);
+  }
+
+  var DIMENSION_MATH_RE = /^(-?[\d.]+)\s*([*/+-])\s*\{([^{}]+)\}$/;
+
+  function resolveDimensionNumber(root, value, depth) {
+    if (typeof value === 'number') return value;
+    if (typeof value !== 'string') return null;
+    var trimmed = value.trim();
+    if (/^-?[\d.]+$/.test(trimmed)) return parseFloat(trimmed); // a plain numeric literal
+    var m = DIMENSION_MATH_RE.exec(trimmed);
+    if (!m) return null;
+    var lhs = parseFloat(m[1]);
+    var op = m[2];
+    var refVal = resolveDimensionRef(root, m[3], depth || 0);
+    if (refVal === null) return null;
+    if (op === '*') return lhs * refVal;
+    if (op === '/') return refVal === 0 ? null : lhs / refVal;
+    if (op === '+') return lhs + refVal;
+    return lhs - refVal;
+  }
+
+  function toDtcgDimension(value, root) {
+    if (typeof value === 'string' && value.indexOf('{') !== -1) {
+      var resolved = root ? resolveDimensionNumber(root, value, 0) : null;
+      if (resolved === null) return value; // still can't be resolved — leave the reference as-is
+      return { value: resolved, unit: 'px' };
+    }
     var n = typeof value === 'number' ? value : parseFloat(value);
     if (isNaN(n)) return value; // not actually numeric — leave it rather than guess
     return { value: n, unit: 'px' };
@@ -48477,7 +48522,7 @@ react/cjs/react-jsx-runtime.development.js:
 
   // --- token conversion ------------------------------------------------------
 
-  function convertToken(node, path, report) {
+  function convertToken(node, path, report, root) {
     var legacyType = node.type;
     var dtcgType = TYPE_MAP[legacyType];
     var out = {};
@@ -48501,13 +48546,18 @@ react/cjs/react-jsx-runtime.development.js:
       value = split.value;
       extra = split.extra;
     } else if (dtcgType === 'dimension') {
-      value = toDtcgDimension(value);
+      value = toDtcgDimension(value, root);
     } else if (dtcgType === 'color') {
       value = toDtcgColor(value);
     }
 
-    if (isMathExpression(node.value)) {
-      report.mathExpressions.push({ path: path, value: node.value });
+    // Only what's STILL a math expression after the dimension resolver above
+    // had its try — a dimension it successfully resolved is now a { value,
+    // unit } object, not a string, so it no longer needs flagging; anything
+    // it couldn't (a reference outside this tree, a cycle, a shape other
+    // than the documented one) still does.
+    if (isMathExpression(value)) {
+      report.mathExpressions.push({ path: path, value: value });
     }
 
     if (dtcgType !== undefined) out.$type = dtcgType;
@@ -48538,12 +48588,18 @@ react/cjs/react-jsx-runtime.development.js:
     return out;
   }
 
-  function convertTree(node, path, report) {
-    if (isTokenNode(node)) return convertToken(node, path, report);
+  // `root` defaults to `node` on the outermost call (one per theme/set) and
+  // is threaded unchanged through every recursive call after that, so a
+  // dimension token anywhere in the tree can resolve a '{path.from.root}'
+  // reference against the same tree convertTree is already walking — see
+  // toDtcgDimension/resolveDimensionNumber above.
+  function convertTree(node, path, report, root) {
+    if (root === undefined) root = node;
+    if (isTokenNode(node)) return convertToken(node, path, report, root);
     if (!isObject(node)) return node;
     var out = {};
     Object.keys(node).forEach(function (key) {
-      out[key] = convertTree(node[key], path ? path + '.' + key : key, report);
+      out[key] = convertTree(node[key], path ? path + '.' + key : key, report, root);
     });
     return out;
   }
