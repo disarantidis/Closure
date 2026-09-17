@@ -115,6 +115,26 @@
     return out;
   }
 
+  // Legacy JSON dimension (spacing/sizing/borderRadius/borderWidth/dimension/
+  // fontSizes/letterSpacing/paragraphSpacing/paragraphIndent — everything
+  // TYPE_MAP maps to 'dimension') → DTCG's dimension composite, { value,
+  // unit }. Figma's own float variables behind every one of these are raw
+  // pixels, so unit is always 'px' — there is no per-token unit to read.
+  //
+  // A string containing '{' is a reference — a plain alias ('{dimension.1}')
+  // or a math expression built on one ('1*{dimension.base}', see
+  // isMathExpression above) — and stays exactly as it is: DTCG aliases are
+  // valid as bare $value strings, and there is no arithmetic in DTCG to
+  // resolve the math form into, so wrapping either in { value, unit } would
+  // turn a real reference into a broken literal instead of leaving it as
+  // the reference/math-expression report already surfaces it to be.
+  function toDtcgDimension(value) {
+    if (typeof value === 'string' && value.indexOf('{') !== -1) return value;
+    var n = typeof value === 'number' ? value : parseFloat(value);
+    if (isNaN(n)) return value; // not actually numeric — leave it rather than guess
+    return { value: n, unit: 'px' };
+  }
+
   // Legacy JSON typography → DTCG typography, plus the non-standard sub-values
   // split off for $extensions.
   function toDtcgTypography(value) {
@@ -153,6 +173,8 @@
       var split = toDtcgTypography(value);
       value = split.value;
       extra = split.extra;
+    } else if (dtcgType === 'dimension') {
+      value = toDtcgDimension(value);
     }
 
     if (isMathExpression(node.value)) {
