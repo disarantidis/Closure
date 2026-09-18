@@ -4289,6 +4289,138 @@ function validateReferenceClosure(tokens) {
 var GIT_CONFIG_KEY = 'json-exporter-git-config';
 
 // --- MESSAGE HANDLER ---
+/*
+  The resolved shape, produced in the sandbox.
+
+  emit-resolved.js measures the architecture and hands back {primitives,
+  groups}, where a group is a set of tokens sharing a dependency signature and
+  a branch is one combination of the axes they actually depend on. That is the
+  complete, lossless form. It is not the form a consumer reads, which is a
+  document with named top-level sections.
+
+  Mapping one to the other is presentation, and the roles it needs are read off
+  the derived data rather than off collection names:
+
+    breakpoint role  the axis some group depends on ALONE — a single-axis group
+                     is a set of tokens that vary by one thing and nothing else
+    scheme role      first axis, in derived order, of the widest group
+    mode role        second axis of that same group
+
+  On both design systems measured this picks out exactly the axes a human would
+  have named, without being told any of them. When a file has no such shape the
+  derived form is returned unchanged rather than forced into a layout that does
+  not fit it.
+*/
+function buildResolvedDocument(rawData, options) {
+  options = options || {};
+  var A = (typeof PomArchitecture !== 'undefined') ? PomArchitecture : null;
+  var E = (typeof PomEmitResolved !== 'undefined') ? PomEmitResolved : null;
+  var D = (typeof PomDtcg !== 'undefined') ? PomDtcg : null;
+  if (!A || !E || !D) throw new Error('resolved shape: modules missing from the build');
+
+  var res = E.emit(rawData.collections, {
+    hooks: {
+      formatValue: formatValue,
+      formatFloatForExport: formatFloatForExport,
+      addTypographyComposite: addTypographyComposite,
+      addElevationCompositesDeep: addElevationCompositesDeep,
+      ensureCoreLineHeightsLetterSpacing: ensureCoreLineHeightsLetterSpacing,
+      toDtcgFormat: D.toDtcgFormat
+    },
+    pin: options.pin,
+    renameMode: options.renameMode,
+    renameToken: options.renameToken,
+    typeHints: options.typeHints
+  });
+
+  var roles = deriveLayoutRoles(res);
+  if (!roles) return { document: shapeDerived(res), roles: null, emit: res };
+  return { document: shapeHouse(res, roles), roles: roles, emit: res };
+}
+
+// Which axis plays which part, read off the derived groups.
+function deriveLayoutRoles(res) {
+  var single = null;
+  var widest = null;
+  Object.keys(res.groups).forEach(function (k) {
+    var g = res.groups[k];
+    if (!g.axes.length) return;
+    if (g.axes.length === 1 && !single) single = g.axes[0];
+    if (!widest || g.axes.length > res.groups[widest].axes.length) widest = k;
+  });
+  if (!widest) return null;
+  var wide = res.groups[widest].axes;
+  if (wide.length < 2) return null;
+  return { breakpoint: single, scheme: wide[0], mode: wide[1] };
+}
+
+// The derived form, lightly flattened: one section per group, branches beneath.
+function shapeDerived(res) {
+  var out = {};
+  Object.keys(res.primitives).forEach(function (name) {
+    out[name.replace(/^\./, '')] = res.primitives[name];
+  });
+  Object.keys(res.groups).forEach(function (key) {
+    var section = {};
+    res.groups[key].branches.forEach(function (b) {
+      section[b.path.length ? b.path.join('/') : 'default'] = b.tokens;
+    });
+    out[key.replace(/[+.]/g, '_')] = section;
+  });
+  return out;
+}
+
+function mergeResolvedInto(target, src) {
+  Object.keys(src).forEach(function (k) {
+    var a = target[k], b = src[k];
+    if (a && typeof a === 'object' && !('$value' in a) &&
+        b && typeof b === 'object' && !('$value' in b)) mergeResolvedInto(a, b);
+    else target[k] = b;
+  });
+  return target;
+}
+
+/*
+  core / breakpoint.<mode> / mode.<mode>.<scheme>.
+
+  Two conventions the graph does not state and this does: a branch is named by
+  its innermost colour choice, so a scheme that routes into a palette reads as
+  the palette; and a scheme that never enters the light/dark switch is repeated
+  under every mode rather than sitting outside them.
+*/
+function shapeHouse(res, roles) {
+  var primitiveName = Object.keys(res.primitives)[0];
+  var out = { core: res.primitives[primitiveName] || {}, breakpoint: {}, mode: {} };
+  var modeAxis = null;
+  res.axes.forEach(function (a) { if (a.name === roles.mode) modeAxis = a; });
+  var allModes = (modeAxis && modeAxis.modes) || [];
+
+  Object.keys(res.groups).forEach(function (key) {
+    res.groups[key].branches.forEach(function (br) {
+      var v = br.vector;
+
+      if (roles.breakpoint && v[roles.breakpoint] !== undefined) {
+        var bi = br.dependsOn.indexOf(roles.breakpoint);
+        var bp = (bi >= 0 && br.path[bi]) || v[roles.breakpoint];
+        out.breakpoint[bp] = mergeResolvedInto(out.breakpoint[bp] || {}, br.tokens);
+        return;
+      }
+      if (v[roles.scheme] === undefined) return;   // the static group stays in core's orbit
+
+      var leafAxes = br.dependsOn.filter(function (n) { return n !== roles.mode; });
+      var leafIdx = br.dependsOn.indexOf(leafAxes[leafAxes.length - 1]);
+      var leaf = br.path[leafIdx];
+      var mi = br.dependsOn.indexOf(roles.mode);
+      var modes = mi >= 0 ? [br.path[mi]] : allModes;
+      modes.forEach(function (mm) {
+        out.mode[mm] = out.mode[mm] || {};
+        out.mode[mm][leaf] = mergeResolvedInto(out.mode[mm][leaf] || {}, br.tokens);
+      });
+    });
+  });
+  return out;
+}
+
 figma.ui.onmessage = function(msg) {
   if (msg.type === 'resize') {
     figma.ui.resize(420, msg.height);
