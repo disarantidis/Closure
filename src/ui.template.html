@@ -898,10 +898,18 @@
        insetting the whole card box from the panel edge to align with
        .folder-paths-title's text above — the card's own padding positions
        its CONTENT. */
-    #dtcg-format-control-mount {
+    #dtcg-format-control-mount,
+    #resolved-format-control-mount {
       display: block;
       margin-left: var(--spacing-component-3);
       margin-right: var(--spacing-component-3);
+    }
+    /* The two format cards are one control split in two, so they sit as a
+       stack with a single gap rather than the section spacing that separates
+       unrelated blocks. Only between them — the section's own bottom margin
+       still ends the group. */
+    #dtcg-format-control-mount + #resolved-format-control-mount {
+      margin-top: var(--spacing-component-2);
     }
 
     /* Outer spacing wrapper only, same padding as .header on the main
