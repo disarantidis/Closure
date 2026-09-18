@@ -2014,14 +2014,27 @@
     // form — so they stay correct on a name the user has edited by hand, and
     // toggling the switch back and forth round-trips instead of stacking
     // suffixes or eating characters.
-    function dtcgFilename(name) {
+    // Swap whatever suffix a name carries for `want` (or none). The two public
+    // helpers below are this with the active format filled in.
+    function withSuffix(name, want) {
       if (!name) return name;
-      var want = activeSuffix();
       var found = matchedDtcgSuffix(name);
       if (found === want) return name;
       var p = splitFilename(name);
       var stem = found ? p.base.slice(0, -found.length) : p.base;
-      return stem + want + p.ext;
+      return stem + (want || '') + p.ext;
+    }
+    function dtcgFilename(name) {
+      return withSuffix(name, activeSuffix());
+    }
+    // What a given format WOULD write, whichever one is active right now —
+    // so each card can name its own file rather than the current one's.
+    function filenameForShape(shape) {
+      var base = ensureJsonExtension(
+        document.getElementById('primary-filename').value.trim() || DEFAULT_FILENAME);
+      if (shape === 'themes') return withSuffix(base, DTCG_SUFFIX);
+      if (shape === 'resolved') return withSuffix(base, RESOLVED_SUFFIX);
+      return withSuffix(base, null);
     }
     function plainFilename(name) {
       if (!name) return name;
@@ -2923,16 +2936,23 @@
     function updateOutputFormatHint() {
       // Names the file it will actually be written to, so the _dtcg swap is
       // visible here and not only in the file name field further down.
-      var name = primaryFilename();
-      var formatName = dtcgShape === 'resolved' ? 'Resolved'
-        : dtcgShape ? 'W3C DTCG' : 'Legacy JSON';
-      var hint = dtcgShape === 'resolved'
-        ? 'One document, routing resolved away, exported as ' + name + '.'
-        : dtcgShape
-        ? '$value / $type, one resolved document per theme, exported as ' + name + '.'
-        : 'The format this plugin has always exported, as ' + name + '.';
-      window.PomDtcgFormat.setLabels(formatName, hint);
-      window.PomResolvedFormat.setLabels(formatName, hint);
+      /*
+        Each card names its OWN format and the file that format would write —
+        not the active one. With a single card the label could track the current
+        state; with two it cannot, or both read the same and neither says what
+        turning it on would do. Switches off on both is Legacy JSON, which the
+        DTCG card's hint says rather than costing a third card for a state that
+        has no options of its own.
+      */
+      window.PomDtcgFormat.setLabels(
+        'W3C DTCG',
+        '$value / $type, one resolved document per theme, as ' +
+          filenameForShape('themes') + '. Off on both leaves Legacy JSON (' +
+          filenameForShape(null) + ').');
+      window.PomResolvedFormat.setLabels(
+        'Resolved',
+        'One document, the routing resolved away and each token under the ' +
+          'choices it varies with, as ' + filenameForShape('resolved') + '.');
     }
 
     // Convert the Legacy JSON tree to DTCG and log a conversion report.

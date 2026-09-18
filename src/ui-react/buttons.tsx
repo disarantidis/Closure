@@ -607,13 +607,15 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   let setLabels: (name: string, hint: string) => void = () => {};
   function View() {
     const [on, setOn] = useState(false);
-    const [name, setName] = useState('Legacy JSON');
+    // Each card names its own format; the template refreshes both on load and
+    // on every change (updateOutputFormatHint). This is only the first paint.
+    const [name, setName] = useState('W3C DTCG');
     const [hint, setHint] = useState('');
     set = setOn;
     setLabels = (n, h) => { setName(n); setHint(h); };
     return (
       <SelectableCard
-        label="DTCG (W3C)"
+        label="W3C DTCG"
         selected={on}
         onSelect={() => { const next = !on; setOn(next); window.PomDtcgFormat.onChange?.(next); }}
         mark="switch"
