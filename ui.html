@@ -21629,6 +21629,11 @@ html[data-theme=dark] {
       <div class="output-format">
         <p class="folder-paths-title">Output format</p>
         <span id="dtcg-format-control-mount"></span>
+        <!-- The third format: the routing resolved away, each token under the
+             choices it actually varies with. Built by buildResolvedDocument()
+             in the sandbox, which is where the raw variable graph and the
+             formatters both live. Mutually exclusive with DTCG above. -->
+        <span id="resolved-format-control-mount"></span>
       </div>
 
       <!-- Always-visible heading for whichever provider's connection fields
@@ -47802,6 +47807,43 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
     window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v), setLabels: (n, h) => setLabels(n, h) };
   })();
+  (function mountResolvedFormatCard() {
+    const container = document.getElementById("resolved-format-control-mount");
+    let set = () => {
+    };
+    let setLabels = () => {
+    };
+    function View() {
+      const [on, setOn] = (0, import_react13.useState)(false);
+      const [name, setName] = (0, import_react13.useState)("Resolved");
+      const [hint, setHint] = (0, import_react13.useState)("");
+      set = setOn;
+      setLabels = (n, h) => {
+        setName(n);
+        setHint(h);
+      };
+      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+        SelectableCard,
+        {
+          label: "Resolved",
+          selected: on,
+          onSelect: () => {
+            const next = !on;
+            setOn(next);
+            window.PomResolvedFormat.onChange?.(next);
+          },
+          mark: "switch",
+          level: GROUND,
+          children: /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 2 }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: { fontWeight: 600, color: "var(--app-text)" }, children: name }),
+            hint && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: hint })
+          ] })
+        }
+      );
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    window.PomResolvedFormat = { onChange: null, setValue: (v) => set(v), setLabels: (n, h) => setLabels(n, h) };
+  })();
   (function mountRepoTabControl() {
     const mountIds = ["repo-settings-tab-mount", "repo-settings-tab-mount-github"];
     const setters = [];
@@ -49070,6 +49112,10 @@ react/cjs/react-jsx-runtime.development.js:
     // name per provider, so what Settings shows is always what gets pushed.
     var DEFAULT_FILENAME = 'tokens.json';
     var DTCG_SUFFIX = '_dtcg';
+    // The resolved shape is DTCG too, but a different DOCUMENT — one resolved
+    // tree rather than one per theme. It gets its own suffix so switching
+    // format never has the two land on the same file name.
+    var RESOLVED_SUFFIX = '_resolved';
     // v1.4.0 development builds wrote _W3C before the output was renamed (it is
     // a partial DTCG conversion, not strict W3C). Still recognised so a name
     // saved by one of those strips cleanly, and re-suffixes to _dtcg, instead of
@@ -49093,10 +49139,15 @@ react/cjs/react-jsx-runtime.development.js:
       if (!s || /\.json$/i.test(s)) return s;
       return s + '.json';
     }
+    // The suffix the ACTIVE format writes to. Everything else recognises all of
+    // them, so switching between formats strips cleanly in either direction.
+    function activeSuffix() {
+      return dtcgShape === 'resolved' ? RESOLVED_SUFFIX : DTCG_SUFFIX;
+    }
     // Which suffix a name currently carries — the live one, a legacy one, or none.
     function matchedDtcgSuffix(name) {
       var base = splitFilename(name).base;
-      var all = [DTCG_SUFFIX].concat(LEGACY_DTCG_SUFFIXES);
+      var all = [DTCG_SUFFIX, RESOLVED_SUFFIX].concat(LEGACY_DTCG_SUFFIXES);
       for (var i = 0; i < all.length; i++) {
         if (all[i].length <= base.length && base.slice(-all[i].length) === all[i]) return all[i];
       }
@@ -49111,11 +49162,12 @@ react/cjs/react-jsx-runtime.development.js:
     // suffixes or eating characters.
     function dtcgFilename(name) {
       if (!name) return name;
+      var want = activeSuffix();
       var found = matchedDtcgSuffix(name);
-      if (found === DTCG_SUFFIX) return name;
+      if (found === want) return name;
       var p = splitFilename(name);
       var stem = found ? p.base.slice(0, -found.length) : p.base;
-      return stem + DTCG_SUFFIX + p.ext;
+      return stem + want + p.ext;
     }
     function plainFilename(name) {
       if (!name) return name;
@@ -49497,6 +49549,9 @@ react/cjs/react-jsx-runtime.development.js:
           // shape name so a config saved here stays readable if the converter
           // ever grows more shapes.
           dtcg: dtcgShape !== null,
+          // The shape by name, because there are three of them now. `dtcg`
+          // above stays for configs written by — and read by — older builds.
+          outputFormat: dtcgShape || 'legacy',
           // One JSON file name for both providers now — no longer nested
           // per-provider below (see gitlabConfig()/githubConfig() and the
           // migration read in setState()).
@@ -49530,8 +49585,17 @@ react/cjs/react-jsx-runtime.development.js:
         // existed, which must keep exporting Legacy JSON — so only an
         // explicit `true` turns DTCG on.
         var previousDtcgShape = dtcgShape;
-        dtcgShape = config.dtcg === true ? 'themes' : null;
-        window.PomDtcgFormat.setValue(dtcgShape !== null);
+        // outputFormat when present; otherwise the old boolean, which only ever
+        // meant 'themes'. Anything unrecognised falls back to Legacy JSON.
+        if (config.outputFormat === 'themes' || config.outputFormat === 'resolved') {
+          dtcgShape = config.outputFormat;
+        } else if (config.outputFormat === 'legacy') {
+          dtcgShape = null;
+        } else {
+          dtcgShape = config.dtcg === true ? 'themes' : null;
+        }
+        window.PomDtcgFormat.setValue(dtcgShape === 'themes');
+        window.PomResolvedFormat.setValue(dtcgShape === 'resolved');
         // No filename rewrite here: a config saved with dtcg on already stored
         // the suffixed name, and defaultFilename() (read below when a provider
         // has none saved) follows dtcgShape, which is why this block runs
@@ -50006,11 +50070,15 @@ react/cjs/react-jsx-runtime.development.js:
       // Names the file it will actually be written to, so the _dtcg swap is
       // visible here and not only in the file name field further down.
       var name = primaryFilename();
-      var formatName = dtcgShape ? 'W3C DTCG' : 'Legacy JSON';
-      var hint = dtcgShape
+      var formatName = dtcgShape === 'resolved' ? 'Resolved'
+        : dtcgShape ? 'W3C DTCG' : 'Legacy JSON';
+      var hint = dtcgShape === 'resolved'
+        ? 'One document, routing resolved away, exported as ' + name + '.'
+        : dtcgShape
         ? '$value / $type, one resolved document per theme, exported as ' + name + '.'
         : 'The format this plugin has always exported, as ' + name + '.';
       window.PomDtcgFormat.setLabels(formatName, hint);
+      window.PomResolvedFormat.setLabels(formatName, hint);
     }
 
     // Convert the Legacy JSON tree to DTCG and log a conversion report.
@@ -50049,6 +50117,9 @@ react/cjs/react-jsx-runtime.development.js:
       var tokens = transformedData.tokens;
       // In Legacy JSON mode the output keys are set names (e.g. 'core', 'mode/light'),
       // not raw Figma collection names — skip the collection filter entirely.
+      // Already a finished DTCG document when the sandbox built it — no
+      // second conversion here, and no collection filter either.
+      if (dtcgShape === 'resolved') return tokens;
       if (exportMode === 'legacy') {
         return dtcgShape ? toDtcg(tokens) : tokens;
       }
@@ -50292,6 +50363,10 @@ react/cjs/react-jsx-runtime.development.js:
           type: 'transform',
           raw: rawData,
           exportMode: exportMode,
+          // The resolved shape is built in the sandbox (buildResolvedDocument),
+          // because that is where the raw variable graph and the formatters
+          // both are — the UI only has the transformed tree.
+          resolvedShape: dtcgShape === 'resolved',
           // Descriptions are only carried when a DTCG shape needs them.
           includeDescriptions: dtcgShape !== null,
           selectedCollections: selectedCollections.length > 0 ? selectedCollections : null
@@ -50313,14 +50388,29 @@ react/cjs/react-jsx-runtime.development.js:
     // 'themes' (not 'partial') — see the note on `var dtcgShape` above and on
     // toDtcg() below: this is the shape that is genuinely standalone W3C
     // DTCG, not the one that still needs an external finishing step.
-    window.PomDtcgFormat.onChange = function(on) {
-      dtcgShape = on ? 'themes' : null;
+    /*
+      Two switches, one choice. Turning either on turns the other off, so the
+      pair reads as three formats — DTCG, Resolved, or neither, which is Legacy
+      JSON. setFormat does the whole job; both handlers just name their shape.
+    */
+    function setFormat(shape) {
+      dtcgShape = shape;
+      window.PomDtcgFormat.setValue(shape === 'themes');
+      window.PomResolvedFormat.setValue(shape === 'resolved');
       // Rewrite the file names BEFORE persisting, so the saved config and the
       // fields on screen never disagree about where the export lands.
       applyFilenameForFormat();
       updateOutputFormatHint();
       persistSettings();
       requestTransform();
+    }
+
+    window.PomResolvedFormat.onChange = function(on) {
+      setFormat(on ? 'resolved' : null);
+    };
+
+    window.PomDtcgFormat.onChange = function(on) {
+      setFormat(on ? 'themes' : null);
     };
 
     updateActionUI();

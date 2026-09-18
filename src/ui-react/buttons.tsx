@@ -398,6 +398,7 @@ declare global {
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomDtcgFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void; setLabels: (name: string, hint: string) => void };
+    PomResolvedFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void; setLabels: (name: string, hint: string) => void };
     PomOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
   }
 }
@@ -627,6 +628,38 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v), setLabels: (n, h) => setLabels(n, h) };
+})();
+
+/* The second output format. Same card, same switch: the template keeps the two
+   mutually exclusive, so together they read as a three-way choice (neither on
+   means Legacy JSON) without introducing a control the kit does not have. */
+(function mountResolvedFormatCard() {
+  const container = document.getElementById('resolved-format-control-mount');
+  let set: (on: boolean) => void = () => {};
+  let setLabels: (name: string, hint: string) => void = () => {};
+  function View() {
+    const [on, setOn] = useState(false);
+    const [name, setName] = useState('Resolved');
+    const [hint, setHint] = useState('');
+    set = setOn;
+    setLabels = (n, h) => { setName(n); setHint(h); };
+    return (
+      <SelectableCard
+        label="Resolved"
+        selected={on}
+        onSelect={() => { const next = !on; setOn(next); window.PomResolvedFormat.onChange?.(next); }}
+        mark="switch"
+        level={GROUND}
+      >
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>{name}</span>
+          {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
+        </span>
+      </SelectableCard>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  window.PomResolvedFormat = { onChange: null, setValue: (v) => set(v), setLabels: (n, h) => setLabels(n, h) };
 })();
 
 /* ── GitHub / GitLab repo-settings tab switcher ────────────────────────────── */

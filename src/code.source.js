@@ -2842,12 +2842,31 @@ figma.ui.onmessage = function(msg) {
     });
     var exportMode = msg.exportMode || 'legacy';
     var finalTokens;
-    if (exportMode === 'legacy') {
+    /*
+      The resolved shape reads the RAW graph, not the transformed tree — the
+      alias hops it resolves are exactly what transformToFinalFormat has
+      already collapsed. So it is built here from msg.raw and handed to the UI
+      finished, rather than being a post-transform the UI could apply.
+
+      nativeResult is still computed above for its token count, which the
+      validation panel reports either way.
+    */
+    if (msg.resolvedShape) {
+      /*
+        No vocabulary passed, deliberately. pin / renameMode / renameToken /
+        typeHints are facts about one design system, and the plugin has nowhere
+        for a user to state them yet — so this emits the file's own mode names,
+        keeps every axis as a branch, and types from Figma's scopes. Correct and
+        complete; it is not yet somebody's house naming. Settings is where that
+        would go, and that decision is still open.
+      */
+      finalTokens = buildResolvedDocument(msg.raw, {}).document;
+    } else if (exportMode === 'legacy') {
       finalTokens = toTokenFormat(nativeResult.tokens, msg.raw);
     } else {
       finalTokens = nativeResult.tokens;
     }
-    var closure = exportMode === 'legacy'
+    var closure = (exportMode === 'legacy' && !msg.resolvedShape)
       ? validateReferenceClosure(finalTokens)
       : { ok: true, brokenCount: 0, totalRefs: 0, byRoot: {}, missingRoots: [], sampleBroken: [] };
     if (!closure.ok) {
