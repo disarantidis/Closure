@@ -49160,7 +49160,7 @@ react/cjs/react-jsx-runtime.development.js:
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '1f5f7f5 16:36:39';
+    var CLOSURE_BUILD = 'ae36c8d 16:48:51';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -50201,6 +50201,10 @@ react/cjs/react-jsx-runtime.development.js:
       var ext = {};
       Object.keys(out['$extensions'] || {}).forEach(function(k) { ext[k] = out['$extensions'][k]; });
       ext['com.closure'] = { build: CLOSURE_BUILD, format: dtcgShape || 'legacy' };
+      // What the sandbox decided, when it decided anything — see its note.
+      if (transformedData && transformedData.resolvedReport) {
+        ext['com.closure'].resolved = transformedData.resolvedReport;
+      }
       out['$extensions'] = ext;
       return out;
     }

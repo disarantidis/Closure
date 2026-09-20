@@ -3008,6 +3008,10 @@
       var ext = {};
       Object.keys(out['$extensions'] || {}).forEach(function(k) { ext[k] = out['$extensions'][k]; });
       ext['com.closure'] = { build: CLOSURE_BUILD, format: dtcgShape || 'legacy' };
+      // What the sandbox decided, when it decided anything — see its note.
+      if (transformedData && transformedData.resolvedReport) {
+        ext['com.closure'].resolved = transformedData.resolvedReport;
+      }
       out['$extensions'] = ext;
       return out;
     }

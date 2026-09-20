@@ -2942,6 +2942,7 @@ figma.ui.onmessage = function(msg) {
     });
     var exportMode = msg.exportMode || 'legacy';
     var finalTokens;
+    var resolvedReport = null;
     /*
       The resolved shape reads the RAW graph, not the transformed tree — the
       alias hops it resolves are exactly what transformToFinalFormat has
@@ -2973,6 +2974,18 @@ figma.ui.onmessage = function(msg) {
           ' paths (no level for: ' + built.unplacedAxes.join(', ') + ') — emitted the complete ' +
           'derived shape instead');
       }
+      /*
+        Travel with the document. Why it came out in one shape rather than the
+        other is the first thing asked of any export, and reading it off a
+        console someone has to have open at the time has not worked.
+      */
+      resolvedReport = {
+        shape: built.shape,
+        roles: built.roles || null,
+        axes: built.emit.axisOrder,
+        collisions: built.layoutCollisions || 0,
+        unplacedAxes: built.unplacedAxes || []
+      };
     } else if (exportMode === 'legacy') {
       finalTokens = toTokenFormat(nativeResult.tokens, msg.raw);
     } else {
@@ -2987,7 +3000,7 @@ figma.ui.onmessage = function(msg) {
     }
     figma.ui.postMessage({
       type: 'transformed',
-      payload: { tokens: finalTokens, count: nativeResult.count },
+      payload: { tokens: finalTokens, count: nativeResult.count, resolvedReport: resolvedReport },
       validation: {
         actual: {
           totalTokens: nativeResult.count,
