@@ -633,19 +633,22 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
 
     return (
       <Card level={GROUND}>
+        {/* the outline is painted by #output-format-control-mount .nd-card —
+            .nd-selcard's own border declaration, which .nd-card does not carry */}
         <ListControlItem
           title="W3C DTCG"
           subtitle={hint}
           trailing={
             <Switch
               label="W3C DTCG"
+              labelHidden
               checked={on}
               onChange={(v: boolean) => choose(v ? 'themes' : 'legacy')}
             />
           }
         />
         {on && (
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 16px 16px' }}>
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 var(--nd-card-pad) var(--nd-card-pad)' }}>
             <Checkbox
               label="Resolved"
               checked={resolved}

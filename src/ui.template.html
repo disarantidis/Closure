@@ -903,6 +903,22 @@
       margin-left: var(--spacing-component-3);
       margin-right: var(--spacing-component-3);
     }
+    /* THE CARD EDGE, BORROWED RATHER THAN INVENTED.
+
+       This is a plain Card, not a SelectableCard, because it HOSTS CONTROLS: a
+       SelectableCard is a <button>, and a switch or a checkbox inside one is a
+       control inside a control — "one press fires BOTH", which the kit refuses
+       outright (SelectableCard.tsx). Its `action` escape hatch is absolutely
+       positioned in the mark's corner and documented for a card that "carries
+       no mark of its own to collide with", so it cannot hold a second control
+       while a switch already sits there.
+
+       .nd-card carries the radius and the surface but not the edge — the
+       border lives on .nd-selcard alone. So the edge is restated here with the
+       SAME tokens that declaration uses, rather than a value of our own. */
+    #output-format-control-mount .nd-card {
+      border: var(--border-width-hairline) solid var(--stroke-subtle);
+    }
 
     /* Outer spacing wrapper only, same padding as .header on the main
        screen — the actual visible container is .header-panel (shared class,
@@ -2936,19 +2952,17 @@
       // Names the file it will actually be written to, so the _dtcg swap is
       // visible here and not only in the file name field further down.
       /*
-        Two hints, because there are two controls. The switch's names the
-        format the export is in and the file it writes; the checkbox's says
-        what choosing the resolved document does instead of the per-theme one.
-        Each sits with the control it belongs to rather than one line trying
-        to describe whichever combination is live.
+        One line each, and each names only its own control's file. The switch's
+        used to read 'one document per theme' while showing the RESOLVED file
+        name whenever the box was ticked — DTCG's description over the other
+        format's output.
       */
       window.PomOutputFormat.setHint(
         dtcgShape === null
-          ? 'Off: the format this plugin has always exported, as ' + filenameForShape(null) + '.'
-          : '$value / $type, one resolved document per theme, as ' + filenameForShape(dtcgShape) + '.');
+          ? 'Off: Legacy JSON, as ' + filenameForShape(null) + '.'
+          : '$value / $type, as ' + filenameForShape(dtcgShape) + '.');
       window.PomOutputFormat.setResolvedHint(
-        'One document instead of one per theme: the routing resolved away and each token '
-        + 'under the choices it varies with. Writes ' + filenameForShape('resolved') + '.');
+        'One document instead of one per theme, routing resolved away.');
     }
 
     // Convert the Legacy JSON tree to DTCG and log a conversion report.
