@@ -4732,9 +4732,28 @@ figma.ui.onmessage = function(msg) {
         };
       });
       
+      /*
+        The axes, so Settings can offer them. classify() walks the alias edges
+        once and is cheap next to the extraction that just ran; the alternative
+        is the UI asking for them separately, which would mean holding the raw
+        graph in two places. Undefined if the modules are missing rather than
+        failing the extract — the resolved shape is the only thing that reads it.
+      */
+      var resolvedAxes;
+      try {
+        if (typeof PomArchitecture !== 'undefined') {
+          resolvedAxes = PomArchitecture.classify(result).axes.map(function (a) {
+            return { name: a.name, modes: a.modes };
+          });
+        }
+      } catch (e) {
+        console.warn('[Resolved] could not read the axes: ' + e.message);
+      }
+
       figma.ui.postMessage({
         type: 'extracted',
         collections: result,
+        resolvedAxes: resolvedAxes,
         fileName: (figma.root && figma.root.name) || '',
         styles: {
           textStyles: textStyles,
@@ -4771,7 +4790,7 @@ figma.ui.onmessage = function(msg) {
         complete; it is not yet somebody's house naming. Settings is where that
         would go, and that decision is still open.
       */
-      var built = buildResolvedDocument(msg.raw, {});
+      var built = buildResolvedDocument(msg.raw, msg.resolvedConfig || {});
       finalTokens = built.document;
       console.log('[Resolved] ' + built.shape + ' shape, ' + built.total + ' tokens, ' +
         built.emit.axes.length + ' axes: ' + built.emit.axisOrder.join(' > '));
