@@ -1746,11 +1746,11 @@
            so the two never overwrite each other. -->
       <div class="output-format">
         <p class="folder-paths-title">Output format</p>
-        <!-- One SegmentedControl, three formats (buttons.tsx). Legacy JSON,
-             W3C DTCG, and Resolved — the last built by buildResolvedDocument()
-             in the sandbox, where the raw variable graph and the formatters
-             both live. A radio group, so only one can be chosen at a time
-             because only one IS. -->
+        <!-- One Card (buttons.tsx): a Switch for DTCG, and inside it — only
+             once that is on — a Checkbox for Resolved, which is a DTCG
+             document in a different shape rather than a format of its own.
+             Built by buildResolvedDocument() in the sandbox, where the raw
+             variable graph and the formatters both live. -->
         <span id="output-format-control-mount"></span>
       </div>
 
@@ -2936,18 +2936,19 @@
       // Names the file it will actually be written to, so the _dtcg swap is
       // visible here and not only in the file name field further down.
       /*
-        The control names the three formats; this says what the chosen one
-        does and which file it writes. One line about one choice — the
-        ambiguity two cards had, over whether a label described itself or the
-        current state, cannot arise.
+        Two hints, because there are two controls. The switch's names the
+        format the export is in and the file it writes; the checkbox's says
+        what choosing the resolved document does instead of the per-theme one.
+        Each sits with the control it belongs to rather than one line trying
+        to describe whichever combination is live.
       */
-      var hint = dtcgShape === 'resolved'
-        ? 'One document, the routing resolved away and each token under the choices it varies with, as '
-          + filenameForShape('resolved') + '.'
-        : dtcgShape === 'themes'
-        ? '$value / $type, one resolved document per theme, as ' + filenameForShape('themes') + '.'
-        : 'The format this plugin has always exported, as ' + filenameForShape(null) + '.';
-      window.PomOutputFormat.setHint(hint);
+      window.PomOutputFormat.setHint(
+        dtcgShape === null
+          ? 'Off: the format this plugin has always exported, as ' + filenameForShape(null) + '.'
+          : '$value / $type, one resolved document per theme, as ' + filenameForShape(dtcgShape) + '.');
+      window.PomOutputFormat.setResolvedHint(
+        'One document instead of one per theme: the routing resolved away and each token '
+        + 'under the choices it varies with. Writes ' + filenameForShape('resolved') + '.');
     }
 
     // Convert the Legacy JSON tree to DTCG and log a conversion report.

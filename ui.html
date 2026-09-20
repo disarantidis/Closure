@@ -21628,11 +21628,11 @@ html[data-theme=dark] {
            so the two never overwrite each other. -->
       <div class="output-format">
         <p class="folder-paths-title">Output format</p>
-        <!-- One SegmentedControl, three formats (buttons.tsx). Legacy JSON,
-             W3C DTCG, and Resolved — the last built by buildResolvedDocument()
-             in the sandbox, where the raw variable graph and the formatters
-             both live. A radio group, so only one can be chosen at a time
-             because only one IS. -->
+        <!-- One Card (buttons.tsx): a Switch for DTCG, and inside it — only
+             once that is on — a Checkbox for Resolved, which is a DTCG
+             document in a different shape rather than a format of its own.
+             Built by buildResolvedDocument() in the sandbox, where the raw
+             variable graph and the formatters both live. -->
         <span id="output-format-control-mount"></span>
       </div>
 
@@ -22898,11 +22898,11 @@ html[data-theme=dark] {
             var dispatcher = resolveDispatcher();
             return dispatcher.useReducer(reducer, initialArg, init);
           }
-          function useRef3(initialValue) {
+          function useRef4(initialValue) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useRef(initialValue);
           }
-          function useEffect3(create, deps) {
+          function useEffect4(create, deps) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useEffect(create, deps);
           }
@@ -22940,7 +22940,7 @@ html[data-theme=dark] {
             var dispatcher = resolveDispatcher();
             return dispatcher.useDeferredValue(value);
           }
-          function useId5() {
+          function useId7() {
             var dispatcher = resolveDispatcher();
             return dispatcher.useId();
           }
@@ -23685,14 +23685,14 @@ html[data-theme=dark] {
           exports.useContext = useContext3;
           exports.useDebugValue = useDebugValue;
           exports.useDeferredValue = useDeferredValue;
-          exports.useEffect = useEffect3;
-          exports.useId = useId5;
+          exports.useEffect = useEffect4;
+          exports.useId = useId7;
           exports.useImperativeHandle = useImperativeHandle;
           exports.useInsertionEffect = useInsertionEffect;
           exports.useLayoutEffect = useLayoutEffect;
           exports.useMemo = useMemo;
           exports.useReducer = useReducer;
-          exports.useRef = useRef3;
+          exports.useRef = useRef4;
           exports.useState = useState3;
           exports.useSyncExternalStore = useSyncExternalStore;
           exports.useTransition = useTransition;
@@ -46270,11 +46270,11 @@ html[data-theme=dark] {
               return jsxWithValidation(type, props, key, false);
             }
           }
-          var jsx20 = jsxWithValidationDynamic;
-          var jsxs15 = jsxWithValidationStatic;
+          var jsx23 = jsxWithValidationDynamic;
+          var jsxs18 = jsxWithValidationStatic;
           exports.Fragment = REACT_FRAGMENT_TYPE;
-          exports.jsx = jsx20;
-          exports.jsxs = jsxs15;
+          exports.jsx = jsx23;
+          exports.jsxs = jsxs18;
         })();
       }
     }
@@ -46293,7 +46293,7 @@ html[data-theme=dark] {
   });
 
   // src/ui-react/buttons.tsx
-  var import_react13 = __toESM(require_react());
+  var import_react15 = __toESM(require_react());
   var import_client = __toESM(require_client());
   var import_react_dom = __toESM(require_react_dom());
 
@@ -46469,9 +46469,73 @@ html[data-theme=dark] {
     );
   });
 
-  // src/vendor/pomegranate/panel/node/SegmentedControl.tsx
+  // src/vendor/pomegranate/panel/node/Switch.tsx
   var import_react3 = __toESM(require_react());
+
+  // src/vendor/pomegranate/panel/node/SwitchMark.tsx
   var import_jsx_runtime3 = __toESM(require_jsx_runtime());
+  function SwitchMark({ checked = false, disabled = false, readOnly = false, glass = false, size = "small" }) {
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+      "span",
+      {
+        className: ["nd-switchmark", `s-${size}`, checked ? "is-checked" : "", disabled ? "is-disabled" : "", readOnly ? "is-readonly" : "", glass ? "is-glass" : ""].filter(Boolean).join(" "),
+        "data-tense": checked ? "strong" : void 0,
+        "aria-hidden": true,
+        children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "nd-switchmark-thumb" })
+      }
+    );
+  }
+
+  // src/vendor/pomegranate/panel/node/Switch.tsx
+  var import_jsx_runtime4 = __toESM(require_jsx_runtime());
+  function Switch({
+    checked,
+    onChange,
+    label,
+    labelHidden = false,
+    readOnly = false,
+    disabled = false,
+    size = "small",
+    glass = false,
+    style
+  }) {
+    const id = (0, import_react3.useId)();
+    const Shell = labelHidden ? "span" : "label";
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+      Shell,
+      {
+        className: ["nd-check", "nd-switch", `s-${size}`, disabled ? "is-disabled" : "", readOnly ? "is-readonly" : "", labelHidden ? "is-bare" : ""].filter(Boolean).join(" "),
+        htmlFor: labelHidden ? void 0 : id,
+        style,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: "nd-check-control", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+              "input",
+              {
+                id,
+                className: "nd-check-input",
+                type: "checkbox",
+                role: "switch",
+                checked,
+                disabled,
+                "aria-readonly": readOnly && !disabled ? true : void 0,
+                onClick: readOnly ? (e) => e.preventDefault() : void 0,
+                onPointerDown: (e) => e.stopPropagation(),
+                "aria-label": labelHidden ? label : void 0,
+                onChange: (e) => !disabled && onChange(e.target.checked)
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SwitchMark, { size, readOnly, checked, disabled, glass })
+          ] }),
+          !labelHidden && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "nd-check-label", children: label })
+        ]
+      }
+    );
+  }
+
+  // src/vendor/pomegranate/panel/node/SegmentedControl.tsx
+  var import_react4 = __toESM(require_react());
+  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
   function SegmentedControl({
     options,
     value,
@@ -46482,8 +46546,8 @@ html[data-theme=dark] {
     block = false,
     style
   }) {
-    const name = (0, import_react3.useId)();
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+    const name = (0, import_react4.useId)();
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       "div",
       {
         role: "radiogroup",
@@ -46505,7 +46569,7 @@ html[data-theme=dark] {
           disabled ? "is-disabled" : ""
         ].filter(Boolean).join(" "),
         style,
-        children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+        children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
           "label",
           {
             className: [
@@ -46516,7 +46580,7 @@ html[data-theme=dark] {
             "data-tense": o.value === value ? "inverted" : void 0,
             title: o.title,
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
                 "input",
                 {
                   className: "nd-seg-input",
@@ -46530,10 +46594,10 @@ html[data-theme=dark] {
                   onChange: () => onChange(o.value)
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { className: "nd-seg-face", children: [
-                o.leading != null && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "nd-seg-slot", children: o.leading }),
-                !o.labelHidden && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "nd-seg-text", children: o.label }),
-                o.trailing != null && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "nd-seg-slot", children: o.trailing })
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "nd-seg-face", children: [
+                o.leading != null && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-seg-slot", children: o.leading }),
+                !o.labelHidden && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-seg-text", children: o.label }),
+                o.trailing != null && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-seg-slot", children: o.trailing })
               ] })
             ]
           },
@@ -46543,8 +46607,97 @@ html[data-theme=dark] {
     );
   }
 
-  // src/vendor/pomegranate/panel/node/DropDownSelect.tsx
-  var import_react4 = __toESM(require_react());
+  // src/vendor/pomegranate/panel/node/Card.tsx
+  var import_react5 = __toESM(require_react());
+  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
+  var CardCanvas = ({ edge = "top", children, style }) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `nd-card-canvas u-canvas-${edge}`, "data-edge": edge, style, children });
+  CardCanvas.displayName = "CardCanvas";
+  var CardBody = ({ children, style }) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "nd-card-body", style, children });
+  CardBody.displayName = "CardBody";
+  var CardHeader = ({ title, icon: icon2, sub, tags, actions, style }) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "nd-card-head", style, children: [
+    icon2 != null && icon2 !== false && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "nd-card-head-icon", "aria-hidden": true, children: icon2 }),
+    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "nd-card-head-titles", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h3", { className: "nd-card-head-title", children: title }),
+      sub != null && sub !== false && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "nd-card-head-sub", children: sub })
+    ] }),
+    tags != null && tags !== false && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "nd-card-head-tags", children: tags }),
+    actions != null && actions !== false && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "nd-card-head-actions", children: actions })
+  ] });
+  CardHeader.displayName = "CardHeader";
+  var isCardHeader = (node) => (0, import_react5.isValidElement)(node) && node.type?.displayName === "CardHeader";
+  var isCardCanvas = (node) => (0, import_react5.isValidElement)(node) && node.type?.displayName === "CardCanvas";
+  var isCardBody = (node) => (0, import_react5.isValidElement)(node) && node.type?.displayName === "CardBody";
+  var resolveCardChildren = (children) => {
+    const kids = import_react5.Children.toArray(children);
+    const hasExplicitBody = kids.some(isCardBody);
+    if (hasExplicitBody) return kids;
+    const heads = kids.filter(isCardHeader);
+    const canvases = kids.filter(isCardCanvas);
+    const others = kids.filter((k) => !isCardCanvas(k) && !isCardHeader(k));
+    return others.length > 0 ? [...heads, ...canvases, /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(CardBody, { children: others }, "__body")] : [...heads, ...canvases];
+  };
+  var Card = (0, import_react5.forwardRef)(function Card2({ size = "medium", level, blur = false, tense, children, style }, ref) {
+    const inherited = useLevel();
+    const className = ["nd-card", `s-${size}`, level ? `u-${level}` : "", blur ? "is-glass" : ""].filter(Boolean).join(" ");
+    const ground = level ?? inherited;
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(LevelContext.Provider, { value: ground, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      "div",
+      {
+        ref,
+        className,
+        "data-level": level,
+        "data-tense": tense === "strong" ? "strong" : void 0,
+        style,
+        children: resolveCardChildren(children)
+      }
+    ) });
+  });
+
+  // src/vendor/pomegranate/panel/node/ListControlItem.tsx
+  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
+  function ListControlItem({
+    title,
+    subtitle,
+    trailing,
+    leading,
+    hint,
+    hintId,
+    disabled = false,
+    align = "start",
+    size = "small",
+    tooltip,
+    data,
+    style
+  }) {
+    const dataAttrs = Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]));
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+      "label",
+      {
+        className: [
+          "nd-item",
+          "is-ctl",
+          `s-${size}`,
+          `al-${align}`,
+          disabled ? "is-disabled" : ""
+        ].filter(Boolean).join(" "),
+        title: tooltip,
+        style,
+        ...dataAttrs,
+        children: [
+          leading != null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-item-leading", children: leading }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "nd-item-text", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-item-title", children: title }),
+            subtitle != null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-item-subtitle", children: subtitle })
+          ] }),
+          trailing != null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-item-ctl", children: trailing }),
+          hint != null && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-item-hint", id: hintId, children: hint })
+        ]
+      }
+    );
+  }
+
+  // src/vendor/pomegranate/panel/node/Checkbox.tsx
+  var import_react6 = __toESM(require_react());
 
   // src/vendor/pomegranate/panel/node/icons.generated.ts
   var ICON_VIEWBOX = "0 0 24 24";
@@ -46585,7 +46738,7 @@ html[data-theme=dark] {
   };
 
   // src/vendor/pomegranate/panel/node/Icon.tsx
-  var import_jsx_runtime4 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
   function Icon({
     name,
     size = 14,
@@ -46593,7 +46746,7 @@ html[data-theme=dark] {
     className
   }) {
     const art = ICONS[name];
-    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(IconArt, { paths: art.paths, solid: art.solid, size, color, className });
+    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(IconArt, { paths: art.paths, solid: art.solid, size, color, className });
   }
   function IconArt({
     paths,
@@ -46602,7 +46755,7 @@ html[data-theme=dark] {
     color,
     className
   }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
       "svg",
       {
         className,
@@ -46615,14 +46768,14 @@ html[data-theme=dark] {
         "aria-hidden": true,
         focusable: "false",
         children: [
-          paths.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d }, `s${i}`)),
-          solid?.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("path", { fill: color ?? "currentColor", stroke: "none", d }, `f${i}`))
+          paths.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { strokeLinecap: "round", strokeLinejoin: "round", d }, `s${i}`)),
+          solid?.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("path", { fill: color ?? "currentColor", stroke: "none", d }, `f${i}`))
         ]
       }
     );
   }
   function icon(name) {
-    const Bound = (props) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Icon, { name, ...props });
+    const Bound = (props) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(Icon, { name, ...props });
     Bound.displayName = `Icon(${name})`;
     return Bound;
   }
@@ -46649,8 +46802,96 @@ html[data-theme=dark] {
   var PoundIcon = icon("pound");
   var YenIcon = icon("yen");
 
+  // src/vendor/pomegranate/panel/node/CheckboxMark.tsx
+  var import_jsx_runtime9 = __toESM(require_jsx_runtime());
+  function CheckboxMark({ checked = false, indeterminate = false, disabled = false, readOnly = false, size = "small" }) {
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+      "span",
+      {
+        className: [
+          "nd-checkmark",
+          `s-${size}`,
+          checked && !indeterminate ? "is-checked" : "",
+          indeterminate ? "is-indeterminate" : "",
+          disabled ? "is-disabled" : "",
+          readOnly ? "is-readonly" : ""
+        ].filter(Boolean).join(" "),
+        "data-tense": checked || indeterminate ? "strong" : void 0,
+        "aria-hidden": true,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "nd-checkmark-tick", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ConfirmIcon, {}) }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "nd-checkmark-part" })
+        ]
+      }
+    );
+  }
+
+  // src/vendor/pomegranate/panel/node/Checkbox.tsx
+  var import_jsx_runtime10 = __toESM(require_jsx_runtime());
+  function Checkbox({
+    checked,
+    onChange,
+    label,
+    labelHidden = false,
+    indeterminate = false,
+    readOnly = false,
+    disabled = false,
+    invalid = false,
+    describedBy,
+    size = "small",
+    style
+  }) {
+    const id = (0, import_react6.useId)();
+    const Shell = labelHidden ? "span" : "label";
+    const box = (0, import_react6.useRef)(null);
+    (0, import_react6.useEffect)(() => {
+      if (box.current) box.current.indeterminate = indeterminate;
+    }, [indeterminate]);
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+      Shell,
+      {
+        "data-scheme": invalid ? "error" : void 0,
+        className: [
+          "nd-check",
+          `s-${size}`,
+          disabled ? "is-disabled" : "",
+          readOnly ? "is-readonly" : "",
+          labelHidden ? "is-bare" : "",
+          invalid ? "is-invalid" : ""
+        ].filter(Boolean).join(" "),
+        htmlFor: labelHidden ? void 0 : id,
+        style,
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("span", { className: "nd-check-control", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+              "input",
+              {
+                ref: box,
+                id,
+                className: "nd-check-input",
+                type: "checkbox",
+                checked,
+                disabled,
+                "aria-readonly": readOnly && !disabled ? true : void 0,
+                onClick: readOnly ? (e) => e.preventDefault() : void 0,
+                "aria-invalid": invalid || void 0,
+                "aria-describedby": describedBy,
+                onPointerDown: (e) => e.stopPropagation(),
+                onChange: (e) => !disabled && onChange(e.target.checked),
+                "aria-label": labelHidden ? label : void 0
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(CheckboxMark, { size, readOnly, checked, indeterminate, disabled })
+          ] }),
+          !labelHidden && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "nd-check-label", children: label })
+        ]
+      }
+    );
+  }
+
   // src/vendor/pomegranate/panel/node/DropDownSelect.tsx
-  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
+  var import_react7 = __toESM(require_react());
+  var import_jsx_runtime11 = __toESM(require_jsx_runtime());
   var isGroup = (o) => "group" in o;
   function DropDownSelect({
     value,
@@ -46671,8 +46912,8 @@ html[data-theme=dark] {
   }) {
     const flat = options.flatMap((o) => isGroup(o) ? o.options : [o]);
     const current = flat.find((o) => o.value === value);
-    const id = (0, import_react4.useId)();
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+    const id = (0, import_react7.useId)();
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       "span",
       {
         ref: disabled || !dynamicLight ? void 0 : glassLightRef,
@@ -46692,15 +46933,15 @@ html[data-theme=dark] {
         "data-scheme": invalid ? "error" : void 0,
         title,
         children: [
-          icon2 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-select-leadbox", "aria-hidden": true, children: icon2 }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("label", { className: "nd-select-float", htmlFor: id, children: label }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("span", { className: "nd-select-face", "aria-hidden": true, children: [
-            current?.swatch && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "nd-select-swatch", style: { background: current.swatch } }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-select-label", children: current?.label ?? "" }),
-            current?.hint && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-select-hint", children: current.hint })
+          icon2 && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-select-leadbox", "aria-hidden": true, children: icon2 }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "nd-select-float", htmlFor: id, children: label }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "nd-select-face", "aria-hidden": true, children: [
+            current?.swatch && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "nd-select-swatch", style: { background: current.swatch } }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-select-label", children: current?.label ?? "" }),
+            current?.hint && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-select-hint", children: current.hint })
           ] }),
-          !readOnly && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "nd-select-caretbox", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(CaretIcon, { className: "nd-select-caret", size: "100%" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+          !readOnly && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-select-caretbox", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(CaretIcon, { className: "nd-select-caret", size: "100%" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
             "select",
             {
               className: "nd-select-native",
@@ -46718,9 +46959,9 @@ html[data-theme=dark] {
               onPointerDown: (e) => e.stopPropagation(),
               onClick: (e) => e.stopPropagation(),
               children: [
-                placeholder && !current && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value: "", disabled: true, children: placeholder }),
+                placeholder && !current && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "", disabled: true, children: placeholder }),
                 (readOnly && !disabled ? current ? [current] : [] : options).map(
-                  (o) => isGroup(o) ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("optgroup", { label: o.group, children: o.options.map((opt) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Opt, { ...opt }, opt.value)) }, o.group) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Opt, { ...o }, o.value)
+                  (o) => isGroup(o) ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("optgroup", { label: o.group, children: o.options.map((opt) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Opt, { ...opt }, opt.value)) }, o.group) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Opt, { ...o }, o.value)
                 )
               ]
             }
@@ -46730,29 +46971,29 @@ html[data-theme=dark] {
     );
   }
   function Opt({ value, label, hint, disabled }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("option", { value, disabled, children: hint ? `${label} \xB7 ${hint}` : label });
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value, disabled, children: hint ? `${label} \xB7 ${hint}` : label });
   }
 
   // src/vendor/pomegranate/panel/node/Dialog.tsx
-  var import_react6 = __toESM(require_react());
+  var import_react9 = __toESM(require_react());
 
   // src/vendor/pomegranate/panel/node/FormGrid.tsx
-  var import_react5 = __toESM(require_react());
-  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
-  var FormGrid = (0, import_react5.forwardRef)(function FormGrid2({ layout, onSubmit, children, style }, ref) {
-    const inner = /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `nd-form l-${layout}`, children });
-    return onSubmit ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("form", { ref, className: "nd-formhost", onSubmit, style, children: inner }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { ref, className: "nd-formhost", style, children: inner });
+  var import_react8 = __toESM(require_react());
+  var import_jsx_runtime12 = __toESM(require_jsx_runtime());
+  var FormGrid = (0, import_react8.forwardRef)(function FormGrid2({ layout, onSubmit, children, style }, ref) {
+    const inner = /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: `nd-form l-${layout}`, children });
+    return onSubmit ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("form", { ref, className: "nd-formhost", onSubmit, style, children: inner }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { ref, className: "nd-formhost", style, children: inner });
   });
-  var FormActionsHostContext = (0, import_react5.createContext)(false);
+  var FormActionsHostContext = (0, import_react8.createContext)(false);
 
   // src/vendor/pomegranate/panel/node/Dialog.tsx
-  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
-  var Dialog = (0, import_react6.forwardRef)(function Dialog2(props, ref) {
+  var import_jsx_runtime13 = __toESM(require_jsx_runtime());
+  var Dialog = (0, import_react9.forwardRef)(function Dialog2(props, ref) {
     const { open, onClose, title, children, actions, modal = true, size = "medium", description, style } = props;
     const dismissible = props.dismissible !== false;
-    const own = (0, import_react6.useRef)(null);
-    const id = (0, import_react6.useId)();
-    (0, import_react6.useEffect)(() => {
+    const own = (0, import_react9.useRef)(null);
+    const id = (0, import_react9.useId)();
+    (0, import_react9.useEffect)(() => {
       const el = own.current;
       if (!el) return;
       if (open && !el.open) {
@@ -46762,7 +47003,7 @@ html[data-theme=dark] {
         el.close();
       }
     }, [open, modal]);
-    (0, import_react6.useEffect)(() => {
+    (0, import_react9.useEffect)(() => {
       const el = own.current;
       if (!el) return;
       const onCancel = (e) => {
@@ -46772,7 +47013,7 @@ html[data-theme=dark] {
       el.addEventListener("cancel", onCancel);
       return () => el.removeEventListener("cancel", onCancel);
     }, [onClose, dismissible]);
-    (0, import_react6.useEffect)(() => {
+    (0, import_react9.useEffect)(() => {
       if (!open || modal || !dismissible) return;
       const onKey = (e) => {
         if (e.key === "Escape") onClose();
@@ -46780,7 +47021,7 @@ html[data-theme=dark] {
       document.addEventListener("keydown", onKey);
       return () => document.removeEventListener("keydown", onKey);
     }, [open, modal, dismissible, onClose]);
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       "dialog",
       {
         ref: (node) => {
@@ -46800,10 +47041,10 @@ html[data-theme=dark] {
           const outside = e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
           if (outside) onClose();
         },
-        children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "nd-dialog-body", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "nd-dialog-head", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h2", { className: "nd-dialog-title", id: `${id}-title`, children: title }),
-            dismissible && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "nd-dialog-close", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "nd-dialog-body", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "nd-dialog-head", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("h2", { className: "nd-dialog-title", id: `${id}-title`, children: title }),
+            dismissible && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-dialog-close", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
               Button,
               {
                 variant: "ghost",
@@ -46811,78 +47052,30 @@ html[data-theme=dark] {
                 size: "small",
                 glass: false,
                 label: "Close",
-                leading: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(DismissIcon, {}),
+                leading: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(DismissIcon, {}),
                 onClick: onClose
               }
             ) }),
-            description != null && description !== false && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "nd-dialog-desc", id: `${id}-desc`, children: description })
+            description != null && description !== false && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "nd-dialog-desc", id: `${id}-desc`, children: description })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(FormActionsHostContext.Provider, { value: actions != null && actions !== false, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "nd-dialog-content", children }) }),
-          actions != null && actions !== false && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "nd-dialog-actions", children: actions })
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(FormActionsHostContext.Provider, { value: actions != null && actions !== false, children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "nd-dialog-content", children }) }),
+          actions != null && actions !== false && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "nd-dialog-actions", children: actions })
         ] })
       }
     );
   });
 
   // src/vendor/pomegranate/panel/node/InteractiveCard.tsx
-  var import_react8 = __toESM(require_react());
-
-  // src/vendor/pomegranate/panel/node/Card.tsx
-  var import_react7 = __toESM(require_react());
-  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
-  var CardCanvas = ({ edge = "top", children, style }) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: `nd-card-canvas u-canvas-${edge}`, "data-edge": edge, style, children });
-  CardCanvas.displayName = "CardCanvas";
-  var CardBody = ({ children, style }) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "nd-card-body", style, children });
-  CardBody.displayName = "CardBody";
-  var CardHeader = ({ title, icon: icon2, sub, tags, actions, style }) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "nd-card-head", style, children: [
-    icon2 != null && icon2 !== false && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "nd-card-head-icon", "aria-hidden": true, children: icon2 }),
-    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "nd-card-head-titles", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h3", { className: "nd-card-head-title", children: title }),
-      sub != null && sub !== false && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "nd-card-head-sub", children: sub })
-    ] }),
-    tags != null && tags !== false && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "nd-card-head-tags", children: tags }),
-    actions != null && actions !== false && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "nd-card-head-actions", children: actions })
-  ] });
-  CardHeader.displayName = "CardHeader";
-  var isCardHeader = (node) => (0, import_react7.isValidElement)(node) && node.type?.displayName === "CardHeader";
-  var isCardCanvas = (node) => (0, import_react7.isValidElement)(node) && node.type?.displayName === "CardCanvas";
-  var isCardBody = (node) => (0, import_react7.isValidElement)(node) && node.type?.displayName === "CardBody";
-  var resolveCardChildren = (children) => {
-    const kids = import_react7.Children.toArray(children);
-    const hasExplicitBody = kids.some(isCardBody);
-    if (hasExplicitBody) return kids;
-    const heads = kids.filter(isCardHeader);
-    const canvases = kids.filter(isCardCanvas);
-    const others = kids.filter((k) => !isCardCanvas(k) && !isCardHeader(k));
-    return others.length > 0 ? [...heads, ...canvases, /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(CardBody, { children: others }, "__body")] : [...heads, ...canvases];
-  };
-  var Card = (0, import_react7.forwardRef)(function Card2({ size = "medium", level, blur = false, tense, children, style }, ref) {
-    const inherited = useLevel();
-    const className = ["nd-card", `s-${size}`, level ? `u-${level}` : "", blur ? "is-glass" : ""].filter(Boolean).join(" ");
-    const ground = level ?? inherited;
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(LevelContext.Provider, { value: ground, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-      "div",
-      {
-        ref,
-        className,
-        "data-level": level,
-        "data-tense": tense === "strong" ? "strong" : void 0,
-        style,
-        children: resolveCardChildren(children)
-      }
-    ) });
-  });
-
-  // src/vendor/pomegranate/panel/node/InteractiveCard.tsx
-  var import_jsx_runtime9 = __toESM(require_jsx_runtime());
-  var InteractiveCard = (0, import_react8.forwardRef)(function InteractiveCard2(props, ref) {
+  var import_react10 = __toESM(require_react());
+  var import_jsx_runtime14 = __toESM(require_jsx_runtime());
+  var InteractiveCard = (0, import_react10.forwardRef)(function InteractiveCard2(props, ref) {
     const { size = "medium", level, blur = false, tense, children, style, label } = props;
     const inherited = useLevel();
     const onClick = "onClick" in props ? props.onClick : void 0;
     const href = "href" in props ? props.href : void 0;
     const className = ["nd-card", `s-${size}`, level ? `u-${level}` : "", blur ? "is-glass" : "", "is-target"].filter(Boolean).join(" ");
     const ground = level ?? inherited;
-    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(LevelContext.Provider, { value: ground, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(LevelContext.Provider, { value: ground, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(
       "div",
       {
         ref,
@@ -46891,7 +47084,7 @@ html[data-theme=dark] {
         "data-tense": tense === "strong" ? "strong" : void 0,
         style,
         children: [
-          href ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("a", { className: "nd-card-hit", href, "aria-label": label, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "nd-card-a11y", children: label }) }) : /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "button", className: "nd-card-hit", onClick, "aria-label": label }),
+          href ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("a", { className: "nd-card-hit", href, "aria-label": label, children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "nd-card-a11y", children: label }) }) : /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "button", className: "nd-card-hit", onClick, "aria-label": label }),
           resolveCardChildren(children)
         ]
       }
@@ -46899,16 +47092,16 @@ html[data-theme=dark] {
   });
 
   // src/vendor/pomegranate/panel/node/Toast.tsx
-  var import_react10 = __toESM(require_react());
+  var import_react12 = __toESM(require_react());
 
   // src/vendor/pomegranate/panel/node/Alert.tsx
-  var import_jsx_runtime10 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime15 = __toESM(require_jsx_runtime());
   var alertRole = (tone) => tone === "error" || tone === "warning" ? "alert" : "status";
   var GLYPH = {
-    info: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(TimerIcon, {}),
-    success: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ConfirmIcon, {}),
-    warning: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(TimerIcon, {}),
-    error: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(DismissIcon, {})
+    info: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(TimerIcon, {}),
+    success: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(ConfirmIcon, {}),
+    warning: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(TimerIcon, {}),
+    error: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(DismissIcon, {})
   };
   function Alert({
     tone = "info",
@@ -46920,7 +47113,7 @@ html[data-theme=dark] {
     glyph,
     style
   }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
       "div",
       {
         className: ["nd-alert", `t-${tone}`].join(" "),
@@ -46930,13 +47123,13 @@ html[data-theme=dark] {
         role: alertRole(tone),
         style,
         children: [
-          glyph !== false && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "nd-alert-glyph", "aria-hidden": true, children: GLYPH[tone] }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "nd-alert-body", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { className: "nd-alert-title", children: title }),
-            children != null && children !== false && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "nd-alert-text", children }),
-            actions && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "nd-alert-actions", children: actions })
+          glyph !== false && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-alert-glyph", "aria-hidden": true, children: GLYPH[tone] }),
+          /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)("div", { className: "nd-alert-body", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("strong", { className: "nd-alert-title", children: title }),
+            children != null && children !== false && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { className: "nd-alert-text", children }),
+            actions && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("div", { className: "nd-alert-actions", children: actions })
           ] }),
-          onDismiss && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "nd-alert-dismiss", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          onDismiss && /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-alert-dismiss", children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(
             Button,
             {
               size: "small",
@@ -46944,7 +47137,7 @@ html[data-theme=dark] {
               kind: "icon-button",
               label: dismissLabel ?? `Dismiss: ${title}`,
               title: void 0,
-              leading: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(DismissIcon, {}),
+              leading: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(DismissIcon, {}),
               onClick: onDismiss
             }
           ) })
@@ -46954,11 +47147,11 @@ html[data-theme=dark] {
   }
 
   // src/vendor/pomegranate/panel/node/ProgressBar.tsx
-  var import_react9 = __toESM(require_react());
-  var import_jsx_runtime11 = __toESM(require_jsx_runtime());
+  var import_react11 = __toESM(require_react());
+  var import_jsx_runtime16 = __toESM(require_jsx_runtime());
   var percent = (v, m) => `${Math.round(v / m * 100)}%`;
   var slotted = (node) => node != null && node !== false && node !== true && node !== "";
-  var ProgressBar = (0, import_react9.forwardRef)(function ProgressBar2({
+  var ProgressBar = (0, import_react11.forwardRef)(function ProgressBar2({
     label,
     labelHidden = false,
     value,
@@ -46978,11 +47171,11 @@ html[data-theme=dark] {
   }, ref) {
     const indeterminate = value == null;
     const clamped = indeterminate ? void 0 : Math.min(Math.max(value, 0), max);
-    const id = (0, import_react9.useId)();
+    const id = (0, import_react11.useId)();
     const shownValue = showValue && !indeterminate ? formatValue(clamped, max) : null;
     const centred = shape === "ring" && valueAt === "head";
     const ground = useLevel();
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)(
       "div",
       {
         ref,
@@ -47000,14 +47193,14 @@ html[data-theme=dark] {
         style: shape === "ring" && !indeterminate ? { ["--nd-progress-pct"]: String(Math.round(clamped / max * 100)), ...style } : style,
         "data-scheme": state === "done" ? "success" : state === "failed" ? "error" : void 0,
         children: [
-          (!labelHidden || shownValue != null && valueAt === "head" && !centred || slotted(head)) && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "nd-progress-head", children: [
-            !labelHidden && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "nd-progress-label", htmlFor: id, children: label }),
-            slotted(head) && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-progress-slot nd-progress-slot-head", children: head }),
-            shownValue != null && valueAt === "head" && !centred && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-progress-value", children: shownValue })
+          (!labelHidden || shownValue != null && valueAt === "head" && !centred || slotted(head)) && /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)("div", { className: "nd-progress-head", children: [
+            !labelHidden && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("label", { className: "nd-progress-label", htmlFor: id, children: label }),
+            slotted(head) && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-progress-slot nd-progress-slot-head", children: head }),
+            shownValue != null && valueAt === "head" && !centred && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-progress-value", children: shownValue })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "nd-progress-line", children: [
-            slotted(leading) && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-progress-slot", children: leading }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)("div", { className: "nd-progress-line", children: [
+            slotted(leading) && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-progress-slot", children: leading }),
+            /* @__PURE__ */ (0, import_jsx_runtime16.jsx)(
               "progress",
               {
                 className: "nd-progress-track",
@@ -47017,9 +47210,9 @@ html[data-theme=dark] {
                 ...indeterminate ? {} : { value: clamped }
               }
             ),
-            shape === "ring" && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("svg", { className: "nd-progress-ring", viewBox: "0 0 100 100", "aria-hidden": true, focusable: "false", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("circle", { className: "nd-progress-ring-track", cx: "50", cy: "50", r: "43.75", pathLength: 800 }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+            shape === "ring" && /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)("svg", { className: "nd-progress-ring", viewBox: "0 0 100 100", "aria-hidden": true, focusable: "false", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("circle", { className: "nd-progress-ring-track", cx: "50", cy: "50", r: "43.75", pathLength: 800 }),
+              /* @__PURE__ */ (0, import_jsx_runtime16.jsx)(
                 "circle",
                 {
                   className: "nd-progress-ring-arc",
@@ -47032,13 +47225,13 @@ html[data-theme=dark] {
                 }
               )
             ] }),
-            slotted(trailing) && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-progress-slot", children: trailing }),
-            shownValue != null && valueAt === "inline" && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-progress-value", children: shownValue }),
-            shownValue != null && centred && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-progress-value nd-progress-centre", children: shownValue })
+            slotted(trailing) && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-progress-slot", children: trailing }),
+            shownValue != null && valueAt === "inline" && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-progress-value", children: shownValue }),
+            shownValue != null && centred && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-progress-value nd-progress-centre", children: shownValue })
           ] }),
-          (slotted(foot) || shownValue != null && valueAt === "foot") && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "nd-progress-foot", children: [
-            slotted(foot) && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-progress-footnote", children: foot }),
-            shownValue != null && valueAt === "foot" && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "nd-progress-value", children: shownValue })
+          (slotted(foot) || shownValue != null && valueAt === "foot") && /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)("div", { className: "nd-progress-foot", children: [
+            slotted(foot) && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-progress-footnote", children: foot }),
+            shownValue != null && valueAt === "foot" && /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-progress-value", children: shownValue })
           ] })
         ]
       }
@@ -47046,7 +47239,7 @@ html[data-theme=dark] {
   });
 
   // src/vendor/pomegranate/panel/node/Toast.tsx
-  var import_jsx_runtime12 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime17 = __toESM(require_jsx_runtime());
   var READING_BASE_MS = 5e3;
   var READING_PER_WORD_MS = 300;
   var READING_CAP_MS = 15e3;
@@ -47065,12 +47258,12 @@ html[data-theme=dark] {
     placement = "bottom-end",
     style
   }) {
-    const ref = (0, import_react10.useRef)(null);
+    const ref = (0, import_react12.useRef)(null);
     const transient = duration != null;
-    const [ms, setMs] = (0, import_react10.useState)(null);
-    const [left, setLeft] = (0, import_react10.useState)(1);
-    const [held, setHeld] = (0, import_react10.useState)(false);
-    (0, import_react10.useEffect)(() => {
+    const [ms, setMs] = (0, import_react12.useState)(null);
+    const [left, setLeft] = (0, import_react12.useState)(1);
+    const [held, setHeld] = (0, import_react12.useState)(false);
+    (0, import_react12.useEffect)(() => {
       const el = ref.current;
       if (!el) return;
       if (open) {
@@ -47080,7 +47273,7 @@ html[data-theme=dark] {
         el.hidePopover();
       }
     }, [open, transient]);
-    (0, import_react10.useEffect)(() => {
+    (0, import_react12.useEffect)(() => {
       if (!open || duration == null) {
         setMs(null);
         return;
@@ -47092,8 +47285,8 @@ html[data-theme=dark] {
       const el = ref.current;
       setMs(readingTime(el?.textContent ?? title));
     }, [open, duration, title, children]);
-    const remaining = (0, import_react10.useRef)(null);
-    (0, import_react10.useEffect)(() => {
+    const remaining = (0, import_react12.useRef)(null);
+    (0, import_react12.useEffect)(() => {
       if (!open || ms == null) return;
       if (remaining.current == null) remaining.current = ms;
       let raf = 0;
@@ -47113,13 +47306,13 @@ html[data-theme=dark] {
       raf = requestAnimationFrame(tick2);
       return () => cancelAnimationFrame(raf);
     }, [open, ms, held, title, onClose]);
-    (0, import_react10.useEffect)(() => {
+    (0, import_react12.useEffect)(() => {
       remaining.current = null;
       setLeft(1);
     }, [open, title, ms]);
-    const hold = (0, import_react10.useCallback)(() => setHeld(true), []);
-    const release = (0, import_react10.useCallback)(() => setHeld(false), []);
-    (0, import_react10.useEffect)(() => {
+    const hold = (0, import_react12.useCallback)(() => setHeld(true), []);
+    const release = (0, import_react12.useCallback)(() => setHeld(false), []);
+    (0, import_react12.useEffect)(() => {
       if (!open || transient) return;
       const onKey = (e) => {
         if (e.key === "Escape") onClose();
@@ -47127,7 +47320,7 @@ html[data-theme=dark] {
       window.addEventListener("keydown", onKey);
       return () => window.removeEventListener("keydown", onKey);
     }, [open, transient, onClose]);
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime17.jsxs)(
       "div",
       {
         ref,
@@ -47143,8 +47336,8 @@ html[data-theme=dark] {
         onBlurCapture: release,
         style,
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("span", { className: "nd-toast-surface", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime17.jsxs)("span", { className: "nd-toast-surface", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime17.jsx)(
               Alert,
               {
                 tone,
@@ -47156,16 +47349,16 @@ html[data-theme=dark] {
                 children
               }
             ),
-            transient && ms != null && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { className: "nd-toast-clock", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(ProgressBar, { label: "Time remaining", labelHidden: true, size: "small", value: Math.round(left * 100) }) })
+            transient && ms != null && /* @__PURE__ */ (0, import_jsx_runtime17.jsx)("span", { className: "nd-toast-clock", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime17.jsx)(ProgressBar, { label: "Time remaining", labelHidden: true, size: "small", value: Math.round(left * 100) }) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { hidden: true, "data-toast-live": transient ? alertRole(tone) : "dialog" })
+          /* @__PURE__ */ (0, import_jsx_runtime17.jsx)("span", { hidden: true, "data-toast-live": transient ? alertRole(tone) : "dialog" })
         ]
       }
     );
   }
 
   // src/vendor/pomegranate/panel/node/Skeleton.tsx
-  var import_jsx_runtime13 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime18 = __toESM(require_jsx_runtime());
   function Skeleton({
     shape = "text",
     lines = 3,
@@ -47177,12 +47370,12 @@ html[data-theme=dark] {
     const a11y = label ? { role: "status", "aria-label": label } : { "aria-hidden": true };
     const fill = recessLevel(useLevel());
     if (shape === "circle") {
-      return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-skeleton nd-skeleton-circle", "data-fill": fill, ...a11y, style: { width: size, height: size } });
+      return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "nd-skeleton nd-skeleton-circle", "data-fill": fill, ...a11y, style: { width: size, height: size } });
     }
     if (shape === "block") {
-      return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "nd-skeleton nd-skeleton-block", "data-fill": fill, ...a11y, style: { width, height } });
+      return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "nd-skeleton nd-skeleton-block", "data-fill": fill, ...a11y, style: { width, height } });
     }
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "nd-skeleton-lines", ...a11y, children: Array.from({ length: lines }, (_, i) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("div", { className: "nd-skeleton-lines", ...a11y, children: Array.from({ length: lines }, (_, i) => /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
       "span",
       {
         className: "nd-skeleton nd-skeleton-text",
@@ -47199,98 +47392,60 @@ html[data-theme=dark] {
   }
 
   // src/vendor/pomegranate/panel/node/Tag.tsx
-  var import_react11 = __toESM(require_react());
-  var import_jsx_runtime14 = __toESM(require_jsx_runtime());
-  var Tag = (0, import_react11.forwardRef)(function Tag2(props, ref) {
+  var import_react13 = __toESM(require_react());
+  var import_jsx_runtime19 = __toESM(require_jsx_runtime());
+  var Tag = (0, import_react13.forwardRef)(function Tag2(props, ref) {
     const { variant = "tonal", size = "small", leading, style, children } = props;
     const fill = fieldLevel(useLevel());
     const className = ["nd-tag", `v-${variant}`, `s-${size}`].join(" ");
     const slotted2 = (node) => node != null && node !== false && node !== true && node !== "";
-    return /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("span", { ref, className, "data-fill": fill, "data-tense": variant === "primary" ? "inverted" : void 0, style, "aria-label": typeof children === "string" ? void 0 : props.label, children: [
-      slotted2(leading) && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "nd-tag-slot", children: leading }),
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "nd-tag-label", children })
+    return /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("span", { ref, className, "data-fill": fill, "data-tense": variant === "primary" ? "inverted" : void 0, style, "aria-label": typeof children === "string" ? void 0 : props.label, children: [
+      slotted2(leading) && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "nd-tag-slot", children: leading }),
+      /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "nd-tag-label", children })
     ] });
   });
 
   // src/vendor/pomegranate/panel/node/SelectableCard.tsx
-  var import_react12 = __toESM(require_react());
-
-  // src/vendor/pomegranate/panel/node/CheckboxMark.tsx
-  var import_jsx_runtime15 = __toESM(require_jsx_runtime());
-  function CheckboxMark({ checked = false, indeterminate = false, disabled = false, readOnly = false, size = "small" }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime15.jsxs)(
-      "span",
-      {
-        className: [
-          "nd-checkmark",
-          `s-${size}`,
-          checked && !indeterminate ? "is-checked" : "",
-          indeterminate ? "is-indeterminate" : "",
-          disabled ? "is-disabled" : "",
-          readOnly ? "is-readonly" : ""
-        ].filter(Boolean).join(" "),
-        "data-tense": checked || indeterminate ? "strong" : void 0,
-        "aria-hidden": true,
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-checkmark-tick", children: /* @__PURE__ */ (0, import_jsx_runtime15.jsx)(ConfirmIcon, {}) }),
-          /* @__PURE__ */ (0, import_jsx_runtime15.jsx)("span", { className: "nd-checkmark-part" })
-        ]
-      }
-    );
-  }
+  var import_react14 = __toESM(require_react());
 
   // src/vendor/pomegranate/panel/node/RadioMark.tsx
-  var import_jsx_runtime16 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime20 = __toESM(require_jsx_runtime());
   function RadioMark({ checked = false, disabled = false, readOnly = false, glass = false, size = "small" }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime16.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
       "span",
       {
         className: ["nd-radiomark", `s-${size}`, checked ? "is-checked" : "", disabled ? "is-disabled" : "", readOnly ? "is-readonly" : "", glass ? "is-glass" : ""].filter(Boolean).join(" "),
         "data-tense": checked ? "strong" : void 0,
         "aria-hidden": true,
-        children: /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "nd-radiomark-dot" })
-      }
-    );
-  }
-
-  // src/vendor/pomegranate/panel/node/SwitchMark.tsx
-  var import_jsx_runtime17 = __toESM(require_jsx_runtime());
-  function SwitchMark({ checked = false, disabled = false, readOnly = false, glass = false, size = "small" }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime17.jsx)(
-      "span",
-      {
-        className: ["nd-switchmark", `s-${size}`, checked ? "is-checked" : "", disabled ? "is-disabled" : "", readOnly ? "is-readonly" : "", glass ? "is-glass" : ""].filter(Boolean).join(" "),
-        "data-tense": checked ? "strong" : void 0,
-        "aria-hidden": true,
-        children: /* @__PURE__ */ (0, import_jsx_runtime17.jsx)("span", { className: "nd-switchmark-thumb" })
+        children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { className: "nd-radiomark-dot" })
       }
     );
   }
 
   // src/vendor/pomegranate/panel/node/SelectableCard.tsx
-  var import_jsx_runtime18 = __toESM(require_jsx_runtime());
-  var SelectableCard = (0, import_react12.forwardRef)(function SelectableCard2({ label, selected, onSelect, group, disabled = false, inert, action, size = "medium", level, blur = false, tense, mark, children, data, style }, ref) {
+  var import_jsx_runtime21 = __toESM(require_jsx_runtime());
+  var SelectableCard = (0, import_react14.forwardRef)(function SelectableCard2({ label, selected, onSelect, group, disabled = false, inert, action, size = "medium", level, blur = false, tense, mark, children, data, style }, ref) {
     const inherited = useLevel();
     const shape = mark ?? (group ? "radio" : "checkbox");
     const role = group ? "radio" : "checkbox";
     const dataAttrs = Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]));
     const effInert = inert ?? (disabled ? "disabled" : void 0);
     const cls = (...extra) => ["nd-selcard", `s-${size}`, `m-${shape}`, level ? `u-${level}` : "", blur ? "is-glass" : "", selected ? "is-selected" : "", ...extra].filter(Boolean).join(" ");
-    const markSpan = shape !== "none" && /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
+    const markSpan = shape !== "none" && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
       "span",
       {
         className: "nd-selcard-mark",
         "data-tense": shape === "tick" && selected ? "strong" : void 0,
         "aria-hidden": true,
-        children: shape === "checkbox" ? /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(CheckboxMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : shape === "radio" ? /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(RadioMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : shape === "switch" ? /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(SwitchMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : selected ? /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(ConfirmIcon, {}) : null
+        children: shape === "checkbox" ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(CheckboxMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : shape === "radio" ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(RadioMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : shape === "switch" ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(SwitchMark, { size, checked: selected, disabled: effInert === "disabled", readOnly: effInert === "readonly" }) : selected ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ConfirmIcon, {}) : null
       }
     );
     const ground = level ?? inherited;
     const fill = level ? void 0 : fieldLevel(inherited);
-    const island = (tree) => /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(LevelContext.Provider, { value: ground, children: tree });
+    const island = (tree) => /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(LevelContext.Provider, { value: ground, children: tree });
     if (effInert) {
       return island(
-        /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
           "div",
           {
             className: cls("is-inert", effInert === "readonly" ? "is-inert-readonly" : "is-inert-disabled"),
@@ -47307,7 +47462,7 @@ html[data-theme=dark] {
             ...dataAttrs,
             children: [
               markSpan,
-              /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "nd-selcard-content", children })
+              /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "nd-selcard-content", children })
             ]
           }
         )
@@ -47316,7 +47471,7 @@ html[data-theme=dark] {
     if (action != null) {
       const stop = (e) => e.stopPropagation();
       return island(
-        /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
           "div",
           {
             className: cls("is-target"),
@@ -47325,7 +47480,7 @@ html[data-theme=dark] {
             "data-fill": fill,
             style,
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime18.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                 "button",
                 {
                   ref,
@@ -47340,15 +47495,15 @@ html[data-theme=dark] {
                 }
               ),
               markSpan,
-              /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "nd-selcard-content", children }),
-              /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "nd-selcard-action", onClick: stop, onPointerDown: stop, children: action })
+              /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "nd-selcard-content", children }),
+              /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "nd-selcard-action", onClick: stop, onPointerDown: stop, children: action })
             ]
           }
         )
       );
     }
     return island(
-      /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
         "button",
         {
           ref,
@@ -47366,7 +47521,7 @@ html[data-theme=dark] {
           ...dataAttrs,
           children: [
             markSpan,
-            /* @__PURE__ */ (0, import_jsx_runtime18.jsx)("span", { className: "nd-selcard-content", children })
+            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "nd-selcard-content", children })
           ]
         }
       )
@@ -47374,11 +47529,11 @@ html[data-theme=dark] {
   });
 
   // src/ui-react/buttons.tsx
-  var import_jsx_runtime19 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime22 = __toESM(require_jsx_runtime());
   var GROUND = 2;
   var CARD_LEVEL = 2;
   var TOP_CARD_LEVEL = 4;
-  var svg = (d, opts) => (size) => opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("path", { d, fillRule: opts.fillRule, clipRule: opts.fillRule }) }) : /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("path", { d }) });
+  var svg = (d, opts) => (size) => opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("path", { d, fillRule: opts.fillRule, clipRule: opts.fillRule }) }) : /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("path", { d }) });
   var IconArrowLeft = svg("M19 12H5M12 19l-7-7 7-7");
   var IconDownload = svg("M12 3v11m0 0l-4-4m4 4l4-4M5 20h14");
   var IconSettings = svg(
@@ -47405,7 +47560,7 @@ html[data-theme=dark] {
   function mountOnce(mountId, node, level = GROUND) {
     const container = document.getElementById(mountId);
     if (!container) return;
-    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: level, children: node })));
+    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: level, children: node })));
   }
   function PomTextField(props) {
     const {
@@ -47425,10 +47580,10 @@ html[data-theme=dark] {
     } = props;
     const wrapClass = ["nd-textfield-wrap", `s-${size}`, "is-block", readonly ? "is-readonly" : ""].filter(Boolean).join(" ");
     const fieldClass = ["nd-textfield", `s-${size}`, readonly ? "is-readonly" : ""].filter(Boolean).join(" ");
-    return /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("span", { className: wrapClass, "data-fill": fieldLevel(useLevel()), style: { width: "100%", ...style }, children: [
-      icon2 && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "nd-textfield-leadbox", "aria-hidden": true, children: icon2 }),
-      label && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("label", { className: "nd-textfield-float", htmlFor: id, children: label }),
-      /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("span", { className: wrapClass, "data-fill": fieldLevel(useLevel()), style: { width: "100%", ...style }, children: [
+      icon2 && /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "nd-textfield-leadbox", "aria-hidden": true, children: icon2 }),
+      label && /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("label", { className: "nd-textfield-float", htmlFor: id, children: label }),
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         "input",
         {
           className: fieldClass,
@@ -47453,15 +47608,15 @@ html[data-theme=dark] {
   }
   function PomTextArea(props) {
     const { id, label, placeholder, size = "small", rows = 2, disabled = false, style } = props;
-    return /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)(
       "span",
       {
         className: ["nd-textfield-wrap", `s-${size}`, "is-multi", "is-block", disabled ? "is-disabled" : ""].filter(Boolean).join(" "),
         "data-fill": fieldLevel(useLevel()),
         style: { width: "100%", ...style },
         children: [
-          label && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("label", { className: "nd-textfield-float", htmlFor: id, children: label }),
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+          label && /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("label", { className: "nd-textfield-float", htmlFor: id, children: label }),
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
             "textarea",
             {
               className: ["nd-textfield", `s-${size}`, "is-multi", disabled ? "is-disabled" : ""].filter(Boolean).join(" "),
@@ -47501,7 +47656,7 @@ html[data-theme=dark] {
     const extra = {};
     if (destructive) extra["data-scheme"] = "error";
     extra.size = btnSize(size);
-    return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
       Button,
       {
         id,
@@ -47527,11 +47682,11 @@ html[data-theme=dark] {
     let set = () => {
     };
     function LiveButton() {
-      const [s, setS] = (0, import_react13.useState)(initial);
+      const [s, setS] = (0, import_react15.useState)(initial);
       set = setS;
       const extra = {};
       if (s.success) extra["data-scheme"] = "success";
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         Button,
         {
           id: base.id,
@@ -47547,7 +47702,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LiveButton, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LiveButton, {}) })));
     return {
       setDisabled: (disabled) => set((s) => ({ ...s, disabled })),
       setLoading: (loading) => set((s) => ({ ...s, loading })),
@@ -47560,11 +47715,11 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [disabled, setD] = (0, import_react13.useState)(initialDisabled);
+      const [disabled, setD] = (0, import_react15.useState)(initialDisabled);
       set = setD;
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(PomButton, { ...base, disabled });
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(PomButton, { ...base, disabled });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
   function mountLiveToggleIconButton(mountId, base, addIcon, removeIcon, addTitle, removeTitle, initial, level = GROUND) {
@@ -47572,10 +47727,10 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [mode, setMode] = (0, import_react13.useState)(initial);
+      const [mode, setMode] = (0, import_react15.useState)(initial);
       set = setMode;
       const isAdd = mode === "add";
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         PomButton,
         {
           ...base,
@@ -47586,7 +47741,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
     return { setMode: (mode) => set(mode) };
   }
   function mountLiveTextArea(mountId, base, initialDisabled, level = GROUND) {
@@ -47594,11 +47749,11 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [disabled, setD] = (0, import_react13.useState)(initialDisabled);
+      const [disabled, setD] = (0, import_react15.useState)(initialDisabled);
       set = setD;
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(PomTextArea, { ...base, disabled });
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(PomTextArea, { ...base, disabled });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
   function mountLiveDropdown(mountId, base, onSelect, level = GROUND) {
@@ -47606,13 +47761,13 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [s, setS] = (0, import_react13.useState)({ items: [], value: "" });
+      const [s, setS] = (0, import_react15.useState)({ items: [], value: "" });
       set = setS;
       const options = s.items.map((it) => ({
         value: it.value ?? it.label ?? it.primaryText ?? "",
         label: it.label ?? it.primaryText ?? it.value ?? ""
       }));
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         DropDownSelect,
         {
           label: "Folder path",
@@ -47625,7 +47780,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
     return { setItems: (items, value) => set(() => ({ items, value })) };
   }
   window.PomButtons = {
@@ -47655,10 +47810,10 @@ html[data-theme=dark] {
     )
   };
   function mountButton(mountId, props, level) {
-    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(PomButton, { ...props }), level);
+    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(PomButton, { ...props }), level);
   }
   function mountIconButton(mountId, props, level) {
-    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(PomButton, { ...props }), level);
+    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(PomButton, { ...props }), level);
   }
   mountIconButton("folder-add-btn-mount", { id: "folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
   mountIconButton("github-folder-add-btn-mount", { id: "github-folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
@@ -47693,13 +47848,13 @@ html[data-theme=dark] {
   (function mountThemeToggle() {
     const container = document.getElementById("theme-toggle-btn-mount");
     function View() {
-      const [dark, setDark] = (0, import_react13.useState)(document.documentElement.getAttribute("data-theme") === "dark");
+      const [dark, setDark] = (0, import_react15.useState)(document.documentElement.getAttribute("data-theme") === "dark");
       function toggle() {
         const next = !dark;
         document.documentElement.setAttribute("data-theme", next ? "dark" : "light");
         setDark(next);
       }
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         PomButton,
         {
           id: "theme-toggle-btn",
@@ -47712,24 +47867,24 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
   })();
   function mountVersionTag(mountId) {
     const container = document.getElementById(mountId);
     let set = () => {
     };
     function View() {
-      const [label, setLabel] = (0, import_react13.useState)("");
+      const [label, setLabel] = (0, import_react15.useState)("");
       set = setLabel;
       if (!label) return null;
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "version-tag-label", title: "Plugin version", children: label });
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "version-tag-label", title: "Plugin version", children: label });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
     window.PomVersionTag = { setLabel: (label) => set(label) };
   }
   mountVersionTag("version-tag-mount");
   function mountTextField(mountId, props, level) {
-    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(PomTextField, { ...props }), level);
+    mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(PomTextField, { ...props }), level);
   }
   mountTextField("primary-filename-mount", { id: "primary-filename", label: "File name", defaultValue: "tokens.json", placeholder: "tokens.json", title: 'JSON file name \u2014 used for both Download and every push destination. ".json" is added automatically if you leave it out.' }, CARD_LEVEL);
   window.PomCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false, CARD_LEVEL);
@@ -47748,8 +47903,8 @@ html[data-theme=dark] {
     const container = document.getElementById("export-mode-control-mount");
     if (!container) return;
     function View() {
-      const [value, setValue] = (0, import_react13.useState)("1");
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+      const [value, setValue] = (0, import_react15.useState)("1");
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         SegmentedControl,
         {
           label: "Output format",
@@ -47763,7 +47918,7 @@ html[data-theme=dark] {
         }
       );
     }
-    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
   })();
   function targetFromCheckboxes(s) {
     if (s.gitlab && s.github) return "both";
@@ -47776,35 +47931,57 @@ html[data-theme=dark] {
     };
     let setHint = () => {
     };
+    let setResolvedHint = () => {
+    };
     function View() {
-      const [value, setValue] = (0, import_react13.useState)("legacy");
-      const [hint, setHintState] = (0, import_react13.useState)("");
-      set = setValue;
+      const [shape, setShape] = (0, import_react15.useState)("legacy");
+      const [hint, setHintState] = (0, import_react15.useState)("");
+      const [resolvedHint, setResolvedHintState] = (0, import_react15.useState)("");
+      set = setShape;
       setHint = (h) => setHintState(h);
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 8 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
-          SegmentedControl,
+      setResolvedHint = (h) => setResolvedHintState(h);
+      const on = shape !== "legacy";
+      const resolved = shape === "resolved";
+      const choose = (next) => {
+        setShape(next);
+        window.PomOutputFormat.onChange?.(next);
+      };
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)(Card, { level: GROUND, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
+          ListControlItem,
           {
-            label: "Output format",
-            size: "medium",
-            block: true,
-            value,
-            options: [
-              { value: "legacy", label: "Legacy JSON" },
-              { value: "themes", label: "W3C DTCG" },
-              { value: "resolved", label: "Resolved" }
-            ],
-            onChange: (v) => {
-              setValue(v);
-              window.PomOutputFormat.onChange?.(v);
-            }
+            title: "W3C DTCG",
+            subtitle: hint,
+            trailing: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
+              Switch,
+              {
+                label: "W3C DTCG",
+                checked: on,
+                onChange: (v) => choose(v ? "themes" : "legacy")
+              }
+            )
           }
         ),
-        hint && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)", lineHeight: 1.4 }, children: hint })
+        on && /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 2, padding: "0 16px 16px" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
+            Checkbox,
+            {
+              label: "Resolved",
+              checked: resolved,
+              onChange: (v) => choose(v ? "resolved" : "themes")
+            }
+          ),
+          resolvedHint && /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)", lineHeight: 1.4, paddingLeft: 24 }, children: resolvedHint })
+        ] })
       ] });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
-    window.PomOutputFormat = { onChange: null, setValue: (v) => set(v), setHint: (h) => setHint(h) };
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
+    window.PomOutputFormat = {
+      onChange: null,
+      setValue: (v) => set(v),
+      setHint: (h) => setHint(h),
+      setResolvedHint: (h) => setResolvedHint(h)
+    };
   })();
   (function mountRepoTabControl() {
     const mountIds = ["repo-settings-tab-mount", "repo-settings-tab-mount-github"];
@@ -47815,7 +47992,7 @@ html[data-theme=dark] {
       let set = () => {
       };
       function View() {
-        const [value, setValue] = (0, import_react13.useState)("gitlab");
+        const [value, setValue] = (0, import_react15.useState)("gitlab");
         set = setValue;
         return (
           // medium, not small: this sits at the top of each provider's own
@@ -47826,7 +48003,7 @@ html[data-theme=dark] {
           // (like the fields inside it), not hug its own two labels — see
           // SegmentedControl's own `block` doc, written for exactly this
           // "governs everything under it" case.
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
             SegmentedControl,
             {
               label: "Repository provider",
@@ -47842,7 +48019,7 @@ html[data-theme=dark] {
           )
         );
       }
-      (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+      (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
       setters.push((v) => set(v));
     });
     window.PomRepoTab = { onChange: null, setValue: (v) => setters.forEach((s) => s(v)) };
@@ -47852,9 +48029,9 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [value, setValue] = (0, import_react13.useState)("gitlab");
+      const [value, setValue] = (0, import_react15.useState)("gitlab");
       set = setValue;
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         SegmentedControl,
         {
           label: "Push destination",
@@ -47869,35 +48046,35 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
     window.PomMainProviderTab = { onChange: null, setValue: (v) => set(v) };
   })();
   mountOnce(
     "skeleton-list",
-    /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { className: "skeleton-foundation-card", "data-level": TOP_CARD_LEVEL, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { className: "skeleton-foundation-card-title-group", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "circle", size: 18, label: "Loading" }),
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "block", width: 160, height: 16, label: "" })
+    /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "skeleton-foundation-card", "data-level": TOP_CARD_LEVEL, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "skeleton-foundation-card-title-group", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "circle", size: 18, label: "Loading" }),
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "block", width: 160, height: 16, label: "" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "block", width: 64, height: 22, label: "" })
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "block", width: 64, height: 22, label: "" })
     ] }),
     TOP_CARD_LEVEL
   );
-  mountOnce("json-download-icon-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "circle", size: 16, label: "Loading" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-title-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "block", width: 80, height: 16, label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-tag-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "block", width: 60, height: 22, label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-field-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "block", height: 50, width: "100%", label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-btn-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "block", width: 125, height: 50, label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-icon-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "circle", size: 16, label: "Loading" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-title-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "block", width: 80, height: 16, label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-tag-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "block", width: 60, height: 22, label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-field-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "block", height: 50, width: "100%", label: "" }), TOP_CARD_LEVEL);
+  mountOnce("json-download-btn-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "block", width: 125, height: 50, label: "" }), TOP_CARD_LEVEL);
   mountOnce(
     "actions-skeleton",
-    /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { className: "export-panel", "data-level": TOP_CARD_LEVEL, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { className: "sk-row", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "circle", size: 14, label: "Loading" }),
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "block", width: 70, height: 16, label: "" })
+    /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "export-panel", "data-level": TOP_CARD_LEVEL, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "sk-row", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "circle", size: 14, label: "Loading" }),
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "block", width: 70, height: 16, label: "" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "block", height: 44, width: "100%", label: "" }),
-      /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "block", height: 68, width: "100%", label: "" }),
-      /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Skeleton, { shape: "block", height: 44, width: "100%", label: "" })
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "block", height: 44, width: "100%", label: "" }),
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "block", height: 68, width: "100%", label: "" }),
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Skeleton, { shape: "block", height: 44, width: "100%", label: "" })
     ] }),
     TOP_CARD_LEVEL
   );
@@ -47906,9 +48083,9 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [s, setS] = (0, import_react13.useState)({ open: false, tone: "success", message: "" });
+      const [s, setS] = (0, import_react15.useState)({ open: false, tone: "success", message: "" });
       set = setS;
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         Toast,
         {
           open: s.open,
@@ -47920,7 +48097,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) }));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) }));
     window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? "error" : "success", message })) };
   })();
   window.PomFolderSelect = {
@@ -47940,8 +48117,8 @@ html[data-theme=dark] {
       generation += 1;
       const gen = generation;
       root.render(
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(import_jsx_runtime19.Fragment, { children: rows.map((row, idx) => /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { className: "folder-row", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(import_jsx_runtime22.Fragment, { children: rows.map((row, idx) => /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "folder-row", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
             PomTextField,
             {
               id: `${idPrefix}-${idx}`,
@@ -47955,7 +48132,7 @@ html[data-theme=dark] {
           ),
           row.canEdit && // medium, not small: beside a field (band 50), same reasoning
           // as folder-add-btn-mount / gl-clear-token-btn-mount above.
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
             PomButton,
             {
               variant: "tonal",
@@ -47979,23 +48156,23 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [state, setState] = (0, import_react13.useState)({ title: "Scanned collections", collections: [], summary: { tokens: "" } });
-      const [open, setOpen] = (0, import_react13.useState)(false);
+      const [state, setState] = (0, import_react15.useState)({ title: "Scanned collections", collections: [], summary: { tokens: "" } });
+      const [open, setOpen] = (0, import_react15.useState)(false);
       set = setState;
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)(import_jsx_runtime19.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("div", { "data-tense": "inverted", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(InteractiveCard, { label: `${state.title} \u2014 view scanned collections`, level: 2, size: "large", onClick: () => setOpen(true), children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("div", { className: "collections-header", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { className: "collections-header-top", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "collections-header-icon", "aria-hidden": "true", children: IconVariables(18) }),
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "collections-summary", children: state.title }),
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("div", { className: "collections-summary-tags", children: state.summary.tokens ? /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Tag, { variant: "tonal", size: "small", children: state.summary.tokens }) : null })
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)(import_jsx_runtime22.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { "data-tense": "inverted", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(InteractiveCard, { label: `${state.title} \u2014 view scanned collections`, level: 2, size: "large", onClick: () => setOpen(true), children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { className: "collections-header", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "collections-header-top", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "collections-header-icon", "aria-hidden": "true", children: IconVariables(18) }),
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "collections-summary", children: state.title }),
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { className: "collections-summary-tags", children: state.summary.tokens ? /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Tag, { variant: "tonal", size: "small", children: state.summary.tokens }) : null })
         ] }) }) }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Dialog, { open, onClose: () => setOpen(false), title: state.title, size: "large", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("div", { className: "collections-readonly-list", children: state.collections.map((c) => /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { className: "collection-item", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "collection-item-check", children: IconCheck(14) }),
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "name", children: c.name }),
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Tag, { variant: "tonal", size: "small", children: c.count })
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Dialog, { open, onClose: () => setOpen(false), title: state.title, size: "large", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { className: "collections-readonly-list", children: state.collections.map((c) => /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "collection-item", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "collection-item-check", children: IconCheck(14) }),
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "name", children: c.name }),
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Tag, { variant: "tonal", size: "small", children: c.count })
         ] }, c.name)) }) })
       ] });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
     window.PomCollectionsAccordion = {
       setTitle: (title) => set((s) => ({ ...s, title })),
       setCollections: (collections) => set((s) => ({ ...s, collections })),
@@ -48007,12 +48184,12 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [size, setSize] = (0, import_react13.useState)("");
+      const [size, setSize] = (0, import_react15.useState)("");
       set = setSize;
       if (!size) return null;
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Tag, { variant: "tonal", size: "small", children: size });
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Tag, { variant: "tonal", size: "small", children: size });
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
     window.PomJsonFileCard = { setSize: (size) => set(size) };
   })();
   (function mountClosureWarning() {
@@ -48020,26 +48197,26 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [s, setS] = (0, import_react13.useState)({ open: false, title: "", groups: [], more: 0 });
+      const [s, setS] = (0, import_react15.useState)({ open: false, title: "", groups: [], more: 0 });
       set = setS;
       if (!s.open) return null;
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)(Alert, { tone: "error", title: s.title, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("p", { className: "closure-warning-subtitle", children: "Not present in this export, but referenced by:" }),
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("ul", { className: "closure-warning-list", children: s.groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("li", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("div", { className: "closure-warning-missing", children: g.ref }),
-          /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { className: "closure-warning-froms", children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)(Alert, { tone: "error", title: s.title, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("p", { className: "closure-warning-subtitle", children: "Not present in this export, but referenced by:" }),
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("ul", { className: "closure-warning-list", children: s.groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("li", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { className: "closure-warning-missing", children: g.ref }),
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "closure-warning-froms", children: [
             "used by ",
             g.froms.join(", ")
           ] })
         ] }, g.ref)) }),
-        s.more > 0 && /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("p", { className: "closure-warning-more", children: [
+        s.more > 0 && /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("p", { className: "closure-warning-more", children: [
           "+",
           s.more,
           " more affected"
         ] })
       ] });
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) }));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) }));
     window.PomClosureWarning = {
       show: (title, groups, more) => set(() => ({ open: true, title, groups, more: more || 0 })),
       hide: () => set((s) => ({ ...s, open: false }))
@@ -48050,9 +48227,9 @@ html[data-theme=dark] {
     let setOpen = () => {
     };
     function View() {
-      const [open, setO] = (0, import_react13.useState)(false);
+      const [open, setO] = (0, import_react15.useState)(false);
       setOpen = setO;
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         Dialog,
         {
           open,
@@ -48060,9 +48237,9 @@ html[data-theme=dark] {
           size: "small",
           title: cfg.title,
           description: cfg.text,
-          actions: /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setO(false), children: "Cancel" }),
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, "data-scheme": "error", onClick: () => {
+          actions: /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setO(false), children: "Cancel" }),
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, "data-scheme": "error", onClick: () => {
               setO(false);
               cfg.onConfirm();
             }, children: cfg.confirmLabel })
@@ -48071,7 +48248,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) }));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) }));
     register(() => setOpen(true));
   }
   window.PomRemoveGithubDialog = { open: () => {
@@ -48099,12 +48276,12 @@ html[data-theme=dark] {
     let setProvider = () => {
     };
     function View() {
-      const [open, setO] = (0, import_react13.useState)(false);
-      const [provider, setP] = (0, import_react13.useState)("gitlab");
+      const [open, setO] = (0, import_react15.useState)(false);
+      const [provider, setP] = (0, import_react15.useState)("gitlab");
       setOpen = setO;
       setProvider = setP;
       const label = provider === "github" ? "GitHub" : "GitLab";
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         Dialog,
         {
           open,
@@ -48112,9 +48289,9 @@ html[data-theme=dark] {
           size: "small",
           title: `Clear ${label} token?`,
           description: `The saved ${label} token is removed from this plugin. Everything else \u2014 repository, branch and saved folder paths \u2014 stays as it is, and pushing is paused until you enter a new token.`,
-          actions: /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setO(false), children: "Cancel" }),
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, "data-scheme": "error", onClick: () => {
+          actions: /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setO(false), children: "Cancel" }),
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, "data-scheme": "error", onClick: () => {
               setO(false);
               window.PomClearTokenDialog.onConfirm?.(provider);
             }, children: "Clear" })
@@ -48123,7 +48300,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) }));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) }));
     window.PomClearTokenDialog = {
       open: (provider) => {
         (0, import_react_dom.flushSync)(() => setProvider(provider));
@@ -48143,9 +48320,9 @@ html[data-theme=dark] {
       // Dialog.tsx), and the composition rule's ascending order above L4 is
       // 1 → 2 → 3, so a selectable row (one of L1's own named uses) gets L1
       // and its logo badge one rung up at L2, so all three read apart.
-      /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(SelectableCard, { label, selected: checked, onSelect: () => onToggle(!checked), mark: "checkbox", level: 1, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("span", { style: { display: "flex", alignItems: "center", gap: 10 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { "aria-hidden": "true", "data-level": 2, style: { display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "var(--background)", color: "var(--app-text-muted)", flexShrink: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "currentColor", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("path", { d: PROVIDER_LOGO_PATH[which] }) }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: { fontWeight: 600, color: "var(--app-text)" }, children: label })
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(SelectableCard, { label, selected: checked, onSelect: () => onToggle(!checked), mark: "checkbox", level: 1, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("span", { style: { display: "flex", alignItems: "center", gap: 10 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { "aria-hidden": "true", "data-level": 2, style: { display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "var(--background)", color: "var(--app-text-muted)", flexShrink: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "currentColor", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("path", { d: PROVIDER_LOGO_PATH[which] }) }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { style: { fontWeight: 600, color: "var(--app-text)" }, children: label })
       ] }) })
     );
   }
@@ -48160,9 +48337,9 @@ html[data-theme=dark] {
       return s.github ? gh : gl;
     }
     function View() {
-      const [open, setO] = (0, import_react13.useState)(false);
-      const [step, setStep] = (0, import_react13.useState)(1);
-      const [state, setState] = (0, import_react13.useState)({ gitlab: true, github: false });
+      const [open, setO] = (0, import_react15.useState)(false);
+      const [step, setStep] = (0, import_react15.useState)(1);
+      const [state, setState] = (0, import_react15.useState)({ gitlab: true, github: false });
       setOpen = (next) => {
         if (next) setStep(1);
         setO(next);
@@ -48171,7 +48348,7 @@ html[data-theme=dark] {
         setState((s) => ({ ...s, [which]: checked }));
       }
       const neitherChecked = !state.gitlab && !state.github;
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
         Dialog,
         {
           open,
@@ -48186,7 +48363,7 @@ html[data-theme=dark] {
             // targetFromCheckboxes() can't express "neither" (it's built
             // for a picker where at least one is always checked), so
             // 'none' is passed explicitly.
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Button, { variant: "primary", size: "large", block: true, onClick: () => {
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Button, { variant: "primary", size: "large", block: true, onClick: () => {
               if (neitherChecked) {
                 setO(false);
                 window.PomOnboardingDialog.onConfirm?.("none");
@@ -48194,21 +48371,21 @@ html[data-theme=dark] {
                 setStep(2);
               }
             }, children: neitherChecked ? "Skip \u2014 just download" : "Next" })
-          ) : /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setStep(1), children: "Back" }),
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, onClick: () => {
+          ) : /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setStep(1), children: "Back" }),
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Button, { variant: "primary", size: "large", style: { flex: 1 }, onClick: () => {
               setO(false);
               window.PomOnboardingDialog.onConfirm?.(targetFromCheckboxes(state));
             }, children: "Add Settings" })
           ] }),
-          children: step === 1 ? /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { style: { display: "flex", flexDirection: "column", gap: 8, width: "100%" }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(ProviderChoiceCard, { which: "gitlab", label: "GitLab", checked: state.gitlab, onToggle: (c) => toggle("gitlab", c) }),
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(ProviderChoiceCard, { which: "github", label: "GitHub", checked: state.github, onToggle: (c) => toggle("github", c) })
+          children: step === 1 ? /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: { display: "flex", flexDirection: "column", gap: 8, width: "100%" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(ProviderChoiceCard, { which: "gitlab", label: "GitLab", checked: state.gitlab, onToggle: (c) => toggle("gitlab", c) }),
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(ProviderChoiceCard, { which: "github", label: "GitHub", checked: state.github, onToggle: (c) => toggle("github", c) })
           ] }) : null
         }
       );
     }
-    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) }));
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) }));
     window.PomOnboardingDialog = { open: () => setOpen(true), onConfirm: null };
   })();
 })();
@@ -50044,18 +50221,19 @@ react/cjs/react-jsx-runtime.development.js:
       // Names the file it will actually be written to, so the _dtcg swap is
       // visible here and not only in the file name field further down.
       /*
-        The control names the three formats; this says what the chosen one
-        does and which file it writes. One line about one choice — the
-        ambiguity two cards had, over whether a label described itself or the
-        current state, cannot arise.
+        Two hints, because there are two controls. The switch's names the
+        format the export is in and the file it writes; the checkbox's says
+        what choosing the resolved document does instead of the per-theme one.
+        Each sits with the control it belongs to rather than one line trying
+        to describe whichever combination is live.
       */
-      var hint = dtcgShape === 'resolved'
-        ? 'One document, the routing resolved away and each token under the choices it varies with, as '
-          + filenameForShape('resolved') + '.'
-        : dtcgShape === 'themes'
-        ? '$value / $type, one resolved document per theme, as ' + filenameForShape('themes') + '.'
-        : 'The format this plugin has always exported, as ' + filenameForShape(null) + '.';
-      window.PomOutputFormat.setHint(hint);
+      window.PomOutputFormat.setHint(
+        dtcgShape === null
+          ? 'Off: the format this plugin has always exported, as ' + filenameForShape(null) + '.'
+          : '$value / $type, one resolved document per theme, as ' + filenameForShape(dtcgShape) + '.');
+      window.PomOutputFormat.setResolvedHint(
+        'One document instead of one per theme: the routing resolved away and each token '
+        + 'under the choices it varies with. Writes ' + filenameForShape('resolved') + '.');
     }
 
     // Convert the Legacy JSON tree to DTCG and log a conversion report.

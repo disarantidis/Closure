@@ -25,6 +25,9 @@ import { flushSync } from 'react-dom';
 import { Button } from '../vendor/pomegranate/panel/node/Button';
 import { Switch } from '../vendor/pomegranate/panel/node/Switch';
 import { SegmentedControl } from '../vendor/pomegranate/panel/node/SegmentedControl';
+import { Card } from '../vendor/pomegranate/panel/node/Card';
+import { ListControlItem } from '../vendor/pomegranate/panel/node/ListControlItem';
+import { Checkbox } from '../vendor/pomegranate/panel/node/Checkbox';
 import { DropDownSelect } from '../vendor/pomegranate/panel/node/DropDownSelect';
 import { Dialog } from '../vendor/pomegranate/panel/node/Dialog';
 import { InteractiveCard } from '../vendor/pomegranate/panel/node/InteractiveCard';
@@ -397,7 +400,7 @@ declare global {
     PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
-    PomOutputFormat: { onChange: ((shape: string) => void) | null; setValue: (shape: string) => void; setHint: (hint: string) => void };
+    PomOutputFormat: { onChange: ((shape: string) => void) | null; setValue: (shape: string) => void; setHint: (hint: string) => void; setResolvedHint: (hint: string) => void };
     PomOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
   }
 }
@@ -588,52 +591,83 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
 }
 
 /*
-  OUTPUT FORMAT IS ONE CHOICE, SO IT IS ONE CONTROL.
+  ONE CARD, AND THE SECOND CHOICE ONLY EXISTS INSIDE THE FIRST.
 
-  It was a SelectableCard switch while there were two formats, and briefly two
-  such switches once there were three — which made exclusivity something the
-  template had to maintain by hand, and made each card's label ambiguous about
-  whether it described itself or the current state. Neither is a problem a
-  radio group has: the platform gives exclusivity, arrow-key navigation and one
-  tab stop, and only one option can read as chosen because only one is.
+  Resolved is not a third peer of Legacy JSON and DTCG — it IS DTCG, in a
+  different document shape, and it cannot be chosen while the export is Legacy
+  JSON. A segmented control says three equal things and would let you pick the
+  impossible one; a switch with a checkbox under it says what is actually true,
+  and the checkbox is simply absent when it has nothing to qualify.
 
-  block, because this dial governs everything the Output format section is
-  about — the same argument the repo-provider one makes above.
+  THE CARD IS A PLAIN `Card`, NOT A `SelectableCard`, and that is the whole
+  reason this composes. A SelectableCard IS a `<button>`, so a control inside
+  it is a control inside a control — "one press fires BOTH", which the kit
+  refuses. Its `action` slot exists for exactly that case, but it is absolutely
+  positioned in the mark's corner and documented as being for a card that
+  "carries no mark of its own to collide with" — so it cannot hold a second
+  control while a switch already occupies that corner.
 
-  The hint below it is the caller's, not the control's: a segmented control
-  names its options and says nothing about what choosing one does, and the file
-  name each format writes is worth stating before the download rather than
-  after.
+  A plain Card carries no role and no press, so the Switch and the Checkbox
+  inside it are ordinary controls in ordinary reading order, each its own tab
+  stop, each labelled. ListControlItem is the kit's row for exactly this: a
+  title, a subtitle, and a control in `trailing`.
 */
 (function mountOutputFormatControl() {
   const container = document.getElementById('output-format-control-mount');
   let set: (shape: string) => void = () => {};
   let setHint: (hint: string) => void = () => {};
+  let setResolvedHint: (hint: string) => void = () => {};
   function View() {
-    const [value, setValue] = useState('legacy');
+    // 'legacy' | 'themes' | 'resolved' — one value, so the two controls cannot
+    // disagree. The checkbox is derived from it rather than kept beside it.
+    const [shape, setShape] = useState('legacy');
     const [hint, setHintState] = useState('');
-    set = setValue;
+    const [resolvedHint, setResolvedHintState] = useState('');
+    set = setShape;
     setHint = (h) => setHintState(h);
+    setResolvedHint = (h) => setResolvedHintState(h);
+
+    const on = shape !== 'legacy';
+    const resolved = shape === 'resolved';
+    const choose = (next: string) => { setShape(next); window.PomOutputFormat.onChange?.(next); };
+
     return (
-      <span style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <SegmentedControl
-          label="Output format"
-          size="medium"
-          block
-          value={value}
-          options={[
-            { value: 'legacy', label: 'Legacy JSON' },
-            { value: 'themes', label: 'W3C DTCG' },
-            { value: 'resolved', label: 'Resolved' },
-          ]}
-          onChange={(v: string) => { setValue(v); window.PomOutputFormat.onChange?.(v); }}
+      <Card level={GROUND}>
+        <ListControlItem
+          title="W3C DTCG"
+          subtitle={hint}
+          trailing={
+            <Switch
+              label="W3C DTCG"
+              checked={on}
+              onChange={(v: boolean) => choose(v ? 'themes' : 'legacy')}
+            />
+          }
         />
-        {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.4 }}>{hint}</span>}
-      </span>
+        {on && (
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 16px 16px' }}>
+            <Checkbox
+              label="Resolved"
+              checked={resolved}
+              onChange={(v: boolean) => choose(v ? 'resolved' : 'themes')}
+            />
+            {resolvedHint && (
+              <span style={{ fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.4, paddingLeft: 24 }}>
+                {resolvedHint}
+              </span>
+            )}
+          </span>
+        )}
+      </Card>
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
-  window.PomOutputFormat = { onChange: null, setValue: (v) => set(v), setHint: (h) => setHint(h) };
+  window.PomOutputFormat = {
+    onChange: null,
+    setValue: (v) => set(v),
+    setHint: (h) => setHint(h),
+    setResolvedHint: (h) => setResolvedHint(h),
+  };
 })();
 
 /* ── GitHub / GitLab repo-settings tab switcher ────────────────────────────── */
