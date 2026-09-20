@@ -2429,21 +2429,20 @@ var GIT_CONFIG_KEY = 'json-exporter-git-config';
   emit-resolved.js measures the architecture and hands back {primitives,
   groups}, where a group is a set of tokens sharing a dependency signature and
   a branch is one combination of the axes they actually depend on. That is the
-  complete, lossless form. It is not the form a consumer reads, which is a
-  document with named top-level sections.
+  complete, lossless form, and it is what this returns by default.
 
-  Mapping one to the other is presentation, and the roles it needs are read off
-  the derived data rather than off collection names:
+  WHICH AXIS IS "LIGHT/DARK" IS NOT DERIVABLE, and an earlier version of this
+  guessed anyway — second axis of the widest group — which fit the one system it
+  was written against and picked the RESTRICTION layer on the next one, because
+  that system routes scheme -> restricted -> mode rather than scheme -> mode.
+  The result silently collapsed 87% of the document onto paths already taken.
+  There is no structural property separating a light/dark router from a
+  permission router: both are collections of N modes that a scheme passes
+  through. It is semantics, so the caller states it or it does not happen.
 
-    breakpoint role  the axis some group depends on ALONE — a single-axis group
-                     is a set of tokens that vary by one thing and nothing else
-    scheme role      first axis, in derived order, of the widest group
-    mode role        second axis of that same group
-
-  On both design systems measured this picks out exactly the axes a human would
-  have named, without being told any of them. When a file has no such shape the
-  derived form is returned unchanged rather than forced into a layout that does
-  not fit it.
+  So a house layout is applied only when options.axes names the roles, AND only
+  when it can hold every branch — checked, not assumed. Anything else returns
+  the derived form, which loses nothing.
 */
 function buildResolvedDocument(rawData, options) {
   options = options || {};
@@ -2467,39 +2466,74 @@ function buildResolvedDocument(rawData, options) {
     typeHints: options.typeHints
   });
 
-  var roles = deriveLayoutRoles(res);
-  if (!roles) return { document: shapeDerived(res), roles: null, emit: res };
-  return { document: shapeHouse(res, roles), roles: roles, emit: res };
+  var derivedTotal = countResolvedTokens(res.primitives) + countResolvedTokens(res.groups);
+
+  if (options.axes && options.axes.scheme && options.axes.mode) {
+    var house = shapeHouse(res, options.axes);
+    if (!house.collisions.length) {
+      return {
+        document: house.document, shape: 'house', roles: options.axes,
+        total: countResolvedTokens(house.document), emit: res
+      };
+    }
+    /*
+      A layout maps branches onto fixed levels, so it can only carry the axes
+      it has somewhere to put. A collision means two branches claimed one path
+      and the second replaced the first — the silent overwrite this whole shape
+      exists to remove — so the complete form goes out instead of the tidy one.
+    */
+    return {
+      document: shapeDerived(res),
+      shape: 'derived',
+      roles: options.axes,
+      total: derivedTotal,
+      layoutCollisions: house.collisions.length,
+      unplacedAxes: res.axes.map(function (a) { return a.name; }).filter(function (n) {
+        return n !== options.axes.breakpoint && n !== options.axes.scheme && n !== options.axes.mode;
+      }),
+      emit: res
+    };
+  }
+
+  return { document: shapeDerived(res), shape: 'derived', roles: null, total: derivedTotal, emit: res };
 }
 
-// Which axis plays which part, read off the derived groups.
-function deriveLayoutRoles(res) {
-  var single = null;
-  var widest = null;
-  Object.keys(res.groups).forEach(function (k) {
-    var g = res.groups[k];
-    if (!g.axes.length) return;
-    if (g.axes.length === 1 && !single) single = g.axes[0];
-    if (!widest || g.axes.length > res.groups[widest].axes.length) widest = k;
-  });
-  if (!widest) return null;
-  var wide = res.groups[widest].axes;
-  if (wide.length < 2) return null;
-  return { breakpoint: single, scheme: wide[0], mode: wide[1] };
+function countResolvedTokens(node) {
+  var n = 0;
+  (function walk(x) {
+    if (!x || typeof x !== 'object') return;
+    if (Object.prototype.hasOwnProperty.call(x, '$value')) { n++; return; }
+    Object.keys(x).forEach(function (k) { if (k.charAt(0) !== '$') walk(x[k]); });
+  })(node);
+  return n;
 }
 
-// The derived form, lightly flattened: one section per group, branches beneath.
+/*
+  The derived form: the primitive collection, then one section per dependency
+  signature, each branch nested by the path its walk actually took. Ragged on
+  purpose — a branch carries only the questions that were asked of it, so a
+  scheme that never enters the light/dark router has no light/dark segment.
+
+  Section names are the group's axes with the leading punctuation Figma
+  collection names carry ('.scheme', '_restricted') removed, because that
+  punctuation orders collections in Figma's sidebar and means nothing here.
+*/
 function shapeDerived(res) {
   var out = {};
   Object.keys(res.primitives).forEach(function (name) {
-    out[name.replace(/^\./, '')] = res.primitives[name];
+    out[name.replace(/^[._]+/, '')] = res.primitives[name];
   });
   Object.keys(res.groups).forEach(function (key) {
-    var section = {};
-    res.groups[key].branches.forEach(function (b) {
-      section[b.path.length ? b.path.join('/') : 'default'] = b.tokens;
+    var g = res.groups[key];
+    var section = g.axes.length
+      ? g.axes.map(function (a) { return a.replace(/^[._]+/, ''); }).join('-')
+      : 'static';
+    var node = out[section] = out[section] || {};
+    g.branches.forEach(function (b) {
+      var here = node;
+      b.path.forEach(function (seg) { here = here[seg] = here[seg] || {}; });
+      mergeResolvedInto(here, b.tokens);
     });
-    out[key.replace(/[+.]/g, '_')] = section;
   });
   return out;
 }
@@ -2515,16 +2549,25 @@ function mergeResolvedInto(target, src) {
 }
 
 /*
-  core / breakpoint.<mode> / mode.<mode>.<scheme>.
-
-  Two conventions the graph does not state and this does: a branch is named by
-  its innermost colour choice, so a scheme that routes into a palette reads as
-  the palette; and a scheme that never enters the light/dark switch is repeated
-  under every mode rather than sitting outside them.
+  core / breakpoint.<mode> / mode.<mode>.<scheme> — one system's convention,
+  applied only when that system names the roles it needs.
 */
 function shapeHouse(res, roles) {
   var primitiveName = Object.keys(res.primitives)[0];
   var out = { core: res.primitives[primitiveName] || {}, breakpoint: {}, mode: {} };
+  /*
+    WHICH BRANCH CLAIMED EACH DESTINATION. Token counts cannot answer whether a
+    layout fits: this one deliberately REPEATS a mode-independent scheme under
+    every mode, so a healthy house document holds more tokens than the branches
+    it was built from. What must not happen is two DIFFERENT branches landing on
+    one path, because the second silently replaces the first.
+  */
+  var claimedBy = {};
+  var collisions = [];
+  function claim(dest, branchKey) {
+    if (claimedBy[dest] === undefined) { claimedBy[dest] = branchKey; return; }
+    if (claimedBy[dest] !== branchKey) collisions.push(dest);
+  }
   var modeAxis = null;
   res.axes.forEach(function (a) { if (a.name === roles.mode) modeAxis = a; });
   var allModes = (modeAxis && modeAxis.modes) || [];
@@ -2536,10 +2579,11 @@ function shapeHouse(res, roles) {
       if (roles.breakpoint && v[roles.breakpoint] !== undefined) {
         var bi = br.dependsOn.indexOf(roles.breakpoint);
         var bp = (bi >= 0 && br.path[bi]) || v[roles.breakpoint];
+        claim('breakpoint/' + bp, key + '#' + br.path.join('/'));
         out.breakpoint[bp] = mergeResolvedInto(out.breakpoint[bp] || {}, br.tokens);
         return;
       }
-      if (v[roles.scheme] === undefined) return;   // the static group stays in core's orbit
+      if (v[roles.scheme] === undefined) return;
 
       var leafAxes = br.dependsOn.filter(function (n) { return n !== roles.mode; });
       var leafIdx = br.dependsOn.indexOf(leafAxes[leafAxes.length - 1]);
@@ -2547,12 +2591,13 @@ function shapeHouse(res, roles) {
       var mi = br.dependsOn.indexOf(roles.mode);
       var modes = mi >= 0 ? [br.path[mi]] : allModes;
       modes.forEach(function (mm) {
+        claim('mode/' + mm + '/' + leaf, key + '#' + br.path.join('/'));
         out.mode[mm] = out.mode[mm] || {};
         out.mode[mm][leaf] = mergeResolvedInto(out.mode[mm][leaf] || {}, br.tokens);
       });
     });
   });
-  return out;
+  return { document: out, collisions: collisions };
 }
 
 figma.ui.onmessage = function(msg) {
@@ -2860,7 +2905,15 @@ figma.ui.onmessage = function(msg) {
         complete; it is not yet somebody's house naming. Settings is where that
         would go, and that decision is still open.
       */
-      finalTokens = buildResolvedDocument(msg.raw, {}).document;
+      var built = buildResolvedDocument(msg.raw, {});
+      finalTokens = built.document;
+      console.log('[Resolved] ' + built.shape + ' shape, ' + built.total + ' tokens, ' +
+        built.emit.axes.length + ' axes: ' + built.emit.axisOrder.join(' > '));
+      if (built.layoutCollisions) {
+        console.warn('[Resolved] the named layout collided on ' + built.layoutCollisions +
+          ' paths (no level for: ' + built.unplacedAxes.join(', ') + ') — emitted the complete ' +
+          'derived shape instead');
+      }
     } else if (exportMode === 'legacy') {
       finalTokens = toTokenFormat(nativeResult.tokens, msg.raw);
     } else {
