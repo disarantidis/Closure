@@ -903,22 +903,6 @@
       margin-left: var(--spacing-component-3);
       margin-right: var(--spacing-component-3);
     }
-    /* THE CARD EDGE, BORROWED RATHER THAN INVENTED.
-
-       This is a plain Card, not a SelectableCard, because it HOSTS CONTROLS: a
-       SelectableCard is a <button>, and a switch or a checkbox inside one is a
-       control inside a control — "one press fires BOTH", which the kit refuses
-       outright (SelectableCard.tsx). Its `action` escape hatch is absolutely
-       positioned in the mark's corner and documented for a card that "carries
-       no mark of its own to collide with", so it cannot hold a second control
-       while a switch already sits there.
-
-       .nd-card carries the radius and the surface but not the edge — the
-       border lives on .nd-selcard alone. So the edge is restated here with the
-       SAME tokens that declaration uses, rather than a value of our own. */
-    #output-format-control-mount .nd-card {
-      border: var(--border-width-hairline) solid var(--stroke-subtle);
-    }
 
     /* Outer spacing wrapper only, same padding as .header on the main
        screen — the actual visible container is .header-panel (shared class,
@@ -1762,11 +1746,12 @@
            so the two never overwrite each other. -->
       <div class="output-format">
         <p class="folder-paths-title">Output format</p>
-        <!-- One Card (buttons.tsx): a Switch for DTCG, and inside it — only
-             once that is on — a Checkbox for Resolved, which is a DTCG
-             document in a different shape rather than a format of its own.
-             Built by buildResolvedDocument() in the sandbox, where the raw
-             variable graph and the formatters both live. -->
+        <!-- A SelectableCard for DTCG (buttons.tsx) and, once it is on, a
+             Checkbox BELOW it — a sibling, not a child: the card is a
+             <button>, and a control inside one fires both. Resolved is a DTCG
+             document in a different shape rather than a format of its own,
+             built by buildResolvedDocument() in the sandbox where the raw
+             variable graph and the formatters live. -->
         <span id="output-format-control-mount"></span>
       </div>
 

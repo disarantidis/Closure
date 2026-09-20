@@ -25,8 +25,6 @@ import { flushSync } from 'react-dom';
 import { Button } from '../vendor/pomegranate/panel/node/Button';
 import { Switch } from '../vendor/pomegranate/panel/node/Switch';
 import { SegmentedControl } from '../vendor/pomegranate/panel/node/SegmentedControl';
-import { Card } from '../vendor/pomegranate/panel/node/Card';
-import { ListControlItem } from '../vendor/pomegranate/panel/node/ListControlItem';
 import { Checkbox } from '../vendor/pomegranate/panel/node/Checkbox';
 import { DropDownSelect } from '../vendor/pomegranate/panel/node/DropDownSelect';
 import { Dialog } from '../vendor/pomegranate/panel/node/Dialog';
@@ -591,26 +589,20 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
 }
 
 /*
-  ONE CARD, AND THE SECOND CHOICE ONLY EXISTS INSIDE THE FIRST.
+  THE CARD IS THE FORMAT; THE CHECKBOX QUALIFIES IT, AND SITS OUTSIDE.
 
-  Resolved is not a third peer of Legacy JSON and DTCG — it IS DTCG, in a
-  different document shape, and it cannot be chosen while the export is Legacy
-  JSON. A segmented control says three equal things and would let you pick the
-  impossible one; a switch with a checkbox under it says what is actually true,
-  and the checkbox is simply absent when it has nothing to qualify.
+  Resolved is not a third format — it IS DTCG, in a different document shape,
+  and it cannot be chosen while the export is Legacy JSON. So it appears only
+  once the card is on, and disappears with it.
 
-  THE CARD IS A PLAIN `Card`, NOT A `SelectableCard`, and that is the whole
-  reason this composes. A SelectableCard IS a `<button>`, so a control inside
-  it is a control inside a control — "one press fires BOTH", which the kit
-  refuses. Its `action` slot exists for exactly that case, but it is absolutely
-  positioned in the mark's corner and documented as being for a card that
-  "carries no mark of its own to collide with" — so it cannot hold a second
-  control while a switch already occupies that corner.
-
-  A plain Card carries no role and no press, so the Switch and the Checkbox
-  inside it are ordinary controls in ordinary reading order, each its own tab
-  stop, each labelled. ListControlItem is the kit's row for exactly this: a
-  title, a subtitle, and a control in `trailing`.
+  IT IS A SIBLING OF THE CARD, NOT A CHILD, and that is structural rather than
+  cosmetic. A SelectableCard IS a `<button>`: a checkbox inside one is a control
+  inside a control, "one press fires BOTH" (SelectableCard.tsx), which the kit
+  refuses. Its `action` slot exists for that case but is absolutely positioned
+  in the mark's corner and documented for a card that "carries no mark of its
+  own to collide with" — no use while a switch occupies that corner. Below the
+  card, the checkbox is an ordinary control: its own tab stop, its own label,
+  no press of the card's to escape.
 */
 (function mountOutputFormatControl() {
   const container = document.getElementById('output-format-control-mount');
@@ -618,8 +610,8 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   let setHint: (hint: string) => void = () => {};
   let setResolvedHint: (hint: string) => void = () => {};
   function View() {
-    // 'legacy' | 'themes' | 'resolved' — one value, so the two controls cannot
-    // disagree. The checkbox is derived from it rather than kept beside it.
+    // 'legacy' | 'themes' | 'resolved' — one value, so the card and the
+    // checkbox cannot disagree. Each is derived from it, not kept beside it.
     const [shape, setShape] = useState('legacy');
     const [hint, setHintState] = useState('');
     const [resolvedHint, setResolvedHintState] = useState('');
@@ -632,23 +624,23 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
     const choose = (next: string) => { setShape(next); window.PomOutputFormat.onChange?.(next); };
 
     return (
-      <Card level={GROUND}>
-        {/* the outline is painted by #output-format-control-mount .nd-card —
-            .nd-selcard's own border declaration, which .nd-card does not carry */}
-        <ListControlItem
-          title="W3C DTCG"
-          subtitle={hint}
-          trailing={
-            <Switch
-              label="W3C DTCG"
-              labelHidden
-              checked={on}
-              onChange={(v: boolean) => choose(v ? 'themes' : 'legacy')}
-            />
-          }
-        />
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-2)' }}>
+        <SelectableCard
+          label="W3C DTCG"
+          selected={on}
+          // unticking Resolved is the checkbox's job; turning the card off
+          // drops the whole format, so it returns to Legacy JSON either way
+          onSelect={() => choose(on ? 'legacy' : 'themes')}
+          mark="switch"
+          level={GROUND}
+        >
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>W3C DTCG</span>
+            {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
+          </span>
+        </SelectableCard>
         {on && (
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 var(--nd-card-pad) var(--nd-card-pad)' }}>
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Checkbox
               label="Resolved"
               checked={resolved}
@@ -661,7 +653,7 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
             )}
           </span>
         )}
-      </Card>
+      </span>
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
