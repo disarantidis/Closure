@@ -3079,6 +3079,8 @@ figma.ui.onmessage = function(msg) {
     }
     figma.ui.postMessage({
       type: 'transformed',
+      // Echoed so the UI can tell this reply's request from a later one.
+      seq: msg.seq,
       payload: { tokens: finalTokens, count: nativeResult.count, resolvedReport: resolvedReport },
       validation: {
         actual: {

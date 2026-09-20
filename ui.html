@@ -49160,7 +49160,7 @@ react/cjs/react-jsx-runtime.development.js:
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '41904b0 16:51:20';
+    var CLOSURE_BUILD = 'eb21cf8 17:02:05';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -50468,10 +50468,28 @@ react/cjs/react-jsx-runtime.development.js:
       Only the resolved shape uses it — see requestTransform.
     */
     var afterTransform = null;
+    /*
+      A TRANSFORM'S REPLY CAN OUTLIVE THE REQUEST THAT WANTED IT.
+
+      The extract and the saved settings are independent round-trips, so a
+      transform can already be in flight when the format arrives and changes
+      what was wanted. Clearing transformedData does not recall the message
+      that is already out: its reply lands afterwards and sets transformedData
+      to the tree nobody asked for any more. Measured — a run with Resolved
+      saved exported the Legacy JSON tree under the resolved file name,
+      because the legacy reply from before the settings loaded arrived after
+      the switch to resolved had already emptied the slot.
+
+      So every request carries a number and only the current one is accepted.
+      Bumping it is what makes a reply stale, which is why it is bumped even on
+      the path that posts nothing at all.
+    */
+    var transformSeq = 0;
 
     function requestTransform(andThen) {
       if (!rawData) return;
       transformedData = null;
+      transformSeq++;
       afterTransform = andThen || null;
       /*
         THE RESOLVED SHAPE IS NOT BUILT ON A TOGGLE.
@@ -50496,6 +50514,7 @@ react/cjs/react-jsx-runtime.development.js:
       parent.postMessage({
         pluginMessage: {
           type: 'transform',
+          seq: transformSeq,
           raw: rawData,
           exportMode: exportMode,
           // The resolved shape is built in the sandbox (buildResolvedDocument),
@@ -50860,6 +50879,9 @@ react/cjs/react-jsx-runtime.development.js:
       }
       
       if (msg.type === 'transformed') {
+        // A reply to a request that has since been superseded — drop it, or it
+        // overwrites the slot its own request no longer owns.
+        if (msg.seq !== undefined && msg.seq !== transformSeq) return;
         transformedData = msg.payload;
         updateActionUI();
         if (afterTransform) {
