@@ -399,12 +399,6 @@ declare global {
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomOutputFormat: { onChange: ((shape: string) => void) | null; setValue: (shape: string) => void; setHint: (hint: string) => void; setResolvedHint: (hint: string) => void };
-    PomResolvedAxes: {
-      onChange: ((cfg: { pin: Record<string, string>; axes: Record<string, string> }) => void) | null;
-      setAxes: (axes: { name: string; modes: string[] }[]) => void;
-      setValue: (cfg: { pin?: Record<string, string>; axes?: Record<string, string> }) => void;
-      setVisible: (on: boolean) => void;
-    };
     PomOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
   }
 }
@@ -668,106 +662,6 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
     setValue: (v) => set(v),
     setHint: (h) => setHint(h),
     setResolvedHint: (h) => setResolvedHint(h),
-  };
-})();
-
-/*
-  WHAT TO BRANCH OVER, AND WHAT TO HOLD STILL.
-
-  The resolved shape emits every combination of every axis a token actually
-  depends on. That is complete and, on a real system, enormous: a permission
-  layer of four modes multiplies the whole colour surface by four, and a file
-  measured here came out at 152 MB — correct, unusable. Most of that is
-  readings nobody asked for. `pin` is how you say so: hold this axis at one
-  mode and it stops being a branch.
-
-  The three role selects are the other half. Which axis is the breakpoint, the
-  scheme, the light/dark switch is SEMANTICS — there is no structural property
-  separating a light/dark router from a permission router, and guessing it is
-  what collapsed that same file's document to 13% of itself. Named, the export
-  lands as core / breakpoint / mode; unnamed, it stays in the derived shape,
-  which is longer to read and loses nothing.
-
-  Every axis here was measured from the file, not listed: a multi-mode
-  collection is an axis, and that is all an axis is.
-*/
-(function mountResolvedAxes() {
-  const container = document.getElementById('resolved-axes-mount');
-  let setAxes: (a: { name: string; modes: string[] }[]) => void = () => {};
-  let setValue: (c: { pin?: Record<string, string>; axes?: Record<string, string> }) => void = () => {};
-  let setVisible: (on: boolean) => void = () => {};
-  const ROLES = [
-    { key: 'breakpoint', label: 'Breakpoint axis' },
-    { key: 'scheme', label: 'Scheme axis' },
-    { key: 'mode', label: 'Light / dark axis' },
-  ];
-  function View() {
-    const [axes, setAxesState] = useState<{ name: string; modes: string[] }[]>([]);
-    const [pin, setPin] = useState<Record<string, string>>({});
-    const [roles, setRoles] = useState<Record<string, string>>({});
-    const [visible, setVis] = useState(false);
-    setAxes = (a) => setAxesState(a || []);
-    setValue = (c) => { setPin(c.pin || {}); setRoles(c.axes || {}); };
-    setVisible = (on) => setVis(on);
-
-    const emit = (nextPin: Record<string, string>, nextRoles: Record<string, string>) =>
-      window.PomResolvedAxes.onChange?.({ pin: nextPin, axes: nextRoles });
-
-    if (!visible) return null;
-    if (!axes.length) {
-      return <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>
-        Run an export to read this file&rsquo;s axes.
-      </span>;
-    }
-    return (
-      <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-2)' }}>
-        <span style={{ fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.4 }}>
-          Hold an axis at one mode to keep it out of the branches.
-        </span>
-        {axes.map((a) => (
-          <DropDownSelect
-            key={a.name}
-            label={a.name}
-            size="small"
-            block
-            value={pin[a.name] || ''}
-            options={[{ value: '', label: 'All ' + a.modes.length + ' — branch over it' }]
-              .concat(a.modes.map((m) => ({ value: m, label: 'Hold at ' + m })))}
-            onChange={(v: string) => {
-              const next = Object.assign({}, pin);
-              if (v) next[a.name] = v; else delete next[a.name];
-              setPin(next); emit(next, roles);
-            }}
-          />
-        ))}
-        <span style={{ fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.4 }}>
-          Name these three and the export lands as core / breakpoint / mode.
-        </span>
-        {ROLES.map((r) => (
-          <DropDownSelect
-            key={r.key}
-            label={r.label}
-            size="small"
-            block
-            value={roles[r.key] || ''}
-            options={[{ value: '', label: 'Not set' }]
-              .concat(axes.map((a) => ({ value: a.name, label: a.name })))}
-            onChange={(v: string) => {
-              const next = Object.assign({}, roles);
-              if (v) next[r.key] = v; else delete next[r.key];
-              setRoles(next); emit(pin, next);
-            }}
-          />
-        ))}
-      </span>
-    );
-  }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
-  window.PomResolvedAxes = {
-    onChange: null,
-    setAxes: (a) => setAxes(a),
-    setValue: (c) => setValue(c),
-    setVisible: (on) => setVisible(on),
   };
 })();
 

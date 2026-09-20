@@ -4334,6 +4334,8 @@ function buildResolvedDocument(rawData, options) {
 
   var derivedTotal = countResolvedTokens(res.primitives) + countResolvedTokens(res.groups);
 
+  if (!options.axes) options.axes = detectLayoutRoles(res);
+
   if (options.axes && options.axes.scheme && options.axes.mode) {
     var house = shapeHouse(res, options.axes);
     if (!house.collisions.length) {
@@ -4362,6 +4364,59 @@ function buildResolvedDocument(rawData, options) {
   }
 
   return { document: shapeDerived(res), shape: 'derived', roles: null, total: derivedTotal, emit: res };
+}
+
+/*
+  WHICH AXIS PLAYS WHICH PART, WITHOUT ASKING.
+
+  Two of the three are structural, and were right on every file measured:
+
+    breakpoint  the axis some group depends on ALONE — a set of tokens that
+                vary by one thing and nothing else is a breakpoint set
+    scheme      the first axis, in derived order, of the widest group — the
+                outermost question the colour surface asks
+
+  The third is not structural, and an earlier version proving that is why this
+  function exists. It took light/dark as the SECOND axis of the widest group,
+  which is right when a scheme routes straight into it and wrong when a
+  permission layer sits between — so on one real file it picked the permission
+  layer and collapsed the document to 13% of itself. Nothing distinguishes the
+  two structurally: both are collections of N modes a scheme passes through.
+
+  So light/dark is read from the MODES, where the semantics actually live. A
+  light/dark switch has modes called light and dark; a permission layer has
+  modes called unrestricted and to-neutral. Nothing else in a file looks like
+  the first. Ambiguity is refused rather than guessed: two candidates means no
+  answer, and no answer means the derived shape, which loses nothing.
+*/
+function detectLayoutRoles(res) {
+  var single = null;
+  var widest = null;
+  Object.keys(res.groups).forEach(function (k) {
+    var g = res.groups[k];
+    if (!g.axes.length) return;
+    if (g.axes.length === 1 && !single) single = g.axes[0];
+    if (!widest || g.axes.length > res.groups[widest].axes.length) widest = k;
+  });
+  if (!widest) return null;
+
+  var wide = res.groups[widest].axes;
+  var word = function (names, w) {
+    return names.some(function (n) {
+      return new RegExp('(^|[^a-z])' + w + '([^a-z]|$)').test(String(n).toLowerCase());
+    });
+  };
+  var candidates = res.axes.filter(function (a) {
+    var names = a.modes || [];
+    return word(names, 'light') && word(names, 'dark');
+  });
+  if (candidates.length !== 1) return null;
+
+  var mode = candidates[0].name;
+  var scheme = wide[0] === mode ? null : wide[0];
+  if (!scheme) return null;
+
+  return { breakpoint: single, scheme: scheme, mode: mode };
 }
 
 function countResolvedTokens(node) {
@@ -4732,28 +4787,9 @@ figma.ui.onmessage = function(msg) {
         };
       });
       
-      /*
-        The axes, so Settings can offer them. classify() walks the alias edges
-        once and is cheap next to the extraction that just ran; the alternative
-        is the UI asking for them separately, which would mean holding the raw
-        graph in two places. Undefined if the modules are missing rather than
-        failing the extract — the resolved shape is the only thing that reads it.
-      */
-      var resolvedAxes;
-      try {
-        if (typeof PomArchitecture !== 'undefined') {
-          resolvedAxes = PomArchitecture.classify(result).axes.map(function (a) {
-            return { name: a.name, modes: a.modes };
-          });
-        }
-      } catch (e) {
-        console.warn('[Resolved] could not read the axes: ' + e.message);
-      }
-
       figma.ui.postMessage({
         type: 'extracted',
         collections: result,
-        resolvedAxes: resolvedAxes,
         fileName: (figma.root && figma.root.name) || '',
         styles: {
           textStyles: textStyles,
@@ -4790,10 +4826,14 @@ figma.ui.onmessage = function(msg) {
         complete; it is not yet somebody's house naming. Settings is where that
         would go, and that decision is still open.
       */
-      var built = buildResolvedDocument(msg.raw, msg.resolvedConfig || {});
+      var built = buildResolvedDocument(msg.raw, {});
       finalTokens = built.document;
       console.log('[Resolved] ' + built.shape + ' shape, ' + built.total + ' tokens, ' +
         built.emit.axes.length + ' axes: ' + built.emit.axisOrder.join(' > '));
+      console.log('[Resolved] roles: ' + (built.roles
+        ? 'breakpoint=' + built.roles.breakpoint + '  scheme=' + built.roles.scheme +
+          '  light/dark=' + built.roles.mode
+        : 'none detected — emitted the derived shape'));
       if (built.layoutCollisions) {
         console.warn('[Resolved] the named layout collided on ' + built.layoutCollisions +
           ' paths (no level for: ' + built.unplacedAxes.join(', ') + ') — emitted the complete ' +

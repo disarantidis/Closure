@@ -898,14 +898,10 @@
        insetting the whole card box from the panel edge to align with
        .folder-paths-title's text above — the card's own padding positions
        its CONTENT. */
-    #output-format-control-mount,
-    #resolved-axes-mount {
+    #output-format-control-mount {
       display: block;
       margin-left: var(--spacing-component-3);
       margin-right: var(--spacing-component-3);
-    }
-    #output-format-control-mount + #resolved-axes-mount:not(:empty) {
-      margin-top: var(--spacing-component-2);
     }
 
     /* Outer spacing wrapper only, same padding as .header on the main
@@ -21639,10 +21635,6 @@ html[data-theme=dark] {
              built by buildResolvedDocument() in the sandbox where the raw
              variable graph and the formatters live. -->
         <span id="output-format-control-mount"></span>
-        <!-- Which axes to branch over and which to hold still, plus the three
-             roles the core/breakpoint/mode layout needs named. Only shown for
-             the resolved shape; the axes themselves come from the extract. -->
-        <span id="resolved-axes-mount"></span>
       </div>
 
       <!-- Always-visible heading for whichever provider's connection fields
@@ -47900,84 +47892,6 @@ html[data-theme=dark] {
       setResolvedHint: (h) => setResolvedHint(h)
     };
   })();
-  (function mountResolvedAxes() {
-    const container = document.getElementById("resolved-axes-mount");
-    let setAxes = () => {
-    };
-    let setValue = () => {
-    };
-    let setVisible = () => {
-    };
-    const ROLES = [
-      { key: "breakpoint", label: "Breakpoint axis" },
-      { key: "scheme", label: "Scheme axis" },
-      { key: "mode", label: "Light / dark axis" }
-    ];
-    function View() {
-      const [axes, setAxesState] = (0, import_react14.useState)([]);
-      const [pin, setPin] = (0, import_react14.useState)({});
-      const [roles, setRoles] = (0, import_react14.useState)({});
-      const [visible, setVis] = (0, import_react14.useState)(false);
-      setAxes = (a) => setAxesState(a || []);
-      setValue = (c) => {
-        setPin(c.pin || {});
-        setRoles(c.axes || {});
-      };
-      setVisible = (on) => setVis(on);
-      const emit = (nextPin, nextRoles) => window.PomResolvedAxes.onChange?.({ pin: nextPin, axes: nextRoles });
-      if (!visible) return null;
-      if (!axes.length) {
-        return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: "Run an export to read this file\u2019s axes." });
-      }
-      return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-2)" }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)", lineHeight: 1.4 }, children: "Hold an axis at one mode to keep it out of the branches." }),
-        axes.map((a) => /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
-          DropDownSelect,
-          {
-            label: a.name,
-            size: "small",
-            block: true,
-            value: pin[a.name] || "",
-            options: [{ value: "", label: "All " + a.modes.length + " \u2014 branch over it" }].concat(a.modes.map((m) => ({ value: m, label: "Hold at " + m }))),
-            onChange: (v) => {
-              const next = Object.assign({}, pin);
-              if (v) next[a.name] = v;
-              else delete next[a.name];
-              setPin(next);
-              emit(next, roles);
-            }
-          },
-          a.name
-        )),
-        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)", lineHeight: 1.4 }, children: "Name these three and the export lands as core / breakpoint / mode." }),
-        ROLES.map((r) => /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
-          DropDownSelect,
-          {
-            label: r.label,
-            size: "small",
-            block: true,
-            value: roles[r.key] || "",
-            options: [{ value: "", label: "Not set" }].concat(axes.map((a) => ({ value: a.name, label: a.name }))),
-            onChange: (v) => {
-              const next = Object.assign({}, roles);
-              if (v) next[r.key] = v;
-              else delete next[r.key];
-              setRoles(next);
-              emit(pin, next);
-            }
-          },
-          r.key
-        ))
-      ] });
-    }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
-    window.PomResolvedAxes = {
-      onChange: null,
-      setAxes: (a) => setAxes(a),
-      setValue: (c) => setValue(c),
-      setVisible: (on) => setVisible(on)
-    };
-  })();
   (function mountRepoTabControl() {
     const mountIds = ["repo-settings-tab-mount", "repo-settings-tab-mount-github"];
     const setters = [];
@@ -49422,13 +49336,6 @@ react/cjs/react-jsx-runtime.development.js:
     // down would be hoisted but still unassigned at that point — and worse,
     // would reset it when its own line was finally reached.
     var dtcgShape = null;
-    /*
-      The resolved shape's vocabulary: which axes are held at one mode rather
-      than branched over, and which axis plays which part in the core /
-      breakpoint / mode layout. Empty means branch over everything and emit the
-      derived shape — complete, and on a real system very large.
-    */
-    var resolvedConfig = { pin: {}, axes: {} };
     // Declared this early (not just above updateActionUI, where it's used)
     // because gitSettings.setState({}) runs near the top of this script,
     // synchronously reaching updateActionUI on its very first call — a var
@@ -49706,7 +49613,6 @@ react/cjs/react-jsx-runtime.development.js:
           // The shape by name, because there are three of them now. `dtcg`
           // above stays for configs written by — and read by — older builds.
           outputFormat: dtcgShape || 'legacy',
-          resolvedConfig: resolvedConfig,
           // One JSON file name for both providers now — no longer nested
           // per-provider below (see gitlabConfig()/githubConfig() and the
           // migration read in setState()).
@@ -49750,12 +49656,6 @@ react/cjs/react-jsx-runtime.development.js:
           dtcgShape = config.dtcg === true ? 'themes' : null;
         }
         window.PomOutputFormat.setValue(dtcgShape || 'legacy');
-        resolvedConfig = {
-          pin: (config.resolvedConfig && config.resolvedConfig.pin) || {},
-          axes: (config.resolvedConfig && config.resolvedConfig.axes) || {}
-        };
-        window.PomResolvedAxes.setValue(resolvedConfig);
-        window.PomResolvedAxes.setVisible(dtcgShape === 'resolved');
         // No filename rewrite here: a config saved with dtcg on already stored
         // the suffixed name, and defaultFilename() (read below when a provider
         // has none saved) follows dtcgShape, which is why this block runs
@@ -50529,7 +50429,6 @@ react/cjs/react-jsx-runtime.development.js:
           // because that is where the raw variable graph and the formatters
           // both are — the UI only has the transformed tree.
           resolvedShape: dtcgShape === 'resolved',
-          resolvedConfig: resolvedConfig,
           // Descriptions are only carried when a DTCG shape needs them.
           includeDescriptions: dtcgShape !== null,
           selectedCollections: selectedCollections.length > 0 ? selectedCollections : null
@@ -50561,7 +50460,6 @@ react/cjs/react-jsx-runtime.development.js:
     function setFormat(shape) {
       dtcgShape = shape;
       window.PomOutputFormat.setValue(shape || 'legacy');
-      window.PomResolvedAxes.setVisible(shape === 'resolved');
       // Rewrite the file names BEFORE persisting, so the saved config and the
       // fields on screen never disagree about where the export lands.
       applyFilenameForFormat();
@@ -50572,12 +50470,6 @@ react/cjs/react-jsx-runtime.development.js:
 
     window.PomOutputFormat.onChange = function(shape) {
       setFormat(shape === 'legacy' ? null : shape);
-    };
-
-    window.PomResolvedAxes.onChange = function(cfg) {
-      resolvedConfig = { pin: cfg.pin || {}, axes: cfg.axes || {} };
-      persistSettings();
-      requestTransform();
     };
 
     updateActionUI();
@@ -50835,9 +50727,6 @@ react/cjs/react-jsx-runtime.development.js:
 
       if (msg.type === 'extracted') {
         rawData = { collections: msg.collections, styles: msg.styles };
-        // Measured from the file by classify(), not listed anywhere.
-        window.PomResolvedAxes.setAxes(msg.resolvedAxes || []);
-        window.PomResolvedAxes.setValue(resolvedConfig);
         selectedCollections = msg.collections.map(function(col) { return col.name; });
         // Re-assert the title from the file name (kept for robustness).
         setFigmaFileName(msg.fileName);
