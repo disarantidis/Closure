@@ -2947,7 +2947,8 @@
           ? 'Off: Legacy JSON, as ' + filenameForShape(null) + '.'
           : '$value / $type, as ' + filenameForShape(dtcgShape) + '.');
       window.PomOutputFormat.setResolvedHint(
-        'One document instead of one per theme, routing resolved away.');
+        'One document instead of one per theme, routing resolved away. '
+        + 'Large, so it is built when you export rather than now.');
     }
 
     // Convert the Legacy JSON tree to DTCG and log a conversion report.
@@ -3105,8 +3106,16 @@
 
       // Pushing requires a commit message — no commit without one.
       var hasCommitMsg = !!(document.getElementById('commit-message').value.trim());
-      var blockedByCommitMsg = !showFallback && !hasCommitMsg && !!transformedData;
-      window.PomButtons.push.setDisabled(!transformedData || !hasCommitMsg || showFallback);
+      /*
+        READY TO EXPORT IS NOT THE SAME AS ALREADY TRANSFORMED, since the
+        resolved document is built on demand: its transform is deliberately not
+        run on a toggle, so transformedData is null while the export is
+        perfectly possible. Keying the buttons off transformedData alone
+        disabled the only thing that could ask for the build.
+      */
+      var exportReady = !!transformedData || (dtcgShape === 'resolved' && !!rawData);
+      var blockedByCommitMsg = !showFallback && !hasCommitMsg && exportReady;
+      window.PomButtons.push.setDisabled(!exportReady || !hasCommitMsg || showFallback);
       if (!showFallback) {
         // The button's own baseProps.label ('Push to GitLab', buttons.tsx)
         // is just an initial-render fallback — this always drives the real
@@ -3116,7 +3125,7 @@
         // the button is hidden in that state anyway.
         window.PomButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
       }
-      window.PomButtons.download.setDisabled(!transformedData);
+      window.PomButtons.download.setDisabled(!exportReady);
     }
 
     // Shows a provider's dropdown+filename row, or — if it has zero saved
@@ -3223,9 +3232,35 @@
     // Needed whenever either changes, because includeDescriptions is decided
     // over in transformToFinalFormat — the UI cannot add descriptions after
     // the fact. No-op before the first extract has landed.
-    function requestTransform() {
+    /*
+      A pending export, waiting on a build that has not been asked for yet.
+      Only the resolved shape uses it — see requestTransform.
+    */
+    var afterTransform = null;
+
+    function requestTransform(andThen) {
       if (!rawData) return;
       transformedData = null;
+      afterTransform = andThen || null;
+      /*
+        THE RESOLVED SHAPE IS NOT BUILT ON A TOGGLE.
+
+        It resolves every alias chain across every branch the file actually
+        has, which on a real system is a six-figure token count and a document
+        of tens of megabytes — seconds of sandbox time, and then that payload
+        cloned across to this iframe. The sandbox is Figma's own thread, so
+        paying it just because someone flipped a switch freezes the editor.
+
+        The other two shapes are a transform over a tree code.js has already
+        built, so they stay eager and the counts stay live. This one is built
+        when it is actually wanted: Download and Push ask for it and continue
+        when it lands.
+      */
+      if (dtcgShape === 'resolved' && !andThen) {
+        updateActionUI();
+        setActionsLoading(false);
+        return;
+      }
       updateActionUI();
       parent.postMessage({
         pluginMessage: {
@@ -3399,6 +3434,12 @@
     // currently names (see its own comment — there's no simultaneous-push
     // 'both' mode any more).
     function pushToGit() {
+      // Same as Download: build the resolved document only when it is wanted.
+      if (dtcgShape === 'resolved' && !transformedData) {
+        showToast('Building the resolved document…');
+        requestTransform(pushToGit);
+        return;
+      }
       var tokens = getTokensToExport();
       if (!tokens) return;
 
@@ -3464,6 +3505,12 @@
     }
 
     function doDownloadSingle() {
+      // The resolved document is built on demand; everything else is ready.
+      if (dtcgShape === 'resolved' && !transformedData) {
+        showToast('Building the resolved document…');
+        requestTransform(doDownloadSingle);
+        return;
+      }
       var tokens = getTokensToExport();
       if (!tokens) return;
       var json = JSON.stringify(tokens, null, 2);
@@ -3582,6 +3629,11 @@
       if (msg.type === 'transformed') {
         transformedData = msg.payload;
         updateActionUI();
+        if (afterTransform) {
+          var pending = afterTransform;
+          afterTransform = null;
+          pending();
+        }
         // Reveal only now — the button's disabled/label state is already
         // correct at this point, instead of appearing as "Push to GitLab"
         // for a moment and then flipping to "Add commit message".
