@@ -50807,16 +50807,18 @@ react/cjs/react-jsx-runtime.development.js:
 
         collectionsWrap.classList.add('visible');
         
-        parent.postMessage({
-          pluginMessage: {
-            type: 'transform',
-            raw: rawData,
-            exportMode: exportMode,
-            // Descriptions are only carried when a DTCG shape needs them.
-            includeDescriptions: dtcgShape !== null,
-            selectedCollections: selectedCollections.length > 0 ? selectedCollections : null
-          }
-        }, '*');
+        /*
+          THROUGH requestTransform, NOT A SECOND COPY OF THE MESSAGE.
+
+          This used to post its own, and drifted: requestTransform learned to
+          send `resolvedShape` and this did not, so an extract while the
+          resolved format was selected transformed to the LEGACY tree, set
+          transformedData, and the deferred build then never ran because
+          something was already there. The download carried the legacy tree
+          under the resolved file name — the two disagreeing silently, which is
+          worse than either being wrong.
+        */
+        requestTransform();
       }
       
       if (msg.type === 'transformed') {
