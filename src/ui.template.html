@@ -2987,7 +2987,36 @@
       return result.tokens;
     }
 
+    /*
+      STAMP THE DOCUMENT WITH THE BUILD THAT MADE IT.
+
+      An export arrived three times carrying the Legacy JSON tree under the
+      resolved file name, while the source on disk could not produce that and
+      the sandbox reported a current build. The missing piece each time was
+      which UI had actually run — Figma caches the iframe separately from the
+      main code, so a stale UI beside a fresh sandbox looks exactly like a bug
+      in code that is already fixed.
+
+      The file now says. A copy is stamped rather than the live tree, so
+      transformedData stays what the sandbox sent and a second export does not
+      accumulate anything.
+    */
+    function stampExport(tokens) {
+      if (!tokens || typeof tokens !== 'object') return tokens;
+      var out = {};
+      Object.keys(tokens).forEach(function(k) { out[k] = tokens[k]; });
+      var ext = {};
+      Object.keys(out['$extensions'] || {}).forEach(function(k) { ext[k] = out['$extensions'][k]; });
+      ext['com.closure'] = { build: CLOSURE_BUILD, format: dtcgShape || 'legacy' };
+      out['$extensions'] = ext;
+      return out;
+    }
+
     function getTokensToExport() {
+      return stampExport(getTokensToExportRaw());
+    }
+
+    function getTokensToExportRaw() {
       if (!transformedData) return null;
       var tokens = transformedData.tokens;
       // In Legacy JSON mode the output keys are set names (e.g. 'core', 'mode/light'),
