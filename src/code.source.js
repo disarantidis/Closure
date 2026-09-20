@@ -2478,6 +2478,59 @@ function buildResolvedDocument(rawData, options) {
         total: countResolvedTokens(house.document), emit: res
       };
     }
+
+    /*
+      THE LAYOUT HAS THREE LEVELS; A FILE MAY HAVE SEVEN AXES.
+
+      When it cannot hold them all, the axes it has no level for are already
+      known — they are the ones that collided. Rather than give up on the
+      layout, hold each of those at its collection's DEFAULT mode: the reading
+      Figma itself falls back to, and on every file measured the neutral one —
+      unrestricted rather than to-neutral, normal rather than subtle,
+      not-a-card rather than a card.
+
+      That is lossy, deliberately and visibly: the other readings of those axes
+      are gone, and `autoPinned` in the report says which and at what. The
+      alternative measured on a real file was a complete document of 152 MB,
+      which is not an export anybody can use. Losing something you can name
+      beats shipping something nobody can open.
+    */
+    var unplaced = res.axes.map(function (a) { return a.name; }).filter(function (n) {
+      return n !== options.axes.breakpoint && n !== options.axes.scheme && n !== options.axes.mode;
+    });
+    if (unplaced.length) {
+      var autoPin = {};
+      Object.keys(options.pin || {}).forEach(function (k) { autoPin[k] = options.pin[k]; });
+      unplaced.forEach(function (name) {
+        var mode = defaultModeNameOf(rawData.collections, name);
+        if (mode !== null) autoPin[name] = mode;
+      });
+
+      var res2 = E.emit(rawData.collections, {
+        hooks: {
+          formatValue: formatValue,
+          formatFloatForExport: formatFloatForExport,
+          addTypographyComposite: addTypographyComposite,
+          addElevationCompositesDeep: addElevationCompositesDeep,
+          ensureCoreLineHeightsLetterSpacing: ensureCoreLineHeightsLetterSpacing,
+          toDtcgFormat: D.toDtcgFormat
+        },
+        pin: autoPin,
+        renameMode: options.renameMode,
+        renameToken: options.renameToken,
+        typeHints: options.typeHints
+      });
+      var roles2 = detectLayoutRoles(res2);
+      if (roles2) {
+        var house2 = shapeHouse(res2, roles2);
+        if (!house2.collisions.length) {
+          return {
+            document: house2.document, shape: 'house', roles: roles2,
+            autoPinned: autoPin, total: countResolvedTokens(house2.document), emit: res2
+          };
+        }
+      }
+    }
     /*
       A layout maps branches onto fixed levels, so it can only carry the axes
       it has somewhere to put. A collision means two branches claimed one path
@@ -2551,6 +2604,25 @@ function detectLayoutRoles(res) {
   if (!scheme) return null;
 
   return { breakpoint: single, scheme: scheme, mode: mode };
+}
+
+/*
+  A collection's default mode, by name — the one Figma answers with when
+  nothing has chosen. Measured on two real systems it is always the first mode
+  and always the neutral reading, but the file states it, so read it rather
+  than assume the ordering.
+*/
+function defaultModeNameOf(collections, name) {
+  for (var i = 0; i < collections.length; i++) {
+    var c = collections[i];
+    if (c.name !== name) continue;
+    var modes = c.modes || [];
+    for (var j = 0; j < modes.length; j++) {
+      if (modes[j].modeId === c.defaultModeId) return modes[j].name;
+    }
+    return modes.length ? modes[0].name : null;
+  }
+  return null;
 }
 
 function countResolvedTokens(node) {
@@ -2984,8 +3056,15 @@ figma.ui.onmessage = function(msg) {
         roles: built.roles || null,
         axes: built.emit.axisOrder,
         collisions: built.layoutCollisions || 0,
-        unplacedAxes: built.unplacedAxes || []
+        unplacedAxes: built.unplacedAxes || [],
+        autoPinned: built.autoPinned || null
       };
+      if (built.autoPinned) {
+        console.warn('[Resolved] held at their default mode so the layout fits: ' +
+          Object.keys(built.autoPinned).map(function (k) {
+            return k + '=' + built.autoPinned[k];
+          }).join(', ') + ' — their other readings are not in this export');
+      }
     } else if (exportMode === 'legacy') {
       finalTokens = toTokenFormat(nativeResult.tokens, msg.raw);
     } else {
