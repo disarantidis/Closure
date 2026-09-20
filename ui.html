@@ -49158,6 +49158,11 @@ react/cjs/react-jsx-runtime.development.js:
     // The file name field stays the single source of truth: toggling the Output
     // format switch rewrites it in place rather than keeping a second hidden
     // name per provider, so what Settings shows is always what gets pushed.
+    // Stamped by scripts/build-ui.js. Logged on load so the build actually
+    // running in Figma can be read off the console — see that file's note.
+    var CLOSURE_BUILD = '810322b 16:29:21';
+    console.log('[Closure] ui build ' + CLOSURE_BUILD);
+
     var DEFAULT_FILENAME = 'tokens.json';
     var DTCG_SUFFIX = '_dtcg';
     // The resolved shape is DTCG too, but a different DOCUMENT — one resolved
