@@ -898,18 +898,10 @@
        insetting the whole card box from the panel edge to align with
        .folder-paths-title's text above — the card's own padding positions
        its CONTENT. */
-    #dtcg-format-control-mount,
-    #resolved-format-control-mount {
+    #output-format-control-mount {
       display: block;
       margin-left: var(--spacing-component-3);
       margin-right: var(--spacing-component-3);
-    }
-    /* The two format cards are one control split in two, so they sit as a
-       stack with a single gap rather than the section spacing that separates
-       unrelated blocks. Only between them — the section's own bottom margin
-       still ends the group. */
-    #dtcg-format-control-mount + #resolved-format-control-mount {
-      margin-top: var(--spacing-component-2);
     }
 
     /* Outer spacing wrapper only, same padding as .header on the main
@@ -21391,7 +21383,7 @@ html[data-theme=dark] {
     <!-- Format toggle hidden: export is locked to Legacy JSON by default.
          Kept in the DOM (display:none) so the existing exportMode logic still
          works. The Legacy JSON ↔ DTCG choice lives in Settings instead
-         (see #dtcg-format-control-mount). -->
+         (see #output-format-control-mount). -->
     <div id="export-mode-control-mount" style="display:none;"></div>
 
     <!-- Wraps the three stacked containers a Figma file's tokens pass
@@ -21636,12 +21628,12 @@ html[data-theme=dark] {
            so the two never overwrite each other. -->
       <div class="output-format">
         <p class="folder-paths-title">Output format</p>
-        <span id="dtcg-format-control-mount"></span>
-        <!-- The third format: the routing resolved away, each token under the
-             choices it actually varies with. Built by buildResolvedDocument()
-             in the sandbox, which is where the raw variable graph and the
-             formatters both live. Mutually exclusive with DTCG above. -->
-        <span id="resolved-format-control-mount"></span>
+        <!-- One SegmentedControl, three formats (buttons.tsx). Legacy JSON,
+             W3C DTCG, and Resolved — the last built by buildResolvedDocument()
+             in the sandbox, where the raw variable graph and the formatters
+             both live. A radio group, so only one can be chosen at a time
+             because only one IS. -->
+        <span id="output-format-control-mount"></span>
       </div>
 
       <!-- Always-visible heading for whichever provider's connection fields
@@ -47778,79 +47770,41 @@ html[data-theme=dark] {
     if (s.github) return "github";
     return "gitlab";
   }
-  (function mountDtcgFormatCard() {
-    const container = document.getElementById("dtcg-format-control-mount");
+  (function mountOutputFormatControl() {
+    const container = document.getElementById("output-format-control-mount");
     let set = () => {
     };
-    let setLabels = () => {
+    let setHint = () => {
     };
     function View() {
-      const [on, setOn] = (0, import_react13.useState)(false);
-      const [name, setName] = (0, import_react13.useState)("W3C DTCG");
-      const [hint, setHint] = (0, import_react13.useState)("");
-      set = setOn;
-      setLabels = (n, h) => {
-        setName(n);
-        setHint(h);
-      };
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
-        SelectableCard,
-        {
-          label: "W3C DTCG",
-          selected: on,
-          onSelect: () => {
-            const next = !on;
-            setOn(next);
-            window.PomDtcgFormat.onChange?.(next);
-          },
-          mark: "switch",
-          level: GROUND,
-          children: /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 2 }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: { fontWeight: 600, color: "var(--app-text)" }, children: name }),
-            hint && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: hint })
-          ] })
-        }
-      );
+      const [value, setValue] = (0, import_react13.useState)("legacy");
+      const [hint, setHintState] = (0, import_react13.useState)("");
+      set = setValue;
+      setHint = (h) => setHintState(h);
+      return /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 8 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
+          SegmentedControl,
+          {
+            label: "Output format",
+            size: "medium",
+            block: true,
+            value,
+            options: [
+              { value: "legacy", label: "Legacy JSON" },
+              { value: "themes", label: "W3C DTCG" },
+              { value: "resolved", label: "Resolved" }
+            ],
+            onChange: (v) => {
+              setValue(v);
+              window.PomOutputFormat.onChange?.(v);
+            }
+          }
+        ),
+        hint && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)", lineHeight: 1.4 }, children: hint })
+      ] });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
-    window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v), setLabels: (n, h) => setLabels(n, h) };
-  })();
-  (function mountResolvedFormatCard() {
-    const container = document.getElementById("resolved-format-control-mount");
-    let set = () => {
-    };
-    let setLabels = () => {
-    };
-    function View() {
-      const [on, setOn] = (0, import_react13.useState)(false);
-      const [name, setName] = (0, import_react13.useState)("Resolved");
-      const [hint, setHint] = (0, import_react13.useState)("");
-      set = setOn;
-      setLabels = (n, h) => {
-        setName(n);
-        setHint(h);
-      };
-      return /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
-        SelectableCard,
-        {
-          label: "Resolved",
-          selected: on,
-          onSelect: () => {
-            const next = !on;
-            setOn(next);
-            window.PomResolvedFormat.onChange?.(next);
-          },
-          mark: "switch",
-          level: GROUND,
-          children: /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 2 }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: { fontWeight: 600, color: "var(--app-text)" }, children: name }),
-            hint && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: hint })
-          ] })
-        }
-      );
-    }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(View, {}) })));
-    window.PomResolvedFormat = { onChange: null, setValue: (v) => set(v), setLabels: (n, h) => setLabels(n, h) };
+    window.PomOutputFormat = { onChange: null, setValue: (v) => set(v), setHint: (h) => setHint(h) };
   })();
   (function mountRepoTabControl() {
     const mountIds = ["repo-settings-tab-mount", "repo-settings-tab-mount-github"];
@@ -49615,8 +49569,7 @@ react/cjs/react-jsx-runtime.development.js:
         } else {
           dtcgShape = config.dtcg === true ? 'themes' : null;
         }
-        window.PomDtcgFormat.setValue(dtcgShape === 'themes');
-        window.PomResolvedFormat.setValue(dtcgShape === 'resolved');
+        window.PomOutputFormat.setValue(dtcgShape || 'legacy');
         // No filename rewrite here: a config saved with dtcg on already stored
         // the suffixed name, and defaultFilename() (read below when a provider
         // has none saved) follows dtcgShape, which is why this block runs
@@ -50091,22 +50044,18 @@ react/cjs/react-jsx-runtime.development.js:
       // Names the file it will actually be written to, so the _dtcg swap is
       // visible here and not only in the file name field further down.
       /*
-        Each card names its OWN format and the file that format would write —
-        not the active one. With a single card the label could track the current
-        state; with two it cannot, or both read the same and neither says what
-        turning it on would do. Switches off on both is Legacy JSON, which the
-        DTCG card's hint says rather than costing a third card for a state that
-        has no options of its own.
+        The control names the three formats; this says what the chosen one
+        does and which file it writes. One line about one choice — the
+        ambiguity two cards had, over whether a label described itself or the
+        current state, cannot arise.
       */
-      window.PomDtcgFormat.setLabels(
-        'W3C DTCG',
-        '$value / $type, one resolved document per theme, as ' +
-          filenameForShape('themes') + '. Off on both leaves Legacy JSON (' +
-          filenameForShape(null) + ').');
-      window.PomResolvedFormat.setLabels(
-        'Resolved',
-        'One document, the routing resolved away and each token under the ' +
-          'choices it varies with, as ' + filenameForShape('resolved') + '.');
+      var hint = dtcgShape === 'resolved'
+        ? 'One document, the routing resolved away and each token under the choices it varies with, as '
+          + filenameForShape('resolved') + '.'
+        : dtcgShape === 'themes'
+        ? '$value / $type, one resolved document per theme, as ' + filenameForShape('themes') + '.'
+        : 'The format this plugin has always exported, as ' + filenameForShape(null) + '.';
+      window.PomOutputFormat.setHint(hint);
     }
 
     // Convert the Legacy JSON tree to DTCG and log a conversion report.
@@ -50417,14 +50366,15 @@ react/cjs/react-jsx-runtime.development.js:
     // toDtcg() below: this is the shape that is genuinely standalone W3C
     // DTCG, not the one that still needs an external finishing step.
     /*
-      Two switches, one choice. Turning either on turns the other off, so the
-      pair reads as three formats — DTCG, Resolved, or neither, which is Legacy
-      JSON. setFormat does the whole job; both handlers just name their shape.
+      One place a format change happens, whoever asked for it — the control,
+      a loaded config, or a later caller. dtcgShape is null for Legacy JSON
+      and the shape name otherwise; the control speaks 'legacy' instead,
+      because a radio group needs a value for every option including the
+      default one.
     */
     function setFormat(shape) {
       dtcgShape = shape;
-      window.PomDtcgFormat.setValue(shape === 'themes');
-      window.PomResolvedFormat.setValue(shape === 'resolved');
+      window.PomOutputFormat.setValue(shape || 'legacy');
       // Rewrite the file names BEFORE persisting, so the saved config and the
       // fields on screen never disagree about where the export lands.
       applyFilenameForFormat();
@@ -50433,12 +50383,8 @@ react/cjs/react-jsx-runtime.development.js:
       requestTransform();
     }
 
-    window.PomResolvedFormat.onChange = function(on) {
-      setFormat(on ? 'resolved' : null);
-    };
-
-    window.PomDtcgFormat.onChange = function(on) {
-      setFormat(on ? 'themes' : null);
+    window.PomOutputFormat.onChange = function(shape) {
+      setFormat(shape === 'legacy' ? null : shape);
     };
 
     updateActionUI();

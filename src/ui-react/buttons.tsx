@@ -397,8 +397,7 @@ declare global {
     PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
-    PomDtcgFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void; setLabels: (name: string, hint: string) => void };
-    PomResolvedFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void; setLabels: (name: string, hint: string) => void };
+    PomOutputFormat: { onChange: ((shape: string) => void) | null; setValue: (shape: string) => void; setHint: (hint: string) => void };
     PomOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
   }
 }
@@ -588,80 +587,53 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   return 'gitlab';
 }
 
-/* ── Settings → Output format card (Legacy JSON / DTCG) ──────────────────────
-   SelectableCard mark="switch" — the same "card is a choice" component
-   ProviderChoiceCard above uses, matching the onboarding step's visual
-   weight per explicit direction. NOTE, decided in conversation rather than
-   discovered as a bug: mark="switch" only draws SwitchMark's picture —
-   SelectableCard's own role is ALWAYS derived from `group` alone
-   (`role={group ? 'radio' : 'checkbox'}`, see the component's own source),
-   never from `mark`. So this card is role="checkbox"/aria-checked, not a
-   real role="switch", even though it visually reads as one — a real Switch
-   nested inside would double-fire on press (the component's own header
-   comment: "a card is a <button>... one press fires BOTH"), which is why
-   SelectableCard refuses to host one. Chosen anyway over ListControlItem's
-   real Switch for the card-styled, whole-surface-pressable look. */
-(function mountDtcgFormatCard() {
-  const container = document.getElementById('dtcg-format-control-mount');
-  let set: (on: boolean) => void = () => {};
-  let setLabels: (name: string, hint: string) => void = () => {};
-  function View() {
-    const [on, setOn] = useState(false);
-    // Each card names its own format; the template refreshes both on load and
-    // on every change (updateOutputFormatHint). This is only the first paint.
-    const [name, setName] = useState('W3C DTCG');
-    const [hint, setHint] = useState('');
-    set = setOn;
-    setLabels = (n, h) => { setName(n); setHint(h); };
-    return (
-      <SelectableCard
-        label="W3C DTCG"
-        selected={on}
-        onSelect={() => { const next = !on; setOn(next); window.PomDtcgFormat.onChange?.(next); }}
-        mark="switch"
-        level={GROUND}
-      >
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>{name}</span>
-          {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
-        </span>
-      </SelectableCard>
-    );
-  }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
-  window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v), setLabels: (n, h) => setLabels(n, h) };
-})();
+/*
+  OUTPUT FORMAT IS ONE CHOICE, SO IT IS ONE CONTROL.
 
-/* The second output format. Same card, same switch: the template keeps the two
-   mutually exclusive, so together they read as a three-way choice (neither on
-   means Legacy JSON) without introducing a control the kit does not have. */
-(function mountResolvedFormatCard() {
-  const container = document.getElementById('resolved-format-control-mount');
-  let set: (on: boolean) => void = () => {};
-  let setLabels: (name: string, hint: string) => void = () => {};
+  It was a SelectableCard switch while there were two formats, and briefly two
+  such switches once there were three — which made exclusivity something the
+  template had to maintain by hand, and made each card's label ambiguous about
+  whether it described itself or the current state. Neither is a problem a
+  radio group has: the platform gives exclusivity, arrow-key navigation and one
+  tab stop, and only one option can read as chosen because only one is.
+
+  block, because this dial governs everything the Output format section is
+  about — the same argument the repo-provider one makes above.
+
+  The hint below it is the caller's, not the control's: a segmented control
+  names its options and says nothing about what choosing one does, and the file
+  name each format writes is worth stating before the download rather than
+  after.
+*/
+(function mountOutputFormatControl() {
+  const container = document.getElementById('output-format-control-mount');
+  let set: (shape: string) => void = () => {};
+  let setHint: (hint: string) => void = () => {};
   function View() {
-    const [on, setOn] = useState(false);
-    const [name, setName] = useState('Resolved');
-    const [hint, setHint] = useState('');
-    set = setOn;
-    setLabels = (n, h) => { setName(n); setHint(h); };
+    const [value, setValue] = useState('legacy');
+    const [hint, setHintState] = useState('');
+    set = setValue;
+    setHint = (h) => setHintState(h);
     return (
-      <SelectableCard
-        label="Resolved"
-        selected={on}
-        onSelect={() => { const next = !on; setOn(next); window.PomResolvedFormat.onChange?.(next); }}
-        mark="switch"
-        level={GROUND}
-      >
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>{name}</span>
-          {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
-        </span>
-      </SelectableCard>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <SegmentedControl
+          label="Output format"
+          size="medium"
+          block
+          value={value}
+          options={[
+            { value: 'legacy', label: 'Legacy JSON' },
+            { value: 'themes', label: 'W3C DTCG' },
+            { value: 'resolved', label: 'Resolved' },
+          ]}
+          onChange={(v: string) => { setValue(v); window.PomOutputFormat.onChange?.(v); }}
+        />
+        {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.4 }}>{hint}</span>}
+      </span>
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
-  window.PomResolvedFormat = { onChange: null, setValue: (v) => set(v), setLabels: (n, h) => setLabels(n, h) };
+  window.PomOutputFormat = { onChange: null, setValue: (v) => set(v), setHint: (h) => setHint(h) };
 })();
 
 /* ── GitHub / GitLab repo-settings tab switcher ────────────────────────────── */
