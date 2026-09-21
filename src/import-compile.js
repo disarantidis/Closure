@@ -188,7 +188,7 @@ function compile(ir, plan, opts) {
       if (v.ref !== undefined) continue;
       if (v.expr !== undefined) {
         if (!opts.evaluateExpressions) { stats.skippedExpression++; continue; }
-        const out = evaluate(v.expr, plan);
+        const out = evaluate(v.expr, plan, mode);
         if (out === null) { stats.skippedExpression++; continue; }
         push({ op: 'setValue', collection: spec.col, name, mode, value: out,
                note: 'evaluated from ' + v.expr + ' — reference lost' });
@@ -238,7 +238,7 @@ function compile(ir, plan, opts) {
 /* Substitute every {ref} with its first literal and evaluate the arithmetic.
    Deliberately narrow: digits and operators only, so nothing in a token file
    can turn into executable code. */
-function evaluate(expr, plan) {
+function evaluate(expr, plan, mode) {
   const { vars } = plan._internals;
   /*
     Through coerce(), not a typeof check — the exporter writes numbers as
@@ -253,32 +253,48 @@ function evaluate(expr, plan) {
     than either a complete one or none at all. Depth-guarded, and it returns
     null on a cycle rather than looping.
   */
-  const firstLiteral = (path, seen) => {
+  /*
+    RESOLVED IN THE MODE BEING WRITTEN, not in whichever mode happens to come
+    first. "( {typography.display.size} / 100 ) * {line-heights.100}" is a
+    per-breakpoint calculation: `size` holds a different number in every mode,
+    so taking values.values()[0] gave every breakpoint the mobile answer.
+
+    The closure check found this — 24 values came back materially wrong while
+    every count and every name still lined up, which is precisely the kind of
+    defect no amount of "did it import?" will show.
+
+    Mode is matched BY NAME, because a referenced variable may live in another
+    collection whose modes are its own. Where the target has no mode of that
+    name the first value is the only available answer, which is correct for the
+    single-mode collections that most primitives live in.
+  */
+  const litAt = (path, mode, seen) => {
     seen = seen || new Set();
-    if (seen.has(path) || seen.size > 16) return null;
-    seen.add(path);
+    const memo = path + '\u0000' + mode;
+    if (seen.has(memo) || seen.size > 32) return null;
+    seen.add(memo);
     for (const s of vars.values()) {
       if (s.path !== path) continue;
-      for (const v of s.values.values()) {
-        if (v.literal !== undefined) {
-          const c = coerce('FLOAT', v.literal);
-          if (c.ok) return c.value;
-        } else if (v.ref !== undefined) {
-          const n = firstLiteral(v.ref, seen);
-          if (n !== null) return n;
-        } else if (v.expr !== undefined) {
-          const n = evalWith(v.expr, seen);
-          if (n !== null) return n;
-        }
+      const v = s.values.has(mode) ? s.values.get(mode) : s.values.values().next().value;
+      if (!v) continue;
+      if (v.literal !== undefined) {
+        const c = coerce('FLOAT', v.literal);
+        if (c.ok) return c.value;
+      } else if (v.ref !== undefined) {
+        const n = litAt(v.ref, mode, seen);
+        if (n !== null) return n;
+      } else if (v.expr !== undefined) {
+        const n = evalWith(v.expr, mode, seen);
+        if (n !== null) return n;
       }
     }
     return null;
   };
 
-  function evalWith(e, seen) {
+  function evalWith(e, mode, seen) {
     let good = true;
     const sub = e.replace(/\{([^}]+)\}/g, (_, p) => {
-      const n = firstLiteral(p, seen);
+      const n = litAt(p, mode, seen);
       if (n === null) { good = false; return 'NaN'; }
       return String(n);
     });
@@ -288,7 +304,7 @@ function evaluate(expr, plan) {
       return typeof out === 'number' && isFinite(out) ? out : null;
     } catch (err) { return null; }
   }
-  return evalWith(expr, new Set());
+  return evalWith(expr, mode, new Set());
 }
 
 /*

@@ -10,6 +10,7 @@ const { toIR, detect } = require('../src/import-ir.js');
 const { derive } = require('../src/import-derive.js');
 const { compile, toColor, evaluate } = require('../src/import-compile.js');
 const { buildManifest, bindManifest } = require('../src/import-manifest.js');
+const { materialise, fromRawGraph, compare, fingerprint } = require('../src/import-verify.js');
 
 let pass = 0, fail = 0;
 function ok(name, cond, detail) {
@@ -326,6 +327,84 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
   const c = compile(ir, derive(ir, {}), {});
   ok('GATE: refuses a variable whose modes disagree about the unit',
      c.ok === false && c.refusals.some((r) => r.kind === 'unit'), JSON.stringify(c.refusals));
+}
+
+
+/* ── STRUCTURAL CLOSURE against real data ────────────────────────────────────
+   Closure already checks that every {ref} in an export has a target inside it.
+   This is that idea one level up: does Figma -> export -> import put back what
+   it took out?
+
+   The two fixtures are a real slice of a real 7,984-variable system — the
+   variable graph exactly as Figma gave it, and the Legacy JSON this exporter
+   produced from it. No Figma is needed to check them: a compiled program
+   already describes exhaustively what Figma WOULD hold, so materialise()
+   interprets it and the two are compared as data.
+
+   This is the test that catches what counting cannot. On the full system it
+   found 24 values that came back materially wrong — every name, every count
+   and every collection still lined up perfectly, because the expression
+   evaluator was resolving references in the wrong MODE and handing every
+   breakpoint the mobile answer. */
+{
+  const rawGraph = require('./__fixtures__/roundtrip-figma.json');
+  const exported = require('./__fixtures__/roundtrip-export.json');
+
+  const source = fromRawGraph(rawGraph);
+  const ir = toIR(exported);
+  const plan = derive(ir, {});
+  ok('closure: the export carries its own structure', plan.usedManifest === true);
+  ok('closure: and the real Figma names come back',
+     ['.core', '.white', '.black'].every((n) => plan.collections.some((c) => c.name === n)),
+     plan.collections.map((c) => c.name).join(','));
+
+  const c = compile(ir, plan, { evaluateExpressions: true });
+  ok('closure: the plan compiles', c.ok === true, JSON.stringify((c.refusals || []).slice(0, 2)));
+
+  const r = compare(source, materialise(c.program), { tolerance: 1e-3 });
+  ok('CLOSURE: nothing the source had was lost',
+     r.missing.length === 0, 'missing: ' + r.missing.slice(0, 4).join('  '));
+  ok('CLOSURE: nothing came back holding a different value',
+     r.changed.length === 0,
+     r.changed.slice(0, 4).map((x) => x.key + ' ' + x.source + ' -> ' + x.imported).join('  '));
+  ok('CLOSURE: the round trip closes', r.closed === true);
+  ok('closure: and it actually compared something', r.matched > 20, 'matched ' + r.matched);
+  /* Extras are the exporter inventing primitives that were never variables —
+     textCase/none and friends. Expected, and reported rather than ignored. */
+  ok('closure: extras are the exporter\'s own invented primitives',
+     r.extra.length > 0 && r.extra.every((k) => /letterSpacing|textCase|textDecoration|lineHeights|paragraph|foundation/.test(k)),
+     r.extra.slice(0, 4).join('  '));
+}
+{
+  /* The comparison has to be able to FAIL, or it proves nothing. */
+  const a = materialise({ ops: [
+    { op: 'createCollection', collection: 'c', firstMode: 'm' },
+    { op: 'createVariable', collection: 'c', name: 'x', type: 'FLOAT' },
+    { op: 'setValue', collection: 'c', name: 'x', mode: 'm', value: 1 } ] });
+  const b = materialise({ ops: [
+    { op: 'createCollection', collection: 'c', firstMode: 'm' },
+    { op: 'createVariable', collection: 'c', name: 'x', type: 'FLOAT' },
+    { op: 'setValue', collection: 'c', name: 'x', mode: 'm', value: 2 } ] });
+  const empty = materialise({ ops: [] });
+  ok('compare: a changed value fails closure', compare(a, b).closed === false);
+  ok('compare: a missing value fails closure',
+     (() => { const r = compare(a, empty); return r.closed === false && r.missing.length === 1; })());
+  ok('compare: an extra value does NOT fail closure',
+     (() => { const r = compare(empty, a); return r.closed === true && r.extra.length === 1; })());
+  ok('compare: tolerance moves a near-miss out of changed and into rounded',
+     (() => {
+       const x = materialise({ ops: [
+         { op: 'createCollection', collection: 'c', firstMode: 'm' },
+         { op: 'createVariable', collection: 'c', name: 'x', type: 'FLOAT' },
+         /* Between the 6dp the fingerprint itself rounds to and the 1e-3
+            tolerance — a smaller gap would be erased before compare() saw it. */
+         { op: 'setValue', collection: 'c', name: 'x', mode: 'm', value: 1.0004 } ] });
+       const strict = compare(a, x);
+       const loose = compare(a, x, { tolerance: 1e-3 });
+       return strict.changed.length === 1 && loose.changed.length === 0 && loose.rounded.length === 1;
+     })());
+  ok('fingerprint: differs when the content does', fingerprint(a) !== fingerprint(b));
+  ok('fingerprint: is stable for the same content', fingerprint(a) === fingerprint(a));
 }
 
 console.log('');
