@@ -474,6 +474,65 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
   ok('fingerprint: is stable for the same content', fingerprint(a) === fingerprint(a));
 }
 
+/* ── DTCG writes two SCALARS as objects ──────────────────────────────────── */
+{
+  /* Found by importing a real 8,312-token DTCG document: it landed 723
+     variables and not one COLOR. Colour and dimension are objects in that
+     spec, the importer read every object as a composite, and because the
+     primitives are what everything references, dropping them took the whole
+     graph down with them — a 6,480-variable collection vanished entirely. */
+  ok('dtcg colour: components in sRGB', (() => {
+    const c = toColor({ colorSpace: 'srgb', components: [1, 0, 0.5], alpha: 1 });
+    return c && c.r === 1 && c.g === 0 && c.b === 0.5 && c.a === 1;
+  })());
+  ok('dtcg colour: alpha is carried', (() => {
+    const c = toColor({ colorSpace: 'srgb', components: [0, 0, 0], alpha: 0.4 });
+    return c && Math.abs(c.a - 0.4) < 1e-9;
+  })());
+  ok('dtcg colour: hex is the fallback, and the separate alpha still applies', (() => {
+    const c = toColor({ colorSpace: 'display-p3', components: [1, 0, 0], alpha: 0.5, hex: '#ff0000' });
+    return c && c.r === 1 && Math.abs(c.a - 0.5) < 1e-9;
+  })());
+  ok('dtcg colour: an 8-digit hex keeps its own alpha', (() => {
+    const c = toColor({ colorSpace: 'display-p3', components: [0, 0, 0], alpha: 1, hex: '#0000001f' });
+    return c && Math.abs(c.a - 31 / 255) < 1e-9;
+  })());
+  ok('dtcg colour: a space we cannot read, with no hex, is refused not invented',
+     toColor({ colorSpace: 'display-p3', components: [1, 0, 0], alpha: 1 }) === null);
+
+  const { coerce } = require('../src/import-compile.js');
+  ok('dtcg dimension: { value, unit } is a number with its unit noted', (() => {
+    const c = coerce('FLOAT', { value: 16, unit: 'px' });
+    return c.ok && c.value === 16 && c.unit === 'px';
+  })());
+  ok('dtcg dimension: a non-numeric value is refused',
+     coerce('FLOAT', { value: 'wide', unit: 'px' }).ok === false);
+}
+{
+  /* End to end, in the shape a real DTCG export arrives in. */
+  const doc = {
+    core: { $type: 'color', red: { $value: { colorSpace: 'srgb', components: [1, 0, 0], alpha: 1 } } },
+    size: { base: { $value: { value: 4, unit: 'px' }, $type: 'dimension' } },
+    mode: { bg: { $value: '{core.red}', $type: 'color' },
+            pad: { $value: '{size.base}', $type: 'dimension' } },
+  };
+  const ir = toIR(doc);
+  ok('dtcg end to end: detected as dtcg', ir.source === 'dtcg');
+  const plan = derive(ir, {});
+  const c = compile(ir, plan, {});
+  ok('dtcg end to end: nothing is mistaken for a composite',
+     plan.losses.composites.length === 0, JSON.stringify(plan.losses.composites));
+  ok('dtcg end to end: no variable is dropped as valueless',
+     c.stats.skippedEmpty === 0 && c.stats.variables === 4, JSON.stringify(c.stats));
+  /* 'core/red', not 'red' — in DTCG the top-level key is part of the path,
+     which is what makes {core.red} resolve. */
+  const colour = c.program.ops.find((o) => o.op === 'setValue' && o.name === 'core/red');
+  ok('dtcg end to end: the colour lands as 0..1 rgba',
+     colour && colour.value.r === 1 && colour.value.g === 0, JSON.stringify(colour));
+  ok('dtcg end to end: the references survive',
+     c.stats.aliases === 2, JSON.stringify(c.stats));
+}
+
 /* ── no variable is created that will never hold anything ────────────────── */
 {
   /* Found by asking what apply() would WRITE rather than what compile()

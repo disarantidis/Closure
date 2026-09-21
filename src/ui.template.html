@@ -1198,6 +1198,14 @@
       font-variant-numeric: tabular-nums;
     }
     .import-fact.is-quiet { opacity: 0.65; }
+    /* The one fact that is allowed to shout. See renderImportSummary. */
+    .import-fact.is-warn, .import-fact.is-warn b { color: #d9a441; }
+    .import-warn-note {
+      margin: 2px 0 0 70px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #d9a441;
+    }
     .import-detail {
       margin: 2px 0 0 70px;
       font-size: 11px;
@@ -2997,8 +3005,28 @@
         html += fact(compiled.stats.variables, 'variables to import');
         if (compiled.stats.aliases) html += fact(compiled.stats.aliases, 'of their values are references', true);
         if (compiled.stats.skippedEmpty) {
-          html += fact(compiled.stats.skippedEmpty,
-            'named here but given no value this file can resolve — skipped', true);
+          /*
+            LOUD WHEN IT IS MOST OF THE FILE.
+
+            A handful of unresolvable tokens is ordinary and belongs in grey
+            with the other asides. Losing MORE than lands is not an aside, it
+            is the import having failed while still reporting a number — which
+            is exactly what happened: a real DTCG document read 8,312 tokens,
+            imported 723, and said so in the same quiet grey as everything
+            else. Whatever the cause, when most of a file cannot be resolved
+            the honest thing is to say it is probably not meant to be read
+            this way.
+          */
+          var lost = compiled.stats.skippedEmpty;
+          var loud = lost > compiled.stats.variables;
+          html += '<div class="import-fact' + (loud ? ' is-warn' : ' is-quiet') + '"><b>' +
+                  lost.toLocaleString() + '</b><span>' +
+                  'named here but given no value this file can resolve — skipped</span></div>';
+          if (loud) {
+            html += '<div class="import-warn-note">More is being skipped than imported. ' +
+                    'That usually means this file is not being read the way it was written — ' +
+                    'check the format above is the one you expected.</div>';
+          }
         }
       } else {
         html += fact(plan.totals.variables, 'variables the file describes');

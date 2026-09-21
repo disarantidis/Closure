@@ -73,6 +73,15 @@ function figmaType(t) {
 }
 const isComposite = (t) => COMPOSITE_TYPES.indexOf(t) !== -1;
 
+/* W3C DTCG writes two SCALAR types as objects — colour as
+   { colorSpace, components, alpha, hex } and dimension as { value, unit } —
+   so "the value is an object" does not mean "the value is a composite". */
+function isDtcgScalar(type, value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (type === 'color') return value.components !== undefined || value.hex !== undefined;
+  return value.value !== undefined && value.unit !== undefined;
+}
+
 const SEP = '␟';
 const vkey = (col, path) => col + SEP + path;
 
@@ -283,7 +292,12 @@ function derive(ir, opts) {
         } else { aliases++; spec.resolved = true; }
       } else if (v.expr !== undefined) {
         plan.losses.expressions.push({ collection: spec.col, path: spec.path, mode, expr: v.expr });
-      } else if (v.literal && typeof v.literal === 'object') {
+      } else if (v.literal && typeof v.literal === 'object' && !isDtcgScalar(spec.type, v.literal)) {
+        /* An object under a non-composite type USUALLY means the type is
+           lying. The exception is DTCG's own scalars — colour and dimension
+           are objects in that spec — and treating those as composites is what
+           made a real document import as 723 of 8,312 tokens with no colours
+           at all. */
         plan.losses.composites.push({ collection: spec.col, path: spec.path, type: spec.type,
                                       note: 'object value under a non-composite type' });
       } else literals++;
@@ -356,7 +370,7 @@ function derive(ir, opts) {
   return plan;
 }
 
-  var api = { derive, figmaType, isComposite, vkey,
+  var api = { derive, figmaType, isComposite, isDtcgScalar, vkey,
                    MODES_MIN, SEPARATE_MAX, FIGMA_TYPES,
                    FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
 

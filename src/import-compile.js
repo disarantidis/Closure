@@ -54,6 +54,41 @@
   strict. Channels may be 0-255 or a percentage; alpha is 0-1 or a percentage.
 */
 function toColor(v) {
+  /*
+    DTCG's OWN COLOUR SHAPE, which is an object and not a string:
+    { colorSpace, components, alpha, hex }. Missing this is not a small gap —
+    it is every colour in a W3C DTCG document, and because the primitives are
+    what everything else references, losing them takes the whole graph with
+    them. A real import of one landed 723 variables out of 8,312 and not a
+    single COLOR among them.
+
+    `components` is preferred over `hex` when the space is sRGB, because it is
+    the more precise of the two and `hex` is the spec's fallback for exactly
+    that reason. For any other space the components are not sRGB channels and
+    must not be read as though they were, so the hex fallback is the only
+    honest answer — and if there is none, this returns null rather than
+    inventing a colour in the wrong space.
+  */
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    const space = v.colorSpace === undefined ? 'srgb' : String(v.colorSpace).toLowerCase();
+    const clamp01 = (n) => (n < 0 ? 0 : n > 1 ? 1 : n);
+    const alpha = v.alpha === undefined || v.alpha === null ? 1 : Number(v.alpha);
+    if ((space === 'srgb' || space === 'srgb-linear') && Array.isArray(v.components) && v.components.length >= 3) {
+      const c = v.components.map(Number);
+      if (c.slice(0, 3).every(isFinite) && isFinite(alpha)) {
+        return { r: clamp01(c[0]), g: clamp01(c[1]), b: clamp01(c[2]), a: clamp01(alpha) };
+      }
+    }
+    if (typeof v.hex === 'string') {
+      const fromHex = toColor(v.hex);
+      /* An 8-digit hex carries its own alpha; a 6-digit one does not, so the
+         separate `alpha` still applies. */
+      if (fromHex && v.hex.replace(/^#/, '').length !== 8 && isFinite(alpha)) fromHex.a = clamp01(alpha);
+      return fromHex;
+    }
+    return null;
+  }
+
   if (typeof v !== 'string') return null;
   const s = v.trim();
 
@@ -109,6 +144,15 @@ function coerce(ft, raw) {
     return c ? { ok: true, value: c } : { ok: false, why: 'not a colour: ' + JSON.stringify(raw) };
   }
   if (ft === 'FLOAT') {
+    /* DTCG's dimension is { value, unit } — the same "a number wearing its
+       unit" case as "100%", just spelled as an object. Stripping the unit is
+       the same decision and for the same reason: Figma's FLOAT is unitless. */
+    if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.value !== undefined) {
+      const n = Number(raw.value);
+      return isFinite(n)
+        ? { ok: true, value: n, unit: raw.unit ? String(raw.unit).toLowerCase() : undefined }
+        : { ok: false, why: 'dimension with a non-numeric value: ' + JSON.stringify(raw) };
+    }
     if (typeof raw === 'number') return isFinite(raw) ? { ok: true, value: raw } : { ok: false, why: 'not finite' };
     const m = typeof raw === 'string' && UNITED_NUMBER.exec(raw);
     if (m) return { ok: true, value: Number(m[1]), unit: m[2].toLowerCase() };
@@ -191,7 +235,10 @@ function compile(ir, plan, opts) {
         if (t && t.ft !== null && alive.has(vkey(t.col, t.path))) return true;
       } else if (v.expr !== undefined) {
         if (opts.evaluateExpressions && evaluate(v.expr, plan, spec.values.keys().next().value) !== null) return true;
-      } else if (v.literal !== undefined && !(v.literal && typeof v.literal === 'object')) {
+      } else if (v.literal !== undefined) {
+        /* Ask coerce() rather than assuming an object literal must be a
+           composite — DTCG writes plain colours and dimensions as objects,
+           and refusing them here is what silently emptied a whole document. */
         if (coerce(spec.ft, v.literal).ok) return true;
       }
     }

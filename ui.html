@@ -1198,6 +1198,14 @@
       font-variant-numeric: tabular-nums;
     }
     .import-fact.is-quiet { opacity: 0.65; }
+    /* The one fact that is allowed to shout. See renderImportSummary. */
+    .import-fact.is-warn, .import-fact.is-warn b { color: #d9a441; }
+    .import-warn-note {
+      margin: 2px 0 0 70px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #d9a441;
+    }
     .import-detail {
       margin: 2px 0 0 70px;
       font-size: 11px;
@@ -49942,6 +49950,15 @@ function figmaType(t) {
 }
 const isComposite = (t) => COMPOSITE_TYPES.indexOf(t) !== -1;
 
+/* W3C DTCG writes two SCALAR types as objects — colour as
+   { colorSpace, components, alpha, hex } and dimension as { value, unit } —
+   so "the value is an object" does not mean "the value is a composite". */
+function isDtcgScalar(type, value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (type === 'color') return value.components !== undefined || value.hex !== undefined;
+  return value.value !== undefined && value.unit !== undefined;
+}
+
 const SEP = '␟';
 const vkey = (col, path) => col + SEP + path;
 
@@ -50152,7 +50169,12 @@ function derive(ir, opts) {
         } else { aliases++; spec.resolved = true; }
       } else if (v.expr !== undefined) {
         plan.losses.expressions.push({ collection: spec.col, path: spec.path, mode, expr: v.expr });
-      } else if (v.literal && typeof v.literal === 'object') {
+      } else if (v.literal && typeof v.literal === 'object' && !isDtcgScalar(spec.type, v.literal)) {
+        /* An object under a non-composite type USUALLY means the type is
+           lying. The exception is DTCG's own scalars — colour and dimension
+           are objects in that spec — and treating those as composites is what
+           made a real document import as 723 of 8,312 tokens with no colours
+           at all. */
         plan.losses.composites.push({ collection: spec.col, path: spec.path, type: spec.type,
                                       note: 'object value under a non-composite type' });
       } else literals++;
@@ -50225,7 +50247,7 @@ function derive(ir, opts) {
   return plan;
 }
 
-  var api = { derive, figmaType, isComposite, vkey,
+  var api = { derive, figmaType, isComposite, isDtcgScalar, vkey,
                    MODES_MIN, SEPARATE_MAX, FIGMA_TYPES,
                    FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
 
@@ -50290,6 +50312,41 @@ function derive(ir, opts) {
   strict. Channels may be 0-255 or a percentage; alpha is 0-1 or a percentage.
 */
 function toColor(v) {
+  /*
+    DTCG's OWN COLOUR SHAPE, which is an object and not a string:
+    { colorSpace, components, alpha, hex }. Missing this is not a small gap —
+    it is every colour in a W3C DTCG document, and because the primitives are
+    what everything else references, losing them takes the whole graph with
+    them. A real import of one landed 723 variables out of 8,312 and not a
+    single COLOR among them.
+
+    `components` is preferred over `hex` when the space is sRGB, because it is
+    the more precise of the two and `hex` is the spec's fallback for exactly
+    that reason. For any other space the components are not sRGB channels and
+    must not be read as though they were, so the hex fallback is the only
+    honest answer — and if there is none, this returns null rather than
+    inventing a colour in the wrong space.
+  */
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    const space = v.colorSpace === undefined ? 'srgb' : String(v.colorSpace).toLowerCase();
+    const clamp01 = (n) => (n < 0 ? 0 : n > 1 ? 1 : n);
+    const alpha = v.alpha === undefined || v.alpha === null ? 1 : Number(v.alpha);
+    if ((space === 'srgb' || space === 'srgb-linear') && Array.isArray(v.components) && v.components.length >= 3) {
+      const c = v.components.map(Number);
+      if (c.slice(0, 3).every(isFinite) && isFinite(alpha)) {
+        return { r: clamp01(c[0]), g: clamp01(c[1]), b: clamp01(c[2]), a: clamp01(alpha) };
+      }
+    }
+    if (typeof v.hex === 'string') {
+      const fromHex = toColor(v.hex);
+      /* An 8-digit hex carries its own alpha; a 6-digit one does not, so the
+         separate `alpha` still applies. */
+      if (fromHex && v.hex.replace(/^#/, '').length !== 8 && isFinite(alpha)) fromHex.a = clamp01(alpha);
+      return fromHex;
+    }
+    return null;
+  }
+
   if (typeof v !== 'string') return null;
   const s = v.trim();
 
@@ -50345,6 +50402,15 @@ function coerce(ft, raw) {
     return c ? { ok: true, value: c } : { ok: false, why: 'not a colour: ' + JSON.stringify(raw) };
   }
   if (ft === 'FLOAT') {
+    /* DTCG's dimension is { value, unit } — the same "a number wearing its
+       unit" case as "100%", just spelled as an object. Stripping the unit is
+       the same decision and for the same reason: Figma's FLOAT is unitless. */
+    if (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.value !== undefined) {
+      const n = Number(raw.value);
+      return isFinite(n)
+        ? { ok: true, value: n, unit: raw.unit ? String(raw.unit).toLowerCase() : undefined }
+        : { ok: false, why: 'dimension with a non-numeric value: ' + JSON.stringify(raw) };
+    }
     if (typeof raw === 'number') return isFinite(raw) ? { ok: true, value: raw } : { ok: false, why: 'not finite' };
     const m = typeof raw === 'string' && UNITED_NUMBER.exec(raw);
     if (m) return { ok: true, value: Number(m[1]), unit: m[2].toLowerCase() };
@@ -50427,7 +50493,10 @@ function compile(ir, plan, opts) {
         if (t && t.ft !== null && alive.has(vkey(t.col, t.path))) return true;
       } else if (v.expr !== undefined) {
         if (opts.evaluateExpressions && evaluate(v.expr, plan, spec.values.keys().next().value) !== null) return true;
-      } else if (v.literal !== undefined && !(v.literal && typeof v.literal === 'object')) {
+      } else if (v.literal !== undefined) {
+        /* Ask coerce() rather than assuming an object literal must be a
+           composite — DTCG writes plain colours and dimensions as objects,
+           and refusing them here is what silently emptied a whole document. */
         if (coerce(spec.ft, v.literal).ok) return true;
       }
     }
@@ -51066,7 +51135,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '8e8438f 20:00:43';
+    var CLOSURE_BUILD = 'c9e216f 20:07:21';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -51842,8 +51911,28 @@ function format(report, limit) {
         html += fact(compiled.stats.variables, 'variables to import');
         if (compiled.stats.aliases) html += fact(compiled.stats.aliases, 'of their values are references', true);
         if (compiled.stats.skippedEmpty) {
-          html += fact(compiled.stats.skippedEmpty,
-            'named here but given no value this file can resolve — skipped', true);
+          /*
+            LOUD WHEN IT IS MOST OF THE FILE.
+
+            A handful of unresolvable tokens is ordinary and belongs in grey
+            with the other asides. Losing MORE than lands is not an aside, it
+            is the import having failed while still reporting a number — which
+            is exactly what happened: a real DTCG document read 8,312 tokens,
+            imported 723, and said so in the same quiet grey as everything
+            else. Whatever the cause, when most of a file cannot be resolved
+            the honest thing is to say it is probably not meant to be read
+            this way.
+          */
+          var lost = compiled.stats.skippedEmpty;
+          var loud = lost > compiled.stats.variables;
+          html += '<div class="import-fact' + (loud ? ' is-warn' : ' is-quiet') + '"><b>' +
+                  lost.toLocaleString() + '</b><span>' +
+                  'named here but given no value this file can resolve — skipped</span></div>';
+          if (loud) {
+            html += '<div class="import-warn-note">More is being skipped than imported. ' +
+                    'That usually means this file is not being read the way it was written — ' +
+                    'check the format above is the one you expected.</div>';
+          }
         }
       } else {
         html += fact(plan.totals.variables, 'variables the file describes');
