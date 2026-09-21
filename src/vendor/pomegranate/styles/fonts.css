@@ -1,0 +1,265 @@
+/*
+  GT Ultra — declared, never vendored.
+
+  THE FONT FILES ARE DELIBERATELY NOT IN THIS REPOSITORY. GT Ultra is a
+  commercial typeface from Grilli Type; the copy that prompted this work arrived
+  from a third-party "free fonts" aggregator, which is not a licence. So every
+  rule below resolves through `local()` ONLY: it binds the CSS family name to a
+  font already installed on the reader's own machine, and ships nothing.
+
+  WHAT THAT MEANS IN PRACTICE
+  - On a machine with GT Ultra installed, every one of these rules resolves and
+    the design system renders in it. That is the case on the authoring machine
+    today, which is why the Typeface page shows real specimens.
+  - On any other machine — CI, a teammate, a deploy — each rule silently fails
+    to match and the stack falls through to the next family. Nothing breaks; the
+    system renders in the fallback, which is why every stack below names one.
+
+  WHEN THE LICENCE IS BOUGHT: add the webfont files (woff2) under src/assets/fonts/
+  and prepend a `url(...)` source to each `src:` list, ahead of the `local()`.
+  Nothing else changes — the family names, weights and the token that points at
+  them are already correct.
+
+  GENERATED SHAPE, HAND-KEPT FILE: 3 cuts x 11 styles. The `local()` names are the
+  PostScript names read out of the .otf name table (nameID 6) with the macOS full
+  name (nameID 4) as a second chance, because the two disagree for this family —
+  its nameID 1 is per-weight ("GT Ultra Light"), the old-style four-style grouping,
+  so matching on family name alone would find only Regular and Bold.
+*/
+
+/* ---- GT Ultra — the text cut — the one the 18 text styles resolve to ---- */
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-Thin'), local('GT Ultra Thin');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-ThinItalic'), local('GT Ultra Thin Italic');
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-Light'), local('GT Ultra Light');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-LightItalic'), local('GT Ultra Light Italic');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-Regular'), local('GT Ultra Regular');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-RegularItalic'), local('GT Ultra Regular Italic');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-Bold'), local('GT Ultra Bold');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-BoldItalic'), local('GT Ultra Bold Italic');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-Black'), local('GT Ultra Black');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-BlackItalic'), local('GT Ultra Black Italic');
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra';
+  src: local('GTUltra-Ultra'), local('GT Ultra Ultra');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---- GT Ultra Fine — the finest cut — highest contrast, for display sizes ---- */
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-Thin'), local('GT Ultra Fine Thin');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-ThinItalic'), local('GT Ultra Fine Thin Italic');
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-Light'), local('GT Ultra Fine Light');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-LightItalic'), local('GT Ultra Fine Light Italic');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-Regular'), local('GT Ultra Fine Regular');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-RegularItalic'), local('GT Ultra Fine Regular Italic');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-Bold'), local('GT Ultra Fine Bold');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-BoldItalic'), local('GT Ultra Fine Bold Italic');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-Black'), local('GT Ultra Fine Black');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-BlackItalic'), local('GT Ultra Fine Black Italic');
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Fine';
+  src: local('GTUltraFine-Ultra'), local('GT Ultra Fine Ultra');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---- GT Ultra Median — the middle cut — between Fine and the text cut ---- */
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-Thin'), local('GT Ultra Median Thin');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-ThinItalic'), local('GT Ultra Median Thin Italic');
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-Light'), local('GT Ultra Median Light');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-LightItalic'), local('GT Ultra Median Light Italic');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-Regular'), local('GT Ultra Median Regular');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-RegularItalic'), local('GT Ultra Median Regular Italic');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-Bold'), local('GT Ultra Median Bold');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-BoldItalic'), local('GT Ultra Median Bold Italic');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-Black'), local('GT Ultra Median Black');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-BlackItalic'), local('GT Ultra Median Black Italic');
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Ultra Median';
+  src: local('GTUltraMedian-Ultra'), local('GT Ultra Median Ultra');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
