@@ -7,7 +7,7 @@
 // silently, so the tests that matter most are the ones proving it stops.
 //
 const { toIR, detect } = require('../src/import-ir.js');
-const { derive } = require('../src/import-derive.js');
+const { derive, applyLevels, levelCandidates } = require('../src/import-derive.js');
 const { compile, toColor, evaluate } = require('../src/import-compile.js');
 const { buildManifest, bindManifest } = require('../src/import-manifest.js');
 const { materialise, fromRawGraph, compare, fingerprint } = require('../src/import-verify.js');
@@ -710,6 +710,116 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
   const keepGoing = apply(c.program, mockFigma('variable'), { stopOnError: false });
   ok('apply: stopOnError:false collects instead',
      keepGoing.failed > 1, 'failed ' + keepGoing.failed);
+}
+
+/* ── the level map: which DEPTH of a path is an axis ─────────────────────── */
+{
+  /* A document with no set names at all — the axis is a nesting depth, which
+     is the shape derive() could not read before. Two modes x two schemes x
+     three leaves, built as a clean cross-product on purpose. */
+  const doc = { theme: {} };
+  ['light', 'dark'].forEach((m) => {
+    doc.theme[m] = {};
+    ['brand', 'neutral'].forEach((sch) => {
+      doc.theme[m][sch] = {};
+      ['bg', 'fg', 'line'].forEach((leaf) => {
+        doc.theme[m][sch][leaf] = tok('#' + (m === 'light' ? 'ff' : '00') + '1111');
+      });
+    });
+  });
+  const ir = toIR(doc);
+  ok('levels: without a map it is all one collection, all one mode', (() => {
+    const p = derive(ir, {});
+    return p.collections.length === 1 && p.collections[0].modes.length === 1 &&
+           p.collections[0].variables === 12;
+  })(), JSON.stringify(derive(ir, {}).collections));
+
+  /* MEASURED, not guessed: a depth is a candidate when its branches carry the
+     same paths beneath them. Both depths qualify here, and both are reported —
+     choosing between them is the caller's. */
+  /* Depth 0 and 1, not 1 and 2: this document has no $metadata so it reads as
+     legacy, where the top-level key is the SET and is not part of the path.
+     The same tree in DTCG would put both axes one deeper. */
+  const cands = levelCandidates(ir);
+  ok('levels: both real axes are proposed',
+     cands.length === 2 && cands.every((c) => c.overlap === 100) &&
+     cands.some((c) => c.depth === 0 && c.distinct === 2) &&
+     cands.some((c) => c.depth === 1 && c.distinct === 2),
+     JSON.stringify(cands.map((c) => 'd' + c.depth + ':' + c.distinct + '@' + c.overlap)));
+
+  const p1 = derive(ir, { levels: { theme: { 0: 'mode' } } });
+  ok('levels: promoting a depth turns it into the mode axis',
+     p1.collections.length === 1 && p1.collections[0].modes.join(',') === 'light,dark' &&
+     p1.collections[0].variables === 6,
+     JSON.stringify(p1.collections));
+
+  /* The promoted segment must LEAVE the name, or it appears twice — once as
+     the axis and once inside every variable that sits under it. */
+  const c1 = compile(ir, p1, {});
+  ok('levels: the promoted segment is gone from the variable names',
+     c1.program.ops.filter((o) => o.op === 'createVariable')
+       .every((o) => !/light|dark/.test(o.name)),
+     c1.program.ops.filter((o) => o.op === 'createVariable').map((o) => o.name).slice(0, 3).join(', '));
+
+  const p2 = derive(ir, { levels: { theme: { 1: 'mode' } } });
+  ok('levels: a different depth gives a different, equally valid projection',
+     p2.collections[0].modes.join(',') === 'brand,neutral' && p2.collections[0].variables === 6,
+     JSON.stringify(p2.collections));
+}
+{
+  /* ONE AXIS PER COLLECTION is Figma's rule. A document with two independent
+     axes cannot become one collection however the depths are assigned — the
+     system that produced such a document solves it with separate collections
+     and aliases, which an import cannot synthesise. */
+  const doc = { t: { light: { a: { x: tok('#111111') } }, dark: { a: { x: tok('#222222') } } } };
+  const ir = toIR(doc);
+  const p = derive(ir, { levels: { t: { 0: 'mode', 1: 'mode' } } });
+  ok('levels: promoting two depths is refused, not approximated',
+     p.ok === false && p.unresolved.some((q) => q.id === 'level:t'),
+     JSON.stringify(p.unresolved.map((q) => q.id)));
+  ok('levels: and the refusal says why',
+     /exactly one mode axis/.test((p.unresolved.find((q) => q.id === 'level:t') || {}).question || ''));
+}
+{
+  /* A depth whose branches hold DISJOINT names is a namespace, not an axis —
+     the same distinction the group verdict makes, one level down. */
+  const doc = { t: { white: { whiteBg: tok('#ffffff') }, black: { blackBg: tok('#000000') } } };
+  const cands = levelCandidates(toIR(doc));
+  ok('levels: disjoint branches are not proposed as an axis',
+     cands.length === 0, JSON.stringify(cands));
+}
+{
+  /* applyLevels is a pre-transform on the IR and nothing downstream knows it
+     ran — which is what keeps the rest of derive() unchanged. */
+  const doc = { t: { light: { a: tok('#111111') }, dark: { a: tok('#222222') } } };
+  const ir = toIR(doc);
+  const moved = applyLevels(ir, { t: { 0: 'mode' } });
+  ok('applyLevels: the promoted segment becomes the variant',
+     moved.rows.every((r) => r.variant === 'light' || r.variant === 'dark'),
+     JSON.stringify(moved.rows.map((r) => r.variant + '|' + r.path)));
+  ok('applyLevels: and leaves the path',
+     moved.rows.every((r) => r.path === 'a'), JSON.stringify(moved.rows.map((r) => r.path)));
+  ok('applyLevels: no map is a no-op', applyLevels(ir, {}) === ir);
+}
+{
+  /* The payoff, on the shape that actually failed: promoting one depth takes a
+     collection from over Figma's 5,000 cap to under it. */
+  const doc = { big: {} };
+  ['light', 'dark'].forEach((m) => {
+    doc.big[m] = {};
+    for (let i = 0; i < 2600; i++) doc.big[m]['v' + i] = tok('#111111');
+  });
+  const ir = toIR(doc);
+  const flat = derive(ir, {});
+  ok('levels: as one flat collection it is over the cap',
+     flat.blocked.length === 1 && flat.blocked[0].kind === 'variables' && flat.blocked[0].needs === 5200,
+     JSON.stringify(flat.blocked));
+  const axed = derive(ir, { levels: { big: { 0: 'mode' } } });
+  ok('levels: with the axis promoted it fits',
+     axed.blocked.length === 0 && axed.collections[0].variables === 2600 &&
+     axed.collections[0].modes.length === 2,
+     JSON.stringify(axed.collections));
+  ok('levels: and it compiles', compile(ir, axed, {}).ok === true);
 }
 
 /* ── a REAL DTCG document, which is the format that broke ────────────────── */

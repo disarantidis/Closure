@@ -104,8 +104,121 @@ function isDtcgScalar(type, value) {
 const SEP = '␟';
 const vkey = (col, path) => col + SEP + path;
 
+/*
+  ── THE LEVEL MAP ──────────────────────────────────────────────────────────
+
+  A JSON has N nesting depths; Figma has three structural slots. Until now
+  derive() read exactly ONE signal to bridge them — a "/" in a set name — and
+  everything else became part of a token's name. That is enough for Tokens
+  Studio, where the set IS the axis, and enough for nothing else.
+
+  A level map says which DEPTH of a path is an axis:
+
+      mode . light . neutral . colours . basic . background
+       d0     d1       d2      └──────────┴──────────┘
+              ↑
+              promote this depth to the mode axis
+
+  DEPTH IS RELATIVE TO THE TOKEN PATH, and the two adapters disagree about
+  where that starts. Tokens Studio's set name is not part of any path, so
+  "mode/light" + "brand.primary" puts the axis at depth 0 of "light.brand…"
+  only if the set was flat; DTCG has no sets and keeps its top-level group in
+  the path, so the same axis sits one deeper. A level map is therefore tied to
+  the format it was written for — which is another reason it belongs in
+  $figmaStructure beside the rest of the projection rather than in a config
+  someone carries between files.
+
+  It is applied as a PRE-TRANSFORM on the IR, before any other decision, which
+  is what keeps it small: promoting depth 1 turns one group with 6,480 paths
+  into one group with two variants of 3,240, and every existing step — the
+  overlap measurement, the manifest binding, the verdicts — then works
+  unchanged on the rewritten rows. Nothing downstream needs to know a level
+  map exists.
+
+  ONE AXIS PER COLLECTION, and this is a Figma constraint rather than a choice
+  here: a variable collection has exactly one mode dimension. A document with
+  two independent axes — light/dark AND twenty schemes — cannot become one
+  collection, no matter how the depths are assigned. The system that produced
+  that document solves it with SEPARATE collections and aliases between them,
+  and an import cannot synthesise those, because it would have to invent which
+  direction the dependency runs. So promoting a second depth is refused rather
+  than approximated.
+*/
+function applyLevels(ir, levels) {
+  if (!levels || !Object.keys(levels).length) return ir;
+  const rows = ir.rows.map((r) => {
+    const spec = levels[r.group];
+    if (!spec) return r;
+    const depths = Object.keys(spec).filter((d) => spec[d] === 'mode').map(Number).sort((a, b) => a - b);
+    if (!depths.length) return r;
+    const segs = r.path.split('.');
+    const d = depths[0];
+    if (d < 0 || d >= segs.length) return r;
+    const variant = segs[d];
+    const rest = segs.slice(0, d).concat(segs.slice(d + 1));
+    /* The promoted segment leaves the NAME and becomes the mode, which is
+       what stops it appearing twice — once as an axis and once inside every
+       variable's own name. */
+    return Object.assign({}, r, { variant, path: rest.join('.') || segs[d] });
+  });
+  return Object.assign({}, ir, { rows });
+}
+
+/*
+  WHICH DEPTHS LOOK LIKE AXES, measured rather than guessed — the same
+  reasoning the group verdict uses, one level down.
+
+  A depth is a candidate when its distinct values are FEW relative to the rows
+  beneath it, and when every one of those values carries the same set of paths
+  below it. That second half is the real test: an axis is a dimension along
+  which the same thing takes different values, so its branches must agree on
+  what "the same thing" is. A depth whose branches hold disjoint names is a
+  namespace, not an axis.
+
+  Reported, never applied. The point of a candidate is that someone confirms it.
+*/
+function levelCandidates(ir, opts) {
+  opts = opts || {};
+  const maxValues = opts.maxValues || 64;
+  const byGroup = new Map();
+  for (const r of ir.rows) {
+    if (!byGroup.has(r.group)) byGroup.set(r.group, []);
+    byGroup.get(r.group).push(r.path.split('.'));
+  }
+  const out = [];
+  for (const [group, paths] of byGroup) {
+    const depth = Math.min.apply(null, paths.map((p) => p.length));
+    /* The last segment is the token's own name, never an axis. */
+    for (let d = 0; d < depth - 1; d++) {
+      const branches = new Map();
+      for (const p of paths) {
+        const key = p[d];
+        if (!branches.has(key)) branches.set(key, new Set());
+        branches.get(key).add(p.slice(0, d).concat(p.slice(d + 1)).join('.'));
+      }
+      const values = [...branches.keys()];
+      if (values.length < 2 || values.length > maxValues) continue;
+      const sets = values.map((v) => branches.get(v));
+      const smallest = sets.reduce((a, b) => (a.size <= b.size ? a : b));
+      let shared = 0;
+      for (const x of smallest) if (sets.every((t) => t.has(x))) shared++;
+      const overlap = smallest.size ? shared / smallest.size : 0;
+      if (overlap >= MODES_MIN) {
+        out.push({ group, depth: d, values, distinct: values.length,
+                   overlap: +(overlap * 100).toFixed(1),
+                   variablesIfPromoted: smallest.size });
+      }
+    }
+  }
+  return out;
+}
+
 function derive(ir, opts) {
   opts = opts || {};
+  /* FIRST, before anything else looks at the rows — see applyLevels. */
+  const levels = opts.levels || {};
+  ir = applyLevels(ir, levels);
+
   const modeCeiling = opts.modeCeiling || Infinity;
   /* Figma's own hard limit, not a caller's preference — so it applies unless
      a caller deliberately turns it off, rather than only when asked for. */
@@ -125,6 +238,10 @@ function derive(ir, opts) {
     unresolved: [],
     decisionsApplied: [],
     decisionsUnused: [],
+    /* Depths that measure like axes but have not been promoted. Reported so a
+       caller can offer them; never applied on their own. */
+    levelCandidates: [],
+    levelsApplied: levels,
     totals: {},
     ok: false,
   };
@@ -365,6 +482,25 @@ function derive(ir, opts) {
   }
   plan.collections.sort((a, b) => b.variables - a.variables);
 
+  /* One axis per collection is Figma's rule, not a preference — a second
+     promoted depth cannot be expressed at all, so it is refused rather than
+     silently ignored. */
+  for (const g of Object.keys(levels)) {
+    const promoted = Object.keys(levels[g]).filter((d) => levels[g][d] === 'mode');
+    if (promoted.length > 1) {
+      plan.unresolved.push({
+        id: 'level:' + g, options: promoted.map((d) => 'depth ' + d),
+        question: '"' + g + '" promotes ' + promoted.length + ' depths to modes, and a Figma ' +
+                  'collection has exactly one mode axis. Which one is the axis?',
+        evidence: 'depths ' + promoted.join(', ') + ' were all marked as modes',
+      });
+    }
+  }
+
+  /* Only worth reporting for a group whose depths were NOT already assigned —
+     confirming what the caller just chose is noise. */
+  plan.levelCandidates = levelCandidates(ir).filter((c) => !levels[c.group]);
+
   for (const id of Object.keys(decisions)) {
     if (!plan.decisionsApplied.some((d) => d.id === id)) plan.decisionsUnused.push(id);
   }
@@ -397,7 +533,7 @@ function derive(ir, opts) {
   return plan;
 }
 
-  var api = { derive, figmaType, isComposite, isDtcgScalar, vkey,
+  var api = { derive, applyLevels, levelCandidates, figmaType, isComposite, isDtcgScalar, vkey,
                    MODES_MIN, SEPARATE_MAX, FIGMA_TYPES, VARIABLE_CEILING,
                    FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
 

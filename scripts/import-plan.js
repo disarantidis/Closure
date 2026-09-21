@@ -8,6 +8,7 @@
 //   node scripts/import-plan.js tokens.json --decide group:theme=separate
 //   node scripts/import-plan.js tokens.json --compile --allow-partial
 //   node scripts/import-plan.js tokens.json --against figma-variables.json
+//   node scripts/import-plan.js tokens.json --level mode:1
 //   node scripts/import-plan.js tokens.json --json -o plan.json
 //
 // --ceiling is the target file's modes-per-collection limit (a property of that
@@ -16,6 +17,10 @@
 // --against takes the CURRENT document's variable graph (the array extract
 // produces) and reports what an import WOULD change in it: what appears, what
 // is overwritten, and what is left alone. Writes nothing either way.
+//
+// --level <group>:<depth> reads that depth of the path as a MODE AXIS rather
+// than as part of every variable's name. The plan proposes candidates for it;
+// a Figma collection has exactly one mode axis, so only one depth per group.
 //
 // --decide answers one of the questions the plan raises, by the id it prints.
 // --compile runs the gate: it reports whether an executable program could be
@@ -30,7 +35,7 @@ const { diff, format: formatDiff } = require('../src/import-diff.js');
 function parseArgs(argv) {
   const a = { input: null, ceiling: Infinity, json: false, out: null, format: null, limit: 8,
               decisions: {}, compile: false, allowPartial: false, evaluateExpressions: false,
-              against: null };
+              against: null, levels: {} };
   for (let i = 0; i < argv.length; i++) {
     const x = argv[i];
     if (x === '--ceiling') a.ceiling = Number(argv[++i]);
@@ -40,6 +45,13 @@ function parseArgs(argv) {
     else if (x === '--limit') a.limit = Number(argv[++i]);
     else if (x === '--compile') a.compile = true;
     else if (x === '--against') { a.against = argv[++i]; a.compile = true; }
+    else if (x === '--level') {
+      const kv = argv[++i] || '';
+      const c = kv.lastIndexOf(':');
+      if (c === -1) { console.error('--level wants group:depth, got: ' + kv); process.exit(1); }
+      const g = kv.slice(0, c), d = kv.slice(c + 1);
+      (a.levels[g] = a.levels[g] || {})[d] = 'mode';
+    }
     else if (x === '--allow-partial') a.allowPartial = true;
     else if (x === '--eval-expressions') a.evaluateExpressions = true;
     else if (x === '--decide') {
@@ -124,6 +136,25 @@ function print(plan, ir, limit) {
     console.log('');
   }
 
+  if (plan.levelCandidates && plan.levelCandidates.length) {
+    console.log('  DEPTHS THAT MEASURE LIKE AXES — promote with --level <group>:<depth>');
+    plan.levelCandidates.forEach((c) => {
+      console.log('     ' + (c.group + ':' + c.depth).padEnd(18) + c.distinct + ' modes  [' +
+        c.values.slice(0, 5).join(', ') + (c.values.length > 5 ? ', …' : '') + ']');
+      console.log('        ' + c.overlap + '% of paths shared across them · ' +
+        c.variablesIfPromoted.toLocaleString() + ' variables per mode if promoted');
+    });
+    console.log('');
+  }
+  if (Object.keys(plan.levelsApplied || {}).length) {
+    console.log('  LEVELS APPLIED');
+    Object.keys(plan.levelsApplied).forEach((g) => {
+      Object.keys(plan.levelsApplied[g]).forEach((d) =>
+        console.log('     ' + g + ' depth ' + d + ' read as the mode axis'));
+    });
+    console.log('');
+  }
+
   if (plan.unresolved.length) {
     console.log('  OPEN QUESTIONS — answer with --decide <id>=<value>');
     for (const q of plan.unresolved) {
@@ -181,7 +212,7 @@ if (!args.input) {
 }
 const doc = JSON.parse(fs.readFileSync(args.input, 'utf8'));
 const ir = toIR(doc, { format: args.format });
-const plan = derive(ir, { modeCeiling: args.ceiling, decisions: args.decisions });
+const plan = derive(ir, { modeCeiling: args.ceiling, decisions: args.decisions, levels: args.levels });
 
 let compiled = null;
 if (args.compile) {
