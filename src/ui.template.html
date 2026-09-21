@@ -1948,7 +1948,7 @@
            overridden. It appears only when there is something to confirm. -->
       <div class="import-card" id="import-levels" data-level="4" hidden>
         <p class="import-card-title">How should this be read?</p>
-        <p class="import-card-note">These depths look like mode axes rather than parts of a name. Turning one on folds it into modes instead of spelling it into every variable underneath.</p>
+        <p class="import-card-note">Each of these can be read three ways. As a <b>group</b> it stays in every variable&rsquo;s name. As <b>modes</b> it folds into one collection&rsquo;s axis. As <b>collections</b> each value becomes a collection of its own.</p>
         <span id="import-levels-mount"></span>
       </div>
 
@@ -3074,13 +3074,18 @@
       el.hidden = !shown.length;
     }
 
-    window.PomImportLevels.onToggle = function(group, depth, on) {
-      if (on) {
+    window.PomImportLevels.onToggle = function(group, depth, role) {
+      /* 'name' is the absence of an assignment, not an assignment of its own —
+         storing it would make an untouched depth and a depth deliberately left
+         alone look different to derive(), which they are not. */
+      if (role === 'name') {
+        if (importState.levels[group]) {
+          delete importState.levels[group][String(depth)];
+          if (!Object.keys(importState.levels[group]).length) delete importState.levels[group];
+        }
+      } else {
         importState.levels[group] = importState.levels[group] || {};
-        importState.levels[group][String(depth)] = 'mode';
-      } else if (importState.levels[group]) {
-        delete importState.levels[group][String(depth)];
-        if (!Object.keys(importState.levels[group]).length) delete importState.levels[group];
+        importState.levels[group][String(depth)] = role;
       }
       if (importState.doc) runImport(importState.doc, importState.fileName);
     };

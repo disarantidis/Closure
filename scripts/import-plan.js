@@ -8,7 +8,8 @@
 //   node scripts/import-plan.js tokens.json --decide group:theme=separate
 //   node scripts/import-plan.js tokens.json --compile --allow-partial
 //   node scripts/import-plan.js tokens.json --against figma-variables.json
-//   node scripts/import-plan.js tokens.json --level mode:1
+//   node scripts/import-plan.js tokens.json --level mode:1=mode
+//   node scripts/import-plan.js tokens.json --level base:0=collection
 //   node scripts/import-plan.js tokens.json --json -o plan.json
 //
 // --ceiling is the target file's modes-per-collection limit (a property of that
@@ -18,9 +19,12 @@
 // produces) and reports what an import WOULD change in it: what appears, what
 // is overwritten, and what is left alone. Writes nothing either way.
 //
-// --level <group>:<depth> reads that depth of the path as a MODE AXIS rather
-// than as part of every variable's name. The plan proposes candidates for it;
-// a Figma collection has exactly one mode axis, so only one depth per group.
+// --level <group>:<depth>[=<role>] says how to read that depth of the path.
+// role is mode (fold it into one collection's axis), collection (give each of
+// its values a collection of its own) or name (the default — leave it in every
+// variable's name). Defaults to mode. The plan proposes candidates and says
+// which reading it measured; a Figma collection has exactly one mode axis, so
+// only one depth per group may be 'mode'.
 //
 // --decide answers one of the questions the plan raises, by the id it prints.
 // --compile runs the gate: it reports whether an executable program could be
@@ -49,8 +53,15 @@ function parseArgs(argv) {
       const kv = argv[++i] || '';
       const c = kv.lastIndexOf(':');
       if (c === -1) { console.error('--level wants group:depth, got: ' + kv); process.exit(1); }
-      const g = kv.slice(0, c), d = kv.slice(c + 1);
-      (a.levels[g] = a.levels[g] || {})[d] = 'mode';
+      let g = kv.slice(0, c), rest = kv.slice(c + 1);
+      let role = 'mode';
+      const eq = rest.indexOf('=');
+      if (eq !== -1) { role = rest.slice(eq + 1); rest = rest.slice(0, eq); }
+      if (['mode', 'collection', 'name'].indexOf(role) === -1) {
+        console.error('--level role must be mode, collection or name; got: ' + role);
+        process.exit(1);
+      }
+      if (role !== 'name') (a.levels[g] = a.levels[g] || {})[rest] = role;
     }
     else if (x === '--allow-partial') a.allowPartial = true;
     else if (x === '--eval-expressions') a.evaluateExpressions = true;
@@ -137,12 +148,13 @@ function print(plan, ir, limit) {
   }
 
   if (plan.levelCandidates && plan.levelCandidates.length) {
-    console.log('  DEPTHS THAT MEASURE LIKE AXES — promote with --level <group>:<depth>');
+    console.log('  DEPTHS THAT ARE NOT JUST NAMES — assign with --level <group>:<depth>=<role>');
     plan.levelCandidates.forEach((c) => {
-      console.log('     ' + (c.group + ':' + c.depth).padEnd(18) + c.distinct + ' modes  [' +
+      console.log('     ' + (c.group + ':' + c.depth).padEnd(18) + c.distinct + ' values  [' +
         c.values.slice(0, 5).join(', ') + (c.values.length > 5 ? ', …' : '') + ']');
-      console.log('        ' + c.overlap + '% of paths shared across them · ' +
-        c.variablesIfPromoted.toLocaleString() + ' variables per mode if promoted');
+      console.log('        ' + c.overlap + '% of paths shared across them — measured as ' +
+        (c.suggests === 'mode' ? 'an axis (modes)' : 'separate namespaces (collections)') +
+        ' · ' + c.variablesIfPromoted.toLocaleString() + ' variables each');
     });
     console.log('');
   }
@@ -150,7 +162,8 @@ function print(plan, ir, limit) {
     console.log('  LEVELS APPLIED');
     Object.keys(plan.levelsApplied).forEach((g) => {
       Object.keys(plan.levelsApplied[g]).forEach((d) =>
-        console.log('     ' + g + ' depth ' + d + ' read as the mode axis'));
+        console.log('     ' + g + ' depth ' + d + ' read as ' +
+          (plan.levelsApplied[g][d] === 'collection' ? 'separate collections' : 'the mode axis')));
     });
     console.log('');
   }

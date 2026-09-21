@@ -149,17 +149,30 @@ function applyLevels(ir, levels) {
   const rows = ir.rows.map((r) => {
     const spec = levels[r.group];
     if (!spec) return r;
-    const depths = Object.keys(spec).filter((d) => spec[d] === 'mode').map(Number).sort((a, b) => a - b);
-    if (!depths.length) return r;
     const segs = r.path.split('.');
-    const d = depths[0];
-    if (d < 0 || d >= segs.length) return r;
-    const variant = segs[d];
-    const rest = segs.slice(0, d).concat(segs.slice(d + 1));
-    /* The promoted segment leaves the NAME and becomes the mode, which is
-       what stops it appearing twice — once as an axis and once inside every
-       variable's own name. */
-    return Object.assign({}, r, { variant, path: rest.join('.') || segs[d] });
+    let group = r.group, variant = r.variant, movedCollection = false, movedMode = false;
+    const drop = new Set();
+
+    /* Read by ORIGINAL index and removed in one pass at the end — taking one
+       segment out first would shift every index after it, so a map written
+       against the document would stop naming the depths it meant. */
+    for (const key of Object.keys(spec)) {
+      const i = Number(key);
+      if (!(i >= 0 && i < segs.length)) continue;
+      if (spec[key] === 'collection') { group = segs[i]; drop.add(i); movedCollection = true; }
+      else if (spec[key] === 'mode') { variant = segs[i]; drop.add(i); movedMode = true; }
+    }
+    if (!drop.size) return r;
+
+    /* A depth read as COLLECTIONS gives each of its values a collection of its
+       own, and a collection with no axis has exactly one mode — named after
+       itself, the same as any other single-set collection here. */
+    if (movedCollection && !movedMode) variant = group;
+
+    /* Whatever was promoted LEAVES the name. Otherwise it appears twice: once
+       as the structure and once again inside every variable underneath it. */
+    const rest = segs.filter((_, i) => !drop.has(i));
+    return Object.assign({}, r, { group, variant, path: rest.join('.') || segs[segs.length - 1] });
   });
   return Object.assign({}, ir, { rows });
 }
@@ -203,10 +216,25 @@ function levelCandidates(ir, opts) {
       let shared = 0;
       for (const x of smallest) if (sets.every((t) => t.has(x))) shared++;
       const overlap = smallest.size ? shared / smallest.size : 0;
-      if (overlap >= MODES_MIN) {
+
+      /*
+        BOTH READINGS ARE REPORTED, because both are real and the measurement
+        distinguishes them the same way the group verdict does one level up.
+
+        Branches that carry the SAME paths are alternative values for one
+        thing — an axis, so: modes. Branches that carry DISJOINT paths are
+        separate namespaces that happen to share a parent — so: collections.
+        Anything in between is neither, and saying nothing is the honest
+        answer there.
+      */
+      const suggests = overlap >= MODES_MIN ? 'mode'
+                     : overlap <= SEPARATE_MAX ? 'collection' : null;
+      if (suggests) {
         out.push({ group, depth: d, values, distinct: values.length,
-                   overlap: +(overlap * 100).toFixed(1),
-                   variablesIfPromoted: smallest.size });
+                   overlap: +(overlap * 100).toFixed(1), suggests,
+                   variablesIfPromoted: suggests === 'mode'
+                     ? smallest.size
+                     : Math.round(sets.reduce((n, t) => n + t.size, 0) / sets.length) });
       }
     }
   }
@@ -493,6 +521,8 @@ function derive(ir, opts) {
      promoted depth cannot be expressed at all, so it is refused rather than
      silently ignored. */
   for (const g of Object.keys(levels)) {
+    /* Only MODE depths compete. A collection split produces independent
+       collections, each free to have an axis of its own. */
     const promoted = Object.keys(levels[g]).filter((d) => levels[g][d] === 'mode');
     if (promoted.length > 1) {
       plan.unresolved.push({
@@ -507,11 +537,18 @@ function derive(ir, opts) {
   /* Every candidate, each marked with whether it is the one in force. A
      collection has one mode axis, so the others in its group are alternatives
      rather than additions — which is a thing to show, not to hide. */
-  plan.levelCandidates = candidates.map((c) => Object.assign({}, c, {
-    applied: !!(levels[c.group] && levels[c.group][String(c.depth)] === 'mode'),
-    blockedBySibling: !!(levels[c.group] &&
-      Object.keys(levels[c.group]).some((d) => levels[c.group][d] === 'mode' && String(c.depth) !== d)),
-  }));
+  plan.levelCandidates = candidates.map((c) => {
+    const spec = levels[c.group] || {};
+    const role = spec[String(c.depth)] || 'name';
+    return Object.assign({}, c, {
+      role,
+      applied: role !== 'name',
+      /* Only a MODE elsewhere in this group rules out a mode here. Reading
+         this depth as collections stays available either way. */
+      modeTakenBySibling: Object.keys(spec)
+        .some((d) => spec[d] === 'mode' && String(c.depth) !== d),
+    });
+  });
 
   for (const id of Object.keys(decisions)) {
     if (!plan.decisionsApplied.some((d) => d.id === id)) plan.decisionsUnused.push(id);

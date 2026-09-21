@@ -754,10 +754,10 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
   const chosen = derive(ir, { levels: { theme: { 0: 'mode' } } });
   ok('levels: every candidate is still reported once one is applied',
      chosen.levelCandidates.length === 2, JSON.stringify(chosen.levelCandidates.map((c) => c.depth)));
-  ok('levels: the one in force is marked, and its sibling marked as displaced',
-     chosen.levelCandidates.some((c) => c.depth === 0 && c.applied === true && !c.blockedBySibling) &&
-     chosen.levelCandidates.some((c) => c.depth === 1 && c.applied === false && c.blockedBySibling === true),
-     JSON.stringify(chosen.levelCandidates.map((c) => 'd' + c.depth + ' applied=' + c.applied + ' blocked=' + c.blockedBySibling)));
+  ok('levels: the one in force carries its role, and its sibling is told modes are taken',
+     chosen.levelCandidates.some((c) => c.depth === 0 && c.role === 'mode' && !c.modeTakenBySibling) &&
+     chosen.levelCandidates.some((c) => c.depth === 1 && c.role === 'name' && c.modeTakenBySibling === true),
+     JSON.stringify(chosen.levelCandidates.map((c) => 'd' + c.depth + ' role=' + c.role + ' taken=' + c.modeTakenBySibling)));
 
   const p1 = derive(ir, { levels: { theme: { 0: 'mode' } } });
   ok('levels: promoting a depth turns it into the mode axis',
@@ -793,12 +793,56 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
      /exactly one mode axis/.test((p.unresolved.find((q) => q.id === 'level:t') || {}).question || ''));
 }
 {
-  /* A depth whose branches hold DISJOINT names is a namespace, not an axis —
-     the same distinction the group verdict makes, one level down. */
-  const doc = { t: { white: { whiteBg: tok('#ffffff') }, black: { blackBg: tok('#000000') } } };
-  const cands = levelCandidates(toIR(doc));
-  ok('levels: disjoint branches are not proposed as an axis',
-     cands.length === 0, JSON.stringify(cands));
+  /* THREE READINGS, and the measurement tells them apart the same way the
+     group verdict does one level up. Branches carrying the SAME paths are one
+     thing taking different values — an axis. Branches carrying DISJOINT paths
+     are separate namespaces sharing a parent — collections. */
+  const axis = { t: { light: { a: tok('#111111') }, dark: { a: tok('#222222') } } };
+  const namespaces = { t: { white: { whiteBg: tok('#ffffff') }, black: { blackBg: tok('#000000') } } };
+
+  const ca = levelCandidates(toIR(axis));
+  ok('levels: shared paths suggest MODES',
+     ca.length === 1 && ca[0].suggests === 'mode' && ca[0].overlap === 100, JSON.stringify(ca));
+
+  const cn = levelCandidates(toIR(namespaces));
+  ok('levels: disjoint paths suggest COLLECTIONS, rather than nothing',
+     cn.length === 1 && cn[0].suggests === 'collection' && cn[0].overlap === 0, JSON.stringify(cn));
+
+  /* Reading a depth as collections gives each value a collection of its own,
+     each with the single mode a collection without an axis has. */
+  const split = derive(toIR(namespaces), { levels: { t: { 0: 'collection' } } });
+  ok('levels: as collections, each value becomes its own collection',
+     split.collections.length === 2 &&
+     split.collections.map((c) => c.name).sort().join(',') === 'black,white' &&
+     split.collections.every((c) => c.modes.length === 1),
+     JSON.stringify(split.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+
+  /* The same depth, read as modes instead — one collection, two modes. */
+  const folded = derive(toIR(axis), { levels: { t: { 0: 'mode' } } });
+  ok('levels: as modes, one collection carries them as its axis',
+     folded.collections.length === 1 && folded.collections[0].modes.join(',') === 'light,dark',
+     JSON.stringify(folded.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+
+  /* And left alone it is simply part of every name — the default. */
+  const plain = derive(toIR(axis), {});
+  ok('levels: left alone it stays in the names',
+     plain.collections.length === 1 && plain.collections[0].modes.length === 1 &&
+     plain.collections[0].variables === 2);
+}
+{
+  /* A collection split does not compete with a mode: the split produces
+     independent collections, each free to carry an axis of its own. */
+  const doc = { t: { white: { light: { a: tok('#111111') }, dark: { a: tok('#222222') } },
+                     black: { light: { a: tok('#333333') }, dark: { a: tok('#444444') } } } };
+  const p = derive(toIR(doc), { levels: { t: { 0: 'collection', 1: 'mode' } } });
+  ok('levels: collections and modes can be assigned together',
+     p.ok === true && p.collections.length === 2 &&
+     p.collections.every((c) => c.modes.join(',') === 'light,dark'),
+     JSON.stringify(p.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+  ok('levels: and the promoted segments leave the names',
+     compile(toIR(doc), p, {}).program.ops
+       .filter((o) => o.op === 'createVariable')
+       .every((o) => !/white|black|light|dark/.test(o.name)));
 }
 {
   /* applyLevels is a pre-transform on the IR and nothing downstream knows it

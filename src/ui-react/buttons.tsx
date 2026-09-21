@@ -392,7 +392,7 @@ declare global {
     PomImportApplyBtn: any;
     PomImportLevels: {
       set: (candidates: any[], applied: Record<string, Record<string, string>>) => void;
-      onToggle: ((group: string, depth: number, on: boolean) => void) | null;
+      onToggle: ((group: string, depth: number, role: string) => void) | null;
     };
     PomImportQuestions: {
       set: (questions: any[]) => void;
@@ -1139,49 +1139,57 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
 (function mountImportLevels() {
   const container = document.getElementById('import-levels-mount');
   let set: (c: any[], a: any) => void = () => {};
+
+  /* What each reading DOES, said as a consequence rather than a category. */
+  function consequence(c: any, role: string) {
+    const n = c.variablesIfPromoted.toLocaleString();
+    if (role === 'mode') return c.distinct + ' modes of one collection · ' + n + ' variables each';
+    if (role === 'collection') return c.distinct + ' separate collections · about ' + n + ' variables each';
+    return 'stays in every variable\u2019s name underneath';
+  }
+
   function View() {
     const [candidates, setCandidates] = useState<any[]>([]);
-    const [applied, setApplied] = useState<Record<string, Record<string, string>>>({});
-    set = (c, a) => { setCandidates(c || []); setApplied(a || {}); };
+    set = (c) => setCandidates(c || []);
     if (!candidates.length) return null;
 
-    /* derive() has already worked out which is in force and which is displaced
-       by a sibling — read those rather than recomputing them here, so the two
-       cannot disagree. `applied` is only a fallback for a caller that passes
-       raw candidates. */
-    const isOn = (c: any) =>
-      c.applied !== undefined ? c.applied : !!(applied[c.group] && applied[c.group][String(c.depth)] === 'mode');
-    const isBlocked = (c: any) =>
-      c.blockedBySibling !== undefined
-        ? c.blockedBySibling
-        : !isOn(c) && !!(applied[c.group] && Object.keys(applied[c.group]).some((k) => applied[c.group][k] === 'mode'));
-
     return (
-      <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-5)' }}>
         {candidates.map((c) => {
-          const on = isOn(c);
-          const blocked = isBlocked(c);
-          const shown = c.values.slice(0, 4).join(', ') + (c.values.length > 4 ? ', …' : '');
+          const role = c.role || 'name';
+          const shown = c.values.slice(0, 5).join(', ') + (c.values.length > 5 ? ', \u2026' : '');
+          /* A mode elsewhere in this group rules out a mode HERE, and nothing
+             else — reading it as collections stays available either way. */
+          const modeTaken = !!c.modeTakenBySibling;
+          const options = [
+            { value: 'name', label: 'group' },
+            { value: 'mode', label: 'modes', disabled: modeTaken },
+            { value: 'collection', label: 'collections' },
+          ];
           return (
-            <ListControlItem
-              key={c.group + ':' + c.depth}
-              title={c.group + ' · ' + c.distinct + ' modes'}
-              subtitle={blocked
-                ? shown + ' — not available: a collection has one mode axis, and this group already uses it'
-                : shown + ' — ' + c.variablesIfPromoted.toLocaleString() + ' variables each'}
-              disabled={blocked}
-              align="center"
-              trailing={
-                <Switch
-                  label={'Read ' + c.group + ' depth ' + c.depth + ' as a mode axis'}
-                  labelHidden
-                  size="small"
-                  checked={on}
-                  disabled={blocked}
-                  onChange={(v: boolean) => window.PomImportLevels.onToggle?.(c.group, c.depth, v)}
-                />
-              }
-            />
+            <span key={c.group + ':' + c.depth} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text)' }}>
+                {c.group} · {shown}
+              </span>
+              <SegmentedControl
+                /* aria only — the line above is the visible name. */
+                label={'How to read ' + c.group + ' depth ' + c.depth}
+                size="small"
+                block
+                value={role}
+                options={options}
+                onChange={(v: string) => window.PomImportLevels.onToggle?.(c.group, c.depth, v)}
+              />
+              <span style={{ fontSize: 11, color: 'var(--app-text-muted)', lineHeight: 1.45 }}>
+                {consequence(c, role)}
+                {modeTaken && role !== 'mode'
+                  ? ' \u00b7 modes unavailable: a collection has one axis and this group already uses it'
+                  : ''}
+                {c.suggests && role === 'name'
+                  ? ' \u00b7 measured as ' + (c.suggests === 'mode' ? 'an axis' : 'separate namespaces')
+                  : ''}
+              </span>
+            </span>
           );
         })}
       </span>
