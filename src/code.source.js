@@ -2029,6 +2029,124 @@ function buildCoreElevationReference() {
   };
 }
 
+/*
+  Complete every theme's selectedTokenSets so the theme actually closes.
+
+  buildThemes() seeds each theme with the sets it is ABOUT — the scheme set,
+  the mode set — from a hand-written table. That names the theme's subject and
+  says nothing about what the subject's tokens reach into: a scheme aliases
+  through the restriction layer, a mode aliases into the white/black leaves, a
+  breakpoint-driven foundation aliases into the breakpoint sets. Those sets
+  went unselected, so the DTCG 'themes' shape — whose whole promise is one
+  self-contained document per theme — shipped 29 of 38 documents with dangling
+  references, 72% of every reference in the file.
+
+  Rather than extend the table (which is how it got wrong in the first place),
+  this measures: take the theme's seed sets, collect every reference their
+  tokens actually make, and pull in whichever set defines the missing path.
+  Repeat until nothing is missing, because a pulled-in set brings references of
+  its own. That is a fixpoint over the FINAL token tree, so it closes by
+  construction and stays correct when the tree changes.
+
+  Sets added this way are marked 'source' rather than 'enabled': they are
+  dependencies a consumer needs in order to resolve, not content the theme is
+  claiming as its own.
+
+  Where several sets define the same path they are the modes of one collection
+  (the four restriction modes all define restrictions.*), and nothing in the
+  theme says which to take. The tie goes to the earliest in tokenSetOrder,
+  which is built in collection-then-mode order — so this picks the
+  collection's first mode, the one Figma itself falls back to.
+*/
+function completeThemeSelections(out) {
+  var themes = out['$themes'];
+  if (!Array.isArray(themes) || !themes.length) return out;
+
+  var order = (out['$metadata'] && out['$metadata'].tokenSetOrder) ||
+    Object.keys(out).filter(function (k) { return k.charAt(0) !== '$'; });
+
+  // What each set defines, and what each set points at.
+  var defines = {};
+  var refsOf = {};
+  var providers = {};
+
+  order.forEach(function (setName) {
+    var set = out[setName];
+    if (!set || typeof set !== 'object') return;
+    var paths = {};
+    var refs = {};
+    (function walk(node, path) {
+      if (!node || typeof node !== 'object') return;
+      if (Object.prototype.hasOwnProperty.call(node, 'value')) {
+        paths[path] = true;
+        var v = node.value;
+        var str = typeof v === 'string' ? v : JSON.stringify(v);
+        (str.match(/\{[^{}]+\}/g) || []).forEach(function (m) {
+          var inner = m.slice(1, -1);
+          if (inner.indexOf('"') !== -1 || inner.indexOf(':') !== -1) return;
+          if (inner.indexOf('.') === -1) return;
+          if (!/^[A-Za-z0-9_.\- ]+$/.test(inner)) return;
+          refs[inner] = true;
+        });
+        return;
+      }
+      Object.keys(node).forEach(function (k) {
+        if (k.charAt(0) === '$') return;
+        walk(node[k], path ? path + '.' + k : k);
+      });
+    })(set, '');
+    defines[setName] = paths;
+    refsOf[setName] = Object.keys(refs);
+    Object.keys(paths).forEach(function (p) {
+      (providers[p] = providers[p] || []).push(setName);
+    });
+  });
+
+  themes.forEach(function (theme) {
+    var selected = theme.selectedTokenSets || {};
+    var active = Object.keys(selected).filter(function (n) {
+      return selected[n] !== 'disabled' && defines[n];
+    });
+
+    for (var pass = 0; pass < 32; pass++) {
+      var have = {};
+      active.forEach(function (n) {
+        Object.keys(defines[n]).forEach(function (p) { have[p] = true; });
+      });
+
+      var missing = {};
+      active.forEach(function (n) {
+        refsOf[n].forEach(function (r) { if (!have[r]) missing[r] = true; });
+      });
+
+      var added = [];
+      Object.keys(missing).forEach(function (r) {
+        if (have[r]) return;
+        var candidates = (providers[r] || []).filter(function (n) {
+          return active.indexOf(n) === -1;
+        });
+        if (!candidates.length) return;
+        candidates.sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
+        var pick = candidates[0];
+        if (active.indexOf(pick) !== -1) return;
+        active.push(pick);
+        added.push(pick);
+        Object.keys(defines[pick]).forEach(function (p) { have[p] = true; });
+      });
+
+      if (!added.length) break;
+      added.forEach(function (n) { if (!selected[n]) selected[n] = 'source'; });
+    }
+
+    theme.selectedTokenSets = selected;
+  });
+
+  return out;
+}
+
+  // Runs last: every set is final here, so the closure it computes is the one
+  // a consumer will actually validate against.
+
 function toTokenFormat(native, rawData) {
   var out = {};
 
@@ -2334,6 +2452,9 @@ function toTokenFormat(native, rawData) {
   });
 
   out['$metadata'] = { tokenSetOrder: buildTokenSetOrder(out) };
+  // Runs last: every set is final here, so the closure it computes is the one
+  // a consumer will actually validate against.
+  completeThemeSelections(out);
   return out;
 }
 
