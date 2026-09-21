@@ -220,13 +220,21 @@ function previewResolved(source, args) {
   const Emit = require('../src/emit-resolved.js');
   const config = args.config ? require(path.resolve(args.config)) : {};
 
-  const res = Emit.emit(source, {
+  /*
+    Emit.document, not Emit.emit — the same entry the plugin calls, so the CLI
+    and the sandbox produce the same document from the same graph. Layout roles,
+    the fitting loop and the fallbacks are all inside it; the only thing either
+    caller supplies is hooks and vocabulary.
+  */
+  const built = Emit.document(source, {
     hooks: loadCodeJsHooks(),
     pin: config.pin,
+    axes: config.axes,
     renameMode: config.renameMode && config.renameMode.bind(config),
     renameToken: config.renameToken && config.renameToken.bind(config),
     typeHints: config.typeHints && config.typeHints.bind(config)
   });
+  const res = built.emit;
 
   const cls = res.classification;
   console.log(`shape        resolved`);
@@ -284,10 +292,21 @@ function previewResolved(source, args) {
       `a branch records only the questions its walk asked.`);
   }
 
-  let document = null;
+  console.log(`\ndocument`);
+  console.log(`  shape       ${built.shape}`);
+  console.log(`  roles       ${built.roles ? JSON.stringify(built.roles) : '(none detected)'}`);
+  if (built.autoPinned) {
+    console.log(`  held still  ${Object.entries(built.autoPinned).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+    console.log(`              (their other readings are not in this document)`);
+  }
+  Object.keys(built.document).forEach((k) => {
+    console.log(`  ${String(countTokens(built.document[k])).padStart(7)}  ${k}`);
+  });
+
+  let document = built.document;
   if (config.toDocument) {
     document = config.toDocument(res, { merge: mergeTrees });
-    console.log(`\nhouse layout from --config`);
+    console.log(`\nhouse layout from --config (overriding the built-in layout)`);
     let kept = 0;
     Object.keys(document).forEach((k) => {
       const sub = document[k];

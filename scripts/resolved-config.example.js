@@ -1,6 +1,21 @@
 /*
  * Example --config for `dtcg-preview.js --shape resolved`.
  *
+ * WHAT IS LEFT TO STATE HERE, and why it is not in the plugin.
+ *
+ * The plugin produces this document on its own: it measures the architecture,
+ * detects which axis is the breakpoint, the scheme and the light/dark switch,
+ * holds still whatever the layout cannot place, and slugs mode names into path
+ * segments. None of that needs saying.
+ *
+ * What it will not do is contradict the DTCG spec on a system's behalf. A
+ * house convention that calls letter spacing a `number` rather than a length,
+ * or drops a `colours/` namespace while keeping `elevation/`, is a decision
+ * somebody made — measured against one real reference document it accounts for
+ * 2,845 type differences, every one of them defensible only as convention. So
+ * it lives here, in a file versioned next to the tokens it describes, rather
+ * than in plugin settings.
+ *
  * emit-resolved.js derives every structural fact from the file: which
  * collection holds raw values, what the axes are, what order to nest them in,
  * which axes each token varies with, and which branches actually exist. None

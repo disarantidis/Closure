@@ -100,11 +100,22 @@ breakpoint axis is the one some group depends on ALONE, and the scheme and mode
 axes are the first two of the widest group. A file with no such shape gets the
 derived form back rather than being forced into a layout that does not fit.
 
-No vocabulary is applied there yet — the plugin has nowhere for a user to state
-`pin` / `renameMode` / `renameToken` / `typeHints`, so the in-plugin export uses
-the file's own mode names, keeps every axis as a branch, and types from Figma's
-scopes. Correct and complete, but not somebody's house naming. The CLI takes a
-`--config` for that.
+The plugin needs nothing stated. It detects the layout roles, holds still
+whatever the layout cannot place (saying which, in the export's own
+`$extensions`), and slugs mode names into path segments — `S Mobile` becomes
+`mobile`.
+
+**What it will not do is contradict the spec on a system's behalf.** Measured
+against one real reference document, 2,845 tokens differ in `$type` alone
+because that system calls letter spacing a `number` rather than a length, and
+drops a `colours/` namespace while keeping `elevation/`. Those are conventions
+somebody chose, not facts about the file, so they live in the CLI's `--config`
+— a file versioned next to the tokens it describes — rather than in plugin
+settings.
+
+Both routes run the same code: `PomEmitResolved.document()` owns the layout,
+the fitting and the fallbacks, and the plugin and `dtcg-preview.js` each supply
+only hooks and vocabulary.
 
 ### It takes a raw variable graph, not a token tree
 
