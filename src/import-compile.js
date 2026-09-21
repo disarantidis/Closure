@@ -155,12 +155,72 @@ function compile(ir, plan, opts) {
   const push = (op) => program.ops.push(op);
   const stats = { collections: 0, modes: 0, variables: 0, literals: 0, aliases: 0,
                   skippedComposite: 0, skippedExpression: 0, skippedUnresolved: 0,
-                  unitsDropped: [] };
+                  unitsDropped: [], skippedEmpty: 0, skippedEmptyCollections: [] };
   const unitsDropped = stats.unitsDropped;
+
+  /*
+    ── phase 2: variables, but only the ones that will hold something ───────
+
+    A VARIABLE WITH NO VALUE IN ANY MODE IS JUNK. Figma will happily create it
+    and fill it with a type default — 0, black, "" — which looks like a real
+    token and is not one. On a real slice this was 145 of 193 variables: the
+    typography sub-values, whose every value is a reference to something the
+    document does not contain.
+
+    Found by asking what apply() would actually write, rather than by counting
+    what compile() produced.
+
+    Dropping them is a FIXPOINT, not a filter: an alias pointing at a dropped
+    variable has nothing to point at, so it is dropped too, and so on until
+    nothing more falls. Composites are excluded up front for the same reason —
+    they are not variables at all, so nothing may alias them either.
+  */
+  const writable = (spec, alive) => {
+    for (const v of spec.values.values()) {
+      if (v.ref !== undefined) {
+        const t = refTarget.get(v.ref);
+        if (t && t.ft !== null && alive.has(vkey(t.col, t.path))) return true;
+      } else if (v.expr !== undefined) {
+        if (opts.evaluateExpressions && evaluate(v.expr, plan, spec.values.keys().next().value) !== null) return true;
+      } else if (v.literal !== undefined && !(v.literal && typeof v.literal === 'object')) {
+        if (coerce(spec.ft, v.literal).ok) return true;
+      }
+    }
+    return false;
+  };
+
+  const alive = new Set();
+  for (const spec of vars.values()) {
+    if (keep.has(spec.col) && spec.ft !== null) alive.add(vkey(spec.col, spec.path));
+    else if (spec.ft === null) stats.skippedComposite++;
+  }
+  for (;;) {
+    let dropped = 0;
+    for (const spec of vars.values()) {
+      const k = vkey(spec.col, spec.path);
+      if (!alive.has(k)) continue;
+      if (!writable(spec, alive)) { alive.delete(k); dropped++; }
+    }
+    if (!dropped) break;
+  }
+  stats.skippedEmpty = 0;
+  for (const spec of vars.values()) {
+    const k = vkey(spec.col, spec.path);
+    if (keep.has(spec.col) && spec.ft !== null && !alive.has(k)) stats.skippedEmpty++;
+  }
+
+  /* Which collections still have anything in them, decided before phase 1 so
+     an empty one is never created in the first place. */
+  const nonEmpty = new Set();
+  for (const spec of vars.values()) if (alive.has(vkey(spec.col, spec.path))) nonEmpty.add(spec.col);
 
   /* ── phase 1: collections and modes ────────────────────────────────────── */
   for (const [name, modes] of modesOf) {
     if (!keep.has(name)) continue;
+    /* A collection with nothing left alive in it would be created empty, which
+       is the same junk one level up — `foundation` in a real slice, whose every
+       variable was a typography sub-value that got dropped above. */
+    if (!nonEmpty.has(name)) { stats.skippedEmptyCollections.push(name); continue; }
     push({ op: 'createCollection', collection: name, firstMode: modes[0] });
     stats.collections++; stats.modes++;
     for (let i = 1; i < modes.length; i++) {
@@ -169,16 +229,17 @@ function compile(ir, plan, opts) {
     }
   }
 
-  /* ── phase 2: variables ────────────────────────────────────────────────── */
+  /* ── phase 2: the variables that survived ──────────────────────────────── */
   const emitted = new Set();
   for (const spec of vars.values()) {
-    if (!keep.has(spec.col) || spec.ft === null) { if (spec.ft === null) stats.skippedComposite++; continue; }
+    if (!alive.has(vkey(spec.col, spec.path))) continue;
     const name = spec.path.split('.').join('/');
     push({ op: 'createVariable', collection: spec.col, name, type: spec.ft,
            description: spec.description || undefined });
     emitted.add(vkey(spec.col, spec.path));
     stats.variables++;
   }
+
 
   /* ── phase 3: literals ─────────────────────────────────────────────────── */
   for (const spec of vars.values()) {
