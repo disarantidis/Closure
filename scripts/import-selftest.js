@@ -12,6 +12,7 @@ const { compile, toColor, evaluate } = require('../src/import-compile.js');
 const { buildManifest, bindManifest } = require('../src/import-manifest.js');
 const { materialise, fromRawGraph, compare, fingerprint } = require('../src/import-verify.js');
 const { apply, preflight } = require('../src/import-apply.js');
+const { diff, format } = require('../src/import-diff.js');
 
 /* A Figma stand-in with the same surface apply() uses, recording what it was
    told to do. Enough to assert the call sequence and to read the result back
@@ -499,6 +500,92 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
   ok('empty: the drop cascades through aliases',
      c.program.ops.filter((o) => o.op === 'createVariable').length === 0,
      JSON.stringify(c.program.ops.map((o) => o.op + ':' + (o.name || o.collection))));
+}
+
+/* ── diff(): what would change, before anything is written ──────────────── */
+{
+  /* The strongest test available: a file's OWN export, diffed back against it.
+     Everything should already match, and whatever does not is a statement
+     about the exporter rather than the import. */
+  const rawGraph = require('./__fixtures__/roundtrip-figma.json');
+  const ir = toIR(require('./__fixtures__/roundtrip-export.json'));
+  const c = compile(ir, derive(ir, {}), { evaluateExpressions: true });
+  const r = diff(rawGraph, c.program);
+
+  ok('diff: an export of this file creates no new collections',
+     r.collections.added.length === 0, r.collections.added.join(','));
+  ok('diff: and adds no modes', r.modes.added.length === 0, r.modes.added.join(','));
+  ok('diff: and overwrites nothing',
+     r.changed.length === 0, JSON.stringify(r.changed.slice(0, 3)));
+  ok('diff: almost everything is already identical',
+     r.summary.valuesUnchanged > 20, 'unchanged ' + r.summary.valuesUnchanged);
+  ok('diff: the only additions are the primitives the exporter invents',
+     r.variables.added.length > 0 &&
+     r.variables.added.every((k) => /letterSpacing|textCase|textDecoration|lineHeights/.test(k)),
+     r.variables.added.slice(0, 3).join('  '));
+}
+{
+  /* Against an EMPTY document everything is an addition and nothing is a
+     change — the case the plugin's empty state offers. */
+  const ir = toIR(require('./__fixtures__/roundtrip-export.json'));
+  const c = compile(ir, derive(ir, {}), { evaluateExpressions: true });
+  const r = diff([], c.program);
+  ok('diff: against an empty document, everything is new',
+     r.changed.length === 0 && r.untouched.length === 0 &&
+     r.collections.added.length === 3 && r.added.length === 48,
+     JSON.stringify(r.summary));
+}
+{
+  const doc = { $metadata: { tokenSetOrder: ['core'] }, core: { red: tok('#ff0000'), blue: tok('#0000ff') } };
+  const ir = toIR(doc);
+  const c = compile(ir, derive(ir, {}), {});
+
+  /* A document holding the same names with one different value. */
+  const existing = [{
+    id: 'c1', name: 'core', defaultModeId: 'm1', modes: [{ modeId: 'm1', name: 'core' }],
+    variables: [
+      { id: 'v1', name: 'red', resolvedType: 'COLOR', valuesByMode: { m1: { r: 1, g: 0, b: 0, a: 1 } } },
+      { id: 'v2', name: 'blue', resolvedType: 'COLOR', valuesByMode: { m1: { r: 0, g: 1, b: 0, a: 1 } } },
+      { id: 'v3', name: 'mine', resolvedType: 'COLOR', valuesByMode: { m1: { r: 0.5, g: 0.5, b: 0.5, a: 1 } } },
+    ],
+  }];
+  const r = diff(existing, c.program);
+  ok('diff: an identical value is not reported as a change', r.summary.valuesUnchanged === 1);
+  ok('diff: a different value is reported, with both sides',
+     r.changed.length === 1 && /blue/.test(r.changed[0].key) &&
+     r.changed[0].from === '#00ff00' && r.changed[0].to === '#0000ff',
+     JSON.stringify(r.changed));
+  ok('diff: a variable the file does not mention is LEFT ALONE, not deleted',
+     r.untouched.length === 1 && /mine/.test(r.untouched[0]) && r.summary.valuesLeftAlone === 1);
+  ok('diff: an existing collection is touched, not created',
+     r.collections.added.length === 0 && r.collections.touched.indexOf('core') !== -1);
+  ok('diff: format() says what would be overwritten',
+     /WOULD OVERWRITE/.test(format(r)) && /never deletes/.test(format(r)));
+}
+{
+  /* Nothing to do is a real answer. */
+  const doc = { $metadata: { tokenSetOrder: ['core'] }, core: { red: tok('#ff0000') } };
+  const ir = toIR(doc);
+  const c = compile(ir, derive(ir, {}), {});
+  const same = [{ id: 'c1', name: 'core', defaultModeId: 'm1', modes: [{ modeId: 'm1', name: 'core' }],
+    variables: [{ id: 'v1', name: 'red', resolvedType: 'COLOR', valuesByMode: { m1: { r: 1, g: 0, b: 0, a: 1 } } }] }];
+  const r = diff(same, c.program);
+  ok('diff: reports a no-op when the document already matches',
+     r.summary.noop === true && /nothing would change/.test(format(r)));
+}
+{
+  /* A mode arriving on a collection that already exists is called out on its
+     own — it is a bigger commitment than a variable, and it is what the mode
+     ceiling gets spent on. */
+  const doc = { $metadata: { tokenSetOrder: ['m/light', 'm/dark'] },
+    'm/light': { bg: tok('#111111') }, 'm/dark': { bg: tok('#222222') } };
+  const ir = toIR(doc);
+  const c = compile(ir, derive(ir, {}), {});
+  const existing = [{ id: 'c1', name: 'm', defaultModeId: 'm1', modes: [{ modeId: 'm1', name: 'light' }],
+    variables: [{ id: 'v1', name: 'bg', resolvedType: 'COLOR', valuesByMode: { m1: { r: 0.0667, g: 0.0667, b: 0.0667, a: 1 } } }] }];
+  const r = diff(existing, c.program);
+  ok('diff: a new mode on an existing collection is named',
+     r.modes.added.length === 1 && /dark/.test(r.modes.added[0]), JSON.stringify(r.modes.added));
 }
 
 /* ── apply(): the only module that writes ────────────────────────────────── */
