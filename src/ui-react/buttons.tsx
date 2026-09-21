@@ -88,6 +88,10 @@ const svg = (d: string, opts?: { fill?: boolean; fillRule?: 'evenodd' }) => (siz
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>
   );
 const IconArrowLeft = svg('M19 12H5M12 19l-7-7 7-7');
+/* An arrow coming DOWN INTO a tray — the mirror of IconDownload's arrow
+   leaving one. The two live on the same screen and read as a pair: tokens
+   out of Figma, tokens back in. */
+const IconImport = svg('M12 3v12m0 0l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2');
 const IconDownload = svg('M12 3v11m0 0l-4-4m4 4l4-4M5 20h14');
 // The exact gear glyph the Settings page's own header uses (ui.template.html,
 // the decorative .git-logo icon) — same path, so "Settings" reads as one
@@ -478,6 +482,17 @@ mountButton('remove-gitlab-btn-mount', { id: 'remove-gitlab-btn', variant: 'ghos
 // what actually gives this a fill distinct from the header behind it.
 mountIconButton('back-btn-mount', { id: 'back-btn', variant: 'tonal', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
 mountIconButton('settings-btn-mount', { id: 'settings-btn', variant: 'ghost', size: 'large', title: 'Git settings', 'aria-label': 'Git settings', icon: IconSettings(24) });
+/* Import lives in the header and not in the pipeline below it, because the
+   pipeline reads in one direction — variables, to a file, to a repo — and an
+   import runs the other way. Putting it in that column would make the arrow
+   ambiguous. Ghost like the gear beside it: both are ways OUT of this screen,
+   neither is the screen's own action. */
+mountIconButton('import-btn-mount', { id: 'import-btn', variant: 'ghost', size: 'large', title: 'Import tokens from JSON', 'aria-label': 'Import tokens from JSON', icon: IconImport(24) });
+mountIconButton('import-back-btn-mount', { id: 'import-back-btn', variant: 'tonal', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
+mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'filled', size: 'large', label: 'Choose a JSON file' });
+/* The empty state is where an import is most obviously the right thing to do,
+   so it gets its own way in rather than making someone find the header. */
+mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', icon: IconImport(16) });
 
 /* ── Settings header: light/dark theme toggle ────────────────────────────── */
 // Flips <html>'s own data-theme attribute directly: every colour in this

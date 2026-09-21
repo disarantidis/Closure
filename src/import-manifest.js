@@ -1,4 +1,11 @@
 /*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
   $figmaStructure — the export declaring the architecture it came out of, so
   the import does not have to infer it back.
 
@@ -161,4 +168,8 @@ function bindManifest(ir, manifest) {
   return { bindings, bound, unbound, collections: cols.length };
 }
 
-module.exports = { buildManifest, bindManifest, norm };
+  var api = { buildManifest, bindManifest, norm };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportManifest = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

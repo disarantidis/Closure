@@ -1,4 +1,11 @@
 /*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
   COMPILE — turn a plan into an ordered list of operations, or refuse.
 
   THIS IS THE GATE, AND IT EXISTS BEFORE ANY WRITER DOES. That ordering is
@@ -29,8 +36,10 @@
      topological sort the alias DAG seems to require is never needed.
 */
 
-const { vkey } = require('./import-derive.js');
-
+  var __dep = (typeof require !== 'undefined')
+    ? require('./import-derive.js')
+    : global.PomImportDerive;
+  var vkey = __dep.vkey;
 /*
   #rgb / #rrggbb / #rrggbbaa / rgb() / rgba() -> Figma's 0..1 RGBA.
 
@@ -387,4 +396,8 @@ function toManifest(plan) {
   };
 }
 
-module.exports = { compile, toManifest, toColor, coerce, evaluate };
+  var api = { compile, toManifest, toColor, coerce, evaluate };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportCompile = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

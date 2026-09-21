@@ -1,4 +1,11 @@
 /*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
   STRUCTURAL CLOSURE — does the round trip close?
 
   Closure already validates REFERENCE closure: every {ref} in an export has a
@@ -192,4 +199,8 @@ function compare(source, imported, opts) {
   return res;
 }
 
-module.exports = { materialise, fromRawGraph, lines, fingerprint, compare };
+  var api = { materialise, fromRawGraph, lines, fingerprint, compare };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportVerify = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

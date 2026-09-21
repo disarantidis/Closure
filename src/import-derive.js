@@ -1,4 +1,11 @@
 /*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
   DERIVE — project an IR onto Figma's three structural slots, and report the
   projection rather than performing it.
 
@@ -29,8 +36,10 @@
   question once answers it for every later import of the same file.
 */
 
-const { bindManifest } = require('./import-manifest.js');
-
+  var __dep = (typeof require !== 'undefined')
+    ? require('./import-manifest.js')
+    : global.PomImportManifest;
+  var bindManifest = __dep.bindManifest;
 /* Above MODES_MIN the variants are read as modes, at or below SEPARATE_MAX as
    separate collections, and anything between is refused. The band is wide on
    purpose: real axes share ~all their paths and real namespaces share ~none, so
@@ -347,6 +356,10 @@ function derive(ir, opts) {
   return plan;
 }
 
-module.exports = { derive, figmaType, isComposite, vkey,
+  var api = { derive, figmaType, isComposite, vkey,
                    MODES_MIN, SEPARATE_MAX, FIGMA_TYPES,
                    FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportDerive = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

@@ -1,4 +1,11 @@
 /*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
   IMPORT IR — one shape every token format is flattened into, so that the
   structural decisions are made ONCE instead of once per format.
 
@@ -189,4 +196,8 @@ function toIR(doc, opts) {
   return fromFlat(doc, opts && opts.name);
 }
 
-module.exports = { toIR, detect, fromLegacy, fromDtcg, fromFlat, splitSet, normaliseValue };
+  var api = { toIR, detect, fromLegacy, fromDtcg, fromFlat, splitSet, normaliseValue };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportIR = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

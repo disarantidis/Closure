@@ -1088,6 +1088,91 @@
       to { transform: translateY(-6px); }
     }
     
+    /* Sits under the hint, with enough space that it reads as an offer
+       rather than part of the sentence above it. */
+    .empty-state-action { margin-top: 18px; }
+
+    /* ── Import page ──────────────────────────────────────────────────────
+       Borrows .settings-page's scrolling and content inset wholesale — it is
+       the same kind of screen and there is no reason for the two to differ. */
+    .import-page { overflow-y: auto; overflow-x: hidden; }
+    .import-page::-webkit-scrollbar { width: 8px; }
+    .import-page::-webkit-scrollbar-track { background: transparent; }
+    .import-page::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
+
+    /* The drop target. A dashed edge is the one border treatment on this
+       screen that says "not a container yet" — every real card here is
+       solid. */
+    .import-drop {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 32px 16px;
+      border: 1.5px dashed var(--app-border);
+      border-radius: 24px;
+      text-align: center;
+      color: var(--app-text-muted);
+      transition: border-color 150ms ease, background 150ms ease;
+    }
+    /* Only while something is actually over it — a permanent highlight would
+       make an empty drop target look like it had already received a file. */
+    .import-drop.is-over {
+      border-color: var(--app-text);
+      background: var(--app-surface);
+    }
+    .import-drop-icon { opacity: 0.4; margin-bottom: 2px; }
+    .import-drop-title {
+      margin: 0;
+      font-weight: 700;
+      color: var(--app-text);
+      font-size: var(--type-body-m-size);
+    }
+    .import-drop-hint { margin: 0 0 10px; font-size: 11px; opacity: 0.75; }
+
+    .import-card {
+      background: var(--background);
+      border-radius: 24px;
+      padding: var(--spacing-component-6);
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .import-card-title {
+      margin: 0;
+      font-weight: 700;
+      color: var(--app-text);
+      font-size: var(--type-body-m-size);
+    }
+    /* A question and a failure are the two states that must not read as an
+       ordinary card, because both of them stop the import. */
+    .import-card.is-question { outline: 1.5px solid #d9a441; outline-offset: -1.5px; }
+    .import-card.is-problem  { outline: 1.5px solid #d04545; outline-offset: -1.5px; }
+    .import-problem-body { margin: 0; font-size: 12px; color: var(--app-text-muted); line-height: 1.5; }
+
+    /* Fact rows: the number first and right-aligned, so the eye can run down
+       the column without reading the labels beside it. */
+    .import-facts { display: flex; flex-direction: column; gap: 4px; }
+    .import-fact { display: flex; gap: 8px; font-size: 12px; color: var(--app-text-muted); }
+    .import-fact b {
+      min-width: 62px;
+      text-align: right;
+      color: var(--app-text);
+      font-variant-numeric: tabular-nums;
+    }
+    .import-fact.is-quiet { opacity: 0.65; }
+    .import-detail {
+      margin: 2px 0 0 70px;
+      font-size: 11px;
+      opacity: 0.7;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .import-question { margin-bottom: 12px; font-size: 12px; color: var(--app-text-muted); line-height: 1.5; }
+    .import-question:last-child { margin-bottom: 0; }
+    .import-question code { color: var(--app-text); font-size: 11px; }
+
     .empty-state .hint {
       font-size: 11px;
       margin-top: 8px;
@@ -21375,7 +21460,8 @@ html[data-theme=dark] {
           <div id="version-tag-mount" class="version-tag-mount"></div>
         </div>
         <div class="header-right">
-          <span id="settings-btn-mount"></span>
+          <span id="import-btn-mount"></span>
+        <span id="settings-btn-mount"></span>
         </div>
       </div>
     </header>
@@ -21434,6 +21520,10 @@ html[data-theme=dark] {
     <div class="empty-state" id="empty-state" style="display: none;">
       <p>No variable collections found.</p>
       <p class="hint">Add variables in Figma to see them here.</p>
+      <!-- The one screen where importing is unambiguously the right next
+           move, so it is offered here directly rather than leaving someone
+           to find the header. Same destination as the header button. -->
+      <span id="import-empty-btn-mount" class="empty-state-action"></span>
     </div>
   </div>
   
@@ -21589,6 +21679,80 @@ html[data-theme=dark] {
         </div>
       </div>
     </div>
+    </div>
+  </div>
+
+  <!--
+    IMPORT. A separate page rather than a section of the main screen, for the
+    same reason the header button is not in the pipeline column: the main
+    screen reads downward in one direction — variables, to a file, to a repo —
+    and this runs the other way.
+
+    It is a sequence, and each step only appears once the one before it has an
+    answer: choose a file -> what it is -> anything it cannot decide alone ->
+    what would change. Nothing is written until the last of those has been
+    read, which is the whole point of showing them.
+  -->
+  <div class="page import-page" id="import-page">
+    <header class="header-settings">
+      <div class="header-panel">
+        <div class="git-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v12m0 0l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/>
+          </svg>
+        </div>
+        <h1 class="title">Import</h1>
+        <span id="import-back-btn-mount"></span>
+      </div>
+    </header>
+    <div class="settings-page-content">
+
+      <!-- Step 1. A drop target that is also a button — the input itself is
+           hidden and clicked through, which is the only way to get a native
+           file dialog behind a styled control. -->
+      <div class="import-drop" id="import-drop">
+        <svg class="import-drop-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6"/>
+        </svg>
+        <p class="import-drop-title">Drop a token JSON here</p>
+        <p class="import-drop-hint">Tokens Studio, W3C DTCG, or a plain token tree</p>
+        <span id="import-choose-btn-mount"></span>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+      </div>
+
+      <!-- Step 2. What arrived. -->
+      <div class="import-card" id="import-summary" data-level="4" hidden>
+        <div class="json-download-header">
+          <div class="json-download-title-group">
+            <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+            </svg>
+            <p class="json-download-title" id="import-summary-name">file.json</p>
+          </div>
+        </div>
+        <div class="import-facts" id="import-facts"></div>
+      </div>
+
+      <!-- Step 3. Only what the file cannot decide on its own. Empty far more
+           often than not — on a real export every group came out certain. -->
+      <div class="import-card is-question" id="import-questions" data-level="4" hidden>
+        <p class="import-card-title">This file does not say</p>
+        <div id="import-questions-body"></div>
+      </div>
+
+      <!-- Step 4. The answer to the only question that matters before
+           writing: what is about to happen to this file. -->
+      <div class="import-card" id="import-changes" data-level="4" hidden>
+        <p class="import-card-title">What would change</p>
+        <div id="import-changes-body"></div>
+      </div>
+
+      <div class="import-card is-problem" id="import-problem" data-level="4" hidden>
+        <p class="import-card-title" id="import-problem-title">Could not read that file</p>
+        <p class="import-problem-body" id="import-problem-body"></p>
+      </div>
+
     </div>
   </div>
 
@@ -47445,6 +47609,7 @@ html[data-theme=dark] {
   var TOP_CARD_LEVEL = 4;
   var svg = (d, opts) => (size) => opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d, fillRule: opts.fillRule, clipRule: opts.fillRule }) }) : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d }) });
   var IconArrowLeft = svg("M19 12H5M12 19l-7-7 7-7");
+  var IconImport = svg("M12 3v12m0 0l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2");
   var IconDownload = svg("M12 3v11m0 0l-4-4m4 4l4-4M5 20h14");
   var IconSettings = svg(
     "m14 1 .5 2.75a.992.992 0 0 0 1.448.71l.102-.06 2.3-1.6 2.85 2.85-1.6 2.3c-.378.567-.087 1.312.537 1.52l.113.03L23 10v4l-2.75.5a.992.992 0 0 0-.71 1.448l.06.102 1.6 2.3-2.85 2.85-2.3-1.6c-.567-.378-1.312-.087-1.52.537l-.03.113L14 23h-4l-.5-2.75c-.142-.661-.863-1.01-1.448-.71l-.102.06-2.3 1.6-2.85-2.85 1.6-2.3c.378-.567.087-1.312-.537-1.52l-.113-.03L1 14v-4l2.75-.5a.992.992 0 0 0 .71-1.448L4.4 7.95l-1.6-2.3L5.65 2.8l2.3 1.6c.567.378 1.312.087 1.52-.537l.03-.113L10 1zm-1.25 1.5h-1.5l-.3 1.5c-.2 1.2-1.25 2.05-2.45 2.05-.437 0-.875-.115-1.246-.345L5.8 4.7 4.75 5.75l.9 1.3c.464.65.584 1.472.318 2.227L5.9 9.45c-.279.743-.902 1.27-1.67 1.462l-.18.038-1.55.3v1.5l1.55.25c.85.15 1.5.7 1.85 1.5a2.43 2.43 0 0 1-.149 2.247l-.101.153-.9 1.3 1.05 1.05 1.3-.9c.4-.3.9-.45 1.4-.45 1.145 0 2.154.774 2.418 1.889l.332 1.711h1.5l.3-1.55c.2-1.2 1.25-2.05 2.45-2.05.438 0 .875.115 1.245.345L18.2 19.25l1.05-1.05-.9-1.3c-.5-.7-.55-1.6-.25-2.3.279-.743.902-1.27 1.67-1.462l.18-.038 1.55-.3v-1.5l-1.55-.3c-.85-.15-1.5-.7-1.85-1.5a2.43 2.43 0 0 1 .149-2.247l.101-.153.9-1.3-1.05-1.05-1.3.9c-.4.3-.9.45-1.4.45a2.474 2.474 0 0 1-2.418-1.889zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6",
@@ -47755,6 +47920,10 @@ html[data-theme=dark] {
   mountButton("remove-gitlab-btn-mount", { id: "remove-gitlab-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitLab" }, CARD_LEVEL);
   mountIconButton("back-btn-mount", { id: "back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
   mountIconButton("settings-btn-mount", { id: "settings-btn", variant: "ghost", size: "large", title: "Git settings", "aria-label": "Git settings", icon: IconSettings(24) });
+  mountIconButton("import-btn-mount", { id: "import-btn", variant: "ghost", size: "large", title: "Import tokens from JSON", "aria-label": "Import tokens from JSON", icon: IconImport(24) });
+  mountIconButton("import-back-btn-mount", { id: "import-back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
+  mountButton("import-choose-btn-mount", { id: "import-choose-btn", variant: "filled", size: "large", label: "Choose a JSON file" });
+  mountButton("import-empty-btn-mount", { id: "import-empty-btn", variant: "tonal", size: "medium", label: "Import from JSON", icon: IconImport(16) });
   (function mountThemeToggle() {
     const container = document.getElementById("theme-toggle-btn-mount");
     function View() {
@@ -49172,6 +49341,1554 @@ react/cjs/react-jsx-runtime.development.js:
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
 </script>
 
+  <!-- The import pipeline (src/import-*.js), inlined by scripts/build-ui.js.
+       Defines window.PomImportIR / PomImportManifest / PomImportDerive /
+       PomImportCompile / PomImportVerify / PomImportDiff.
+
+       It runs HERE, in the UI, rather than in the sandbox, for two reasons.
+       None of it touches `figma` — reading a file, deciding the projection and
+       compiling a program are all pure — and derive() is what RAISES the
+       questions an import has to answer, so it belongs on the side that can
+       ask them. Only the finished program crosses to the sandbox, once, after
+       the user has seen the diff and agreed to it. -->
+  <script>// ===== src/import-ir.js =====
+/*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
+  IMPORT IR — one shape every token format is flattened into, so that the
+  structural decisions are made ONCE instead of once per format.
+
+  THE ADAPTERS DELIBERATELY DO NOT DECIDE COLLECTION AND MODE. That is the
+  whole point of the boundary. An adapter knows how to read its own syntax —
+  where a token's value lives, how a reference is spelled, what a set is called
+  — and nothing else. It emits rows carrying the file's own `group` / `variant`
+  decomposition verbatim, and derive() is the only thing that ever decides
+  which of those become Figma collections and which become modes.
+
+  Splitting it the other way round is the mistake that makes this unmaintainable:
+  every new format would re-implement the same projection, each slightly
+  differently, and the "base/white is not a mode" rule would have to be
+  rediscovered in each one.
+
+  A ROW IS:
+    { group, variant, path, type, value, description }
+
+  `group`/`variant` come from the set name ("mode/light" -> mode + light). A set
+  with no separator is its own group with a single variant. `value` is either a
+  literal or { ref: 'token.path' } — normalising the reference syntax is the
+  adapter's job, because that IS format-specific, while the graph built on top
+  of it is not.
+*/
+
+/* A reference in Tokens Studio / legacy syntax: "{a.b.c}". Anything else
+   containing braces is an EXPRESSION ("{dimension.1}*2"), which is a different
+   thing entirely and is classified as such rather than silently evaluated —
+   see derive()'s losses.expressions. */
+const PURE_REF = /^\{([^}]+)\}$/;
+
+function splitSet(setName) {
+  const i = setName.indexOf('/');
+  return i === -1
+    ? { group: setName, variant: setName, grouped: false }
+    : { group: setName.slice(0, i), variant: setName.slice(i + 1), grouped: true };
+}
+
+function normaliseValue(raw) {
+  if (typeof raw === 'string') {
+    const m = PURE_REF.exec(raw.trim());
+    if (m) return { ref: m[1] };
+    if (raw.indexOf('{') !== -1) return { expr: raw };
+  }
+  return { literal: raw };
+}
+
+/* ── Tokens Studio / Closure "legacy" ──────────────────────────────────────
+   Token sets at the top level, $metadata.tokenSetOrder naming them, $themes
+   describing which sets a theme enables. A token is any object carrying both
+   `value` and `type`. */
+function fromLegacy(doc) {
+  const sets = (doc.$metadata && doc.$metadata.tokenSetOrder) ||
+               Object.keys(doc).filter((k) => k.charAt(0) !== '$');
+  const rows = [];
+  const seenSets = [];
+  for (const set of sets) {
+    const node = doc[set];
+    if (!node || typeof node !== 'object') continue;
+    seenSets.push(set);
+    const { group, variant } = splitSet(set);
+    (function walk(o, path) {
+      for (const k of Object.keys(o)) {
+        const v = o[k];
+        if (!v || typeof v !== 'object') continue;
+        if (v.value !== undefined && v.type) {
+          rows.push({
+            group, variant, set,
+            path: path.concat(k).join('.'),
+            type: v.type,
+            value: normaliseValue(v.value),
+            description: v.description || '',
+          });
+        } else {
+          walk(v, path.concat(k));
+        }
+      }
+    })(node, []);
+  }
+  return {
+    source: 'legacy',
+    rows,
+    sets: seenSets,
+    themes: doc.$themes || null,
+    /* Present only on a file this tool exported. When it is there the whole
+       derivation is skipped — a declaration beats an inference, always. */
+    manifest: doc.$figmaStructure || null,
+  };
+}
+
+/* ── W3C DTCG ──────────────────────────────────────────────────────────────
+   $value / $type instead of value / type, {a.b.c} references spelled the same
+   way, and groups that may carry an inherited $type.
+
+   THE TOP-LEVEL KEY IS NOT ALWAYS A SET, and this is the one place the two
+   formats genuinely disagree. In Tokens Studio a set is a FILE and its name is
+   not part of any token's path, so "{brand.primary}" means brand.primary
+   inside whichever set is enabled. In DTCG there are no sets — the document is
+   one tree and "{core.red}" names the path from the ROOT, top-level group
+   included.
+
+   So: a top-level key containing "/" is read as a set (that separator only
+   appears in the set-per-file convention, never in a DTCG group name) and is
+   stripped from the path; a plain key is a real group and STAYS in the path.
+   Getting this backwards silently breaks every reference in the document —
+   which is exactly what the first run of this adapter did. */
+function fromDtcg(doc) {
+  const rows = [];
+  const seenSets = [];
+  for (const top of Object.keys(doc)) {
+    if (top.charAt(0) === '$') continue;
+    seenSets.push(top);
+    const { group, variant, grouped } = splitSet(top);
+    const base = grouped ? [] : [top];
+    (function walk(o, path, inheritedType) {
+      const t = o.$type || inheritedType;
+      for (const k of Object.keys(o)) {
+        if (k.charAt(0) === '$') continue;
+        const v = o[k];
+        if (!v || typeof v !== 'object') continue;
+        if (v.$value !== undefined) {
+          rows.push({
+            group, variant, set: top,
+            path: path.concat(k).join('.'),
+            type: v.$type || t || null,
+            value: normaliseValue(v.$value),
+            description: v.$description || '',
+          });
+        } else {
+          walk(v, path.concat(k), t);
+        }
+      }
+    })(doc[top], base, null);
+  }
+  return { source: 'dtcg', rows, sets: seenSets, themes: doc.$themes || null,
+           manifest: doc.$figmaStructure || null };
+}
+
+/* ── FLAT ──────────────────────────────────────────────────────────────────
+   No sets at all — one tree of tokens. Perfectly legitimate, and the right
+   answer is one collection with one mode; it is only "structureless" relative
+   to formats that carry axes. Handled explicitly so it does not fall through
+   one of the above and get mis-grouped by a stray "/" in a name. */
+function fromFlat(doc, name) {
+  const rows = [];
+  const group = name || 'tokens';
+  (function walk(o, path) {
+    for (const k of Object.keys(o)) {
+      if (k.charAt(0) === '$') continue;
+      const v = o[k];
+      if (!v || typeof v !== 'object') continue;
+      const val = v.$value !== undefined ? v.$value : v.value;
+      const typ = v.$type || v.type;
+      if (val !== undefined && typ) {
+        rows.push({ group, variant: group, set: group, path: path.concat(k).join('.'),
+                    type: typ, value: normaliseValue(val),
+                    description: v.$description || v.description || '' });
+      } else walk(v, path.concat(k));
+    }
+  })(doc, []);
+  return { source: 'flat', rows, sets: [group], themes: null, manifest: null };
+}
+
+/* Which adapter — decided by what the document actually contains, not by a
+   file name or a flag the caller might get wrong. */
+function detect(doc) {
+  if (doc.$metadata && doc.$metadata.tokenSetOrder) return 'legacy';
+  let sawDollarValue = false, sawPlainValue = false;
+  (function probe(o, depth) {
+    if (!o || typeof o !== 'object' || depth > 6) return;
+    for (const k of Object.keys(o)) {
+      const v = o[k];
+      if (!v || typeof v !== 'object') continue;
+      if (v.$value !== undefined) { sawDollarValue = true; return; }
+      if (v.value !== undefined && v.type) { sawPlainValue = true; return; }
+      probe(v, depth + 1);
+    }
+  })(doc, 0);
+  if (sawDollarValue) return 'dtcg';
+  if (sawPlainValue) return 'legacy';
+  return 'flat';
+}
+
+function toIR(doc, opts) {
+  const kind = (opts && opts.format) || detect(doc);
+  if (kind === 'legacy') return fromLegacy(doc);
+  if (kind === 'dtcg') return fromDtcg(doc);
+  return fromFlat(doc, opts && opts.name);
+}
+
+  var api = { toIR, detect, fromLegacy, fromDtcg, fromFlat, splitSet, normaliseValue };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportIR = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
+
+// ===== src/import-manifest.js =====
+/*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
+  $figmaStructure — the export declaring the architecture it came out of, so
+  the import does not have to infer it back.
+
+  WHY A DECLARATION BEATS THE MEASUREMENT, even a measurement that works.
+  derive()'s path-overlap rule recovers the right shape from a real export and
+  refuses honestly when it cannot. But it can only ever recover the SHAPE. It
+  cannot recover a NAME the export threw away, and it is inference where the
+  exporter had certainty: at export time we are reading the collections
+  straight out of Figma and know, with no doubt at all, that ".white" is its
+  own collection and that its mode is called ".white". Writing that down costs
+  one small object and removes a whole class of question.
+
+  WHAT IT FIXES CONCRETELY. Round-tripping a real file without it produced:
+
+      .core        -> core             the leading dot, gone
+      _restricted  -> restrictions     renamed by the exporter's own rules
+      .breakpoint  -> breakpoint       and "S Mobile" -> "mobile"
+
+  Every one of those is the exporter's spelling, not the file's, and no
+  derivation can undo them — the information is simply not in the JSON. With
+  the manifest it is, and the import reproduces the original names.
+
+  IT IS A HINT, NOT A CONTRACT. A manifest that does not match the document it
+  arrives in (sets added, renamed, hand-edited) is IGNORED rather than trusted,
+  and the derivation runs as if it were absent. A stale declaration that
+  overrides a live measurement would be worse than no declaration at all.
+*/
+
+/* Figma collection names carry prefixes the export strips — ".core" becomes
+   "core", "_restricted" becomes "restrictions". Matching is done on a
+   normalised form so a manifest still binds to the sets the exporter wrote. */
+function norm(s) {
+  return String(s).replace(/^[._]+/, '').toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+/*
+  EXPORT SIDE. Built from the raw variable graph, which is the only place the
+  truth exists — by the time the token tree is assembled the names have already
+  been rewritten.
+*/
+function buildManifest(rawCollections) {
+  if (!rawCollections || !rawCollections.length) return null;
+  return {
+    version: 1,
+    collections: rawCollections.map(function (c) {
+      return {
+        figmaName: c.name,
+        modes: (c.modes || []).map(function (m) { return m.name; }),
+        variables: (c.variables || []).length,
+      };
+    }),
+  };
+}
+
+/*
+  IMPORT SIDE. Bind each of the IR's groups to a manifest collection.
+
+  A group binds one of two ways, and which one IS the verdict — no measuring
+  needed:
+
+    'modes'     one collection whose mode names are this group's variants
+                (mode/light + mode/dark  ->  ".mode" [light, dark])
+
+    'separate'  one collection PER variant, each a single-mode collection whose
+                name matches that variant
+                (base/white + base/black  ->  ".white", ".black")
+
+  Anything that does not bind cleanly returns null for that group and the
+  caller falls back to measuring it. Partial binding is fine and expected: a
+  hand-added set should not invalidate the declaration for everything else.
+*/
+function bindManifest(ir, manifest) {
+  if (!manifest || !manifest.collections || !manifest.collections.length) return null;
+
+  const cols = manifest.collections;
+  const byNorm = new Map();
+  for (const c of cols) {
+    const k = norm(c.figmaName);
+    if (!byNorm.has(k)) byNorm.set(k, []);
+    byNorm.get(k).push(c);
+  }
+
+  const groups = new Map();                     // group -> variants in order
+  for (const r of ir.rows) {
+    if (!groups.has(r.group)) groups.set(r.group, []);
+    const v = groups.get(r.group);
+    if (v.indexOf(r.variant) === -1) v.push(r.variant);
+  }
+
+  const bindings = new Map();                   // group -> binding
+  let bound = 0, unbound = 0;
+
+  const sig = (names) => names.map(norm).sort().join('\u0000');
+  const used = new Set();
+
+  for (const [group, variants] of groups) {
+    const want = sig(variants);
+    const byName = byNorm.get(norm(group)) || [];
+
+    /* 1. NAME AND MODES BOTH AGREE — the unambiguous case. Modes compared as a
+          set, since their order carries no meaning. */
+    let asModes = byName.filter((c) => sig(c.modes) === want)[0];
+    let how = 'name and modes';
+
+    /* 2. MODES AGREE, NAME DOES NOT. The exporter renames collections as well
+          as stripping their prefixes (_restricted -> restrictions), so the
+          name is the less reliable half of the pair. A mode-set that matches
+          exactly ONE unclaimed collection identifies it on its own; if two
+          could match, it identifies nothing and this stays unbound. */
+    if (!asModes) {
+      const bySig = cols.filter((c) => !used.has(c) && sig(c.modes) === want);
+      if (bySig.length === 1) { asModes = bySig[0]; how = 'modes'; }
+    }
+
+    /* 3. NAME AGREES AND THE COUNT DOES, BUT THE MODE NAMES DO NOT — the
+          exporter rewrites those too (".breakpoint"'s "S Mobile" -> "mobile").
+          Bound positionally, because the sets are written in the collection's
+          own mode order. Weaker than the two above, so it is recorded as such
+          and a caller can tell the difference. */
+    let positional = false;
+    if (!asModes) {
+      const byCount = byName.filter((c) => !used.has(c) && c.modes.length === variants.length)[0];
+      if (byCount) { asModes = byCount; how = 'name and mode count (positional)'; positional = true; }
+    }
+
+    if (asModes) {
+      used.add(asModes);
+      const modeName = {};
+      variants.forEach(function (v, i) {
+        modeName[v] = positional
+          ? asModes.modes[i]
+          : (asModes.modes.filter((m) => norm(m) === norm(v))[0] || v);
+      });
+      bindings.set(group, { verdict: 'modes', collection: asModes.figmaName, modeName, how });
+      bound++;
+      continue;
+    }
+
+    /* 'separate': every variant is its own single-mode collection. */
+    const per = {};
+    const claimed = [];
+    let all = true;
+    for (const v of variants) {
+      const c = (byNorm.get(norm(v)) || []).filter((x) => !used.has(x) && x.modes.length === 1)[0];
+      if (!c) { all = false; break; }
+      per[v] = { collection: c.figmaName, mode: c.modes[0] };
+      claimed.push(c);
+    }
+    if (all && variants.length) {
+      claimed.forEach((c) => used.add(c));
+      bindings.set(group, { verdict: 'separate', per, how: 'one single-mode collection per variant' });
+      bound++;
+      continue;
+    }
+
+    unbound++;
+  }
+
+  if (!bound) return null;                      // nothing matched: treat as absent
+  return { bindings, bound, unbound, collections: cols.length };
+}
+
+  var api = { buildManifest, bindManifest, norm };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportManifest = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
+
+// ===== src/import-derive.js =====
+/*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
+  DERIVE — project an IR onto Figma's three structural slots, and report the
+  projection rather than performing it.
+
+  THIS MODULE WRITES NOTHING. It has no Figma dependency at all, which is what
+  lets the hard part be tested against real exports without a document open and
+  without any risk of half-applying a wrong answer.
+
+  THE ONE DECISION THAT MATTERS is whether the variants of a group are MODES of
+  one collection or SEPARATE collections that happen to share a name prefix.
+  "mode/light" + "mode/dark" are the first; "base/white" + "base/black" are the
+  second, and the two are indistinguishable by name. Getting it wrong does not
+  throw — it produces a collection in which every variable is empty in all but
+  one of its modes, which looks fine until someone tries to use it.
+
+  So it is decided by measurement, not by naming: DO THE VARIANTS DEFINE THE
+  SAME TOKEN PATHS? Alternative values for one thing are modes. Disjoint path
+  sets are separate namespaces. On a real 34,481-token export this came out
+  absolute — every group was either 100% or 0%, never in between.
+
+  AND WHERE IT IS NOT ABSOLUTE, THE IMPORT STOPS. A group at 61% overlap is not
+  a thing to guess at, because the wrong guess is silent. Ambiguity blocks and
+  asks; it never picks the likelier reading.
+
+  WHAT AN ANSWER LOOKS LIKE. Every open question gets an id — "group:theme",
+  "type:core/radius.s", "ref:shared.c" — and a caller resolves it by passing a
+  decision under that id. Decisions are the ONLY way past a refusal, they are
+  recorded in the plan, and they serialise into the manifest, so answering a
+  question once answers it for every later import of the same file.
+*/
+
+  var __dep = (typeof require !== 'undefined')
+    ? require('./import-manifest.js')
+    : global.PomImportManifest;
+  var bindManifest = __dep.bindManifest;
+/* Above MODES_MIN the variants are read as modes, at or below SEPARATE_MAX as
+   separate collections, and anything between is refused. The band is wide on
+   purpose: real axes share ~all their paths and real namespaces share ~none, so
+   a group landing in the middle means the file is not saying what we think it
+   is — which is a reason to ask, not to round. */
+const MODES_MIN = 0.9;
+const SEPARATE_MAX = 0;
+
+/* Figma has four variable types. Everything else is either one of these in
+   disguise or not a variable at all. */
+const FLOAT_TYPES = ['dimension', 'borderRadius', 'fontSizes', 'lineHeights', 'letterSpacing',
+                     'number', 'spacing', 'sizing', 'borderWidth', 'opacity', 'paragraphSpacing',
+                     'paragraphIndent'];
+const STRING_TYPES = ['fontFamilies', 'fontWeights', 'textCase', 'textDecoration', 'string',
+                      'asset', 'text', 'fontFamily', 'fontWeight'];
+/* Not "unsupported" — NOT VARIABLES. A shadow or a type ramp is a Figma STYLE,
+   a different API with a different shape. Reported as a loss for the variable
+   importer and as the scope of a second one. */
+const COMPOSITE_TYPES = ['typography', 'boxShadow', 'border', 'shadow', 'composition', 'gradient'];
+
+const FIGMA_TYPES = ['COLOR', 'FLOAT', 'STRING', 'BOOLEAN'];
+
+function figmaType(t) {
+  if (t == null) return null;
+  if (t === 'color') return 'COLOR';
+  if (t === 'boolean') return 'BOOLEAN';
+  if (FLOAT_TYPES.indexOf(t) !== -1) return 'FLOAT';
+  if (STRING_TYPES.indexOf(t) !== -1) return 'STRING';
+  if (COMPOSITE_TYPES.indexOf(t) !== -1) return null;
+  return 'STRING';
+}
+const isComposite = (t) => COMPOSITE_TYPES.indexOf(t) !== -1;
+
+const SEP = '␟';
+const vkey = (col, path) => col + SEP + path;
+
+function derive(ir, opts) {
+  opts = opts || {};
+  const modeCeiling = opts.modeCeiling || Infinity;
+  const decisions = opts.decisions || {};
+
+  const plan = {
+    source: ir.source,
+    usedManifest: false,
+    collections: [],
+    ambiguous: [],
+    blocked: [],
+    losses: { composites: [], expressions: [], unresolvedRefs: [], typeConflicts: [], emptyCollections: [] },
+    refCollisions: [],
+    /* Every open question, by id. compile() refuses while this is non-empty,
+       and each entry names exactly what a decision for it must say. */
+    unresolved: [],
+    decisionsApplied: [],
+    decisionsUnused: [],
+    totals: {},
+    ok: false,
+  };
+
+  const claim = (id) => {
+    if (!Object.prototype.hasOwnProperty.call(decisions, id)) return undefined;
+    plan.decisionsApplied.push({ id, value: decisions[id] });
+    return decisions[id];
+  };
+  const ask = (id, question, options, detail) =>
+    plan.unresolved.push(Object.assign({ id, question, options }, detail || {}));
+
+  /* ── 1. group verdicts ─────────────────────────────────────────────────── */
+  const groups = new Map();                 // group -> Map(variant -> Set(path))
+  for (const r of ir.rows) {
+    if (!groups.has(r.group)) groups.set(r.group, new Map());
+    const g = groups.get(r.group);
+    if (!g.has(r.variant)) g.set(r.variant, new Set());
+    g.get(r.variant).add(r.path);
+  }
+
+  /* A DECLARATION BEATS A MEASUREMENT. $figmaStructure, when the document
+     carries one, states the architecture the export came out of — including
+     the names the export itself then threw away (".core" -> "core",
+     "_restricted" -> "restrictions"). Bound per group, so a hand-added set
+     falls through to measurement without invalidating the rest, and a manifest
+     that matches nothing at all is ignored entirely. */
+  const bound = opts.ignoreManifest ? null : bindManifest(ir, ir.manifest);
+  plan.usedManifest = !!bound;
+  if (bound) plan.manifestBinding = { bound: bound.bound, measured: bound.unbound };
+
+  const verdict = new Map();                // group -> 'modes' | 'separate'
+  const naming = new Map();                 // group -> how the manifest names it
+  const evidence = new Map();
+  for (const [g, variants] of groups) {
+    const names = [...variants.keys()];
+
+    const b = bound && bound.bindings.get(g);
+    if (b) {
+      verdict.set(g, b.verdict);
+      naming.set(g, b);
+      evidence.set(g, { variants: names.length, overlap: null, declared: true,
+                        note: 'declared by $figmaStructure' });
+      continue;
+    }
+
+    if (names.length === 1) {
+      verdict.set(g, 'modes');
+      evidence.set(g, { variants: 1, overlap: 1, note: 'single set', decided: false });
+      continue;
+    }
+    const sets = names.map((n) => variants.get(n));
+    /* Intersection over ALL variants as a fraction of the SMALLEST — using the
+       smallest rather than the first makes the measure order-independent. */
+    const smallest = sets.reduce((a, b) => (a.size <= b.size ? a : b));
+    let shared = 0;
+    for (const p of smallest) if (sets.every((s) => s.has(p))) shared++;
+    const overlap = smallest.size ? shared / smallest.size : 0;
+
+    let v = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : null;
+    let decided = false;
+    if (v === null) {
+      const answer = claim('group:' + g);
+      if (answer === 'modes' || answer === 'separate') { v = answer; decided = true; }
+    }
+    if (v === null) {
+      v = 'modes';                          // provisional, only so the rest can be reported
+      plan.ambiguous.push({ group: g, variants: names, overlap: +(overlap * 100).toFixed(1),
+                            shared, of: smallest.size });
+      ask('group:' + g,
+          'Are the ' + names.length + ' variants of "' + g + '" modes of one collection, or separate collections?',
+          ['modes', 'separate'],
+          { evidence: names.length + ' variants share ' + shared + ' of ' + smallest.size +
+                      ' paths (' + (overlap * 100).toFixed(1) + '%)' });
+    }
+    verdict.set(g, v);
+    evidence.set(g, { variants: names.length, overlap, shared, of: smallest.size, decided,
+                      note: overlap === 1 ? 'every variant defines the same paths'
+                          : overlap === 0 ? 'no path defined by more than one variant'
+                          : 'partial overlap — cannot be read from the file' });
+  }
+
+  /* ── 2. address every row to (collection, mode) ────────────────────────── */
+  const address = (r) => {
+    const n = naming.get(r.group);
+    if (n) {
+      /* The manifest's own names — this is the only route by which ".core"
+         comes back as ".core" rather than "core". */
+      return n.verdict === 'separate'
+        ? { col: n.per[r.variant].collection, mode: n.per[r.variant].mode }
+        : { col: n.collection, mode: n.modeName[r.variant] || r.variant };
+    }
+    return verdict.get(r.group) === 'separate'
+      ? { col: r.variant, mode: r.variant }   // a namespace of its own, one mode
+      : { col: r.group, mode: r.variant };    // a mode of the group's collection
+  };
+
+  /* ── 3. a variable is (collection, path); modes contribute values ──────── */
+  const vars = new Map();
+  const modesOf = new Map();
+  const groupOfCol = new Map();
+  for (const r of ir.rows) {
+    const a = address(r);
+    if (!modesOf.has(a.col)) { modesOf.set(a.col, []); groupOfCol.set(a.col, r.group); }
+    const ms = modesOf.get(a.col);
+    if (ms.indexOf(a.mode) === -1) ms.push(a.mode);
+
+    const k = vkey(a.col, r.path);
+    let spec = vars.get(k);
+    if (!spec) {
+      spec = { col: a.col, path: r.path, types: new Set(), values: new Map(),
+               description: r.description || '' };
+      vars.set(k, spec);
+    }
+    spec.types.add(r.type);
+    spec.values.set(a.mode, r.value);
+    if (!spec.description && r.description) spec.description = r.description;
+  }
+
+  /* ── 4. a variable is ONE type across all its modes ────────────────────── */
+  for (const spec of vars.values()) {
+    const ts = [...spec.types];
+    spec.type = ts[0];
+    spec.ft = figmaType(spec.type);
+    if (ts.length > 1) {
+      const id = 'type:' + spec.col + '/' + spec.path;
+      const answer = claim(id);
+      if (answer && FIGMA_TYPES.indexOf(answer) !== -1) { spec.ft = answer; spec.typeDecided = true; }
+      else {
+        plan.losses.typeConflicts.push({ collection: spec.col, path: spec.path, types: ts });
+        ask(id, 'Variable "' + spec.col + '/' + spec.path + '" is ' + ts.join(' in one mode and ') +
+                ' in another. Which Figma type?', FIGMA_TYPES.slice(),
+            { evidence: 'declared types: ' + ts.join(', ') });
+      }
+    }
+  }
+
+  /* ── 5. reference targets ──────────────────────────────────────────────—
+     A reference names a token PATH, not a collection. If that path exists in
+     more than one collection the reference is genuinely ambiguous — the source
+     format resolved it by which sets a theme had enabled, and that context is
+     gone once the sets have become collections. Asked, never guessed. */
+  const byPath = new Map();
+  for (const spec of vars.values()) {
+    if (!byPath.has(spec.path)) byPath.set(spec.path, []);
+    byPath.get(spec.path).push(spec);
+  }
+  /* Only a path something actually POINTS AT can be ambiguous. Two collections
+     holding a variable of the same name is ordinary — Figma allows it and it
+     carries no meaning — so a duplicate nobody references is not a question,
+     and asking about it would bury the real ones. */
+  const referenced = new Set();
+  for (const spec of vars.values()) {
+    for (const v of spec.values.values()) if (v.ref !== undefined) referenced.add(v.ref);
+  }
+
+  const refTarget = new Map();              // path -> the one spec it resolves to
+  for (const [p, list] of byPath) {
+    const live = list.filter((s) => s.ft !== null);
+    if (live.length <= 1) { if (live.length) refTarget.set(p, live[0]); continue; }
+    if (!referenced.has(p)) continue;       // duplicated, but nothing can hit it
+    const id = 'ref:' + p;
+    const answer = claim(id);
+    const picked = answer && live.filter((s) => s.col === answer)[0];
+    if (picked) { refTarget.set(p, picked); continue; }
+    plan.refCollisions.push({ path: p, collections: live.map((s) => s.col) });
+    ask(id, 'Path "' + p + '" is defined in ' + live.length + ' collections. Which one do references to it mean?',
+        live.map((s) => s.col), { evidence: 'defined in: ' + live.map((s) => s.col).join(', ') });
+  }
+
+  /* ── 6. walk every value, classify what can and cannot land ────────────── */
+  let literals = 0, aliases = 0, importable = 0;
+  for (const spec of vars.values()) {
+    if (spec.ft === null) {
+      plan.losses.composites.push({ collection: spec.col, path: spec.path, type: spec.type });
+      continue;
+    }
+    importable++;
+    for (const [mode, v] of spec.values) {
+      if (v.ref !== undefined) {
+        const target = refTarget.get(v.ref);
+        if (!target) {
+          const known = byPath.has(v.ref);
+          plan.losses.unresolvedRefs.push({ collection: spec.col, path: spec.path, mode, ref: v.ref,
+            reason: known ? 'target is a composite, so it is not a variable'
+                          : 'no token defines this path' });
+        } else { aliases++; spec.resolved = true; }
+      } else if (v.expr !== undefined) {
+        plan.losses.expressions.push({ collection: spec.col, path: spec.path, mode, expr: v.expr });
+      } else if (v.literal && typeof v.literal === 'object') {
+        plan.losses.composites.push({ collection: spec.col, path: spec.path, type: spec.type,
+                                      note: 'object value under a non-composite type' });
+      } else literals++;
+    }
+  }
+
+  /* ── 7. collections, with the mode ceiling applied ─────────────────────── */
+  const varsPerCol = new Map();
+  for (const spec of vars.values()) {
+    if (spec.ft === null) continue;
+    varsPerCol.set(spec.col, (varsPerCol.get(spec.col) || 0) + 1);
+  }
+  for (const [name, modes] of modesOf) {
+    const g = groupOfCol.get(name);
+    const ev = evidence.get(g) || {};
+    const count = varsPerCol.get(name) || 0;
+    const entry = {
+      name, modes: modes.slice(), variables: count, fromGroup: g,
+      verdict: verdict.get(g),
+      overlap: ev.overlap === undefined ? null : +(ev.overlap * 100).toFixed(1),
+      evidence: ev.note,
+      confidence: plan.ambiguous.some((a) => a.group === g) ? 'AMBIGUOUS'
+                : ev.declared ? 'declared'
+                : ev.decided ? 'decided by caller'
+                : ev.variants === 1 ? 'certain (single set)'
+                : ev.overlap === 1 || ev.overlap === 0 ? 'certain' : 'high',
+    };
+    if (count === 0) {
+      plan.losses.emptyCollections.push({ name, reason: 'every token in it is a composite' });
+      continue;
+    }
+    if (modes.length > modeCeiling) {
+      plan.blocked.push({ collection: name, needs: modes.length, ceiling: modeCeiling,
+                          reason: "more modes than this file's plan allows" });
+      entry.blocked = true;
+    }
+    plan.collections.push(entry);
+  }
+  plan.collections.sort((a, b) => b.variables - a.variables);
+
+  for (const id of Object.keys(decisions)) {
+    if (!plan.decisionsApplied.some((d) => d.id === id)) plan.decisionsUnused.push(id);
+  }
+
+  plan.totals = {
+    rows: ir.rows.length,
+    sets: ir.sets ? ir.sets.length : null,
+    collections: plan.collections.length,
+    variables: importable,
+    modeValues: literals + aliases,
+    literals, aliases,
+    composites: plan.losses.composites.length,
+    blockedVariables: plan.blocked.reduce((n, b) => n + (varsPerCol.get(b.collection) || 0), 0),
+  };
+  const t = plan.totals;
+  t.importablePct = t.rows ? +(100 * (t.literals + t.aliases) / t.rows).toFixed(1) : 0;
+
+  /* A blocked collection does not make the plan invalid — it makes it PARTIAL,
+     which is the user's call and is gated separately in compile(). Only an open
+     question makes it unusable. */
+  plan.ok = plan.unresolved.length === 0;
+  plan.needsConfirmation = !plan.ok;
+
+  /* Everything compile() needs, kept off the reported surface so a plan stays
+     printable and serialisable. */
+  Object.defineProperty(plan, '_internals', {
+    enumerable: false, value: { vars, modesOf, refTarget, verdict, address },
+  });
+
+  return plan;
+}
+
+  var api = { derive, figmaType, isComposite, vkey,
+                   MODES_MIN, SEPARATE_MAX, FIGMA_TYPES,
+                   FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportDerive = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
+
+// ===== src/import-compile.js =====
+/*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
+  COMPILE — turn a plan into an ordered list of operations, or refuse.
+
+  THIS IS THE GATE, AND IT EXISTS BEFORE ANY WRITER DOES. That ordering is
+  deliberate. A check added after a write path already works is a check someone
+  can forget to call; a check that is the only way to OBTAIN the thing a writer
+  consumes cannot be skipped, because there is nothing else to pass it.
+
+  So: apply() will take a program. Only compile() produces a program. And
+  compile() produces nothing at all while the plan has an open question.
+
+  THE PROGRAM IS PURE DATA — no Figma objects, no closures, no judgement. Every
+  decision has already been made by the time it exists, which leaves apply() as
+  a loop with a switch in it and nothing to get wrong. It can be diffed,
+  reviewed, stored, and replayed.
+
+  TWO THINGS ARE ENCODED IN THE OPS RATHER THAN LEFT TO THE INTERPRETER, both
+  because they are exactly the mistakes a careless writer makes:
+
+  1. createVariableCollection ALREADY HAS A MODE, auto-named "Mode 1". The
+     first mode must be a rename and only the rest additions. A writer that
+     loops addMode() over every mode leaves a junk mode behind AND burns one of
+     the ceiling's slots. So the program says renameMode for the first and
+     addMode for the rest, explicitly, and apply() never has to know.
+
+  2. ALIASES COME LAST, as their own phase. Not because the dependency order
+     demands it — because deferring every reference to a final pass means the
+     order collections are created in stops mattering at all, and the
+     topological sort the alias DAG seems to require is never needed.
+*/
+
+  var __dep = (typeof require !== 'undefined')
+    ? require('./import-derive.js')
+    : global.PomImportDerive;
+  var vkey = __dep.vkey;
+/*
+  #rgb / #rrggbb / #rrggbbaa / rgb() / rgba() -> Figma's 0..1 RGBA.
+
+  RETURNS NULL RATHER THAN GUESSING. An unparseable colour has to become a
+  refusal, because the alternative is writing black and calling it a success —
+  and a wrong colour is indistinguishable from a deliberate one once it is in
+  the file.
+
+  rgba() is here because the gate found it: a real 34,481-token export turned
+  out to carry 19 of them among 374 hex values, and refusing the whole import
+  over a form that is perfectly well defined would have been the wrong kind of
+  strict. Channels may be 0-255 or a percentage; alpha is 0-1 or a percentage.
+*/
+function toColor(v) {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+
+  const fn = /^rgba?\(([^)]+)\)$/i.exec(s);
+  if (fn) {
+    /* Both the legacy "r, g, b, a" and the modern "r g b / a" spellings. */
+    const parts = fn[1].split(/[,/\s]+/).map((x) => x.trim()).filter((x) => x !== '');
+    if (parts.length < 3 || parts.length > 4) return null;
+    const chan = (x) => {
+      if (/%$/.test(x)) { const p = parseFloat(x); return isFinite(p) ? p / 100 : null; }
+      const n = parseFloat(x);
+      return isFinite(n) ? n / 255 : null;
+    };
+    const alpha = (x) => {
+      if (x === undefined) return 1;
+      if (/%$/.test(x)) { const p = parseFloat(x); return isFinite(p) ? p / 100 : null; }
+      const n = parseFloat(x);
+      return isFinite(n) ? n : null;
+    };
+    const r = chan(parts[0]), g = chan(parts[1]), b = chan(parts[2]), a = alpha(parts[3]);
+    if (r === null || g === null || b === null || a === null) return null;
+    const clamp = (n) => (n < 0 ? 0 : n > 1 ? 1 : n);
+    return { r: clamp(r), g: clamp(g), b: clamp(b), a: clamp(a) };
+  }
+
+  let h = s.replace(/^#/, '');
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (h.length !== 6 && h.length !== 8) return null;
+  if (!/^[0-9a-fA-F]+$/.test(h)) return null;
+  const n = (i) => parseInt(h.slice(i, i + 2), 16) / 255;
+  return { r: n(0), g: n(2), b: n(4), a: h.length === 8 ? n(6) : 1 };
+}
+
+/*
+  A FLOAT may arrive carrying its unit — "100%", "0px", "-2.5%".
+
+  STRIPPING IT RESTORES THE SOURCE, it does not lose it. Figma's FLOAT is
+  unitless; the property a variable is bound to decides how to read it, and the
+  file these came from stores line-heights/100 as the number 100 while the
+  export writes "100%". So the unit is something the exporter ADDED, and taking
+  it off is the inverse of that rather than a lossy guess. Checked against the
+  real file before it was written this way.
+
+  What would be a real conflict is one variable whose modes disagree about the
+  unit — 10px in one and 10% in another are not the same quantity, and no
+  single number means both. That is caught in compile() and refused.
+*/
+const UNITED_NUMBER = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|%|rem|em|pt)\s*$/i;
+
+function coerce(ft, raw) {
+  if (ft === 'COLOR') {
+    const c = toColor(raw);
+    return c ? { ok: true, value: c } : { ok: false, why: 'not a colour: ' + JSON.stringify(raw) };
+  }
+  if (ft === 'FLOAT') {
+    if (typeof raw === 'number') return isFinite(raw) ? { ok: true, value: raw } : { ok: false, why: 'not finite' };
+    const m = typeof raw === 'string' && UNITED_NUMBER.exec(raw);
+    if (m) return { ok: true, value: Number(m[1]), unit: m[2].toLowerCase() };
+    const n = Number(raw);
+    return isFinite(n) && raw !== '' && raw !== null
+      ? { ok: true, value: n }
+      : { ok: false, why: 'not a number: ' + JSON.stringify(raw) };
+  }
+  if (ft === 'BOOLEAN') return { ok: true, value: raw === true || raw === 'true' };
+  return { ok: true, value: String(raw) };
+}
+
+/*
+  compile(ir, plan, opts) -> { ok: true, program, manifest, stats }
+                          |  { ok: false, refusals: [...] }
+
+  opts.allowPartial   a collection over the target's mode ceiling is DROPPED
+                      rather than refusing the whole import. Off by default:
+                      silently importing 13 of 14 collections is exactly the
+                      kind of partial success that gets mistaken for a whole
+                      one, so it has to be asked for.
+  opts.evaluateExpressions
+                      write "{a}*2" as its evaluated literal. Off by default —
+                      it loses the reference, and a scale whose base no longer
+                      propagates is worse than a scale that is visibly absent.
+*/
+function compile(ir, plan, opts) {
+  opts = opts || {};
+  const refusals = [];
+
+  /* ── the gate ──────────────────────────────────────────────────────────── */
+  if (plan.unresolved && plan.unresolved.length) {
+    for (const q of plan.unresolved) {
+      refusals.push({ kind: 'unresolved', id: q.id, question: q.question,
+                      options: q.options, evidence: q.evidence });
+    }
+  }
+  if (plan.blocked.length && !opts.allowPartial) {
+    for (const b of plan.blocked) {
+      refusals.push({ kind: 'blocked', id: 'blocked:' + b.collection,
+        question: 'Collection "' + b.collection + '" needs ' + b.needs +
+                  ' modes and the target allows ' + b.ceiling + '. Import the rest without it?',
+        options: ['pass allowPartial to drop it', 'import into a file whose plan allows more modes'] });
+    }
+  }
+  if (refusals.length) return { ok: false, refusals, program: null };
+
+  const { vars, modesOf, refTarget } = plan._internals;
+  const dropped = new Set(plan.blocked.map((b) => b.collection));
+  const keep = new Set(plan.collections.filter((c) => !dropped.has(c.name)).map((c) => c.name));
+
+  const program = { version: 1, source: ir.source, ops: [] };
+  const push = (op) => program.ops.push(op);
+  const stats = { collections: 0, modes: 0, variables: 0, literals: 0, aliases: 0,
+                  skippedComposite: 0, skippedExpression: 0, skippedUnresolved: 0,
+                  unitsDropped: [], skippedEmpty: 0, skippedEmptyCollections: [] };
+  const unitsDropped = stats.unitsDropped;
+
+  /*
+    ── phase 2: variables, but only the ones that will hold something ───────
+
+    A VARIABLE WITH NO VALUE IN ANY MODE IS JUNK. Figma will happily create it
+    and fill it with a type default — 0, black, "" — which looks like a real
+    token and is not one. On a real slice this was 145 of 193 variables: the
+    typography sub-values, whose every value is a reference to something the
+    document does not contain.
+
+    Found by asking what apply() would actually write, rather than by counting
+    what compile() produced.
+
+    Dropping them is a FIXPOINT, not a filter: an alias pointing at a dropped
+    variable has nothing to point at, so it is dropped too, and so on until
+    nothing more falls. Composites are excluded up front for the same reason —
+    they are not variables at all, so nothing may alias them either.
+  */
+  const writable = (spec, alive) => {
+    for (const v of spec.values.values()) {
+      if (v.ref !== undefined) {
+        const t = refTarget.get(v.ref);
+        if (t && t.ft !== null && alive.has(vkey(t.col, t.path))) return true;
+      } else if (v.expr !== undefined) {
+        if (opts.evaluateExpressions && evaluate(v.expr, plan, spec.values.keys().next().value) !== null) return true;
+      } else if (v.literal !== undefined && !(v.literal && typeof v.literal === 'object')) {
+        if (coerce(spec.ft, v.literal).ok) return true;
+      }
+    }
+    return false;
+  };
+
+  const alive = new Set();
+  for (const spec of vars.values()) {
+    if (keep.has(spec.col) && spec.ft !== null) alive.add(vkey(spec.col, spec.path));
+    else if (spec.ft === null) stats.skippedComposite++;
+  }
+  for (;;) {
+    let dropped = 0;
+    for (const spec of vars.values()) {
+      const k = vkey(spec.col, spec.path);
+      if (!alive.has(k)) continue;
+      if (!writable(spec, alive)) { alive.delete(k); dropped++; }
+    }
+    if (!dropped) break;
+  }
+  stats.skippedEmpty = 0;
+  for (const spec of vars.values()) {
+    const k = vkey(spec.col, spec.path);
+    if (keep.has(spec.col) && spec.ft !== null && !alive.has(k)) stats.skippedEmpty++;
+  }
+
+  /* Which collections still have anything in them, decided before phase 1 so
+     an empty one is never created in the first place. */
+  const nonEmpty = new Set();
+  for (const spec of vars.values()) if (alive.has(vkey(spec.col, spec.path))) nonEmpty.add(spec.col);
+
+  /* ── phase 1: collections and modes ────────────────────────────────────── */
+  for (const [name, modes] of modesOf) {
+    if (!keep.has(name)) continue;
+    /* A collection with nothing left alive in it would be created empty, which
+       is the same junk one level up — `foundation` in a real slice, whose every
+       variable was a typography sub-value that got dropped above. */
+    if (!nonEmpty.has(name)) { stats.skippedEmptyCollections.push(name); continue; }
+    push({ op: 'createCollection', collection: name, firstMode: modes[0] });
+    stats.collections++; stats.modes++;
+    for (let i = 1; i < modes.length; i++) {
+      push({ op: 'addMode', collection: name, mode: modes[i] });
+      stats.modes++;
+    }
+  }
+
+  /* ── phase 2: the variables that survived ──────────────────────────────── */
+  const emitted = new Set();
+  for (const spec of vars.values()) {
+    if (!alive.has(vkey(spec.col, spec.path))) continue;
+    const name = spec.path.split('.').join('/');
+    push({ op: 'createVariable', collection: spec.col, name, type: spec.ft,
+           description: spec.description || undefined });
+    emitted.add(vkey(spec.col, spec.path));
+    stats.variables++;
+  }
+
+
+  /* ── phase 3: literals ─────────────────────────────────────────────────── */
+  for (const spec of vars.values()) {
+    if (!emitted.has(vkey(spec.col, spec.path))) continue;
+    const name = spec.path.split('.').join('/');
+    for (const [mode, v] of spec.values) {
+      if (v.ref !== undefined) continue;
+      if (v.expr !== undefined) {
+        if (!opts.evaluateExpressions) { stats.skippedExpression++; continue; }
+        const out = evaluate(v.expr, plan, mode);
+        if (out === null) { stats.skippedExpression++; continue; }
+        push({ op: 'setValue', collection: spec.col, name, mode, value: out,
+               note: 'evaluated from ' + v.expr + ' — reference lost' });
+        stats.literals++;
+        continue;
+      }
+      const c = coerce(spec.ft, v.literal);
+      if (!c.ok) { refusals.push({ kind: 'value', id: 'value:' + spec.col + '/' + spec.path + '@' + mode,
+                                   question: c.why }); continue; }
+      /* 10px in one mode and 10% in another are not the same quantity, and a
+         unitless FLOAT cannot mean both. Only a DISAGREEMENT is a problem —
+         one unit used consistently is just the exporter's spelling. */
+      if (c.unit) {
+        if (spec._unit && spec._unit !== c.unit) {
+          refusals.push({ kind: 'unit', id: 'unit:' + spec.col + '/' + spec.path,
+            question: 'Variable "' + spec.col + '/' + spec.path + '" is given in ' +
+                      spec._unit + ' in one mode and ' + c.unit + ' in another; a Figma FLOAT is unitless.' });
+          continue;
+        }
+        spec._unit = c.unit;
+        if (unitsDropped.indexOf(c.unit) === -1) unitsDropped.push(c.unit);
+      }
+      push({ op: 'setValue', collection: spec.col, name, mode, value: c.value });
+      stats.literals++;
+    }
+  }
+
+  /* ── phase 4: aliases, last, so every target already exists ────────────── */
+  for (const spec of vars.values()) {
+    if (!emitted.has(vkey(spec.col, spec.path))) continue;
+    const name = spec.path.split('.').join('/');
+    for (const [mode, v] of spec.values) {
+      if (v.ref === undefined) continue;
+      const target = refTarget.get(v.ref);
+      if (!target || !emitted.has(vkey(target.col, target.path))) { stats.skippedUnresolved++; continue; }
+      push({ op: 'setAlias', collection: spec.col, name, mode,
+             target: { collection: target.col, name: target.path.split('.').join('/') } });
+      stats.aliases++;
+    }
+  }
+
+  if (refusals.length) return { ok: false, refusals, program: null };
+
+  return { ok: true, program, stats, manifest: toManifest(plan) };
+}
+
+/* Substitute every {ref} with its first literal and evaluate the arithmetic.
+   Deliberately narrow: digits and operators only, so nothing in a token file
+   can turn into executable code. */
+function evaluate(expr, plan, mode) {
+  const { vars } = plan._internals;
+  /*
+    Through coerce(), not a typeof check — the exporter writes numbers as
+    strings ("4") and sometimes with a unit ("4px"), and an evaluator that only
+    accepted a JS number silently skipped every expression in a real file for
+    that reason alone.
+
+    AND TRANSITIVELY, because these expressions are a chain, not a leaf:
+    "{dimension.1}*0.25" points at "1*{dimension.base}" which points at "4".
+    Resolving only one hop skipped 102 of 121 expressions in a real export —
+    a half-working evaluator that quietly covers 16% of the cases is worse
+    than either a complete one or none at all. Depth-guarded, and it returns
+    null on a cycle rather than looping.
+  */
+  /*
+    RESOLVED IN THE MODE BEING WRITTEN, not in whichever mode happens to come
+    first. "( {typography.display.size} / 100 ) * {line-heights.100}" is a
+    per-breakpoint calculation: `size` holds a different number in every mode,
+    so taking values.values()[0] gave every breakpoint the mobile answer.
+
+    The closure check found this — 24 values came back materially wrong while
+    every count and every name still lined up, which is precisely the kind of
+    defect no amount of "did it import?" will show.
+
+    Mode is matched BY NAME, because a referenced variable may live in another
+    collection whose modes are its own. Where the target has no mode of that
+    name the first value is the only available answer, which is correct for the
+    single-mode collections that most primitives live in.
+  */
+  const litAt = (path, mode, seen) => {
+    seen = seen || new Set();
+    const memo = path + '\u0000' + mode;
+    if (seen.has(memo) || seen.size > 32) return null;
+    seen.add(memo);
+    for (const s of vars.values()) {
+      if (s.path !== path) continue;
+      const v = s.values.has(mode) ? s.values.get(mode) : s.values.values().next().value;
+      if (!v) continue;
+      if (v.literal !== undefined) {
+        const c = coerce('FLOAT', v.literal);
+        if (c.ok) return c.value;
+      } else if (v.ref !== undefined) {
+        const n = litAt(v.ref, mode, seen);
+        if (n !== null) return n;
+      } else if (v.expr !== undefined) {
+        const n = evalWith(v.expr, mode, seen);
+        if (n !== null) return n;
+      }
+    }
+    return null;
+  };
+
+  function evalWith(e, mode, seen) {
+    let good = true;
+    const sub = e.replace(/\{([^}]+)\}/g, (_, p) => {
+      const n = litAt(p, mode, seen);
+      if (n === null) { good = false; return 'NaN'; }
+      return String(n);
+    });
+    if (!good || !/^[\d\s.+\-*/()]+$/.test(sub)) return null;
+    try {
+      const out = Function('"use strict";return (' + sub + ')')();
+      return typeof out === 'number' && isFinite(out) ? out : null;
+    } catch (err) { return null; }
+  }
+  return evalWith(expr, mode, new Set());
+}
+
+/*
+  The plan, as the declaration that makes the next import of this file need no
+  derivation at all. Written back into the document as $figmaStructure on
+  export: a question answered once is answered for good, and a file that
+  carries its own structure can never be mis-projected.
+*/
+function toManifest(plan) {
+  return {
+    version: 1,
+    collections: plan.collections.map((c) => ({
+      name: c.name,
+      modes: c.modes,
+      fromGroup: c.fromGroup,
+      verdict: c.verdict,
+    })),
+    decisions: plan.decisionsApplied,
+  };
+}
+
+  var api = { compile, toManifest, toColor, coerce, evaluate };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportCompile = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
+
+// ===== src/import-verify.js =====
+/*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
+  STRUCTURAL CLOSURE — does the round trip close?
+
+  Closure already validates REFERENCE closure: every {ref} in an export has a
+  target inside it. This is the same idea one level up. A file has structural
+  closure when
+
+      Figma -> export -> import
+
+  puts back what it took out. And the useful part is that it can be checked
+  without knowing the right answer in advance, which is exactly the situation
+  an arbitrary third-party JSON puts you in: you cannot assert that a file you
+  have never seen projects correctly, but you CAN require that the round trip
+  agrees with itself.
+
+  NO FIGMA IS INVOLVED. A compiled program already describes, exhaustively,
+  what Figma would contain if it were applied — so materialise() interprets it
+  into the same shape an extract has, and the two are compared as data. That
+  means the check runs in the suite, offline, in milliseconds, against a real
+  file's real numbers.
+
+  IT DOES NOT RETURN A BOOLEAN, because "equal / not equal" is the wrong
+  question. A round trip through this exporter is a SUPERSET: it invents
+  primitives (textCase/none, the typography text-case split) that were never
+  variables in the source. Those are EXTRA and they are fine. What is never
+  fine is MISSING — a variable the source had and the round trip lost — or
+  CHANGED, a variable that came back holding something else. Extras are
+  reported; missing and changed are failures.
+*/
+
+const ROUND = 1e6;                    // colours and numbers compared at 6dp
+const r6 = (n) => Math.round(n * ROUND) / ROUND;
+
+function fmtValue(v) {
+  if (v && typeof v === 'object') {
+    if (v.type === 'VARIABLE_ALIAS') return null;          // handled by the caller
+    if ('r' in v) {
+      return '#' + [v.r, v.g, v.b].map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('') +
+             (v.a !== undefined && v.a < 1 ? ':' + r6(v.a) : '');
+    }
+    return JSON.stringify(v);
+  }
+  if (typeof v === 'number') return String(r6(v));
+  return String(v);
+}
+
+/*
+  A compiled program, interpreted into the same shape an extract has. This is
+  apply() with no side effects — and writing it first is what makes apply()
+  itself trivial, since the semantics of every op are pinned here before
+  anything touches a document.
+*/
+function materialise(program) {
+  const collections = new Map();        // name -> { modes: [], vars: Map(name -> Map(mode -> value)) }
+  const get = (n) => {
+    if (!collections.has(n)) collections.set(n, { modes: [], vars: new Map() });
+    return collections.get(n);
+  };
+  for (const op of program.ops) {
+    const c = get(op.collection);
+    switch (op.op) {
+      case 'createCollection': c.modes.push(op.firstMode); break;
+      case 'addMode': c.modes.push(op.mode); break;
+      case 'createVariable': c.vars.set(op.name, { type: op.type, values: new Map() }); break;
+      case 'setValue': {
+        const v = c.vars.get(op.name); if (v) v.values.set(op.mode, { literal: op.value });
+        break;
+      }
+      case 'setAlias': {
+        const v = c.vars.get(op.name); if (v) v.values.set(op.mode, { alias: op.target });
+        break;
+      }
+      default: break;
+    }
+  }
+  return collections;
+}
+
+/* The same shape, read off a real Figma extract. */
+function fromRawGraph(rawCollections) {
+  const collections = new Map();
+  const nameOf = {}, colOf = {};
+  rawCollections.forEach((c) => c.variables.forEach((v) => { nameOf[v.id] = v.name; colOf[v.id] = c.name; }));
+  for (const c of rawCollections) {
+    const entry = { modes: c.modes.map((m) => m.name), vars: new Map() };
+    const modeName = {};
+    c.modes.forEach((m) => { modeName[m.modeId] = m.name; });
+    for (const v of c.variables) {
+      const values = new Map();
+      for (const [mid, raw] of Object.entries(v.valuesByMode || {})) {
+        const mn = modeName[mid];
+        if (mn === undefined) continue;
+        values.set(mn, raw && raw.type === 'VARIABLE_ALIAS'
+          ? { alias: { collection: colOf[raw.id], name: nameOf[raw.id] } }
+          : { literal: raw });
+      }
+      entry.vars.set(v.name, { type: v.resolvedType, values });
+    }
+    collections.set(c.name, entry);
+  }
+  return collections;
+}
+
+/* One canonical line per (collection, variable, mode). Sorted, so two states
+   built in different orders still compare. */
+function lines(state) {
+  const out = [];
+  for (const [cname, c] of state) {
+    for (const [vname, v] of c.vars) {
+      for (const [mode, val] of v.values) {
+        const rendered = val.alias
+          ? 'ALIAS:' + val.alias.collection + '/' + val.alias.name
+          : fmtValue(val.literal);
+        out.push(cname + '|' + vname + '|' + mode + '|' + rendered);
+      }
+    }
+  }
+  out.sort();
+  return out;
+}
+
+/* FNV-1a. Not cryptographic and does not need to be — this identifies a
+   mismatch, it does not defend against one. Inline so the same function runs
+   on both sides and the algorithm can never be the difference (which it was,
+   once, when one side used node's crypto and the other did not). */
+function fingerprint(state) {
+  const s = lines(state).join('\n');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return ('00000000' + h.toString(16)).slice(-8);
+}
+
+/*
+  compare(source, imported) — what the round trip did to each mode-value.
+
+    matched   identical on both sides
+    missing   the source had it and the round trip lost it     -> FAILURE
+    changed   present on both, holding something else          -> FAILURE
+    extra     the round trip invented it                       -> reported
+
+  `ignoreCollections` drops collections the import deliberately did not carry
+  (one over the target's mode ceiling, say) so a partial import can still be
+  verified on the part it did do.
+*/
+function compare(source, imported, opts) {
+  opts = opts || {};
+  const skip = new Set(opts.ignoreCollections || []);
+  const index = (state) => {
+    const m = new Map();
+    for (const l of lines(state)) {
+      const i = l.lastIndexOf('|');
+      m.set(l.slice(0, i), l.slice(i + 1));
+    }
+    return m;
+  };
+  /*
+    A number may differ in its last places without anything having gone wrong:
+    the EXPORTER rounds (62.285999 comes back as 62.286), so a difference below
+    the tolerance is the exporter's precision, not the import's fidelity. It is
+    still counted and reported — quietly folding it into `matched` would hide a
+    real, if small, loss — but it does not fail closure.
+
+    Default 0: a caller has to say out loud that it will accept imprecision.
+  */
+  const tol = opts.tolerance || 0;
+  const nearly = (x, y) => {
+    if (!tol) return false;
+    const a = parseFloat(x), b = parseFloat(y);
+    return isFinite(a) && isFinite(b) && Math.abs(a - b) <= tol;
+  };
+
+  const a = index(source), b = index(imported);
+  const res = { matched: 0, missing: [], changed: [], rounded: [], extra: [] };
+
+  for (const [k, v] of a) {
+    if (skip.has(k.split('|')[0])) continue;
+    if (!b.has(k)) { res.missing.push(k); continue; }
+    const got = b.get(k);
+    if (got === v) { res.matched++; continue; }
+    if (nearly(v, got)) { res.rounded.push({ key: k, source: v, imported: got }); continue; }
+    res.changed.push({ key: k, source: v, imported: got });
+  }
+  for (const k of b.keys()) {
+    if (skip.has(k.split('|')[0])) continue;
+    if (!a.has(k)) res.extra.push(k);
+  }
+
+  res.closed = res.missing.length === 0 && res.changed.length === 0;
+  return res;
+}
+
+  var api = { materialise, fromRawGraph, lines, fingerprint, compare };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportVerify = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
+
+// ===== src/import-diff.js =====
+/*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
+  DIFF — what would change if this JSON were applied to this document.
+
+  The question a person actually asks before an import is not "is it valid" but
+  "what is about to happen to my file". So this is the step that runs BEFORE
+  anything is written, against a document that already has variables in it, and
+  it answers in the document's own terms: what appears, what changes, what is
+  left alone.
+
+  IT IS compare() FROM import-verify.js, TURNED AROUND. That function exists to
+  ask whether a round trip closed, so it calls the incoming side "imported" and
+  anything only on that side "extra". Here the incoming side is a proposal and
+  the existing side is the user's work, so the same four buckets mean something
+  different and are named for what they are:
+
+      added      in the JSON, not in the document      -> will be created
+      changed    in both, holding different values     -> will be overwritten
+      unchanged  in both, identical                    -> nothing happens
+      untouched  in the document, not in the JSON      -> LEFT ALONE, not deleted
+
+  THAT LAST ONE IS THE IMPORTANT PROMISE. An import adds and overwrites; it
+  never deletes. A variable the JSON does not mention keeps whatever it holds.
+  Saying so in the report is the difference between a person reading it as a
+  merge and reading it as a replacement, and they are very different things to
+  agree to.
+
+  IT ALSO ROLLS UP. Thirty thousand changed values is not a report, it is a
+  wall. The collection- and variable-level summaries are what someone actually
+  reads; the per-value detail is there to drill into.
+*/
+
+  var __dep = (typeof require !== 'undefined')
+    ? require('./import-verify.js')
+    : global.PomImportVerify;
+  var materialise = __dep.materialise;
+  var fromRawGraph = __dep.fromRawGraph;
+  var lines = __dep.lines;
+/* "collection|variable|mode" -> rendered value */
+function index(state) {
+  const m = new Map();
+  for (const l of lines(state)) {
+    const i = l.lastIndexOf('|');
+    m.set(l.slice(0, i), l.slice(i + 1));
+  }
+  return m;
+}
+
+const split = (key) => {
+  const a = key.indexOf('|');
+  const b = key.lastIndexOf('|');
+  return { collection: key.slice(0, a), variable: key.slice(a + 1, b), mode: key.slice(b + 1) };
+};
+
+/*
+  diff(existingRawGraph, program) -> report
+
+  `existingRawGraph` is the document as extractVariables() gives it — the same
+  shape import-verify.fromRawGraph() consumes. `program` is what compile()
+  produced. Neither is modified and nothing is written.
+*/
+function diff(existingRawGraph, program) {
+  const before = fromRawGraph(existingRawGraph || []);
+  const after = materialise(program);
+
+  const A = index(before), B = index(after);
+
+  const report = {
+    added: [], changed: [], untouched: [], unchangedCount: 0,
+    collections: { added: [], touched: [], untouched: [] },
+    modes: { added: [] },
+    variables: { added: new Set(), changed: new Set() },
+    summary: {},
+  };
+
+  for (const [k, v] of B) {
+    if (!A.has(k)) { report.added.push({ key: k, value: v }); continue; }
+    if (A.get(k) !== v) report.changed.push({ key: k, from: A.get(k), to: v });
+    else report.unchangedCount++;
+  }
+  for (const k of A.keys()) if (!B.has(k)) report.untouched.push(k);
+
+  /* Roll up to the levels a person reads at. */
+  const beforeCols = new Set(before.keys());
+  const afterCols = new Set(after.keys());
+  for (const c of afterCols) {
+    if (!beforeCols.has(c)) report.collections.added.push(c);
+  }
+  for (const c of beforeCols) if (!afterCols.has(c)) report.collections.untouched.push(c);
+
+  const touched = new Set();
+  report.added.forEach((x) => { const s = split(x.key); touched.add(s.collection); report.variables.added.add(s.collection + '|' + s.variable); });
+  report.changed.forEach((x) => { const s = split(x.key); touched.add(s.collection); report.variables.changed.add(s.collection + '|' + s.variable); });
+  report.collections.touched = [...touched].filter((c) => beforeCols.has(c));
+
+  /* A mode the document does not have yet — worth naming separately, because
+     adding one to an existing collection is a bigger deal than adding a
+     variable to it, and it is what the mode ceiling is spent on. */
+  for (const [cname, c] of after) {
+    const existing = before.get(cname);
+    if (!existing) continue;
+    for (const m of c.modes) if (existing.modes.indexOf(m) === -1) report.modes.added.push(cname + ' / ' + m);
+  }
+
+  report.variables.added = [...report.variables.added];
+  report.variables.changed = [...report.variables.changed];
+
+  report.summary = {
+    willCreateCollections: report.collections.added.length,
+    willAddModes: report.modes.added.length,
+    willCreateVariables: report.variables.added.length,
+    willChangeVariables: report.variables.changed.length,
+    valuesAdded: report.added.length,
+    valuesChanged: report.changed.length,
+    valuesUnchanged: report.unchangedCount,
+    valuesLeftAlone: report.untouched.length,
+    /* Nothing to do is a real and useful answer — it means the document
+       already matches the file. */
+    noop: report.added.length === 0 && report.changed.length === 0,
+  };
+
+  return report;
+}
+
+/* A short, readable rendering for a CLI or a panel. `limit` caps each list. */
+function format(report, limit) {
+  limit = limit || 10;
+  const s = report.summary;
+  const out = [];
+  const push = (label, arr, fmt) => {
+    if (!arr.length) return;
+    out.push('  ' + String(arr.length).padStart(7) + '  ' + label);
+    arr.slice(0, limit).forEach((x) => out.push('            ' + fmt(x)));
+    if (arr.length > limit) out.push('            … and ' + (arr.length - limit).toLocaleString() + ' more');
+  };
+
+  if (s.noop) {
+    out.push('  This document already matches the file — nothing would change.');
+    return out.join('\n');
+  }
+
+  out.push('  WOULD CREATE');
+  push('collection(s)', report.collections.added, (x) => x);
+  push('mode(s) on an existing collection', report.modes.added, (x) => x);
+  push('variable(s)', report.variables.added, (x) => x.replace('|', ' / '));
+  out.push('');
+  if (report.changed.length) {
+    out.push('  WOULD OVERWRITE');
+    push('value(s), in ' + report.variables.changed.length + ' existing variable(s)',
+         report.changed, (x) => { const p = split(x.key); return p.collection + ' / ' + p.variable + ' [' + p.mode + ']  ' + x.from + '  ->  ' + x.to; });
+    out.push('');
+  }
+  out.push('  WOULD LEAVE ALONE');
+  out.push('  ' + String(s.valuesUnchanged).padStart(7) + '  value(s) already identical');
+  out.push('  ' + String(s.valuesLeftAlone).padStart(7) + '  value(s) this file does not mention — an import never deletes');
+  if (report.collections.untouched.length) {
+    out.push('  ' + String(report.collections.untouched.length).padStart(7) + '  collection(s) untouched: ' +
+             report.collections.untouched.slice(0, limit).join(', '));
+  }
+  return out.join('\n');
+}
+
+  var api = { diff, format };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportDiff = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
+</script>
+
   <script>
     // Plugin version — single source of truth in the UI. Keep in sync with
     // package.json via `npm run version:set <x.y.z>` (scripts/set-version.js).
@@ -49216,7 +50933,7 @@ react/cjs/react-jsx-runtime.development.js:
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '89d0b99 19:14:13';
+    var CLOSURE_BUILD = '0305bff 19:44:00';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -49834,6 +51551,204 @@ react/cjs/react-jsx-runtime.development.js:
 
     function localStorageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+    /* ────────────────────────────────────────────────────────────────────
+       IMPORT
+
+       Everything up to the program runs here, in the UI. None of it touches
+       `figma` — reading a file, deciding the projection, compiling a program
+       are all pure — and derive() is what RAISES the questions an import has
+       to answer, so it belongs on the side that can ask them. Only the
+       finished program crosses to the sandbox, once, after the diff has been
+       seen and agreed to.
+
+       The modules are the same files Node's suite and the CLI load
+       (src/import-*.js, inlined by scripts/build-ui.js), so the plugin cannot
+       drift from what the tests cover.
+       ──────────────────────────────────────────────────────────────────── */
+    var importState = { doc: null, fileName: null, ir: null, plan: null, compiled: null, changes: null };
+
+    function openImport() {
+      document.getElementById('main-page').classList.add('hidden');
+      document.getElementById('import-page').classList.add('visible');
+    }
+    function closeImport() {
+      document.getElementById('import-page').classList.remove('visible');
+      document.getElementById('main-page').classList.remove('hidden');
+    }
+    document.getElementById('import-btn').addEventListener('click', openImport);
+    document.getElementById('import-back-btn').addEventListener('click', closeImport);
+    var importEmptyBtn = document.getElementById('import-empty-btn');
+    if (importEmptyBtn) importEmptyBtn.addEventListener('click', openImport);
+
+    var importFileInput = document.getElementById('import-file');
+    var importDrop = document.getElementById('import-drop');
+
+    document.getElementById('import-choose-btn').addEventListener('click', function() {
+      importFileInput.click();
+    });
+    importFileInput.addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0]) readImportFile(e.target.files[0]);
+      // Cleared so choosing the SAME file twice still fires a change event —
+      // without this, a second attempt after fixing the file does nothing.
+      e.target.value = '';
+    });
+
+    /* dragover must be cancelled or the browser navigates to the file instead
+       of handing it over — the default action for a drop is "open this". */
+    ['dragenter', 'dragover'].forEach(function(t) {
+      importDrop.addEventListener(t, function(e) { e.preventDefault(); importDrop.classList.add('is-over'); });
+    });
+    ['dragleave', 'drop'].forEach(function(t) {
+      importDrop.addEventListener(t, function(e) { e.preventDefault(); importDrop.classList.remove('is-over'); });
+    });
+    importDrop.addEventListener('drop', function(e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) readImportFile(f);
+    });
+
+    function importProblem(title, body) {
+      document.getElementById('import-problem-title').textContent = title;
+      document.getElementById('import-problem-body').textContent = body;
+      document.getElementById('import-problem').hidden = false;
+      ['import-summary', 'import-questions', 'import-changes'].forEach(function(id) {
+        document.getElementById(id).hidden = true;
+      });
+    }
+
+    function readImportFile(file) {
+      importState.fileName = file.name;
+      var fr = new FileReader();
+      fr.onerror = function() { importProblem('Could not read that file', 'The browser could not open ' + file.name + '.'); };
+      fr.onload = function() {
+        var doc;
+        try { doc = JSON.parse(fr.result); }
+        catch (err) {
+          /* Worth being specific: "not valid JSON" and "valid JSON that is
+             not tokens" are different problems with different fixes. */
+          importProblem('That file is not valid JSON', String(err.message || err));
+          return;
+        }
+        runImport(doc, file.name);
+      };
+      fr.readAsText(file);
+    }
+
+    function runImport(doc, fileName) {
+      document.getElementById('import-problem').hidden = true;
+      importState.doc = doc;
+
+      var ir, plan, compiled;
+      try {
+        ir = window.PomImportIR.toIR(doc);
+      } catch (err) {
+        importProblem('Could not read that as tokens', String(err.message || err));
+        return;
+      }
+      if (!ir.rows.length) {
+        importProblem('No tokens in that file',
+          'It parsed, but nothing in it looks like a token — a token needs both a value and a type.');
+        return;
+      }
+      plan = window.PomImportDerive.derive(ir, {});
+      compiled = window.PomImportCompile.compile(ir, plan, { evaluateExpressions: true });
+
+      importState.ir = ir;
+      importState.plan = plan;
+      importState.compiled = compiled;
+
+      renderImportSummary(fileName, ir, plan, compiled);
+      renderImportQuestions(plan, compiled);
+
+      if (compiled.ok) {
+        /* rawData is whatever the main screen already extracted — so the diff
+           is against THIS document, not against nothing. Before an extract has
+           landed it is null, and diff() reads that as an empty document, which
+           is the right answer for a file that genuinely has no variables. */
+        var existing = (rawData && rawData.collections) ? rawData.collections : [];
+        importState.changes = window.PomImportDiff.diff(existing, compiled.program);
+        renderImportChanges(importState.changes);
+      } else {
+        document.getElementById('import-changes').hidden = true;
+      }
+    }
+
+    function fact(n, label, quiet) {
+      return '<div class="import-fact' + (quiet ? ' is-quiet' : '') + '"><b>' +
+             (typeof n === 'number' ? n.toLocaleString() : n) + '</b><span>' + label + '</span></div>';
+    }
+    var esc = function(x) { return String(x).replace(/[&<>]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); };
+
+    function renderImportSummary(fileName, ir, plan, compiled) {
+      document.getElementById('import-summary-name').textContent = fileName;
+      var format = ir.source === 'legacy' ? 'Tokens Studio / Legacy'
+                 : ir.source === 'dtcg' ? 'W3C DTCG' : 'plain token tree';
+      var html = '';
+      html += fact(ir.rows.length, 'tokens read, as ' + format);
+      html += fact(plan.collections.length, 'collection' + (plan.collections.length === 1 ? '' : 's') +
+                   (plan.usedManifest ? ' — declared by the file itself' : ' — worked out from the file'));
+
+      /*
+        THE COMPILED COUNT, NOT THE PLAN'S. plan.totals.variables is how many
+        the file DESCRIBES; compile() is what survives — it drops every
+        variable that would hold nothing, and the gap between the two can be
+        most of them (193 down to 48 on a real slice). Reporting the larger
+        number would promise something the import does not deliver, so the
+        smaller one leads and the difference is accounted for underneath.
+      */
+      if (compiled && compiled.ok) {
+        html += fact(compiled.stats.variables, 'variables to import');
+        if (compiled.stats.aliases) html += fact(compiled.stats.aliases, 'of their values are references', true);
+        if (compiled.stats.skippedEmpty) {
+          html += fact(compiled.stats.skippedEmpty,
+            'named here but given no value this file can resolve — skipped', true);
+        }
+      } else {
+        html += fact(plan.totals.variables, 'variables the file describes');
+      }
+      if (plan.losses.composites.length) {
+        html += fact(plan.losses.composites.length, 'shadows and type styles — not variables in Figma', true);
+      }
+      document.getElementById('import-facts').innerHTML = html;
+      document.getElementById('import-summary').hidden = false;
+    }
+
+    function renderImportQuestions(plan, compiled) {
+      var el = document.getElementById('import-questions');
+      var refusals = (compiled && compiled.refusals) || [];
+      if (!refusals.length) { el.hidden = true; return; }
+      var html = '';
+      refusals.forEach(function(r) {
+        html += '<div class="import-question">' + esc(r.question) +
+                (r.evidence ? '<br><code>' + esc(r.evidence) + '</code>' : '') + '</div>';
+      });
+      document.getElementById('import-questions-body').innerHTML = html;
+      el.hidden = false;
+    }
+
+    function renderImportChanges(d) {
+      var s = d.summary, html = '';
+      if (s.noop) {
+        html = '<div class="import-fact"><span>This file already matches the document — nothing would change.</span></div>';
+      } else {
+        if (s.willCreateCollections) html += fact(s.willCreateCollections, 'new collection' + (s.willCreateCollections === 1 ? '' : 's') + ': ' + esc(d.collections.added.join(', ')));
+        if (s.willAddModes) html += fact(s.willAddModes, 'new mode' + (s.willAddModes === 1 ? '' : 's') + ' on a collection that already exists');
+        if (s.willCreateVariables) html += fact(s.willCreateVariables, 'variables created');
+        if (s.willChangeVariables) html += fact(s.willChangeVariables, 'existing variables overwritten');
+        if (s.valuesUnchanged) html += fact(s.valuesUnchanged, 'values already identical', true);
+        /* Stated even when it is zero. "Never deletes" is the promise being
+           made, and a promise only shown sometimes is not one. */
+        html += fact(s.valuesLeftAlone, 'values this file does not mention — left alone, never deleted', true);
+        if (d.changed.length) {
+          html += '<div class="import-detail">' + d.changed.slice(0, 6).map(function(c) {
+            var p = c.key.split('|');
+            return esc(p[0] + ' / ' + p[1] + ' [' + p[2] + ']  ' + c.from + ' → ' + c.to);
+          }).join('<br>') + (d.changed.length > 6 ? '<br>… and ' + (d.changed.length - 6).toLocaleString() + ' more' : '') + '</div>';
+        }
+      }
+      document.getElementById('import-changes-body').innerHTML = html;
+      document.getElementById('import-changes').hidden = false;
+    }
 
     document.getElementById('settings-btn').addEventListener('click', function() {
       document.getElementById('main-page').classList.add('hidden');

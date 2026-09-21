@@ -1,4 +1,11 @@
 /*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
   DIFF — what would change if this JSON were applied to this document.
 
   The question a person actually asks before an import is not "is it valid" but
@@ -29,8 +36,12 @@
   reads; the per-value detail is there to drill into.
 */
 
-const { materialise, fromRawGraph, lines } = require('./import-verify.js');
-
+  var __dep = (typeof require !== 'undefined')
+    ? require('./import-verify.js')
+    : global.PomImportVerify;
+  var materialise = __dep.materialise;
+  var fromRawGraph = __dep.fromRawGraph;
+  var lines = __dep.lines;
 /* "collection|variable|mode" -> rendered value */
 function index(state) {
   const m = new Map();
@@ -155,4 +166,8 @@ function format(report, limit) {
   return out.join('\n');
 }
 
-module.exports = { diff, format };
+  var api = { diff, format };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportDiff = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

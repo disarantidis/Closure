@@ -1088,6 +1088,91 @@
       to { transform: translateY(-6px); }
     }
     
+    /* Sits under the hint, with enough space that it reads as an offer
+       rather than part of the sentence above it. */
+    .empty-state-action { margin-top: 18px; }
+
+    /* ── Import page ──────────────────────────────────────────────────────
+       Borrows .settings-page's scrolling and content inset wholesale — it is
+       the same kind of screen and there is no reason for the two to differ. */
+    .import-page { overflow-y: auto; overflow-x: hidden; }
+    .import-page::-webkit-scrollbar { width: 8px; }
+    .import-page::-webkit-scrollbar-track { background: transparent; }
+    .import-page::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
+
+    /* The drop target. A dashed edge is the one border treatment on this
+       screen that says "not a container yet" — every real card here is
+       solid. */
+    .import-drop {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 32px 16px;
+      border: 1.5px dashed var(--app-border);
+      border-radius: 24px;
+      text-align: center;
+      color: var(--app-text-muted);
+      transition: border-color 150ms ease, background 150ms ease;
+    }
+    /* Only while something is actually over it — a permanent highlight would
+       make an empty drop target look like it had already received a file. */
+    .import-drop.is-over {
+      border-color: var(--app-text);
+      background: var(--app-surface);
+    }
+    .import-drop-icon { opacity: 0.4; margin-bottom: 2px; }
+    .import-drop-title {
+      margin: 0;
+      font-weight: 700;
+      color: var(--app-text);
+      font-size: var(--type-body-m-size);
+    }
+    .import-drop-hint { margin: 0 0 10px; font-size: 11px; opacity: 0.75; }
+
+    .import-card {
+      background: var(--background);
+      border-radius: 24px;
+      padding: var(--spacing-component-6);
+      margin-top: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .import-card-title {
+      margin: 0;
+      font-weight: 700;
+      color: var(--app-text);
+      font-size: var(--type-body-m-size);
+    }
+    /* A question and a failure are the two states that must not read as an
+       ordinary card, because both of them stop the import. */
+    .import-card.is-question { outline: 1.5px solid #d9a441; outline-offset: -1.5px; }
+    .import-card.is-problem  { outline: 1.5px solid #d04545; outline-offset: -1.5px; }
+    .import-problem-body { margin: 0; font-size: 12px; color: var(--app-text-muted); line-height: 1.5; }
+
+    /* Fact rows: the number first and right-aligned, so the eye can run down
+       the column without reading the labels beside it. */
+    .import-facts { display: flex; flex-direction: column; gap: 4px; }
+    .import-fact { display: flex; gap: 8px; font-size: 12px; color: var(--app-text-muted); }
+    .import-fact b {
+      min-width: 62px;
+      text-align: right;
+      color: var(--app-text);
+      font-variant-numeric: tabular-nums;
+    }
+    .import-fact.is-quiet { opacity: 0.65; }
+    .import-detail {
+      margin: 2px 0 0 70px;
+      font-size: 11px;
+      opacity: 0.7;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .import-question { margin-bottom: 12px; font-size: 12px; color: var(--app-text-muted); line-height: 1.5; }
+    .import-question:last-child { margin-bottom: 0; }
+    .import-question code { color: var(--app-text); font-size: 11px; }
+
     .empty-state .hint {
       font-size: 11px;
       margin-top: 8px;
@@ -1493,7 +1578,8 @@
           <div id="version-tag-mount" class="version-tag-mount"></div>
         </div>
         <div class="header-right">
-          <span id="settings-btn-mount"></span>
+          <span id="import-btn-mount"></span>
+        <span id="settings-btn-mount"></span>
         </div>
       </div>
     </header>
@@ -1552,6 +1638,10 @@
     <div class="empty-state" id="empty-state" style="display: none;">
       <p>No variable collections found.</p>
       <p class="hint">Add variables in Figma to see them here.</p>
+      <!-- The one screen where importing is unambiguously the right next
+           move, so it is offered here directly rather than leaving someone
+           to find the header. Same destination as the header button. -->
+      <span id="import-empty-btn-mount" class="empty-state-action"></span>
     </div>
   </div>
   
@@ -1707,6 +1797,80 @@
         </div>
       </div>
     </div>
+    </div>
+  </div>
+
+  <!--
+    IMPORT. A separate page rather than a section of the main screen, for the
+    same reason the header button is not in the pipeline column: the main
+    screen reads downward in one direction — variables, to a file, to a repo —
+    and this runs the other way.
+
+    It is a sequence, and each step only appears once the one before it has an
+    answer: choose a file -> what it is -> anything it cannot decide alone ->
+    what would change. Nothing is written until the last of those has been
+    read, which is the whole point of showing them.
+  -->
+  <div class="page import-page" id="import-page">
+    <header class="header-settings">
+      <div class="header-panel">
+        <div class="git-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v12m0 0l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2"/>
+          </svg>
+        </div>
+        <h1 class="title">Import</h1>
+        <span id="import-back-btn-mount"></span>
+      </div>
+    </header>
+    <div class="settings-page-content">
+
+      <!-- Step 1. A drop target that is also a button — the input itself is
+           hidden and clicked through, which is the only way to get a native
+           file dialog behind a styled control. -->
+      <div class="import-drop" id="import-drop">
+        <svg class="import-drop-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6"/>
+        </svg>
+        <p class="import-drop-title">Drop a token JSON here</p>
+        <p class="import-drop-hint">Tokens Studio, W3C DTCG, or a plain token tree</p>
+        <span id="import-choose-btn-mount"></span>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+      </div>
+
+      <!-- Step 2. What arrived. -->
+      <div class="import-card" id="import-summary" data-level="4" hidden>
+        <div class="json-download-header">
+          <div class="json-download-title-group">
+            <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
+            </svg>
+            <p class="json-download-title" id="import-summary-name">file.json</p>
+          </div>
+        </div>
+        <div class="import-facts" id="import-facts"></div>
+      </div>
+
+      <!-- Step 3. Only what the file cannot decide on its own. Empty far more
+           often than not — on a real export every group came out certain. -->
+      <div class="import-card is-question" id="import-questions" data-level="4" hidden>
+        <p class="import-card-title">This file does not say</p>
+        <div id="import-questions-body"></div>
+      </div>
+
+      <!-- Step 4. The answer to the only question that matters before
+           writing: what is about to happen to this file. -->
+      <div class="import-card" id="import-changes" data-level="4" hidden>
+        <p class="import-card-title">What would change</p>
+        <div id="import-changes-body"></div>
+      </div>
+
+      <div class="import-card is-problem" id="import-problem" data-level="4" hidden>
+        <p class="import-card-title" id="import-problem-title">Could not read that file</p>
+        <p class="import-problem-body" id="import-problem-body"></p>
+      </div>
+
     </div>
   </div>
 
@@ -1922,6 +2086,18 @@
   <!-- src/dtcg-format.js, inlined by scripts/build-ui.js. Defines window.PomDtcg
        (the DTCG post-transform over the Legacy JSON tree). -->
   <script>__Pom_DTCG_SCRIPT__</script>
+
+  <!-- The import pipeline (src/import-*.js), inlined by scripts/build-ui.js.
+       Defines window.PomImportIR / PomImportManifest / PomImportDerive /
+       PomImportCompile / PomImportVerify / PomImportDiff.
+
+       It runs HERE, in the UI, rather than in the sandbox, for two reasons.
+       None of it touches `figma` — reading a file, deciding the projection and
+       compiling a program are all pure — and derive() is what RAISES the
+       questions an import has to answer, so it belongs on the side that can
+       ask them. Only the finished program crosses to the sandbox, once, after
+       the user has seen the diff and agreed to it. -->
+  <script>__Pom_IMPORT_SCRIPT__</script>
 
   <script>
     // Plugin version — single source of truth in the UI. Keep in sync with
@@ -2585,6 +2761,204 @@
 
     function localStorageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
     function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+    /* ────────────────────────────────────────────────────────────────────
+       IMPORT
+
+       Everything up to the program runs here, in the UI. None of it touches
+       `figma` — reading a file, deciding the projection, compiling a program
+       are all pure — and derive() is what RAISES the questions an import has
+       to answer, so it belongs on the side that can ask them. Only the
+       finished program crosses to the sandbox, once, after the diff has been
+       seen and agreed to.
+
+       The modules are the same files Node's suite and the CLI load
+       (src/import-*.js, inlined by scripts/build-ui.js), so the plugin cannot
+       drift from what the tests cover.
+       ──────────────────────────────────────────────────────────────────── */
+    var importState = { doc: null, fileName: null, ir: null, plan: null, compiled: null, changes: null };
+
+    function openImport() {
+      document.getElementById('main-page').classList.add('hidden');
+      document.getElementById('import-page').classList.add('visible');
+    }
+    function closeImport() {
+      document.getElementById('import-page').classList.remove('visible');
+      document.getElementById('main-page').classList.remove('hidden');
+    }
+    document.getElementById('import-btn').addEventListener('click', openImport);
+    document.getElementById('import-back-btn').addEventListener('click', closeImport);
+    var importEmptyBtn = document.getElementById('import-empty-btn');
+    if (importEmptyBtn) importEmptyBtn.addEventListener('click', openImport);
+
+    var importFileInput = document.getElementById('import-file');
+    var importDrop = document.getElementById('import-drop');
+
+    document.getElementById('import-choose-btn').addEventListener('click', function() {
+      importFileInput.click();
+    });
+    importFileInput.addEventListener('change', function(e) {
+      if (e.target.files && e.target.files[0]) readImportFile(e.target.files[0]);
+      // Cleared so choosing the SAME file twice still fires a change event —
+      // without this, a second attempt after fixing the file does nothing.
+      e.target.value = '';
+    });
+
+    /* dragover must be cancelled or the browser navigates to the file instead
+       of handing it over — the default action for a drop is "open this". */
+    ['dragenter', 'dragover'].forEach(function(t) {
+      importDrop.addEventListener(t, function(e) { e.preventDefault(); importDrop.classList.add('is-over'); });
+    });
+    ['dragleave', 'drop'].forEach(function(t) {
+      importDrop.addEventListener(t, function(e) { e.preventDefault(); importDrop.classList.remove('is-over'); });
+    });
+    importDrop.addEventListener('drop', function(e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) readImportFile(f);
+    });
+
+    function importProblem(title, body) {
+      document.getElementById('import-problem-title').textContent = title;
+      document.getElementById('import-problem-body').textContent = body;
+      document.getElementById('import-problem').hidden = false;
+      ['import-summary', 'import-questions', 'import-changes'].forEach(function(id) {
+        document.getElementById(id).hidden = true;
+      });
+    }
+
+    function readImportFile(file) {
+      importState.fileName = file.name;
+      var fr = new FileReader();
+      fr.onerror = function() { importProblem('Could not read that file', 'The browser could not open ' + file.name + '.'); };
+      fr.onload = function() {
+        var doc;
+        try { doc = JSON.parse(fr.result); }
+        catch (err) {
+          /* Worth being specific: "not valid JSON" and "valid JSON that is
+             not tokens" are different problems with different fixes. */
+          importProblem('That file is not valid JSON', String(err.message || err));
+          return;
+        }
+        runImport(doc, file.name);
+      };
+      fr.readAsText(file);
+    }
+
+    function runImport(doc, fileName) {
+      document.getElementById('import-problem').hidden = true;
+      importState.doc = doc;
+
+      var ir, plan, compiled;
+      try {
+        ir = window.PomImportIR.toIR(doc);
+      } catch (err) {
+        importProblem('Could not read that as tokens', String(err.message || err));
+        return;
+      }
+      if (!ir.rows.length) {
+        importProblem('No tokens in that file',
+          'It parsed, but nothing in it looks like a token — a token needs both a value and a type.');
+        return;
+      }
+      plan = window.PomImportDerive.derive(ir, {});
+      compiled = window.PomImportCompile.compile(ir, plan, { evaluateExpressions: true });
+
+      importState.ir = ir;
+      importState.plan = plan;
+      importState.compiled = compiled;
+
+      renderImportSummary(fileName, ir, plan, compiled);
+      renderImportQuestions(plan, compiled);
+
+      if (compiled.ok) {
+        /* rawData is whatever the main screen already extracted — so the diff
+           is against THIS document, not against nothing. Before an extract has
+           landed it is null, and diff() reads that as an empty document, which
+           is the right answer for a file that genuinely has no variables. */
+        var existing = (rawData && rawData.collections) ? rawData.collections : [];
+        importState.changes = window.PomImportDiff.diff(existing, compiled.program);
+        renderImportChanges(importState.changes);
+      } else {
+        document.getElementById('import-changes').hidden = true;
+      }
+    }
+
+    function fact(n, label, quiet) {
+      return '<div class="import-fact' + (quiet ? ' is-quiet' : '') + '"><b>' +
+             (typeof n === 'number' ? n.toLocaleString() : n) + '</b><span>' + label + '</span></div>';
+    }
+    var esc = function(x) { return String(x).replace(/[&<>]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); };
+
+    function renderImportSummary(fileName, ir, plan, compiled) {
+      document.getElementById('import-summary-name').textContent = fileName;
+      var format = ir.source === 'legacy' ? 'Tokens Studio / Legacy'
+                 : ir.source === 'dtcg' ? 'W3C DTCG' : 'plain token tree';
+      var html = '';
+      html += fact(ir.rows.length, 'tokens read, as ' + format);
+      html += fact(plan.collections.length, 'collection' + (plan.collections.length === 1 ? '' : 's') +
+                   (plan.usedManifest ? ' — declared by the file itself' : ' — worked out from the file'));
+
+      /*
+        THE COMPILED COUNT, NOT THE PLAN'S. plan.totals.variables is how many
+        the file DESCRIBES; compile() is what survives — it drops every
+        variable that would hold nothing, and the gap between the two can be
+        most of them (193 down to 48 on a real slice). Reporting the larger
+        number would promise something the import does not deliver, so the
+        smaller one leads and the difference is accounted for underneath.
+      */
+      if (compiled && compiled.ok) {
+        html += fact(compiled.stats.variables, 'variables to import');
+        if (compiled.stats.aliases) html += fact(compiled.stats.aliases, 'of their values are references', true);
+        if (compiled.stats.skippedEmpty) {
+          html += fact(compiled.stats.skippedEmpty,
+            'named here but given no value this file can resolve — skipped', true);
+        }
+      } else {
+        html += fact(plan.totals.variables, 'variables the file describes');
+      }
+      if (plan.losses.composites.length) {
+        html += fact(plan.losses.composites.length, 'shadows and type styles — not variables in Figma', true);
+      }
+      document.getElementById('import-facts').innerHTML = html;
+      document.getElementById('import-summary').hidden = false;
+    }
+
+    function renderImportQuestions(plan, compiled) {
+      var el = document.getElementById('import-questions');
+      var refusals = (compiled && compiled.refusals) || [];
+      if (!refusals.length) { el.hidden = true; return; }
+      var html = '';
+      refusals.forEach(function(r) {
+        html += '<div class="import-question">' + esc(r.question) +
+                (r.evidence ? '<br><code>' + esc(r.evidence) + '</code>' : '') + '</div>';
+      });
+      document.getElementById('import-questions-body').innerHTML = html;
+      el.hidden = false;
+    }
+
+    function renderImportChanges(d) {
+      var s = d.summary, html = '';
+      if (s.noop) {
+        html = '<div class="import-fact"><span>This file already matches the document — nothing would change.</span></div>';
+      } else {
+        if (s.willCreateCollections) html += fact(s.willCreateCollections, 'new collection' + (s.willCreateCollections === 1 ? '' : 's') + ': ' + esc(d.collections.added.join(', ')));
+        if (s.willAddModes) html += fact(s.willAddModes, 'new mode' + (s.willAddModes === 1 ? '' : 's') + ' on a collection that already exists');
+        if (s.willCreateVariables) html += fact(s.willCreateVariables, 'variables created');
+        if (s.willChangeVariables) html += fact(s.willChangeVariables, 'existing variables overwritten');
+        if (s.valuesUnchanged) html += fact(s.valuesUnchanged, 'values already identical', true);
+        /* Stated even when it is zero. "Never deletes" is the promise being
+           made, and a promise only shown sometimes is not one. */
+        html += fact(s.valuesLeftAlone, 'values this file does not mention — left alone, never deleted', true);
+        if (d.changed.length) {
+          html += '<div class="import-detail">' + d.changed.slice(0, 6).map(function(c) {
+            var p = c.key.split('|');
+            return esc(p[0] + ' / ' + p[1] + ' [' + p[2] + ']  ' + c.from + ' → ' + c.to);
+          }).join('<br>') + (d.changed.length > 6 ? '<br>… and ' + (d.changed.length - 6).toLocaleString() + ' more' : '') + '</div>';
+        }
+      }
+      document.getElementById('import-changes-body').innerHTML = html;
+      document.getElementById('import-changes').hidden = false;
+    }
 
     document.getElementById('settings-btn').addEventListener('click', function() {
       document.getElementById('main-page').classList.add('hidden');

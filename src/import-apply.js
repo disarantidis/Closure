@@ -1,4 +1,11 @@
 /*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
   APPLY — run a compiled program against a Figma document.
 
   THIS IS THE ONLY MODULE THAT WRITES, and it is the smallest one on purpose.
@@ -177,4 +184,8 @@ async function preflight(program, figma, opts) {
   return out;
 }
 
-module.exports = { apply, preflight };
+  var api = { apply, preflight };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportApply = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
