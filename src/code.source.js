@@ -2461,7 +2461,7 @@ function buildResolvedDocument(rawData, options) {
       toDtcgFormat: D.toDtcgFormat
     },
     pin: options.pin,
-    renameMode: options.renameMode,
+    renameMode: options.renameMode || function (axis, mode) { return slugModeName(mode); },
     renameToken: options.renameToken,
     typeHints: options.typeHints
   });
@@ -2539,7 +2539,7 @@ function buildResolvedDocument(rawData, options) {
             toDtcgFormat: D.toDtcgFormat
           },
           pin: pinned,
-          renameMode: options.renameMode,
+          renameMode: options.renameMode || function (axis, mode) { return slugModeName(mode); },
           renameToken: options.renameToken,
           typeHints: options.typeHints
         });
@@ -2560,7 +2560,7 @@ function buildResolvedDocument(rawData, options) {
           toDtcgFormat: D.toDtcgFormat
         },
         pin: pinned,
-        renameMode: options.renameMode,
+        renameMode: options.renameMode || function (axis, mode) { return slugModeName(mode); },
         renameToken: options.renameToken,
         typeHints: options.typeHints
       });
@@ -2604,6 +2604,31 @@ function buildResolvedDocument(rawData, options) {
   the first. Ambiguity is refused rather than guessed: two candidates means no
   answer, and no answer means the derived shape, which loses nothing.
 */
+/*
+  A MODE NAME AS A PATH SEGMENT.
+
+  Figma mode names are written for the mode picker — 'S Mobile', 'XXL Large
+  Desktop' — where the leading size code orders the list and the space reads
+  fine. As a key in a document neither survives: a space in a path is awkward
+  for every consumer, and the size code is the sidebar's ordering rather than
+  part of the name.
+
+  So: drop a leading size code when one is there, lowercase, and join the rest
+  with hyphens. 'S Mobile' becomes 'mobile' and 'XXL Large Desktop' becomes
+  'large-desktop', while a mode already written as a plain word — light, dark,
+  unrestricted, aperitif — comes back untouched.
+
+  Only a leading size code is dropped, and only when something follows it, so
+  a mode legitimately called 'S' keeps its name.
+*/
+function slugModeName(name) {
+  var s = String(name === undefined || name === null ? '' : name).trim();
+  if (!s) return s;
+  var m = s.match(/^(?:X{0,3}[SML]|\d+)\s+(.+)$/i);
+  if (m) s = m[1];
+  return s.toLowerCase().replace(/\s+/g, '-');
+}
+
 function detectLayoutRoles(res) {
   var single = null;
   var widest = null;
