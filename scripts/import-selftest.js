@@ -747,6 +747,18 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
      cands.some((c) => c.depth === 1 && c.distinct === 2),
      JSON.stringify(cands.map((c) => 'd' + c.depth + ':' + c.distinct + '@' + c.overlap)));
 
+  /* Candidates are measured on the ORIGINAL rows, so the list does not shrink
+     as it is used: what a document COULD be read as does not change because of
+     what it is currently being read as, and a caller offering these as choices
+     needs the siblings of the one already taken. */
+  const chosen = derive(ir, { levels: { theme: { 0: 'mode' } } });
+  ok('levels: every candidate is still reported once one is applied',
+     chosen.levelCandidates.length === 2, JSON.stringify(chosen.levelCandidates.map((c) => c.depth)));
+  ok('levels: the one in force is marked, and its sibling marked as displaced',
+     chosen.levelCandidates.some((c) => c.depth === 0 && c.applied === true && !c.blockedBySibling) &&
+     chosen.levelCandidates.some((c) => c.depth === 1 && c.applied === false && c.blockedBySibling === true),
+     JSON.stringify(chosen.levelCandidates.map((c) => 'd' + c.depth + ' applied=' + c.applied + ' blocked=' + c.blockedBySibling)));
+
   const p1 = derive(ir, { levels: { theme: { 0: 'mode' } } });
   ok('levels: promoting a depth turns it into the mode axis',
      p1.collections.length === 1 && p1.collections[0].modes.join(',') === 'light,dark' &&

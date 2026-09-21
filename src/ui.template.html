@@ -1175,6 +1175,12 @@
       flex-direction: column;
       gap: 10px;
     }
+    .import-card-note {
+      margin: -4px 0 4px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--app-text-muted);
+    }
     .import-card-title {
       margin: 0;
       font-weight: 700;
@@ -1935,7 +1941,18 @@
         <div class="import-facts" id="import-facts"></div>
       </div>
 
-      <!-- Step 3. Only what the file cannot decide on its own. Empty far more
+      <!-- Step 3. How the file should be READ, before anything derived from it
+           is shown. A JSON has N nesting depths and Figma has one mode axis
+           per collection; derive() has already measured which depths behave
+           like axes, and this is where that measurement is confirmed or
+           overridden. It appears only when there is something to confirm. -->
+      <div class="import-card" id="import-levels" data-level="4" hidden>
+        <p class="import-card-title">How should this be read?</p>
+        <p class="import-card-note">These depths look like mode axes rather than parts of a name. Turning one on folds it into modes instead of spelling it into every variable underneath.</p>
+        <span id="import-levels-mount"></span>
+      </div>
+
+      <!-- Step 4. Only what the file cannot decide on its own. Empty far more
            often than not — on a real export every group came out certain. -->
       <div class="import-card is-question" id="import-questions" data-level="4" hidden>
         <p class="import-card-title">This file does not say</p>
@@ -2869,7 +2886,7 @@
       than four modes and every variable in it moves.
     */
     var importState = { doc: null, fileName: null, ir: null, plan: null,
-                        compiled: null, changes: null, decisions: {} };
+                        compiled: null, changes: null, decisions: {}, levels: {} };
 
     function openImport() {
       document.getElementById('main-page').classList.add('hidden');
@@ -2934,6 +2951,7 @@
         }
           /* A new file answers nothing the last one was asked. */
         importState.decisions = {};
+        importState.levels = {};
         runImport(doc, file.name);
       };
       fr.readAsText(file);
@@ -2955,7 +2973,8 @@
           'It parsed, but nothing in it looks like a token — a token needs both a value and a type.');
         return;
       }
-      plan = window.PomImportDerive.derive(ir, { decisions: importState.decisions });
+      plan = window.PomImportDerive.derive(ir, { decisions: importState.decisions,
+                                                 levels: importState.levels });
       compiled = window.PomImportCompile.compile(ir, plan, { evaluateExpressions: true });
 
       importState.ir = ir;
@@ -2963,6 +2982,7 @@
       importState.compiled = compiled;
 
       renderImportSummary(fileName, ir, plan, compiled);
+      renderImportLevels(plan);
       renderImportQuestions(plan, compiled);
 
       if (compiled.ok) {
@@ -3037,6 +3057,33 @@
       document.getElementById('import-facts').innerHTML = html;
       document.getElementById('import-summary').hidden = false;
     }
+
+    /*
+      Candidates plus whatever is already promoted, so a row that is ON stays
+      on the list rather than disappearing the moment it is chosen — derive()
+      stops proposing a group once it has been assigned, and a control that
+      vanishes when you use it cannot be undone.
+    */
+    function renderImportLevels(plan) {
+      var el = document.getElementById('import-levels');
+      /* derive() reports every candidate it measured, each already marked with
+         whether it is in force — so the list does not shrink as it is used and
+         an alternative stays visible next to the choice that displaced it. */
+      var shown = plan.levelCandidates || [];
+      window.PomImportLevels.set(shown, importState.levels);
+      el.hidden = !shown.length;
+    }
+
+    window.PomImportLevels.onToggle = function(group, depth, on) {
+      if (on) {
+        importState.levels[group] = importState.levels[group] || {};
+        importState.levels[group][String(depth)] = 'mode';
+      } else if (importState.levels[group]) {
+        delete importState.levels[group][String(depth)];
+        if (!Object.keys(importState.levels[group]).length) delete importState.levels[group];
+      }
+      if (importState.doc) runImport(importState.doc, importState.fileName);
+    };
 
     function renderImportQuestions(plan, compiled) {
       var el = document.getElementById('import-questions');

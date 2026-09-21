@@ -24,6 +24,7 @@ import { flushSync } from 'react-dom';
 
 import { Button } from '../vendor/pomegranate/panel/node/Button';
 import { Switch } from '../vendor/pomegranate/panel/node/Switch';
+import { ListControlItem } from '../vendor/pomegranate/panel/node/ListControlItem';
 import { SegmentedControl } from '../vendor/pomegranate/panel/node/SegmentedControl';
 import { Checkbox } from '../vendor/pomegranate/panel/node/Checkbox';
 import { DropDownSelect } from '../vendor/pomegranate/panel/node/DropDownSelect';
@@ -389,6 +390,10 @@ type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
 declare global {
   interface Window {
     PomImportApplyBtn: any;
+    PomImportLevels: {
+      set: (candidates: any[], applied: Record<string, Record<string, string>>) => void;
+      onToggle: ((group: string, depth: number, on: boolean) => void) | null;
+    };
     PomImportQuestions: {
       set: (questions: any[]) => void;
       onAnswer: ((id: string, value: string) => void) | null;
@@ -1112,6 +1117,79 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
   if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   register(() => setOpen(true));
 }
+
+/* ── which depth of a path is an axis ───────────────────────────────────────
+
+  The validation step: a JSON has N nesting depths, Figma has one mode axis per
+  collection, and derive() has already MEASURED which depths behave like axes.
+  This is where that measurement gets confirmed or overridden — not a blank
+  question, a proposal with its evidence attached.
+
+  ListControlItem with a trailing Switch, which is the kit's own pairing for
+  this: the row carries the name and the explanation, the control carries only
+  the state, and Switch's `labelHidden` exists precisely so the name is not
+  said twice. (Checkbox cannot carry a description of its own — see
+  disarantidis/pomegranate#87 — and this is the row that would have needed it.)
+
+  ONE AXIS PER COLLECTION is enforced here as well as refused downstream: once
+  a depth in a group is on, its siblings go disabled and say why. Letting
+  someone turn on a second one and only then be told it is impossible would be
+  offering a choice that was never available.
+*/
+(function mountImportLevels() {
+  const container = document.getElementById('import-levels-mount');
+  let set: (c: any[], a: any) => void = () => {};
+  function View() {
+    const [candidates, setCandidates] = useState<any[]>([]);
+    const [applied, setApplied] = useState<Record<string, Record<string, string>>>({});
+    set = (c, a) => { setCandidates(c || []); setApplied(a || {}); };
+    if (!candidates.length) return null;
+
+    /* derive() has already worked out which is in force and which is displaced
+       by a sibling — read those rather than recomputing them here, so the two
+       cannot disagree. `applied` is only a fallback for a caller that passes
+       raw candidates. */
+    const isOn = (c: any) =>
+      c.applied !== undefined ? c.applied : !!(applied[c.group] && applied[c.group][String(c.depth)] === 'mode');
+    const isBlocked = (c: any) =>
+      c.blockedBySibling !== undefined
+        ? c.blockedBySibling
+        : !isOn(c) && !!(applied[c.group] && Object.keys(applied[c.group]).some((k) => applied[c.group][k] === 'mode'));
+
+    return (
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {candidates.map((c) => {
+          const on = isOn(c);
+          const blocked = isBlocked(c);
+          const shown = c.values.slice(0, 4).join(', ') + (c.values.length > 4 ? ', …' : '');
+          return (
+            <ListControlItem
+              key={c.group + ':' + c.depth}
+              title={c.group + ' · ' + c.distinct + ' modes'}
+              subtitle={blocked
+                ? shown + ' — not available: a collection has one mode axis, and this group already uses it'
+                : shown + ' — ' + c.variablesIfPromoted.toLocaleString() + ' variables each'}
+              disabled={blocked}
+              align="center"
+              trailing={
+                <Switch
+                  label={'Read ' + c.group + ' depth ' + c.depth + ' as a mode axis'}
+                  labelHidden
+                  size="small"
+                  checked={on}
+                  disabled={blocked}
+                  onChange={(v: boolean) => window.PomImportLevels.onToggle?.(c.group, c.depth, v)}
+                />
+              }
+            />
+          );
+        })}
+      </span>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomImportLevels = { set: (c, a) => set(c, a), onToggle: null };
+})();
 
 /* ── the questions an import cannot answer for itself ───────────────────────
 

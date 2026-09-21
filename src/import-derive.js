@@ -217,6 +217,13 @@ function derive(ir, opts) {
   opts = opts || {};
   /* FIRST, before anything else looks at the rows — see applyLevels. */
   const levels = opts.levels || {};
+  /* Measured on the ORIGINAL rows, not the rewritten ones. What a document
+     could be read as does not change because of what it is currently being
+     read as — and the depth indices would shift under the transform anyway,
+     so post-transform numbers would not even name the same depths. A caller
+     showing these as choices needs the SIBLINGS of the one already taken, not
+     a list that shrinks as it is used. */
+  const candidates = levelCandidates(ir);
   ir = applyLevels(ir, levels);
 
   const modeCeiling = opts.modeCeiling || Infinity;
@@ -497,9 +504,14 @@ function derive(ir, opts) {
     }
   }
 
-  /* Only worth reporting for a group whose depths were NOT already assigned —
-     confirming what the caller just chose is noise. */
-  plan.levelCandidates = levelCandidates(ir).filter((c) => !levels[c.group]);
+  /* Every candidate, each marked with whether it is the one in force. A
+     collection has one mode axis, so the others in its group are alternatives
+     rather than additions — which is a thing to show, not to hide. */
+  plan.levelCandidates = candidates.map((c) => Object.assign({}, c, {
+    applied: !!(levels[c.group] && levels[c.group][String(c.depth)] === 'mode'),
+    blockedBySibling: !!(levels[c.group] &&
+      Object.keys(levels[c.group]).some((d) => levels[c.group][d] === 'mode' && String(c.depth) !== d)),
+  }));
 
   for (const id of Object.keys(decisions)) {
     if (!plan.decisionsApplied.some((d) => d.id === id)) plan.decisionsUnused.push(id);
