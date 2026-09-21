@@ -1208,6 +1208,9 @@
     .import-question { margin-bottom: 12px; font-size: 12px; color: var(--app-text-muted); line-height: 1.5; }
     .import-question:last-child { margin-bottom: 0; }
     .import-question code { color: var(--app-text); font-size: 11px; }
+    /* Separated from the counts above it — it is a commitment, not another
+       line of the report. */
+    .import-apply { margin-top: 8px; }
 
     .empty-state .hint {
       font-size: 11px;
@@ -21810,7 +21813,7 @@ html[data-theme=dark] {
            often than not — on a real export every group came out certain. -->
       <div class="import-card is-question" id="import-questions" data-level="4" hidden>
         <p class="import-card-title">This file does not say</p>
-        <div id="import-questions-body"></div>
+        <span id="import-questions-mount"></span>
       </div>
 
       <!-- Step 4. The answer to the only question that matters before
@@ -21818,6 +21821,9 @@ html[data-theme=dark] {
       <div class="import-card" id="import-changes" data-level="4" hidden>
         <p class="import-card-title">What would change</p>
         <div id="import-changes-body"></div>
+        <!-- Deliberately at the FOOT of this card and nowhere else: the only
+             route to writing runs past the report of what writing would do. -->
+        <div id="import-apply-btn-mount" class="import-apply"></div>
       </div>
 
       <div class="import-card is-problem" id="import-problem" data-level="4" hidden>
@@ -47935,6 +47941,12 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
     return { setItems: (items, value) => set(() => ({ items, value })) };
   }
+  window.PomImportApplyBtn = mountLiveButton(
+    "import-apply-btn-mount",
+    { id: "import-apply-btn", variant: "filled", size: "large", label: "Import into this file", block: true },
+    { disabled: false, loading: false, success: false, label: null },
+    CARD_LEVEL
+  );
   window.PomButtons = {
     push: mountLiveButton(
       "push-btn-mount",
@@ -48406,6 +48418,50 @@ html[data-theme=dark] {
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) }));
     register(() => setOpen(true));
   }
+  (function mountImportQuestions() {
+    const container = document.getElementById("import-questions-mount");
+    let set = () => {
+    };
+    function View() {
+      const [questions, setQuestions] = (0, import_react14.useState)([]);
+      const [answers, setAnswers] = (0, import_react14.useState)({});
+      set = (qs) => {
+        setQuestions(qs || []);
+        setAnswers({});
+      };
+      if (!questions.length) return null;
+      const answer = (id, value) => {
+        setAnswers((a) => ({ ...a, [id]: value }));
+        window.PomImportQuestions.onAnswer?.(id, value);
+      };
+      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-5)" }, children: questions.map((q) => /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 6 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 12, color: "var(--app-text)", lineHeight: 1.5 }, children: q.question }),
+        q.evidence && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 11, color: "var(--app-text-muted)", lineHeight: 1.5 }, children: q.evidence }),
+        q.options && q.options.length <= 3 ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+          SegmentedControl,
+          {
+            label: q.question,
+            size: "small",
+            value: answers[q.id] ?? "",
+            options: q.options.map((o) => ({ value: o, label: o })),
+            onChange: (v) => answer(q.id, v)
+          }
+        ) : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: 4 }, children: (q.options || []).map((o) => /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+          PomButton,
+          {
+            variant: answers[q.id] === o ? "primary" : "tonal",
+            size: "small",
+            label: o,
+            block: true,
+            onClick: () => answer(q.id, o)
+          },
+          o
+        )) })
+      ] }, q.id)) });
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) })));
+    window.PomImportQuestions = { set: (qs) => set(qs), onAnswer: null };
+  })();
   window.PomRemoveGithubDialog = { open: () => {
   }, onConfirm: null };
   confirmDialog(
@@ -51010,7 +51066,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '3af792d 19:55:13';
+    var CLOSURE_BUILD = '8e8438f 20:00:43';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -51643,7 +51699,14 @@ function format(report, limit) {
        (src/import-*.js, inlined by scripts/build-ui.js), so the plugin cannot
        drift from what the tests cover.
        ──────────────────────────────────────────────────────────────────── */
-    var importState = { doc: null, fileName: null, ir: null, plan: null, compiled: null, changes: null };
+    /*
+      `decisions` is the only thing that survives a re-run. Everything else is
+      rebuilt from the document each time, because an answer can change the
+      projection wholesale — decide that a group is four collections rather
+      than four modes and every variable in it moves.
+    */
+    var importState = { doc: null, fileName: null, ir: null, plan: null,
+                        compiled: null, changes: null, decisions: {} };
 
     function openImport() {
       document.getElementById('main-page').classList.add('hidden');
@@ -51706,6 +51769,8 @@ function format(report, limit) {
           importProblem('That file is not valid JSON', String(err.message || err));
           return;
         }
+          /* A new file answers nothing the last one was asked. */
+        importState.decisions = {};
         runImport(doc, file.name);
       };
       fr.readAsText(file);
@@ -51727,7 +51792,7 @@ function format(report, limit) {
           'It parsed, but nothing in it looks like a token — a token needs both a value and a type.');
         return;
       }
-      plan = window.PomImportDerive.derive(ir, {});
+      plan = window.PomImportDerive.derive(ir, { decisions: importState.decisions });
       compiled = window.PomImportCompile.compile(ir, plan, { evaluateExpressions: true });
 
       importState.ir = ir;
@@ -51792,16 +51857,42 @@ function format(report, limit) {
 
     function renderImportQuestions(plan, compiled) {
       var el = document.getElementById('import-questions');
-      var refusals = (compiled && compiled.refusals) || [];
-      if (!refusals.length) { el.hidden = true; return; }
-      var html = '';
-      refusals.forEach(function(r) {
-        html += '<div class="import-question">' + esc(r.question) +
-                (r.evidence ? '<br><code>' + esc(r.evidence) + '</code>' : '') + '</div>';
-      });
-      document.getElementById('import-questions-body').innerHTML = html;
+      /* Only the questions a caller can actually ANSWER. compile() also
+         refuses for reasons no choice resolves — a collection over this file's
+         mode ceiling, a value it cannot parse — and offering options for those
+         would be offering a button that does nothing. */
+      var answerable = ((compiled && compiled.refusals) || [])
+        .filter(function(r) { return r.kind === 'unresolved' && r.options && r.options.length; });
+      window.PomImportQuestions.set(answerable);
+      if (!answerable.length) { el.hidden = true; return; }
       el.hidden = false;
     }
+
+    /*
+      THE ONE CROSSING. Everything above this line ran in the UI; this is the
+      only thing that goes to the sandbox, and it goes once, after the diff
+      has been rendered. The program is pure data — no closures, no Figma
+      objects — which is exactly what makes it postMessage-able.
+    */
+    document.getElementById('import-apply-btn').addEventListener('click', function() {
+      if (!importState.compiled || !importState.compiled.ok) return;
+      window.PomImportApplyBtn.setDisabled(true);
+      window.PomImportApplyBtn.setLoading(true);
+      parent.postMessage({ pluginMessage: {
+        type: 'applyImport',
+        program: importState.compiled.program,
+      } }, '*');
+    });
+
+    /*
+      An answer re-runs the whole projection rather than patching the plan.
+      derive() is cheap and pure, and a decision can move every variable in a
+      group — there is no smaller correct update, only a faster wrong one.
+    */
+    window.PomImportQuestions.onAnswer = function(id, value) {
+      importState.decisions[id] = value;
+      if (importState.doc) runImport(importState.doc, importState.fileName);
+    };
 
     function renderImportChanges(d) {
       var s = d.summary, html = '';
@@ -53011,6 +53102,28 @@ function format(report, limit) {
         }, '*');
       }
       
+      if (msg.type === 'importApplied') {
+        window.PomImportApplyBtn.setLoading(false);
+        window.PomImportApplyBtn.setDisabled(false);
+        window.PomImportApplyBtn.setSuccess(!msg.report.failed);
+        var r = msg.report;
+        if (r.failed) {
+          importProblem('Imported with ' + r.failed + ' failure' + (r.failed === 1 ? '' : 's'),
+            (r.errors[0] ? r.errors[0].error : '') +
+            '  ·  ' + r.applied + ' of ' + (r.applied + r.failed) + ' operations went through. ' +
+            'Nothing was rolled back — Figma has no transaction — so the file holds exactly what ' +
+            'the count above says.');
+        } else {
+          showToast('Imported — ' + r.variables.toLocaleString() + ' created, ' +
+                    ((r.reusedVariables || 0)).toLocaleString() + ' updated');
+          /* The document has changed underneath the main screen, so its own
+             read of it is now stale. Re-extracting is also what makes a
+             second import diff against the new state rather than the old. */
+          parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+          closeImport();
+        }
+      }
+
       if (msg.type === 'error') {
         if (skeletonList) skeletonList.hidden = true;
         revealJsonDownloadCard();

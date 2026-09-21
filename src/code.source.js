@@ -2894,6 +2894,36 @@ figma.ui.onmessage = function(msg) {
     });
   }
 
+  /*
+    THE ONLY WRITE PATH IN THE PLUGIN.
+
+    Everything that decided WHAT to write happened in the UI — reading the
+    file, projecting it, refusing what it could not know, and showing the diff.
+    By the time a program arrives here every decision is already made, which is
+    why this handler is short and has no judgement in it.
+
+    snapshot() first, so names in the program resolve to the objects already in
+    this document: that is what makes the run an upsert rather than a duplicate
+    factory, and it is what the diff has been describing.
+  */
+  if (msg.type === 'applyImport') {
+    (async function() {
+      try {
+        var existing = await PomImportApply.snapshot(figma);
+        var report = PomImportApply.apply(msg.program, figma, { existing: existing });
+        console.log('[Import] ' + report.applied + ' applied, ' + report.failed + ' failed; ' +
+          report.variables + ' created, ' + (report.reusedVariables || 0) + ' reused, ' +
+          (report.modesAdded || 0) + ' modes added');
+        figma.ui.postMessage({ type: 'importApplied', report: report });
+      } catch (e) {
+        console.error('[Import] apply failed:', e);
+        figma.ui.postMessage({ type: 'importApplied',
+          report: { applied: 0, failed: 1, variables: 0, errors: [{ error: e.message || String(e) }] } });
+      }
+    })();
+    return;
+  }
+
   if (msg.type === 'transform') {
     var nativeResult = transformToFinalFormat(msg.raw, {
       includeDescriptions: !!msg.includeDescriptions

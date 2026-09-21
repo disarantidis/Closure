@@ -388,6 +388,11 @@ type FolderSelectBridge = { setItems: (items: any[], selectedValue: string) => v
 type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
 declare global {
   interface Window {
+    PomImportApplyBtn: any;
+    PomImportQuestions: {
+      set: (questions: any[]) => void;
+      onAnswer: ((id: string, value: string) => void) | null;
+    };
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
     PomAddGitlabBtn: LiveToggleIconHandle;
     PomAddGithubBtn: LiveToggleIconHandle;
@@ -417,6 +422,13 @@ declare global {
 }
 
 /* ── push + download ───────────────────────────────────────────────────────── */
+window.PomImportApplyBtn = mountLiveButton(
+  'import-apply-btn-mount',
+  { id: 'import-apply-btn', variant: 'filled', size: 'large', label: 'Import into this file', block: true },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+
 window.PomButtons = {
   push: mountLiveButton(
     'push-btn-mount',
@@ -1100,6 +1112,76 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
   if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   register(() => setOpen(true));
 }
+
+/* ── the questions an import cannot answer for itself ───────────────────────
+
+  derive() refuses rather than guessing, and every refusal it raises carries an
+  id, the question in words, and the answers that would settle it. This renders
+  them and hands the answer back; nothing here decides anything.
+
+  Each question is a CHOICE BETWEEN NAMED OPTIONS, never free text — the set of
+  valid answers is always known (modes vs separate, the four Figma types, which
+  collection a path meant), so offering a text field would only invite an
+  answer that cannot be used.
+
+  SegmentedControl while the options fit on one line, a stacked list once they
+  do not: a reference collision can name a dozen collections, and squeezing
+  twelve segments into a plugin panel makes every one of them unreadable.
+*/
+(function mountImportQuestions() {
+  const container = document.getElementById('import-questions-mount');
+  let set: (qs: any[]) => void = () => {};
+  function View() {
+    const [questions, setQuestions] = useState<any[]>([]);
+    const [answers, setAnswers] = useState<Record<string, string>>({});
+    set = (qs) => { setQuestions(qs || []); setAnswers({}); };
+    if (!questions.length) return null;
+    const answer = (id: string, value: string) => {
+      setAnswers((a) => ({ ...a, [id]: value }));
+      window.PomImportQuestions.onAnswer?.(id, value);
+    };
+    return (
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-5)' }}>
+        {questions.map((q) => (
+          <span key={q.id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--app-text)', lineHeight: 1.5 }}>{q.question}</span>
+            {q.evidence && (
+              <span style={{ fontSize: 11, color: 'var(--app-text-muted)', lineHeight: 1.5 }}>{q.evidence}</span>
+            )}
+            {q.options && q.options.length <= 3 ? (
+              <SegmentedControl
+                /* Not rendered — SegmentedControl uses `label` as the
+                   radiogroup's aria-label. The question is already on screen
+                   above it, and passing it here is what names the group for a
+                   screen reader too. */
+                label={q.question}
+                size="small"
+                value={answers[q.id] ?? ''}
+                options={q.options.map((o: string) => ({ value: o, label: o }))}
+                onChange={(v: string) => answer(q.id, v)}
+              />
+            ) : (
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {(q.options || []).map((o: string) => (
+                  <PomButton
+                    key={o}
+                    variant={answers[q.id] === o ? 'primary' : 'tonal'}
+                    size="small"
+                    label={o}
+                    block
+                    onClick={() => answer(q.id, o)}
+                  />
+                ))}
+              </span>
+            )}
+          </span>
+        ))}
+      </span>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomImportQuestions = { set: (qs) => set(qs), onAnswer: null };
+})();
 
 window.PomRemoveGithubDialog = { open: () => {}, onConfirm: null };
 confirmDialog('remove-github-dialog-mount',

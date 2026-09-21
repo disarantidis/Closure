@@ -56,6 +56,36 @@ function apply(program, figma, opts) {
   const vars = new Map();        // "collection␟name" -> variable
   const K = (a, b) => a + '␟' + b;
 
+  /*
+    WHAT IS ALREADY HERE, adopted before the first op runs.
+
+    Without this apply() can only ever CREATE: every lookup starts empty, so a
+    program naming a collection that exists makes a second one beside it, and
+    a variable that exists is duplicated rather than updated. That is why the
+    first version refused a non-empty document outright — it had no way to
+    mean anything else.
+
+    Adopting turns the same program into an UPSERT, which is what the diff has
+    been describing all along: names present in the document are resolved to
+    the objects already holding them, and only what is genuinely absent gets
+    created. createCollection on a name that exists is a rename-and-reuse, not
+    a second collection.
+
+    The caller passes this in (`opts.existing`, the array extractVariables
+    produces) rather than apply() reading it, so the whole module stays
+    synchronous and the mock in the suite stays honest — the real Figma API
+    for this is async and apply() is deliberately not.
+  */
+  if (opts.existing && opts.existing.length) {
+    for (const c of opts.existing) {
+      if (!c || !c.handle) continue;              // handle = the live collection object
+      cols.set(c.name, c.handle);
+      (c.modes || []).forEach((m) => modeIds.set(K(c.name, m.name), m.modeId));
+      (c.variables || []).forEach((v) => { if (v.handle) vars.set(K(c.name, v.name), v.handle); });
+      report.adopted = (report.adopted || 0) + 1;
+    }
+  }
+
   const fail = (op, e) => {
     report.failed++;
     report.errors.push({ op: op.op, collection: op.collection, name: op.name, mode: op.mode,
@@ -68,6 +98,21 @@ function apply(program, figma, opts) {
     try {
       switch (op.op) {
         case 'createCollection': {
+          /* Already here: reuse it. Creating a second collection of the same
+             name is never what anyone meant, and Figma will happily do it. */
+          const found = cols.get(op.collection);
+          if (found) {
+            if (modeIds.get(K(op.collection, op.firstMode)) === undefined) {
+              /* The collection exists but not under this mode name. Renaming
+                 its default would silently repoint every value already in that
+                 mode, so the mode is ADDED instead and the existing one left
+                 as it is. */
+              modeIds.set(K(op.collection, op.firstMode), found.addMode(op.firstMode));
+              report.modesAdded = (report.modesAdded || 0) + 1;
+            }
+            report.reusedCollections = (report.reusedCollections || 0) + 1;
+            break;
+          }
           const c = figma.variables.createVariableCollection(op.collection);
           /* The collection ARRIVES WITH A MODE, auto-named "Mode 1". The
              program says rename-then-add precisely so this line cannot become
@@ -83,12 +128,26 @@ function apply(program, figma, opts) {
         case 'addMode': {
           const c = cols.get(op.collection);
           if (!c) throw new Error('collection not created: ' + op.collection);
+          if (modeIds.get(K(op.collection, op.mode)) !== undefined) break;   // already there
           modeIds.set(K(op.collection, op.mode), c.addMode(op.mode));
+          report.modesAdded = (report.modesAdded || 0) + 1;
           break;
         }
         case 'createVariable': {
           const c = cols.get(op.collection);
           if (!c) throw new Error('collection not created: ' + op.collection);
+          const found = vars.get(K(op.collection, op.name));
+          if (found) {
+            /* Reused, not replaced. The values that follow overwrite the modes
+               this program names and leave every other mode of it untouched —
+               which is exactly what the diff promised: adds and overwrites,
+               never deletes. A description is only written when the incoming
+               file actually carries one, so an import cannot blank one that
+               was written in Figma. */
+            if (op.description) found.description = op.description;
+            report.reusedVariables = (report.reusedVariables || 0) + 1;
+            break;
+          }
           const v = figma.variables.createVariable(op.name, c, op.type);
           if (op.description) v.description = op.description;
           if (op.scopes && op.scopes.length) v.scopes = op.scopes;
@@ -147,12 +206,22 @@ async function preflight(program, figma, opts) {
 
   const existing = await figma.variables.getLocalVariableCollectionsAsync();
   out.existingCollections = existing.length;
-  if (existing.length && !opts.allowExisting) {
+  /*
+    NO LONGER A REFUSAL BY DEFAULT. It was one while apply() could only create,
+    because importing on top of a populated document genuinely did produce
+    duplicates. Now that names resolve to what is already there the same run is
+    an upsert, and refusing it would be refusing the case the diff exists to
+    describe.
+
+    `requireEmpty` keeps the old behaviour for a caller that wants it — a first
+    import into a fresh file has no reason to tolerate anything being there.
+  */
+  if (existing.length && opts.requireEmpty) {
     out.ok = false;
     out.problems.push({
       kind: 'not-empty',
-      message: 'the target already holds ' + existing.length + ' variable collection(s); ' +
-               'importing on top of them produces duplicates, not a merge',
+      message: 'this file already holds ' + existing.length + ' variable collection(s), ' +
+               'and this import was asked to run only into an empty one',
     });
   }
 
@@ -184,7 +253,29 @@ async function preflight(program, figma, opts) {
   return out;
 }
 
-  var api = { apply, preflight };
+/*
+  The shape apply() adopts, read off a live document.
+
+  Separate from apply() and async because the Figma API for this is, and
+  apply() deliberately is not: keeping the one impure await out here is what
+  lets the whole writer be driven synchronously by a mock and asserted
+  call-by-call.
+*/
+async function snapshot(figma) {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const byId = {};
+  vars.forEach((v) => { byId[v.id] = v; });
+  return cols.map((c) => ({
+    name: c.name,
+    handle: c,
+    modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })),
+    variables: (c.variableIds || []).map((id) => byId[id]).filter(Boolean)
+      .map((v) => ({ name: v.name, handle: v })),
+  }));
+}
+
+  var api = { apply, preflight, snapshot };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.PomImportApply = api;

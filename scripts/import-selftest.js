@@ -63,6 +63,15 @@ function mockFigma(fail) {
   return F;
 }
 
+/* The same shape src/import-apply.js's snapshot() builds, from the mock. */
+function snapshotOf(F) {
+  return F.collections.map((c) => ({
+    name: c.name, handle: c,
+    modes: c.modes.map((m) => ({ modeId: m.modeId, name: m.name })),
+    variables: c.vars.map((v) => ({ name: v.name, handle: v })),
+  }));
+}
+
 let pass = 0, fail = 0;
 function ok(name, cond, detail) {
   if (cond) { pass++; console.log('ok    ' + name); }
@@ -644,6 +653,79 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
      keepGoing.failed > 1, 'failed ' + keepGoing.failed);
 }
 
+/* ── apply() into a document that already has things in it ──────────────── */
+{
+  /* The same program, run twice. The second run must change nothing and
+     create nothing — if apply() could only create, it would double
+     everything, which is precisely why it used to refuse. */
+  const doc = { $metadata: { tokenSetOrder: ['core', 'mode/light', 'mode/dark'] },
+    core: { red: tok('#ff0000') },
+    'mode/light': { bg: tok('{red}') }, 'mode/dark': { bg: tok('#330000') } };
+  const ir = toIR(doc);
+  const c = compile(ir, derive(ir, {}), {});
+
+  const F = mockFigma();
+  apply(c.program, F, {});
+  const first = fingerprint(fromRawGraph(F.toRawGraph()));
+  const collectionsAfterFirst = F.collections.length;
+
+  const again = apply(c.program, F, { existing: snapshotOf(F) });
+  ok('upsert: a second run creates no second collection',
+     F.collections.length === collectionsAfterFirst, F.collections.map((x) => x.name).join(','));
+  ok('upsert: and no duplicate variables',
+     F.collections.every((col) => new Set(col.vars.map((v) => v.name)).size === col.vars.length));
+  ok('upsert: it reused rather than created',
+     again.reusedCollections === 2 && again.reusedVariables === 2 && again.variables === 0,
+     JSON.stringify({ rc: again.reusedCollections, rv: again.reusedVariables, v: again.variables }));
+  ok('upsert: running it twice is the same document as running it once',
+     fingerprint(fromRawGraph(F.toRawGraph())) === first);
+}
+{
+  /* An existing variable is OVERWRITTEN in the modes the program names, and
+     left alone in every mode it does not. That is the promise the diff makes. */
+  const doc = { $metadata: { tokenSetOrder: ['m/light'] }, 'm/light': { bg: tok('#ff0000') } };
+  const ir = toIR(doc);
+  const c = compile(ir, derive(ir, {}), {});
+
+  const F = mockFigma();
+  const col = F.variables.createVariableCollection('m');
+  col.renameMode(col.defaultModeId, 'light');
+  const darkId = col.addMode('dark');
+  const v = F.variables.createVariable('bg', col, 'COLOR');
+  v.setValueForMode(col.defaultModeId, { r: 0, g: 0, b: 1, a: 1 });   // light: blue
+  v.setValueForMode(darkId, { r: 0, g: 1, b: 0, a: 1 });              // dark: green
+
+  const rep = apply(c.program, F, { existing: snapshotOf(F) });
+  ok('upsert: the named mode is overwritten',
+     v.valuesByMode[col.defaultModeId].r === 1 && v.valuesByMode[col.defaultModeId].b === 0,
+     JSON.stringify(v.valuesByMode[col.defaultModeId]));
+  ok('upsert: a mode the file never mentions is untouched',
+     v.valuesByMode[darkId].g === 1, JSON.stringify(v.valuesByMode[darkId]));
+  ok('upsert: nothing new was created', rep.variables === 0 && rep.created.length === 0);
+}
+{
+  /* A mode the document does not have yet is ADDED to the existing
+     collection, not conjured as a rename of its default — renaming would
+     silently repoint every value already sitting in that mode. */
+  const doc = { $metadata: { tokenSetOrder: ['m/light', 'm/dark'] },
+    'm/light': { bg: tok('#111111') }, 'm/dark': { bg: tok('#222222') } };
+  const ir = toIR(doc);
+  const c = compile(ir, derive(ir, {}), {});
+
+  const F = mockFigma();
+  const col = F.variables.createVariableCollection('m');
+  col.renameMode(col.defaultModeId, 'light');
+  const v = F.variables.createVariable('bg', col, 'COLOR');
+  v.setValueForMode(col.defaultModeId, { r: 0, g: 0, b: 1, a: 1 });
+
+  const rep = apply(c.program, F, { existing: snapshotOf(F) });
+  ok('upsert: the missing mode is added to the collection that exists',
+     col.modes.length === 2 && col.modes.some((m) => m.name === 'dark') && rep.modesAdded === 1,
+     JSON.stringify(col.modes.map((m) => m.name)));
+  ok('upsert: the mode that already existed keeps its id',
+     col.modes[0].name === 'light' && v.valuesByMode[col.modes[0].modeId] !== undefined);
+}
+
 /* ── preflight(): ask the document before writing to it ──────────────────── */
 {
   const doc = { $metadata: { tokenSetOrder: ['core'] }, core: { red: tok('#ff0000') } };
@@ -656,11 +738,14 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
 
     const dirty = mockFigma();
     dirty.variables.createVariableCollection('already here');
+    /* No longer a refusal: apply() resolves names to what is already there, so
+       running into a populated document is an upsert rather than a duplicate
+       factory. Refusing it would refuse the case the diff exists to describe. */
     const p2 = await preflight(c.program, dirty, {});
-    ok('preflight: refuses a target that already holds collections',
-       p2.ok === false && p2.problems[0].kind === 'not-empty');
-    const p3 = await preflight(c.program, dirty, { allowExisting: true });
-    ok('preflight: unless the caller says otherwise', p3.ok === true);
+    ok('preflight: a populated document is allowed by default', p2.ok === true);
+    const p3 = await preflight(c.program, dirty, { requireEmpty: true });
+    ok('preflight: requireEmpty still refuses one',
+       p3.ok === false && p3.problems[0].kind === 'not-empty');
 
     /* The ceiling is found by hitting it, in a collection that is removed
        either way — compile() is only ever told the ceiling by its caller. */
