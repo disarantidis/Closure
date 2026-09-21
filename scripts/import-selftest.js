@@ -9,6 +9,7 @@
 const { toIR, detect } = require('../src/import-ir.js');
 const { derive } = require('../src/import-derive.js');
 const { compile, toColor, evaluate } = require('../src/import-compile.js');
+const { buildManifest, bindManifest } = require('../src/import-manifest.js');
 
 let pass = 0, fail = 0;
 function ok(name, cond, detail) {
@@ -126,6 +127,103 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
   const ir = toIR(doc);
   const plan = derive(ir, { decisions: { 'type:m/a.b': 'FLOAT' } });
   ok('decision: resolves a type conflict', plan.ok === true);
+}
+
+/* ── $figmaStructure: a declaration beats a measurement ──────────────────── */
+{
+  /* The exporter strips the leading dot and renames as it goes, so a round
+     trip WITHOUT the manifest cannot give ".core" back — the information is
+     not in the JSON. With it, it can. */
+  const doc = { $metadata: { tokenSetOrder: ['core', 'mode/light', 'mode/dark'] },
+    core: { red: tok('#ff0000') },
+    'mode/light': { bg: tok('{red}') }, 'mode/dark': { bg: tok('#330000') },
+    $figmaStructure: { version: 1, collections: [
+      { figmaName: '.core', modes: ['.core'] },
+      { figmaName: '.mode', modes: ['light', 'dark'] },
+    ] } };
+  const ir = toIR(doc);
+  ok('manifest: survives the adapter', !!ir.manifest);
+
+  const bare = derive(toIR({ $metadata: doc.$metadata, core: doc.core,
+    'mode/light': doc['mode/light'], 'mode/dark': doc['mode/dark'] }), {});
+  ok('without manifest: the leading dot is gone',
+     bare.collections.map((c) => c.name).sort().join(',') === 'core,mode');
+
+  const plan = derive(ir, {});
+  ok('with manifest: the real Figma names come back',
+     plan.usedManifest === true &&
+     plan.collections.map((c) => c.name).sort().join(',') === '.core,.mode',
+     plan.collections.map((c) => c.name).join(','));
+  ok('with manifest: it is reported as declared, not measured',
+     plan.collections.every((c) => c.confidence === 'declared'));
+}
+{
+  /* A manifest naming nothing in the document is stale, and a stale
+     declaration that overrode a live measurement would be worse than none. */
+  const doc = { $metadata: { tokenSetOrder: ['a', 'b'] },
+    a: { x: tok('#111111') }, b: { y: tok('#222222') },
+    $figmaStructure: { version: 1, collections: [
+      { figmaName: 'something-else', modes: ['nope'] } ] } };
+  const plan = derive(toIR(doc), {});
+  ok('manifest: one that matches nothing is ignored', plan.usedManifest === false);
+}
+{
+  /* Bound per group: a hand-added set falls through to measurement without
+     invalidating the declaration for everything else. */
+  const doc = { $metadata: { tokenSetOrder: ['mode/light', 'mode/dark', 'extra'] },
+    'mode/light': { bg: tok('#111111') }, 'mode/dark': { bg: tok('#222222') },
+    extra: { z: tok('#333333') },
+    $figmaStructure: { version: 1, collections: [{ figmaName: '.mode', modes: ['light', 'dark'] }] } };
+  const plan = derive(toIR(doc), {});
+  ok('manifest: binds per group, measures the rest',
+     plan.usedManifest === true && plan.manifestBinding.bound === 1 &&
+     plan.manifestBinding.measured === 1 &&
+     plan.collections.some((c) => c.name === '.mode') &&
+     plan.collections.some((c) => c.name === 'extra'),
+     JSON.stringify(plan.collections.map((c) => c.name)));
+}
+{
+  /* The declaration answers what measurement would have had to ask about. */
+  const doc = { $metadata: { tokenSetOrder: ['t/a', 't/b', 't/c'] },
+    't/a': { s: { x: tok('#111111'), y: tok('#222222') }, only: { a: tok('#333333') } },
+    't/b': { s: { x: tok('#444444'), y: tok('#555555') }, only: { b: tok('#666666') } },
+    't/c': { s: { x: tok('#777777') }, only: { c: tok('#888888') } },
+    $figmaStructure: { version: 1, collections: [{ figmaName: '.theme', modes: ['a', 'b', 'c'] }] } };
+  const plan = derive(toIR(doc), {});
+  ok('manifest: settles a group measurement would have refused',
+     plan.ok === true && plan.ambiguous.length === 0 && plan.collections[0].name === '.theme');
+  const ignored = derive(toIR(doc), { ignoreManifest: true });
+  ok('manifest: ignoreManifest puts the question back', ignored.ok === false);
+}
+{
+  /* The exporter renames collections AND their modes, so the name is the less
+     reliable half of the pair — matched by mode-set, then positionally. */
+  const doc = { $metadata: { tokenSetOrder: ['restrictions/open', 'restrictions/closed'] },
+    'restrictions/open': { a: tok('#111111') }, 'restrictions/closed': { a: tok('#222222') },
+    $figmaStructure: { version: 1, collections: [
+      { figmaName: '_restricted', modes: ['open', 'closed'] } ] } };
+  const plan = derive(toIR(doc), {});
+  ok('manifest: binds by modes when the collection was renamed',
+     plan.collections[0].name === '_restricted', plan.collections[0].name);
+
+  const renamedModes = { $metadata: { tokenSetOrder: ['bp/mobile', 'bp/tablet'] },
+    'bp/mobile': { a: tok('#111111') }, 'bp/tablet': { a: tok('#222222') },
+    $figmaStructure: { version: 1, collections: [
+      { figmaName: '.bp', modes: ['S Mobile', 'M Tablet'] } ] } };
+  const p2 = derive(toIR(renamedModes), {});
+  ok('manifest: binds positionally when the mode names were rewritten too',
+     p2.collections[0].name === '.bp' &&
+     p2.collections[0].modes.join(',') === 'S Mobile,M Tablet',
+     JSON.stringify(p2.collections[0]));
+}
+{
+  const built = buildManifest([{ name: '.core', modes: [{ name: '.core' }], variables: [1, 2] }]);
+  ok('buildManifest: shapes what the export writes',
+     built.version === 1 && built.collections[0].figmaName === '.core' &&
+     built.collections[0].variables === 2);
+  ok('buildManifest: nothing to declare -> nothing declared', buildManifest([]) === null);
+  ok('bindManifest: absent manifest binds nothing',
+     bindManifest({ rows: [] }, null) === null);
 }
 
 /* ── the program ─────────────────────────────────────────────────────────── */

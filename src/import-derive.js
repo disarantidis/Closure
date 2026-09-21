@@ -29,6 +29,8 @@
   question once answers it for every later import of the same file.
 */
 
+const { bindManifest } = require('./import-manifest.js');
+
 /* Above MODES_MIN the variants are read as modes, at or below SEPARATE_MAX as
    separate collections, and anything between is refused. The band is wide on
    purpose: real axes share ~all their paths and real namespaces share ~none, so
@@ -104,10 +106,31 @@ function derive(ir, opts) {
     g.get(r.variant).add(r.path);
   }
 
+  /* A DECLARATION BEATS A MEASUREMENT. $figmaStructure, when the document
+     carries one, states the architecture the export came out of — including
+     the names the export itself then threw away (".core" -> "core",
+     "_restricted" -> "restrictions"). Bound per group, so a hand-added set
+     falls through to measurement without invalidating the rest, and a manifest
+     that matches nothing at all is ignored entirely. */
+  const bound = opts.ignoreManifest ? null : bindManifest(ir, ir.manifest);
+  plan.usedManifest = !!bound;
+  if (bound) plan.manifestBinding = { bound: bound.bound, measured: bound.unbound };
+
   const verdict = new Map();                // group -> 'modes' | 'separate'
+  const naming = new Map();                 // group -> how the manifest names it
   const evidence = new Map();
   for (const [g, variants] of groups) {
     const names = [...variants.keys()];
+
+    const b = bound && bound.bindings.get(g);
+    if (b) {
+      verdict.set(g, b.verdict);
+      naming.set(g, b);
+      evidence.set(g, { variants: names.length, overlap: null, declared: true,
+                        note: 'declared by $figmaStructure' });
+      continue;
+    }
+
     if (names.length === 1) {
       verdict.set(g, 'modes');
       evidence.set(g, { variants: 1, overlap: 1, note: 'single set', decided: false });
@@ -145,9 +168,19 @@ function derive(ir, opts) {
   }
 
   /* ── 2. address every row to (collection, mode) ────────────────────────── */
-  const address = (r) => verdict.get(r.group) === 'separate'
-    ? { col: r.variant, mode: r.variant }     // a namespace of its own, one mode
-    : { col: r.group, mode: r.variant };      // a mode of the group's collection
+  const address = (r) => {
+    const n = naming.get(r.group);
+    if (n) {
+      /* The manifest's own names — this is the only route by which ".core"
+         comes back as ".core" rather than "core". */
+      return n.verdict === 'separate'
+        ? { col: n.per[r.variant].collection, mode: n.per[r.variant].mode }
+        : { col: n.collection, mode: n.modeName[r.variant] || r.variant };
+    }
+    return verdict.get(r.group) === 'separate'
+      ? { col: r.variant, mode: r.variant }   // a namespace of its own, one mode
+      : { col: r.group, mode: r.variant };    // a mode of the group's collection
+  };
 
   /* ── 3. a variable is (collection, path); modes contribute values ──────── */
   const vars = new Map();
@@ -264,6 +297,7 @@ function derive(ir, opts) {
       overlap: ev.overlap === undefined ? null : +(ev.overlap * 100).toFixed(1),
       evidence: ev.note,
       confidence: plan.ambiguous.some((a) => a.group === g) ? 'AMBIGUOUS'
+                : ev.declared ? 'declared'
                 : ev.decided ? 'decided by caller'
                 : ev.variants === 1 ? 'certain (single set)'
                 : ev.overlap === 1 || ev.overlap === 0 ? 'certain' : 'high',

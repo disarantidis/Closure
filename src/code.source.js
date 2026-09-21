@@ -2452,6 +2452,41 @@ function toTokenFormat(native, rawData) {
   });
 
   out['$metadata'] = { tokenSetOrder: buildTokenSetOrder(out) };
+
+  /*
+    THE ARCHITECTURE THIS CAME OUT OF, written down, so importing it back does
+    not have to be inferred.
+
+    Everything above this line has been rewriting names: ".core" became "core",
+    "_restricted" became "restrictions", ".breakpoint"'s "S Mobile" became
+    "mobile". Those are this exporter's spellings, not the file's, and nothing
+    in the resulting JSON can undo them — the information is gone by the time
+    the tree exists. So it is recorded here from rawData, which still holds the
+    collections exactly as Figma gave them.
+
+    It also settles, with certainty rather than inference, the one question an
+    importer otherwise has to measure its way to: whether "base/white" and
+    "base/black" are two modes of one collection or two collections sharing a
+    prefix. At this point we KNOW — we just read them out of Figma.
+
+    A hint, never a contract. src/import-manifest.js binds it per group and
+    ignores whatever does not match the document it arrives in, so a
+    hand-edited or stale structure falls back to being measured rather than
+    being believed.
+  */
+  if (rawData && rawData.collections && rawData.collections.length) {
+    out['$figmaStructure'] = {
+      version: 1,
+      collections: rawData.collections.map(function (c) {
+        return {
+          figmaName: c.name,
+          modes: (c.modes || []).map(function (m) { return m.name; }),
+          variables: (c.variables || []).length,
+        };
+      }),
+    };
+  }
+
   // Runs last: every set is final here, so the closure it computes is the one
   // a consumer will actually validate against.
   completeThemeSelections(out);
@@ -2466,12 +2501,14 @@ function toTokenFormat(native, rawData) {
 // leaf → .core, so omitting any middle set breaks subtle / elevation / black.
 // ============================================================================
 function validateReferenceClosure(tokens) {
-  var META = { '$themes': 1, '$metadata': 1 };
+  // Any $-prefixed root key is metadata, not a token set — an allowlist would
+  // have to be extended for every new one ($figmaStructure was the first).
+  var META = { '$themes': 1, '$metadata': 1, '$figmaStructure': 1 };
 
   // 1) Index every token name-path present in the output (dotted form).
   var index = {};
   Object.keys(tokens).forEach(function(setName) {
-    if (META[setName]) return;
+    if (META[setName] || setName.charAt(0) === '$') return;
     (function walk(node, path) {
       if (!node || typeof node !== 'object') return;
       if (('value' in node) || ('$value' in node)) {
