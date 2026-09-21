@@ -69,10 +69,13 @@ npm run dtcg:preview -- <export.json>   # convert an existing export + report
 npm run dtcg:selftest                   # format / description-dedupe / file-name checks
 ```
 
-## The resolved shape (`--shape resolved`)
+## The resolved shape
 
-An experimental fourth shape, reachable **only** from the CLI — the plugin's
-Settings switch does not offer it and no shipped export changes.
+Settings → **Output format** offers three: Legacy JSON, W3C DTCG, and
+**Resolved**. Each writes its own file name (`tokens.json`,
+`tokens_dtcg.json`, `tokens_resolved.json`) so switching never overwrites the
+previous one. The same shape is also reachable from the CLI as
+`--shape resolved`, described below.
 
 Where the three shapes above mirror how a file is *authored* (one document per
 collection x mode, alias hops kept as cross-document references), this one
@@ -84,6 +87,35 @@ collection rather than inlining values.
 node scripts/dtcg-preview.js <graph.json> --shape resolved \
      [--config scripts/resolved-config.example.js] [-o out.json]
 ```
+
+### In the plugin
+
+Built in the sandbox by `buildResolvedDocument()` in `src/code.source.js`,
+because the raw variable graph and the value formatters both live there — the
+UI only ever sees the transformed tree, which has already collapsed the alias
+hops this shape resolves.
+
+The layout roles are read off the derived data, not off collection names: the
+breakpoint axis is the one some group depends on ALONE, and the scheme and mode
+axes are the first two of the widest group. A file with no such shape gets the
+derived form back rather than being forced into a layout that does not fit.
+
+The plugin needs nothing stated. It detects the layout roles, holds still
+whatever the layout cannot place (saying which, in the export's own
+`$extensions`), and slugs mode names into path segments — `S Mobile` becomes
+`mobile`.
+
+**What it will not do is contradict the spec on a system's behalf.** Measured
+against one real reference document, 2,845 tokens differ in `$type` alone
+because that system calls letter spacing a `number` rather than a length, and
+drops a `colours/` namespace while keeping `elevation/`. Those are conventions
+somebody chose, not facts about the file, so they live in the CLI's `--config`
+— a file versioned next to the tokens it describes — rather than in plugin
+settings.
+
+Both routes run the same code: `PomEmitResolved.document()` owns the layout,
+the fitting and the fallbacks, and the plugin and `dtcg-preview.js` each supply
+only hooks and vocabulary.
 
 ### It takes a raw variable graph, not a token tree
 
