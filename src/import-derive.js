@@ -48,6 +48,25 @@
 const MODES_MIN = 0.9;
 const SEPARATE_MAX = 0;
 
+/*
+  FIGMA CAPS A COLLECTION AT 5,000 VARIABLES, and unlike the mode ceiling this
+  one is not a plan tier — it is the same for everybody. Found the hard way: a
+  real import ran 6,195 operations and then stopped on the 5,001st variable of
+  a collection wanting 6,480.
+
+  It has to be caught BEFORE anything is written, because of how the program is
+  ordered. Every createVariable runs before any setValue, so a failure during
+  variable creation leaves a file full of variables holding NOTHING — 6,192 of
+  them, in the run that found this. Discovering the limit by hitting it is the
+  worst possible time to discover it.
+
+  Which collection blows it is a property of the DOCUMENT SHAPE, not its size.
+  The system this came from holds that collection as 716 variables across two
+  modes; the resolved export denormalises those modes into names, and 716
+  becomes 6,480 in a single mode. Same tokens, nine times the variables.
+*/
+const VARIABLE_CEILING = 5000;
+
 /* Figma has four variable types. Everything else is either one of these in
    disguise or not a variable at all. */
 const FLOAT_TYPES = ['dimension', 'borderRadius', 'fontSizes', 'lineHeights', 'letterSpacing',
@@ -88,6 +107,9 @@ const vkey = (col, path) => col + SEP + path;
 function derive(ir, opts) {
   opts = opts || {};
   const modeCeiling = opts.modeCeiling || Infinity;
+  /* Figma's own hard limit, not a caller's preference — so it applies unless
+     a caller deliberately turns it off, rather than only when asked for. */
+  const variableCeiling = opts.variableCeiling === undefined ? VARIABLE_CEILING : opts.variableCeiling;
   const decisions = opts.decisions || {};
 
   const plan = {
@@ -330,8 +352,13 @@ function derive(ir, opts) {
       continue;
     }
     if (modes.length > modeCeiling) {
-      plan.blocked.push({ collection: name, needs: modes.length, ceiling: modeCeiling,
+      plan.blocked.push({ collection: name, kind: 'modes', needs: modes.length, ceiling: modeCeiling,
                           reason: "more modes than this file's plan allows" });
+      entry.blocked = true;
+    }
+    if (count > variableCeiling) {
+      plan.blocked.push({ collection: name, kind: 'variables', needs: count, ceiling: variableCeiling,
+                          reason: 'more variables than Figma allows in one collection' });
       entry.blocked = true;
     }
     plan.collections.push(entry);
@@ -371,7 +398,7 @@ function derive(ir, opts) {
 }
 
   var api = { derive, figmaType, isComposite, isDtcgScalar, vkey,
-                   MODES_MIN, SEPARATE_MAX, FIGMA_TYPES,
+                   MODES_MIN, SEPARATE_MAX, FIGMA_TYPES, VARIABLE_CEILING,
                    FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

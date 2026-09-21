@@ -193,9 +193,16 @@ function compile(ir, plan, opts) {
   if (plan.blocked.length && !opts.allowPartial) {
     for (const b of plan.blocked) {
       refusals.push({ kind: 'blocked', id: 'blocked:' + b.collection,
-        question: 'Collection "' + b.collection + '" needs ' + b.needs +
-                  ' modes and the target allows ' + b.ceiling + '. Import the rest without it?',
-        options: ['pass allowPartial to drop it', 'import into a file whose plan allows more modes'] });
+        question: b.kind === 'variables'
+          ? 'Collection "' + b.collection + '" would hold ' + b.needs.toLocaleString() +
+            ' variables and Figma allows ' + b.ceiling.toLocaleString() + ' in one collection. ' +
+            'Import the rest without it?'
+          : 'Collection "' + b.collection + '" needs ' + b.needs +
+            ' modes and the target allows ' + b.ceiling + '. Import the rest without it?',
+        options: b.kind === 'variables'
+          ? ['pass allowPartial to drop it',
+             'import a shape that keeps these as modes rather than as names']
+          : ['pass allowPartial to drop it', 'import into a file whose plan allows more modes'] });
     }
   }
   if (refusals.length) return { ok: false, refusals, program: null };

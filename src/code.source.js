@@ -2910,6 +2910,25 @@ figma.ui.onmessage = function(msg) {
     (async function() {
       try {
         var existing = await PomImportApply.snapshot(figma);
+
+        /*
+          ASK THE DOCUMENT BEFORE TOUCHING IT. Figma has no transaction, and
+          this program is ordered in phases — every createVariable runs before
+          any setValue — so a limit discovered PART WAY THROUGH leaves a file
+          full of variables holding nothing. That is not hypothetical: a real
+          import created 6,192 of them before stopping on the 5,001st variable
+          of a collection Figma caps at 5,000.
+
+          Refusing up front costs one read and cannot half-write.
+        */
+        var pre = await PomImportApply.preflight(msg.program, figma, { existing: existing });
+        if (!pre.ok) {
+          console.warn('[Import] refused before writing: ' +
+            pre.problems.map(function(p) { return p.message; }).join('; '));
+          figma.ui.postMessage({ type: 'importRefused', problems: pre.problems });
+          return;
+        }
+
         var report = PomImportApply.apply(msg.program, figma, { existing: existing });
         console.log('[Import] ' + report.applied + ' applied, ' + report.failed + ' failed; ' +
           report.variables + ' created, ' + (report.reusedVariables || 0) + ' reused, ' +

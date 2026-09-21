@@ -225,6 +225,33 @@ async function preflight(program, figma, opts) {
     });
   }
 
+  /*
+    FIGMA CAPS A COLLECTION AT 5,000 VARIABLES. Checked here and not only in
+    compile() for the same reason the mode ceiling is: compile is told what to
+    expect, preflight looks. And it matters more than most checks because of
+    the program's order — every createVariable runs before any setValue, so
+    hitting this mid-run leaves a document full of variables holding nothing.
+  */
+  const VARIABLE_CEILING = 5000;
+  const wanted = new Map();
+  for (const op of program.ops) {
+    if (op.op !== 'createVariable') continue;
+    wanted.set(op.collection, (wanted.get(op.collection) || 0) + 1);
+  }
+  const existingCount = new Map();
+  (opts.existing || []).forEach((c) => existingCount.set(c.name, (c.variables || []).length));
+  for (const [name, n] of wanted) {
+    const total = n + (existingCount.get(name) || 0);
+    if (total > VARIABLE_CEILING) {
+      out.ok = false;
+      out.problems.push({
+        kind: 'variable-ceiling',
+        message: 'collection "' + name + '" would hold ' + total.toLocaleString() +
+                 ' variables and Figma allows ' + VARIABLE_CEILING.toLocaleString() + ' in one',
+      });
+    }
+  }
+
   /* The widest collection the program wants. */
   let widest = 0, widestName = null;
   const modes = new Map();

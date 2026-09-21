@@ -712,6 +712,58 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
      keepGoing.failed > 1, 'failed ' + keepGoing.failed);
 }
 
+/* ── Figma caps a collection at 5,000 variables ──────────────────────────── */
+{
+  /* Found by a real import: 6,195 operations went through and then stopped on
+     the 5,001st variable of a collection wanting 6,480. Because every
+     createVariable runs before any setValue, the file was left holding 6,192
+     variables and not one value. */
+  const big = { $metadata: { tokenSetOrder: ['huge'] }, huge: {} };
+  for (let i = 0; i < 5200; i++) big.huge['v' + i] = tok('#' + (i % 10) + '11111');
+  const ir = toIR(big);
+
+  const plan = derive(ir, {});
+  ok('ceiling: a collection over 5,000 variables is blocked',
+     plan.blocked.length === 1 && plan.blocked[0].kind === 'variables' &&
+     plan.blocked[0].needs === 5200 && plan.blocked[0].ceiling === 5000,
+     JSON.stringify(plan.blocked));
+  ok('ceiling: blocked is not the same as ambiguous — the plan is still readable',
+     plan.ok === true);
+
+  const refused = compile(ir, plan, {});
+  ok('GATE: compile refuses it rather than emitting a program that cannot run',
+     refused.ok === false && refused.refusals.some((r) => /5,000|5000/.test(r.question)),
+     JSON.stringify((refused.refusals || []).map((r) => r.question)));
+
+  const under = derive(toIR(big), { variableCeiling: 10000 });
+  ok('ceiling: it can be raised for a caller that knows better',
+     under.blocked.length === 0);
+}
+{
+  /* preflight looks at the document rather than being told about it, so it
+     also catches a collection pushed over the line by what is ALREADY there. */
+  const doc = { $metadata: { tokenSetOrder: ['c'] }, c: {} };
+  for (let i = 0; i < 10; i++) doc.c['v' + i] = tok('#111111');
+  const ir = toIR(doc);
+  const c = compile(ir, derive(ir, {}), {});
+
+  const F = mockFigma();
+  /* Wrapped, because this file is CommonJS and a top-level await would make
+     its module format ambiguous — same reason the preflight block below is. */
+  (async () => {
+    const clean = await preflight(c.program, F, {});
+    ok('preflight: a small program into an empty file is fine', clean.ok === true);
+
+    /* Same program, but the collection already holds 4,995. */
+    const crowded = [{ name: 'c', handle: {}, modes: [{ modeId: 'm', name: 'c' }],
+                       variables: Array.from({ length: 4995 }, (_, i) => ({ name: 'old' + i, handle: {} })) }];
+    const p = await preflight(c.program, F, { existing: crowded });
+    ok('preflight: counts what is already there, not just what is arriving',
+       p.ok === false && p.problems.some((x) => x.kind === 'variable-ceiling'),
+       JSON.stringify(p.problems));
+  })();
+}
+
 /* ── apply() into a document that already has things in it ──────────────── */
 {
   /* The same program, run twice. The second run must change nothing and

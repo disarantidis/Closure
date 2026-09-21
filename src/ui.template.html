@@ -4285,6 +4285,16 @@
         }, '*');
       }
       
+      if (msg.type === 'importRefused') {
+        /* Refused BEFORE anything was written, which is the whole point of
+           saying so differently from a failure part way through. */
+        window.PomImportApplyBtn.setLoading(false);
+        window.PomImportApplyBtn.setDisabled(false);
+        importProblem('Nothing was imported',
+          msg.problems.map(function(p) { return p.message; }).join('  ·  ') +
+          '  ·  The file is exactly as it was.');
+      }
+
       if (msg.type === 'importApplied') {
         window.PomImportApplyBtn.setLoading(false);
         window.PomImportApplyBtn.setDisabled(false);
