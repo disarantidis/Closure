@@ -442,7 +442,28 @@
       value = split.value;
       extra = split.extra;
     } else if (dtcgType === 'dimension') {
-      value = toDtcgDimension(value, root);
+      /*
+        A PERCENTAGE IS NOT A LENGTH, WHATEVER THE NAMESPACE SAYS.
+
+        TYPE_MAP works per namespace: letterSpacing is a dimension, lineHeights
+        is a number. That is right for the usual case and wrong for the value
+        Figma actually stores here — letter spacing as a percentage of the font
+        size. Sent down the dimension path, '-5%' lost its unit and came out as
+        { value: -5, unit: 'px' }: a fixed −5px at every size, where −5% of a
+        72px display is about −3.6px. Silent, and wrong by a different amount
+        at every step of the type scale.
+
+        lineHeights already had the rule — a '%' literal is a ratio, divided by
+        100 — because its namespace maps to 'number'. It belongs to the VALUE,
+        not the namespace, so a percentage takes it wherever it appears and the
+        token is reported as the number it is.
+      */
+      if (typeof value === 'string' && /^\s*-?[\d.]+%\s*$/.test(value)) {
+        dtcgType = 'number';
+        value = toDtcgNumber(value, root);
+      } else {
+        value = toDtcgDimension(value, root);
+      }
     } else if (dtcgType === 'color') {
       value = toDtcgColor(value);
     } else if (dtcgType === 'number') {
