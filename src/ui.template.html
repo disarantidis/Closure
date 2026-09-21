@@ -898,7 +898,7 @@
        insetting the whole card box from the panel edge to align with
        .folder-paths-title's text above — the card's own padding positions
        its CONTENT. */
-    #dtcg-format-control-mount {
+    #output-format-control-mount {
       display: block;
       margin-left: var(--spacing-component-3);
       margin-right: var(--spacing-component-3);
@@ -1501,7 +1501,7 @@
     <!-- Format toggle hidden: export is locked to Legacy JSON by default.
          Kept in the DOM (display:none) so the existing exportMode logic still
          works. The Legacy JSON ↔ DTCG choice lives in Settings instead
-         (see #dtcg-format-control-mount). -->
+         (see #output-format-control-mount). -->
     <div id="export-mode-control-mount" style="display:none;"></div>
 
     <!-- Wraps the three stacked containers a Figma file's tokens pass
@@ -1746,7 +1746,13 @@
            so the two never overwrite each other. -->
       <div class="output-format">
         <p class="folder-paths-title">Output format</p>
-        <span id="dtcg-format-control-mount"></span>
+        <!-- A SelectableCard for DTCG (buttons.tsx) and, once it is on, a
+             Checkbox BELOW it — a sibling, not a child: the card is a
+             <button>, and a control inside one fires both. Resolved is a DTCG
+             document in a different shape rather than a format of its own,
+             built by buildResolvedDocument() in the sandbox where the raw
+             variable graph and the formatters live. -->
+        <span id="output-format-control-mount"></span>
       </div>
 
       <!-- Always-visible heading for whichever provider's connection fields
@@ -1959,8 +1965,17 @@
     // The file name field stays the single source of truth: toggling the Output
     // format switch rewrites it in place rather than keeping a second hidden
     // name per provider, so what Settings shows is always what gets pushed.
+    // Stamped by scripts/build-ui.js. Logged on load so the build actually
+    // running in Figma can be read off the console — see that file's note.
+    var CLOSURE_BUILD = '__Pom_BUILD_STAMP__';
+    console.log('[Closure] ui build ' + CLOSURE_BUILD);
+
     var DEFAULT_FILENAME = 'tokens.json';
     var DTCG_SUFFIX = '_dtcg';
+    // The resolved shape is DTCG too, but a different DOCUMENT — one resolved
+    // tree rather than one per theme. It gets its own suffix so switching
+    // format never has the two land on the same file name.
+    var RESOLVED_SUFFIX = '_resolved';
     // v1.4.0 development builds wrote _W3C before the output was renamed (it is
     // a partial DTCG conversion, not strict W3C). Still recognised so a name
     // saved by one of those strips cleanly, and re-suffixes to _dtcg, instead of
@@ -1984,10 +1999,15 @@
       if (!s || /\.json$/i.test(s)) return s;
       return s + '.json';
     }
+    // The suffix the ACTIVE format writes to. Everything else recognises all of
+    // them, so switching between formats strips cleanly in either direction.
+    function activeSuffix() {
+      return dtcgShape === 'resolved' ? RESOLVED_SUFFIX : DTCG_SUFFIX;
+    }
     // Which suffix a name currently carries — the live one, a legacy one, or none.
     function matchedDtcgSuffix(name) {
       var base = splitFilename(name).base;
-      var all = [DTCG_SUFFIX].concat(LEGACY_DTCG_SUFFIXES);
+      var all = [DTCG_SUFFIX, RESOLVED_SUFFIX].concat(LEGACY_DTCG_SUFFIXES);
       for (var i = 0; i < all.length; i++) {
         if (all[i].length <= base.length && base.slice(-all[i].length) === all[i]) return all[i];
       }
@@ -2000,13 +2020,27 @@
     // form — so they stay correct on a name the user has edited by hand, and
     // toggling the switch back and forth round-trips instead of stacking
     // suffixes or eating characters.
-    function dtcgFilename(name) {
+    // Swap whatever suffix a name carries for `want` (or none). The two public
+    // helpers below are this with the active format filled in.
+    function withSuffix(name, want) {
       if (!name) return name;
       var found = matchedDtcgSuffix(name);
-      if (found === DTCG_SUFFIX) return name;
+      if (found === want) return name;
       var p = splitFilename(name);
       var stem = found ? p.base.slice(0, -found.length) : p.base;
-      return stem + DTCG_SUFFIX + p.ext;
+      return stem + (want || '') + p.ext;
+    }
+    function dtcgFilename(name) {
+      return withSuffix(name, activeSuffix());
+    }
+    // What a given format WOULD write, whichever one is active right now —
+    // so each card can name its own file rather than the current one's.
+    function filenameForShape(shape) {
+      var base = ensureJsonExtension(
+        document.getElementById('primary-filename').value.trim() || DEFAULT_FILENAME);
+      if (shape === 'themes') return withSuffix(base, DTCG_SUFFIX);
+      if (shape === 'resolved') return withSuffix(base, RESOLVED_SUFFIX);
+      return withSuffix(base, null);
     }
     function plainFilename(name) {
       if (!name) return name;
@@ -2388,6 +2422,9 @@
           // shape name so a config saved here stays readable if the converter
           // ever grows more shapes.
           dtcg: dtcgShape !== null,
+          // The shape by name, because there are three of them now. `dtcg`
+          // above stays for configs written by — and read by — older builds.
+          outputFormat: dtcgShape || 'legacy',
           // One JSON file name for both providers now — no longer nested
           // per-provider below (see gitlabConfig()/githubConfig() and the
           // migration read in setState()).
@@ -2421,8 +2458,16 @@
         // existed, which must keep exporting Legacy JSON — so only an
         // explicit `true` turns DTCG on.
         var previousDtcgShape = dtcgShape;
-        dtcgShape = config.dtcg === true ? 'themes' : null;
-        window.PomDtcgFormat.setValue(dtcgShape !== null);
+        // outputFormat when present; otherwise the old boolean, which only ever
+        // meant 'themes'. Anything unrecognised falls back to Legacy JSON.
+        if (config.outputFormat === 'themes' || config.outputFormat === 'resolved') {
+          dtcgShape = config.outputFormat;
+        } else if (config.outputFormat === 'legacy') {
+          dtcgShape = null;
+        } else {
+          dtcgShape = config.dtcg === true ? 'themes' : null;
+        }
+        window.PomOutputFormat.setValue(dtcgShape || 'legacy');
         // No filename rewrite here: a config saved with dtcg on already stored
         // the suffixed name, and defaultFilename() (read below when a provider
         // has none saved) follows dtcgShape, which is why this block runs
@@ -2896,12 +2941,19 @@
     function updateOutputFormatHint() {
       // Names the file it will actually be written to, so the _dtcg swap is
       // visible here and not only in the file name field further down.
-      var name = primaryFilename();
-      var formatName = dtcgShape ? 'W3C DTCG' : 'Legacy JSON';
-      var hint = dtcgShape
-        ? '$value / $type, one resolved document per theme, exported as ' + name + '.'
-        : 'The format this plugin has always exported, as ' + name + '.';
-      window.PomDtcgFormat.setLabels(formatName, hint);
+      /*
+        One line each, and each names only its own control's file. The switch's
+        used to read 'one document per theme' while showing the RESOLVED file
+        name whenever the box was ticked — DTCG's description over the other
+        format's output.
+      */
+      window.PomOutputFormat.setHint(
+        dtcgShape === null
+          ? 'Off: Legacy JSON, as ' + filenameForShape(null) + '.'
+          : '$value / $type, as ' + filenameForShape(dtcgShape) + '.');
+      window.PomOutputFormat.setResolvedHint(
+        'One document instead of one per theme, routing resolved away. '
+        + 'Large, so it is built when you export rather than now.');
     }
 
     // Convert the Legacy JSON tree to DTCG and log a conversion report.
@@ -2935,11 +2987,47 @@
       return result.tokens;
     }
 
+    /*
+      STAMP THE DOCUMENT WITH THE BUILD THAT MADE IT.
+
+      An export arrived three times carrying the Legacy JSON tree under the
+      resolved file name, while the source on disk could not produce that and
+      the sandbox reported a current build. The missing piece each time was
+      which UI had actually run — Figma caches the iframe separately from the
+      main code, so a stale UI beside a fresh sandbox looks exactly like a bug
+      in code that is already fixed.
+
+      The file now says. A copy is stamped rather than the live tree, so
+      transformedData stays what the sandbox sent and a second export does not
+      accumulate anything.
+    */
+    function stampExport(tokens) {
+      if (!tokens || typeof tokens !== 'object') return tokens;
+      var out = {};
+      Object.keys(tokens).forEach(function(k) { out[k] = tokens[k]; });
+      var ext = {};
+      Object.keys(out['$extensions'] || {}).forEach(function(k) { ext[k] = out['$extensions'][k]; });
+      ext['com.closure'] = { build: CLOSURE_BUILD, format: dtcgShape || 'legacy' };
+      // What the sandbox decided, when it decided anything — see its note.
+      if (transformedData && transformedData.resolvedReport) {
+        ext['com.closure'].resolved = transformedData.resolvedReport;
+      }
+      out['$extensions'] = ext;
+      return out;
+    }
+
     function getTokensToExport() {
+      return stampExport(getTokensToExportRaw());
+    }
+
+    function getTokensToExportRaw() {
       if (!transformedData) return null;
       var tokens = transformedData.tokens;
       // In Legacy JSON mode the output keys are set names (e.g. 'core', 'mode/light'),
       // not raw Figma collection names — skip the collection filter entirely.
+      // Already a finished DTCG document when the sandbox built it — no
+      // second conversion here, and no collection filter either.
+      if (dtcgShape === 'resolved') return tokens;
       if (exportMode === 'legacy') {
         return dtcgShape ? toDtcg(tokens) : tokens;
       }
@@ -3056,8 +3144,16 @@
 
       // Pushing requires a commit message — no commit without one.
       var hasCommitMsg = !!(document.getElementById('commit-message').value.trim());
-      var blockedByCommitMsg = !showFallback && !hasCommitMsg && !!transformedData;
-      window.PomButtons.push.setDisabled(!transformedData || !hasCommitMsg || showFallback);
+      /*
+        READY TO EXPORT IS NOT THE SAME AS ALREADY TRANSFORMED, since the
+        resolved document is built on demand: its transform is deliberately not
+        run on a toggle, so transformedData is null while the export is
+        perfectly possible. Keying the buttons off transformedData alone
+        disabled the only thing that could ask for the build.
+      */
+      var exportReady = !!transformedData || (dtcgShape === 'resolved' && !!rawData);
+      var blockedByCommitMsg = !showFallback && !hasCommitMsg && exportReady;
+      window.PomButtons.push.setDisabled(!exportReady || !hasCommitMsg || showFallback);
       if (!showFallback) {
         // The button's own baseProps.label ('Push to GitLab', buttons.tsx)
         // is just an initial-render fallback — this always drives the real
@@ -3067,7 +3163,7 @@
         // the button is hidden in that state anyway.
         window.PomButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
       }
-      window.PomButtons.download.setDisabled(!transformedData);
+      window.PomButtons.download.setDisabled(!exportReady);
     }
 
     // Shows a provider's dropdown+filename row, or — if it has zero saved
@@ -3174,15 +3270,64 @@
     // Needed whenever either changes, because includeDescriptions is decided
     // over in transformToFinalFormat — the UI cannot add descriptions after
     // the fact. No-op before the first extract has landed.
-    function requestTransform() {
+    /*
+      A pending export, waiting on a build that has not been asked for yet.
+      Only the resolved shape uses it — see requestTransform.
+    */
+    var afterTransform = null;
+    /*
+      A TRANSFORM'S REPLY CAN OUTLIVE THE REQUEST THAT WANTED IT.
+
+      The extract and the saved settings are independent round-trips, so a
+      transform can already be in flight when the format arrives and changes
+      what was wanted. Clearing transformedData does not recall the message
+      that is already out: its reply lands afterwards and sets transformedData
+      to the tree nobody asked for any more. Measured — a run with Resolved
+      saved exported the Legacy JSON tree under the resolved file name,
+      because the legacy reply from before the settings loaded arrived after
+      the switch to resolved had already emptied the slot.
+
+      So every request carries a number and only the current one is accepted.
+      Bumping it is what makes a reply stale, which is why it is bumped even on
+      the path that posts nothing at all.
+    */
+    var transformSeq = 0;
+
+    function requestTransform(andThen) {
       if (!rawData) return;
       transformedData = null;
+      transformSeq++;
+      afterTransform = andThen || null;
+      /*
+        THE RESOLVED SHAPE IS NOT BUILT ON A TOGGLE.
+
+        It resolves every alias chain across every branch the file actually
+        has, which on a real system is a six-figure token count and a document
+        of tens of megabytes — seconds of sandbox time, and then that payload
+        cloned across to this iframe. The sandbox is Figma's own thread, so
+        paying it just because someone flipped a switch freezes the editor.
+
+        The other two shapes are a transform over a tree code.js has already
+        built, so they stay eager and the counts stay live. This one is built
+        when it is actually wanted: Download and Push ask for it and continue
+        when it lands.
+      */
+      if (dtcgShape === 'resolved' && !andThen) {
+        updateActionUI();
+        setActionsLoading(false);
+        return;
+      }
       updateActionUI();
       parent.postMessage({
         pluginMessage: {
           type: 'transform',
+          seq: transformSeq,
           raw: rawData,
           exportMode: exportMode,
+          // The resolved shape is built in the sandbox (buildResolvedDocument),
+          // because that is where the raw variable graph and the formatters
+          // both are — the UI only has the transformed tree.
+          resolvedShape: dtcgShape === 'resolved',
           // Descriptions are only carried when a DTCG shape needs them.
           includeDescriptions: dtcgShape !== null,
           selectedCollections: selectedCollections.length > 0 ? selectedCollections : null
@@ -3204,14 +3349,26 @@
     // 'themes' (not 'partial') — see the note on `var dtcgShape` above and on
     // toDtcg() below: this is the shape that is genuinely standalone W3C
     // DTCG, not the one that still needs an external finishing step.
-    window.PomDtcgFormat.onChange = function(on) {
-      dtcgShape = on ? 'themes' : null;
+    /*
+      One place a format change happens, whoever asked for it — the control,
+      a loaded config, or a later caller. dtcgShape is null for Legacy JSON
+      and the shape name otherwise; the control speaks 'legacy' instead,
+      because a radio group needs a value for every option including the
+      default one.
+    */
+    function setFormat(shape) {
+      dtcgShape = shape;
+      window.PomOutputFormat.setValue(shape || 'legacy');
       // Rewrite the file names BEFORE persisting, so the saved config and the
       // fields on screen never disagree about where the export lands.
       applyFilenameForFormat();
       updateOutputFormatHint();
       persistSettings();
       requestTransform();
+    }
+
+    window.PomOutputFormat.onChange = function(shape) {
+      setFormat(shape === 'legacy' ? null : shape);
     };
 
     updateActionUI();
@@ -3334,6 +3491,12 @@
     // currently names (see its own comment — there's no simultaneous-push
     // 'both' mode any more).
     function pushToGit() {
+      // Same as Download: build the resolved document only when it is wanted.
+      if (dtcgShape === 'resolved' && !transformedData) {
+        showToast('Building the resolved document…');
+        requestTransform(pushToGit);
+        return;
+      }
       var tokens = getTokensToExport();
       if (!tokens) return;
 
@@ -3399,6 +3562,12 @@
     }
 
     function doDownloadSingle() {
+      // The resolved document is built on demand; everything else is ready.
+      if (dtcgShape === 'resolved' && !transformedData) {
+        showToast('Building the resolved document…');
+        requestTransform(doDownloadSingle);
+        return;
+      }
       var tokens = getTokensToExport();
       if (!tokens) return;
       var json = JSON.stringify(tokens, null, 2);
@@ -3411,6 +3580,44 @@
       URL.revokeObjectURL(url);
       parent.postMessage({ pluginMessage: { type: 'notify', message: '✅ JSON downloaded successfully!' } }, '*');
     }
+
+    /*
+      Developer affordance, deliberately not a control.
+
+      scripts/dtcg-preview.js --shape resolved needs the RAW variable graph:
+      collections with valuesByMode and alias targets intact. code.js already
+      sends exactly that and rawData is holding it — the transformed tree the
+      Download button produces has collapsed the alias hops that shape exists to
+      resolve, so it cannot stand in.
+
+      This is bound to a chord rather than given a button because it is for
+      working on the exporter, not for exporting. Nothing in the UI advertises
+      it and no product flow depends on it.
+
+        Cmd/Ctrl + Shift + G   ->  <file name>.graph.json
+    */
+    function doDownloadGraph() {
+      if (!rawData || !rawData.collections) {
+        showToast('No graph yet — run an extract first.', true);
+        return;
+      }
+      var json = JSON.stringify(rawData.collections, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (lastFigmaFileName || 'tokens').replace(/[\\/:*?"<>|]/g, '-') + '.graph.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Raw variable graph downloaded (' + rawData.collections.length + ' collections).');
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'G' || e.key === 'g')) {
+        e.preventDefault();
+        doDownloadGraph();
+      }
+    });
 
     pushBtn.addEventListener('click', pushToGit);
     // Re-evaluate the Push button as the commit message is typed/cleared.
@@ -3464,21 +3671,31 @@
 
         collectionsWrap.classList.add('visible');
         
-        parent.postMessage({
-          pluginMessage: {
-            type: 'transform',
-            raw: rawData,
-            exportMode: exportMode,
-            // Descriptions are only carried when a DTCG shape needs them.
-            includeDescriptions: dtcgShape !== null,
-            selectedCollections: selectedCollections.length > 0 ? selectedCollections : null
-          }
-        }, '*');
+        /*
+          THROUGH requestTransform, NOT A SECOND COPY OF THE MESSAGE.
+
+          This used to post its own, and drifted: requestTransform learned to
+          send `resolvedShape` and this did not, so an extract while the
+          resolved format was selected transformed to the LEGACY tree, set
+          transformedData, and the deferred build then never ran because
+          something was already there. The download carried the legacy tree
+          under the resolved file name — the two disagreeing silently, which is
+          worse than either being wrong.
+        */
+        requestTransform();
       }
       
       if (msg.type === 'transformed') {
+        // A reply to a request that has since been superseded — drop it, or it
+        // overwrites the slot its own request no longer owns.
+        if (msg.seq !== undefined && msg.seq !== transformSeq) return;
         transformedData = msg.payload;
         updateActionUI();
+        if (afterTransform) {
+          var pending = afterTransform;
+          afterTransform = null;
+          pending();
+        }
         // Reveal only now — the button's disabled/label state is already
         // correct at this point, instead of appearing as "Push to GitLab"
         // for a moment and then flipping to "Add commit message".

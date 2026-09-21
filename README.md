@@ -61,11 +61,12 @@ fields each one still needs.
 
 ## Building the UI
 
-> **`ui.html` is generated output — do not edit it by hand.** Your changes will be
-> overwritten by the next `npm run ui:build`.
+> **`ui.html` and `code.js` are generated output — do not edit them by hand.**
+> Your changes will be overwritten by the next `npm run ui:build`.
 
 | File | What it is |
 |---|---|
+| `src/code.source.js` | The plugin sandbox: extraction and token transforms |
 | `src/ui.template.html` | Markup, CSS and the plugin's vanilla-JS logic |
 | `src/ui-react/buttons.tsx` | Every Pomegranate component mounted into that markup |
 | `src/vendor/pomegranate/` | Vendored copy of the Pomegranate kit (components + `tokens.css` / `node.css`) |
@@ -73,7 +74,10 @@ fields each one still needs.
 
 `scripts/build-ui.js` bundles `buttons.tsx` with **esbuild** and inlines the JS
 and CSS into the template, because a Figma plugin's `ui` must be **one**
-self-contained file. `buttons.tsx` mounts the Pomegranate components into
+self-contained file. It builds `code.js` the same way and for the same reason —
+a plugin's `main` must also be one file, and the sandbox has no module loader —
+by prepending `resolve-architecture.js`, `emit-resolved.js` and
+`dtcg-format.js` to `src/code.source.js`. `buttons.tsx` mounts the Pomegranate components into
 `<span id="…-mount">` placeholders and exposes `window.Pom*` bridges the
 template's vanilla script drives — so `code.js` and the template's logic are
 independent of which design system paints the controls.
@@ -83,12 +87,20 @@ npm run ui:build       # regenerate ui.html from its sources
 npm run ui:typecheck   # tsc --noEmit over src/ui-react (optional)
 npm run dtcg:preview   # convert an export to DTCG outside Figma + report
 npm run dtcg:selftest  # DTCG format / description-dedupe checks
+
+# experimental, CLI only — no plugin surface, no change to shipped exports
+node scripts/dtcg-preview.js <graph.json> --shape resolved \
+     --config scripts/resolved-config.example.js
 ```
+
+`--shape resolved` re-shapes a raw Figma variable graph the way a consumer
+reads it rather than the way it is authored, deriving the architecture from the
+file instead of being told it — see [`DTCG.md`](./DTCG.md#the-resolved-shape---shape-resolved).
 
 ## Technical architecture
 
 ```javascript
-// Export pipeline (code.js — the plugin sandbox)
+// Export pipeline (src/code.source.js — the plugin sandbox)
 - extractVariables()        → Figma variables → raw collections
 - transformToFinalFormat()  → native tree (opt-in { includeDescriptions } for DTCG)
 - toTokenFormat()           → $themes, foundation, breakpoints, typography fixes
@@ -136,15 +148,20 @@ and re-import the plugin from the manifest.
 
 ```
 Closure/
-├── code.js                 # Export + token transforms (plugin sandbox)
+├── code.js                 # GENERATED — built from src/, do not edit
 ├── ui.html                 # GENERATED — built from src/, do not edit
 ├── manifest.json           # Plugin configuration + network allowlist
 ├── src/
+│   ├── code.source.js      # Plugin sandbox source (export + token transforms)
 │   ├── ui.template.html    # UI source: markup, CSS, vanilla-JS logic
 │   ├── dtcg-format.js       # DTCG conversion (inlined into ui.html, also runs in Node)
+│   ├── resolve-architecture.js # Mode-vector resolver over the variable graph (CLI only)
+│   ├── emit-resolved.js    # Consumption-shaped emit, derived from the graph (CLI only)
 │   ├── ui-react/buttons.tsx # Pomegranate components mounted into the template
 │   └── vendor/pomegranate/  # Vendored Pomegranate kit (components + tokens.css/node.css)
-├── scripts/                # build-ui.js, dtcg-preview/selftest/descriptions
+├── scripts/                # build-ui.js, dtcg-preview/selftest/descriptions,
+│   │                       # resolved-config.example.js
+│   └── __fixtures__/       # legacy-sample.json — the selftest's checked-in input
 ├── README.md               # This file
 ├── TYPOGRAPHY.md           # Typography parity (lineHeights / letterSpacing)
 ├── DTCG.md                 # DTCG output format

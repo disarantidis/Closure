@@ -25,6 +25,7 @@ import { flushSync } from 'react-dom';
 import { Button } from '../vendor/pomegranate/panel/node/Button';
 import { Switch } from '../vendor/pomegranate/panel/node/Switch';
 import { SegmentedControl } from '../vendor/pomegranate/panel/node/SegmentedControl';
+import { Checkbox } from '../vendor/pomegranate/panel/node/Checkbox';
 import { DropDownSelect } from '../vendor/pomegranate/panel/node/DropDownSelect';
 import { Dialog } from '../vendor/pomegranate/panel/node/Dialog';
 import { InteractiveCard } from '../vendor/pomegranate/panel/node/InteractiveCard';
@@ -397,7 +398,7 @@ declare global {
     PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
-    PomDtcgFormat: { onChange: ((on: boolean) => void) | null; setValue: (on: boolean) => void; setLabels: (name: string, hint: string) => void };
+    PomOutputFormat: { onChange: ((shape: string) => void) | null; setValue: (shape: string) => void; setHint: (hint: string) => void; setResolvedHint: (hint: string) => void };
     PomOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
   }
 }
@@ -587,46 +588,81 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   return 'gitlab';
 }
 
-/* ── Settings → Output format card (Legacy JSON / DTCG) ──────────────────────
-   SelectableCard mark="switch" — the same "card is a choice" component
-   ProviderChoiceCard above uses, matching the onboarding step's visual
-   weight per explicit direction. NOTE, decided in conversation rather than
-   discovered as a bug: mark="switch" only draws SwitchMark's picture —
-   SelectableCard's own role is ALWAYS derived from `group` alone
-   (`role={group ? 'radio' : 'checkbox'}`, see the component's own source),
-   never from `mark`. So this card is role="checkbox"/aria-checked, not a
-   real role="switch", even though it visually reads as one — a real Switch
-   nested inside would double-fire on press (the component's own header
-   comment: "a card is a <button>... one press fires BOTH"), which is why
-   SelectableCard refuses to host one. Chosen anyway over ListControlItem's
-   real Switch for the card-styled, whole-surface-pressable look. */
-(function mountDtcgFormatCard() {
-  const container = document.getElementById('dtcg-format-control-mount');
-  let set: (on: boolean) => void = () => {};
-  let setLabels: (name: string, hint: string) => void = () => {};
+/*
+  THE CARD IS THE FORMAT; THE CHECKBOX QUALIFIES IT, AND SITS OUTSIDE.
+
+  Resolved is not a third format — it IS DTCG, in a different document shape,
+  and it cannot be chosen while the export is Legacy JSON. So it appears only
+  once the card is on, and disappears with it.
+
+  IT IS A SIBLING OF THE CARD, NOT A CHILD, and that is structural rather than
+  cosmetic. A SelectableCard IS a `<button>`: a checkbox inside one is a control
+  inside a control, "one press fires BOTH" (SelectableCard.tsx), which the kit
+  refuses. Its `action` slot exists for that case but is absolutely positioned
+  in the mark's corner and documented for a card that "carries no mark of its
+  own to collide with" — no use while a switch occupies that corner. Below the
+  card, the checkbox is an ordinary control: its own tab stop, its own label,
+  no press of the card's to escape.
+*/
+(function mountOutputFormatControl() {
+  const container = document.getElementById('output-format-control-mount');
+  let set: (shape: string) => void = () => {};
+  let setHint: (hint: string) => void = () => {};
+  let setResolvedHint: (hint: string) => void = () => {};
   function View() {
-    const [on, setOn] = useState(false);
-    const [name, setName] = useState('Legacy JSON');
-    const [hint, setHint] = useState('');
-    set = setOn;
-    setLabels = (n, h) => { setName(n); setHint(h); };
+    // 'legacy' | 'themes' | 'resolved' — one value, so the card and the
+    // checkbox cannot disagree. Each is derived from it, not kept beside it.
+    const [shape, setShape] = useState('legacy');
+    const [hint, setHintState] = useState('');
+    const [resolvedHint, setResolvedHintState] = useState('');
+    set = setShape;
+    setHint = (h) => setHintState(h);
+    setResolvedHint = (h) => setResolvedHintState(h);
+
+    const on = shape !== 'legacy';
+    const resolved = shape === 'resolved';
+    const choose = (next: string) => { setShape(next); window.PomOutputFormat.onChange?.(next); };
+
     return (
-      <SelectableCard
-        label="DTCG (W3C)"
-        selected={on}
-        onSelect={() => { const next = !on; setOn(next); window.PomDtcgFormat.onChange?.(next); }}
-        mark="switch"
-        level={GROUND}
-      >
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>{name}</span>
-          {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
-        </span>
-      </SelectableCard>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-2)' }}>
+        <SelectableCard
+          label="W3C DTCG"
+          selected={on}
+          // unticking Resolved is the checkbox's job; turning the card off
+          // drops the whole format, so it returns to Legacy JSON either way
+          onSelect={() => choose(on ? 'legacy' : 'themes')}
+          mark="switch"
+          level={GROUND}
+        >
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>W3C DTCG</span>
+            {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
+          </span>
+        </SelectableCard>
+        {on && (
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Checkbox
+              label="Resolved"
+              checked={resolved}
+              onChange={(v: boolean) => choose(v ? 'resolved' : 'themes')}
+            />
+            {resolvedHint && (
+              <span style={{ fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.4, paddingLeft: 24 }}>
+                {resolvedHint}
+              </span>
+            )}
+          </span>
+        )}
+      </span>
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
-  window.PomDtcgFormat = { onChange: null, setValue: (v) => set(v), setLabels: (n, h) => setLabels(n, h) };
+  window.PomOutputFormat = {
+    onChange: null,
+    setValue: (v) => set(v),
+    setHint: (h) => setHint(h),
+    setResolvedHint: (h) => setResolvedHint(h),
+  };
 })();
 
 /* ── GitHub / GitLab repo-settings tab switcher ────────────────────────────── */

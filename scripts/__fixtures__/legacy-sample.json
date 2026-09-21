@@ -1,0 +1,157 @@
+{
+  "core": {
+    "dimension": {
+      "1": {
+        "value": 4,
+        "type": "dimension",
+        "description": "The 4px base step every spacing and radius token is built from."
+      }
+    },
+    "fontFamilies": {
+      "inter": {
+        "value": "Inter",
+        "type": "fontFamilies"
+      }
+    },
+    "fontWeights": {
+      "regular": {
+        "value": "Regular",
+        "type": "fontWeights"
+      }
+    },
+    "fontSizes": {
+      "l": {
+        "value": 20,
+        "type": "fontSizes"
+      }
+    },
+    "lineHeights": {
+      "l": {
+        "value": 28,
+        "type": "lineHeights"
+      }
+    },
+    "letterSpacing": {
+      "none": {
+        "value": 0,
+        "type": "letterSpacing"
+      }
+    }
+  },
+  "foundation": {
+    "colours": {
+      "brand": {
+        "primary": {
+          "value": "{mode.brand.primary}",
+          "type": "color",
+          "description": "Primary brand colour for the current scheme and mode."
+        }
+      },
+      "shadow": {
+        "value": "#0000001f",
+        "type": "color"
+      }
+    },
+    "radius": {
+      "small": {
+        "value": "{dimension.1}*1",
+        "type": "borderRadius"
+      }
+    }
+  },
+  "breakpoint": {
+    "breakpoint": {
+      "typography": {
+        "title-L": {
+          "title-L": {
+            "value": {
+              "fontFamily": "{fontFamilies.inter}",
+              "fontWeight": "{fontWeights.regular}",
+              "fontSize": "{fontSizes.l}",
+              "lineHeight": "{lineHeights.l}",
+              "letterSpacing": "{letterSpacing.none}",
+              "textCase": "none",
+              "textDecoration": "none"
+            },
+            "type": "typography",
+            "description": "Large title. Five DTCG sub-values; textCase and textDecoration ride in $extensions."
+          }
+        }
+      }
+    }
+  },
+  "mode/light": {
+    "mode": {
+      "brand": {
+        "primary": {
+          "value": "#3de4dc",
+          "type": "color",
+          "description": "Brand accent, resolved per mode."
+        }
+      },
+      "neutral": {
+        "elevation": {
+          "level-1": {
+            "level-1": {
+              "value": {
+                "type": "dropShadow",
+                "color": "{colours.shadow}",
+                "x": 0,
+                "y": 1,
+                "blur": 2,
+                "spread": 0
+              },
+              "type": "boxShadow"
+            }
+          }
+        }
+      }
+    }
+  },
+  "mode/dark": {
+    "mode": {
+      "brand": {
+        "primary": {
+          "value": "#1abbb3",
+          "type": "color",
+          "description": "Brand accent, resolved per mode."
+        }
+      }
+    }
+  },
+  "$themes": [
+    {
+      "id": "theme-light",
+      "name": "light",
+      "group": "mode",
+      "selectedTokenSets": {
+        "core": "source",
+        "foundation": "enabled",
+        "breakpoint": "enabled",
+        "mode/light": "enabled",
+        "mode/dark": "disabled"
+      }
+    },
+    {
+      "id": "theme-dark",
+      "name": "dark",
+      "group": "mode",
+      "selectedTokenSets": {
+        "core": "source",
+        "foundation": "enabled",
+        "breakpoint": "enabled",
+        "mode/light": "disabled",
+        "mode/dark": "enabled"
+      }
+    }
+  ],
+  "$metadata": {
+    "tokenSetOrder": [
+      "core",
+      "foundation",
+      "breakpoint",
+      "mode/light",
+      "mode/dark"
+    ]
+  }
+}
