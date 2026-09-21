@@ -392,9 +392,19 @@
     if (typeof value === 'string' && value.indexOf('{') !== -1) return value;
     var c = parseColorChannels(value);
     if (!c) return value;
-    var hex = '#' + [c.r, c.g, c.b].map(function (n) {
-      return Math.round(n).toString(16).padStart(2, '0');
-    }).join('');
+    /*
+      EIGHT DIGITS WHEN IT IS NOT OPAQUE.
+
+      `hex` is the fallback a consumer reads when it does not understand the
+      components — and a six-digit one silently claims the colour is opaque.
+      A 40% black shipped as alpha 0.4 beside hex '#212121', so anything
+      reading hex drew it solid. DTCG allows the alpha pair, so it is written
+      whenever there is transparency to lose, and left off when there is not
+      rather than appending 'ff' to every colour in the file.
+    */
+    var byte = function (n) { return Math.round(n).toString(16).padStart(2, '0'); };
+    var hex = '#' + [c.r, c.g, c.b].map(byte).join('');
+    if (c.a < 1) hex += byte(c.a * 255);
     return {
       colorSpace: 'srgb',
       components: [round5(c.r / 255), round5(c.g / 255), round5(c.b / 255)],
@@ -405,12 +415,30 @@
 
   // Legacy JSON typography → DTCG typography, plus the non-standard sub-values
   // split off for $extensions.
+  /*
+    A NUMBER THAT ARRIVED AS A STRING IS STILL A NUMBER.
+
+    Sub-values pass through this untouched, which is right for a reference and
+    wrong for a literal: a line height read straight off a Figma float reaches
+    here as '72', and shipped as the string "72" while its four siblings were
+    references. A standalone token of the same value goes through toDtcgNumber
+    and comes out as 72, so the composite was the only place it stayed quoted.
+
+    Only a plain numeric string is coerced — anything holding '{' is a
+    reference and is left exactly as it is.
+  */
+  function coerceTypographyLiteral(v) {
+    if (typeof v !== 'string') return v;
+    if (v.indexOf('{') !== -1) return v;
+    return /^-?\d+(\.\d+)?$/.test(v.trim()) ? parseFloat(v) : v;
+  }
+
   function toDtcgTypography(value) {
     if (!isObject(value)) return { value: value, extra: null };
     var std = {};
     var extra = {};
     Object.keys(value).forEach(function (key) {
-      if (TYPOGRAPHY_KEYS.indexOf(key) !== -1) std[key] = value[key];
+      if (TYPOGRAPHY_KEYS.indexOf(key) !== -1) std[key] = coerceTypographyLiteral(value[key]);
       else extra[key] = value[key];
     });
     return { value: std, extra: Object.keys(extra).length ? extra : null };

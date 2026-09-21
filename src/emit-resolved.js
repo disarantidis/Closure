@@ -227,6 +227,43 @@
       if (best) byId[id] = best;
     });
 
+    /*
+      A SCALE IS ONE KIND OF THING, INCLUDING THE STEPS NOBODY USES.
+
+      Propagation can only type a primitive that something consumes, so a scale
+      split into used and unused steps came out split by type too: 12 of
+      core.shadows.* as dimension and 12 as bare number, dimension.base alone
+      among twenty dimensions, viewport-tv alone among six viewports. The
+      difference was never about the tokens — it was about which ones happened
+      to be aliased.
+
+      So a step with no answer takes its siblings'. Siblings are the tokens
+      sharing a scale prefix and the same Figma type, and the type is only
+      borrowed when the ones that DO have an answer agree; a mixed group is
+      left alone rather than flattened towards whichever is commoner.
+    */
+    var groups = {};
+    Object.keys(index.varsById).forEach(function (id) {
+      var v = index.varsById[id];
+      var name = v.name || '';
+      var cut = Math.max(name.lastIndexOf('/'), name.lastIndexOf('-'));
+      var key = (cut > 0 ? name.slice(0, cut) : name) + '\u0000' + v.type;
+      (groups[key] = groups[key] || []).push(v);
+    });
+    Object.keys(groups).forEach(function (key) {
+      var members = groups[key];
+      if (members.length < 2) return;
+      var seen = {};
+      var missing = [];
+      members.forEach(function (v) {
+        if (byId[v.id]) seen[byId[v.id]] = true;
+        else missing.push(v);
+      });
+      var kinds = Object.keys(seen);
+      if (kinds.length !== 1 || !missing.length) return;
+      missing.forEach(function (v) { byId[v.id] = kinds[0]; });
+    });
+
     return function typeOf(v) {
       return byId[v.id] || typeFromResolved(v.type);
     };
@@ -301,6 +338,27 @@
 
   function stripPrefix(name, prefix) {
     return (prefix && name.indexOf(prefix) === 0) ? name.slice(prefix.length) : name;
+  }
+
+  /*
+    '{textCase.none}' -> 'none'. Only these two scales, and only inside a
+    composite: they are the ones code.js invents for the legacy tree, and the
+    leaf of the reference IS the value the invented token holds.
+  */
+  var SYNTHESISED_SCALES = /^\{(textCase|textDecoration)\.([^}]+)\}$/;
+
+  function inlineSynthesisedRefs(node) {
+    if (!node || typeof node !== 'object') return node;
+    Object.keys(node).forEach(function (k) {
+      var v = node[k];
+      if (typeof v === 'string') {
+        var m = SYNTHESISED_SCALES.exec(v);
+        if (m) node[k] = m[2];
+      } else if (v && typeof v === 'object') {
+        inlineSynthesisedRefs(v);
+      }
+    });
+    return node;
   }
 
   // --- composites -------------------------------------------------------------
@@ -523,8 +581,21 @@
               var scaleObj = group[scale];
               if (!scaleObj || typeof scaleObj !== 'object' || 'value' in scaleObj) return;
               group[scale] = hooks.addTypographyComposite(scaleObj, scale);
-              // textCase/textDecoration ride inside the composite's $extensions
-              // in this shape rather than as tokens of their own.
+              /*
+                textCase/textDecoration ride inside the composite's $extensions
+                in this shape rather than as tokens of their own — so the
+                standalone pair goes.
+
+                And the composite refers to them as '{textCase.none}', a
+                reference code.js writes for the legacy tree, where it also
+                synthesises core.textCase.none to receive it. Neither scale is
+                a Figma variable, so nothing synthesises them here and the
+                reference had nowhere to land: 160 of them, dangling, inside
+                $extensions. They are inlined as the literal the synthesised
+                token would have held, which is what the reference document
+                carries too — "textCase": "none", not a reference.
+              */
+              inlineSynthesisedRefs(group[scale]);
               delete group[scale]['text-case'];
               delete group[scale]['text-decoration'];
             });
