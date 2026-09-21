@@ -335,15 +335,18 @@
       min-width: 0;
     }
 
-    /* The real Closure wordmark (Pomegranate Identity, Figma node 6:18) —
-       replaces the plain "Closure" text this class name used to sit
-       unused beside. currentColor, not a fixed white/dark fill (the
-       source export had `fill="white"`, which would have vanished
-       against a light-theme header): color: var(--app-heading), same
-       token the plain text used, so the mark stays theme-adaptive like
-       everything else here rather than being pinned to one theme. height
-       set, width left to the viewBox's own 334.648:61.9986 ratio, so it
-       scales proportionally at whatever height matches the header. */
+    /* The Closure lockup (Pomegranate Identity, Figma node 16:24) — the
+       badge and the word together, replacing the older bracketed
+       wordmark (node 6:18) this used to carry.
+       currentColor on every path, not the export's own fill="white"
+       (which would have vanished against a light-theme header): color:
+       var(--app-heading), so the mark stays theme-adaptive like
+       everything else here rather than being pinned to one theme. The
+       badge's own glyph is a HOLE in its path, not a painted shape, so
+       it shows the header behind it and reads correctly in both themes
+       without needing a second colour. height set, width left to the
+       viewBox's own 462.315:108 ratio, so it scales proportionally at
+       whatever height matches the header. */
     .header-logo {
       display: block;
       height: 30px;
@@ -972,6 +975,27 @@
       display: none;
     }
 
+    /* A file with zero variable collections: everything stacked below the
+       empty state — the Json file card, the push-settings card, and the
+       wire threading them together — describes an export that has nothing
+       to export. Shown anyway they read as a working pipeline with a
+       broken first link, which is what the screenshot reported: a
+       "Download" button and an "Add Repo Settings" card offered for
+       tokens that do not exist. One class on the wrapper drops the whole
+       run and leaves only the message standing, rather than each card
+       having to learn about the empty case separately — the wire included,
+       since it is a direct child here too. Toggled in the 'extracted'
+       handler, the one place that knows the count is zero. */
+    .flow-wrap.is-empty > *:not(.collections-wrap) {
+      display: none !important;
+    }
+    /* .collections-wrap's own trailing 16px spaces it from the card that
+       follows it; with nothing following, that gap is a dangling tail
+       below the last thing on screen. */
+    .flow-wrap.is-empty .collections-wrap {
+      margin-bottom: 0;
+    }
+
     .collections-wrap {
       display: flex;
       flex-direction: column;
@@ -1088,6 +1112,18 @@
       to { transform: translateY(-6px); }
     }
     
+    /* Sized by height, width following from the glyph's own 448:512 ratio
+       — the mark is taller than it is wide, so a square box would letterbox
+       it. currentColor on the <svg> means it inherits .empty-state's
+       --app-text-muted; the extra opacity keeps it quieter than the text it
+       introduces rather than competing with it. */
+    .empty-state-icon {
+      height: 40px;
+      width: auto;
+      margin-bottom: 14px;
+      opacity: 0.45;
+    }
+
     .empty-state .hint {
       font-size: 11px;
       margin-top: 8px;
@@ -21360,16 +21396,15 @@ html[data-theme=dark] {
       <div class="header-panel">
         <div class="header-title-row">
           <h1 class="title">
-            <svg class="header-logo" role="img" aria-label="Closure" viewBox="0 0 334.648 61.9986" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M18.1918 0.0272093C22.9441 0.106473 27.8668 0.0154448 32.643 0.038908L26.2055 11.7616C25.3428 13.339 24.4578 14.9603 23.5951 16.5332C20.0067 23.0747 16.9948 27.1929 8.83806 27.4558L8.83353 34.9285C10.4424 34.9568 11.8835 35.0946 13.4306 35.5484C19.6727 37.3804 22.6722 44.0631 25.5434 49.2317L32.6476 61.9986L18.2002 61.9966C17.6371 60.9492 16.8557 59.6967 16.239 58.6479L0 31.0245C1.46934 28.3564 3.24755 25.4787 4.81021 22.8241L13.6597 7.77054C15.0795 5.35658 16.9113 2.43074 18.1918 0.0272093Z" fill="currentColor"/>
-              <path d="M316.456 61.9714C311.704 61.8922 306.781 61.9832 302.005 61.9597L308.442 50.237C309.305 48.6597 310.19 47.0383 311.053 45.4654C314.641 38.9239 317.653 34.8057 325.81 34.5428L325.814 27.0701C324.205 27.0418 322.764 26.904 321.217 26.4502C314.975 24.6182 311.975 17.9356 309.104 12.7669L302 0L316.447 0.00202305C317.011 1.04946 317.792 2.30195 318.409 3.35074L334.648 30.9741C333.178 33.6423 331.4 36.52 329.837 39.1745L320.988 54.2281C319.568 56.642 317.736 59.5679 316.456 61.9714Z" fill="currentColor"/>
-              <path d="M73.462 56.035C59.317 56.035 49.864 45.961 49.864 31.333C49.864 15.67 59.8 5.66499 74.842 5.66499C81.535 5.66499 87.055 7.45899 90.988 10.909V19.948C88.09 15.394 82.156 12.496 75.463 12.496C64.354 12.496 57.523 19.465 57.523 30.712C57.523 41.614 64.768 48.859 75.808 48.859C83.053 48.859 88.918 45.754 91.816 39.682C91.816 50.446 85.399 56.035 73.462 56.035Z" fill="currentColor"/>
-              <path d="M100.376 55V4.62999H107.345V55H100.376Z" fill="currentColor"/>
-              <path d="M133.886 56.035C123.743 56.035 116.084 48.79 116.084 38.095C116.084 27.469 123.743 20.362 133.886 20.362C144.029 20.362 151.688 27.469 151.688 38.095C151.688 48.79 144.029 56.035 133.886 56.035ZM123.26 38.095C123.26 44.857 127.607 49.549 133.886 49.549C140.096 49.549 144.512 44.857 144.512 38.095C144.512 31.471 140.165 26.917 133.886 26.917C127.538 26.917 123.26 31.471 123.26 38.095Z" fill="currentColor"/>
-              <path d="M169.934 56.035C164.966 56.035 161.033 54.517 157.997 51.412V43.96C160.826 47.755 165.587 50.239 169.865 50.239C173.177 50.239 174.902 48.721 174.902 46.306C174.902 44.167 173.936 42.994 171.59 42.028L165.38 39.337C160.895 37.405 158.687 34.507 158.687 30.16C158.687 24.502 163.586 20.362 170.486 20.362C174.488 20.362 177.869 21.466 180.56 23.605V30.643C178.49 28.09 174.212 26.02 170.693 26.02C167.726 26.02 165.863 27.469 165.863 29.608C165.863 31.678 167.036 32.782 169.451 33.748L175.73 36.508C179.939 38.302 182.078 41.269 182.078 45.685C182.078 51.826 177.041 56.035 169.934 56.035Z" fill="currentColor"/>
-              <path d="M212.548 21.397H219.517V55H212.548V51.136C210.478 54.241 206.959 56.035 202.198 56.035C194.401 56.035 189.847 50.86 189.847 43.201V21.397H196.747V41.062C196.747 46.306 199.645 49.411 204.406 49.411C208.477 49.411 211.03 47.548 212.548 43.96V21.397Z" fill="currentColor"/>
-              <path d="M230.829 55V21.397H237.177V27.676C238.626 23.26 242.007 20.707 246.63 20.707C247.872 20.707 249.114 20.914 249.666 21.19V27.745C248.769 27.538 247.458 27.4 246.078 27.4C242.214 27.4 238.971 29.47 237.798 33.886V55H230.829Z" fill="currentColor"/>
-              <path d="M270.937 56.035C260.449 56.035 253.342 49.549 253.342 38.371C253.342 27.814 259.345 20.362 269.695 20.362C280.321 20.362 286.048 26.986 285.91 38.992H260.518C260.932 46.168 266.452 49.342 273.628 49.342C278.665 49.342 283.288 47.479 285.358 44.167C285.358 51.481 280.045 56.035 270.937 56.035ZM260.587 34.162H278.596C278.596 29.539 275.629 25.33 269.695 25.33C264.313 25.33 261.001 28.849 260.587 34.162Z" fill="currentColor"/>
+            <svg class="header-logo" role="img" aria-label="Closure" viewBox="0 0 462.315 108" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M169.81 88.425C150.335 88.425 137.32 74.555 137.32 54.415C137.32 32.85 151 19.075 171.71 19.075C180.925 19.075 188.525 21.545 193.94 26.295V38.74C189.95 32.47 181.78 28.48 172.565 28.48C157.27 28.48 147.865 38.075 147.865 53.56C147.865 68.57 157.84 78.545 173.04 78.545C183.015 78.545 191.09 74.27 195.08 65.91C195.08 80.73 186.245 88.425 169.81 88.425Z" fill="currentColor"/>
+              <path d="M206.865 87V17.65H216.46V87H206.865Z" fill="currentColor"/>
+              <path d="M253.002 88.425C239.037 88.425 228.492 78.45 228.492 63.725C228.492 49.095 239.037 39.31 253.002 39.31C266.967 39.31 277.512 49.095 277.512 63.725C277.512 78.45 266.967 88.425 253.002 88.425ZM238.372 63.725C238.372 73.035 244.357 79.495 253.002 79.495C261.552 79.495 267.632 73.035 267.632 63.725C267.632 54.605 261.647 48.335 253.002 48.335C244.262 48.335 238.372 54.605 238.372 63.725Z" fill="currentColor"/>
+              <path d="M302.634 88.425C295.794 88.425 290.379 86.335 286.199 82.06V71.8C290.094 77.025 296.649 80.445 302.539 80.445C307.099 80.445 309.474 78.355 309.474 75.03C309.474 72.085 308.144 70.47 304.914 69.14L296.364 65.435C290.189 62.775 287.149 58.785 287.149 52.8C287.149 45.01 293.894 39.31 303.394 39.31C308.904 39.31 313.559 40.83 317.264 43.775V53.465C314.414 49.95 308.524 47.1 303.679 47.1C299.594 47.1 297.029 49.095 297.029 52.04C297.029 54.89 298.644 56.41 301.969 57.74L310.614 61.54C316.409 64.01 319.354 68.095 319.354 74.175C319.354 82.63 312.419 88.425 302.634 88.425Z" fill="currentColor"/>
+              <path d="M361.306 40.735H370.901V87H361.306V81.68C358.456 85.955 353.611 88.425 347.056 88.425C336.321 88.425 330.051 81.3 330.051 70.755V40.735H339.551V67.81C339.551 75.03 343.541 79.305 350.096 79.305C355.701 79.305 359.216 76.74 361.306 71.8V40.735Z" fill="currentColor"/>
+              <path d="M386.475 87V40.735H395.215V49.38C397.21 43.3 401.865 39.785 408.23 39.785C409.94 39.785 411.65 40.07 412.41 40.45V49.475C411.175 49.19 409.37 49 407.47 49C402.15 49 397.685 51.85 396.07 57.93V87H386.475Z" fill="currentColor"/>
+              <path d="M441.696 88.425C427.256 88.425 417.471 79.495 417.471 64.105C417.471 49.57 425.736 39.31 439.986 39.31C454.616 39.31 462.501 48.43 462.311 64.96H427.351C427.921 74.84 435.521 79.21 445.401 79.21C452.336 79.21 458.701 76.645 461.551 72.085C461.551 82.155 454.236 88.425 441.696 88.425ZM427.446 58.31H452.241C452.241 51.945 448.156 46.15 439.986 46.15C432.576 46.15 428.016 50.995 427.446 58.31Z" fill="currentColor"/>
+              <path d="M84 0C97.2548 0 108 10.7452 108 24V84C108 97.2548 97.2548 108 84 108H24C10.7452 108 9.66449e-08 97.2548 0 84V24C0 10.7452 10.7452 9.66386e-08 24 0H84ZM69.4463 26.6523C65.3384 26.6345 61.0298 26.5886 56.9326 26.6523L62.8027 37.2656C64.4167 40.1913 65.9215 43.2448 68.0352 45.8584C70.5773 49.0021 73.5213 50.1473 77.5244 50.2178C77.5244 52.3797 77.5456 54.5765 77.5225 56.7354C77.1968 56.7459 76.8694 56.7641 76.5449 56.7734C68.8552 56.9872 65.9207 64.1372 62.752 69.9521L56.9395 80.6133L69.4512 80.6201C69.9419 79.6294 70.7901 78.2661 71.3633 77.2871L85.1826 53.6387L71.2529 29.7939C70.7574 28.9458 69.8533 27.4967 69.4463 26.6523ZM37.7871 26.6436C36.6798 28.7368 35.0968 31.2854 33.8691 33.3877L26.2158 46.499C24.8646 48.811 23.3272 51.3178 22.0566 53.6416L36.0996 77.7002C36.6328 78.6136 37.308 79.705 37.7949 80.6172L50.2881 80.6182L44.1455 69.499C41.6627 64.9974 39.0685 59.1768 33.6709 57.5811C32.3331 57.1858 31.0865 57.0666 29.6953 57.042L29.6992 50.5332C36.7525 50.3041 39.357 46.7168 42.46 41.0195C43.206 39.6497 43.9708 38.237 44.7168 36.8633L50.2842 26.6543C46.1541 26.6339 41.8966 26.7126 37.7871 26.6436Z" fill="currentColor"/>
             </svg>
           </h1>
           <div id="version-tag-mount" class="version-tag-mount"></div>
@@ -21432,6 +21467,15 @@ html[data-theme=dark] {
     </div>
     <div class="collections-list" id="collections-list" style="display: none;"></div>
     <div class="empty-state" id="empty-state" style="display: none;">
+      <!-- The Closure variable mark (Pomegranate Identity, node 16:31) — a
+           hexagon with a centred dot, the same glyph the brand uses for "a
+           variable". Inline rather than React-mounted for the same reason
+           the Json file card's own title icon is: this block is static
+           markup, not a React root. fill="currentColor" so it takes
+           .empty-state's own --app-text-muted and follows the theme. -->
+      <svg class="empty-state-icon" viewBox="0 0 448.253 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M224.291 0C228.861 3.11883 238.191 8.06017 243.27 10.9668L281.556 32.8584L392.028 95.9863L428.185 116.635C434.503 120.242 441.916 124.242 448.033 128.062C448.483 148.142 448.103 169.751 448.101 189.924L448.105 306.543L448.103 360.293L448.098 374.702C448.098 377.135 448.205 381.697 447.82 383.935C443.788 386.807 433.849 392.125 429.188 394.787L392.193 415.928L272.538 484.298L239.216 503.332L229.285 509.01C228.22 509.625 225.181 511.308 224.288 512H223.83C222.29 510.83 217.99 508.542 216.113 507.475L201.5 499.152L151.188 470.4L52.6142 414.065C35.5567 404.318 17.3488 393.465 0.17279 384.202C-0.146659 380.552 0.074087 372.922 0.0770869 369.082L0.0966182 339.25V245.088L0.0917353 165.016L0.07904 140.786C0.07729 137.155 -0.113577 130.988 0.271423 127.627C2.4837 126.682 7.26641 123.797 9.47064 122.538L26.4013 112.864L82.288 80.9268L176.742 26.9512L207.661 9.27637C212.712 6.38948 218.963 3.05347 223.806 0H224.291ZM121.38 132.478L84.4013 153.616C78.0818 157.23 70.2297 161.424 64.2382 165.293C63.7863 169.694 64.0934 181.281 64.0966 186.091L64.0986 227.669L64.0976 306.69C64.0973 319.825 63.8929 333.585 64.1054 346.67C72.8009 352.04 82.9489 357.555 91.8798 362.66L142.331 391.513L195.479 421.912C198.771 423.795 222.196 437.655 224.516 438.027C228.588 435.367 234.108 432.405 238.408 429.947L262.876 415.965L342.681 370.327L368.863 355.367C373.798 352.547 379.263 349.577 384.023 346.582C384.308 334.062 384.093 320.717 384.093 308.125L384.098 237.584V190.074C384.098 182.797 384.408 172.467 384.013 165.405C379.773 162.667 374.738 159.937 370.296 157.402L348.313 144.837L279.016 105.205L241.575 83.8037C238.682 82.1443 225.577 74.3711 223.738 73.959L121.38 132.478ZM220.128 192.146C255.353 189.98 285.681 216.747 287.908 251.97C290.136 287.192 263.42 317.565 228.2 319.853C192.897 322.145 162.434 295.35 160.202 260.043C157.97 224.736 184.816 194.318 220.128 192.146Z"/>
+      </svg>
       <p>No variable collections found.</p>
       <p class="hint">Add variables in Figma to see them here.</p>
     </div>
@@ -21515,6 +21559,34 @@ html[data-theme=dark] {
       <!-- data-level="4", same bump and same reason as .json-download-card
            right above — see that comment. -->
       <div class="export-panel" data-level="4">
+        <!-- Names the card, the way .json-download-card above it and the
+             collections card above that both name themselves. This was the
+             one container in the stack with no title of its own: the two
+             cards above announced what they were and this one opened
+             straight into a provider block (or, with nothing configured
+             yet, into a bare "Add Repo Settings" button floating in an
+             unlabelled box). Same markup shape and the same classes as the
+             Json file card's header so the three titles read as one family
+             rather than three separate treatments. -->
+        <div class="json-download-header">
+          <div class="json-download-title-group">
+            <!-- Plain inline SVG, not React-mounted — same reasoning as the
+                 GitLab/GitHub marks on .target-row-title below and the
+                 file-text glyph on the Json file card: these title rows are
+                 static markup, not React roots. Lucide's "git-branch" — a
+                 repository, reading as "this is where it gets pushed", and
+                 deliberately NOT the gear the header's Settings button
+                 uses, which means "open the Settings page" everywhere else
+                 in this UI. -->
+            <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 3v12"/>
+              <circle cx="18" cy="6" r="3"/>
+              <circle cx="6" cy="18" r="3"/>
+              <path d="M18 9a9 9 0 0 1-9 9"/>
+            </svg>
+            <p class="json-download-title">Repo settings</p>
+          </div>
+        </div>
         <!-- Only meaningful once BOTH providers are actually added (see
              updatePushTargetUI()'s tabMode — same gitlabAdded && githubAdded
              gate the Settings page's own GitLab/GitHub tab switcher uses).
@@ -47443,7 +47515,12 @@ html[data-theme=dark] {
   var GROUND = 2;
   var CARD_LEVEL = 2;
   var TOP_CARD_LEVEL = 4;
-  var svg = (d, opts) => (size) => opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d, fillRule: opts.fillRule, clipRule: opts.fillRule }) }) : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d }) });
+  var svg = (d, opts) => (size) => {
+    const vb = opts?.viewBox ?? "0 0 24 24";
+    const parts = vb.split(/\s+/).map(Number);
+    const w = Math.round(size * parts[2] / parts[3] * 100) / 100;
+    return opts?.fill ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("svg", { width: w, height: size, viewBox: vb, fill: "currentColor", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d, fillRule: opts.fillRule, clipRule: opts.fillRule }) }) : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("svg", { width: w, height: size, viewBox: vb, fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d }) });
+  };
   var IconArrowLeft = svg("M19 12H5M12 19l-7-7 7-7");
   var IconDownload = svg("M12 3v11m0 0l-4-4m4 4l4-4M5 20h14");
   var IconSettings = svg(
@@ -47458,7 +47535,7 @@ html[data-theme=dark] {
   var IconMoon = svg("M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z");
   var IconGitLab = svg("M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024", { fill: true });
   var IconGitHub = svg("M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z", { fill: true });
-  var IconVariables = svg("M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z");
+  var IconVariables = svg("M224.291 0C228.861 3.11883 238.191 8.06017 243.27 10.9668L281.556 32.8584L392.028 95.9863L428.185 116.635C434.503 120.242 441.916 124.242 448.033 128.062C448.483 148.142 448.103 169.751 448.101 189.924L448.105 306.543L448.103 360.293L448.098 374.702C448.098 377.135 448.205 381.697 447.82 383.935C443.788 386.807 433.849 392.125 429.188 394.787L392.193 415.928L272.538 484.298L239.216 503.332L229.285 509.01C228.22 509.625 225.181 511.308 224.288 512H223.83C222.29 510.83 217.99 508.542 216.113 507.475L201.5 499.152L151.188 470.4L52.6142 414.065C35.5567 404.318 17.3488 393.465 0.17279 384.202C-0.146659 380.552 0.074087 372.922 0.0770869 369.082L0.0966182 339.25V245.088L0.0917353 165.016L0.07904 140.786C0.07729 137.155 -0.113577 130.988 0.271423 127.627C2.4837 126.682 7.26641 123.797 9.47064 122.538L26.4013 112.864L82.288 80.9268L176.742 26.9512L207.661 9.27637C212.712 6.38948 218.963 3.05347 223.806 0H224.291ZM121.38 132.478L84.4013 153.616C78.0818 157.23 70.2297 161.424 64.2382 165.293C63.7863 169.694 64.0934 181.281 64.0966 186.091L64.0986 227.669L64.0976 306.69C64.0973 319.825 63.8929 333.585 64.1054 346.67C72.8009 352.04 82.9489 357.555 91.8798 362.66L142.331 391.513L195.479 421.912C198.771 423.795 222.196 437.655 224.516 438.027C228.588 435.367 234.108 432.405 238.408 429.947L262.876 415.965L342.681 370.327L368.863 355.367C373.798 352.547 379.263 349.577 384.023 346.582C384.308 334.062 384.093 320.717 384.093 308.125L384.098 237.584V190.074C384.098 182.797 384.408 172.467 384.013 165.405C379.773 162.667 374.738 159.937 370.296 157.402L348.313 144.837L279.016 105.205L241.575 83.8037C238.682 82.1443 225.577 74.3711 223.738 73.959L121.38 132.478ZM220.128 192.146C255.353 189.98 285.681 216.747 287.908 251.97C290.136 287.192 263.42 317.565 228.2 319.853C192.897 322.145 162.434 295.35 160.202 260.043C157.97 224.736 184.816 194.318 220.128 192.146Z", { fill: true, viewBox: "0 0 448.253 512" });
   function btnVariant(v) {
     if (v === "filled") return "primary";
     if (v === "ghost") return "ghost";
@@ -49209,7 +49286,7 @@ react/cjs/react-jsx-runtime.development.js:
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '5e4d393 15:11:54';
+    var CLOSURE_BUILD = '3d62eca 18:06:57';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -50893,9 +50970,22 @@ react/cjs/react-jsx-runtime.development.js:
         if (msg.collections.length === 0) {
           emptyState.style.display = 'flex';
           collectionsWrap.classList.add('visible');
+          // Nothing to export, so nothing downstream of this message has
+          // anything to act on: .is-empty drops the Json file card, the
+          // push-settings card and the wire between them in one go (see
+          // the rule beside .flow-wrap.is-loading). setActionsLoading(false)
+          // still runs so the hidden containers settle into their real,
+          // non-skeleton state — if a later extract does find collections,
+          // the class comes off below and they are already correct rather
+          // than revealing as stale skeletons.
+          document.querySelector('.flow-wrap').classList.add('is-empty');
           setActionsLoading(false);   // nothing to transform — reveal now
           return;
         }
+
+        // A previous extract may have emptied the screen (file switched, or
+        // variables added since) — put the pipeline back.
+        document.querySelector('.flow-wrap').classList.remove('is-empty');
         
         collectionsList.style.display = 'flex';
         // Collections card + modal (buttons.tsx): one row per collection in
