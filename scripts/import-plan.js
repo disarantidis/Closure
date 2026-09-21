@@ -5,17 +5,25 @@
 //
 //   node scripts/import-plan.js tokens.json
 //   node scripts/import-plan.js tokens.json --ceiling 10
+//   node scripts/import-plan.js tokens.json --decide group:theme=separate
+//   node scripts/import-plan.js tokens.json --compile --allow-partial
 //   node scripts/import-plan.js tokens.json --json -o plan.json
 //
 // --ceiling is the target file's modes-per-collection limit (a property of that
 // file's plan, not of the API). Without it no collection is reported blocked.
 //
+// --decide answers one of the questions the plan raises, by the id it prints.
+// --compile runs the gate: it reports whether an executable program could be
+// produced, and refuses while any question is open. It still writes nothing.
+//
 const fs = require('fs');
 const { toIR, detect } = require('../src/import-ir.js');
 const { derive } = require('../src/import-derive.js');
+const { compile } = require('../src/import-compile.js');
 
 function parseArgs(argv) {
-  const a = { input: null, ceiling: Infinity, json: false, out: null, format: null, limit: 8 };
+  const a = { input: null, ceiling: Infinity, json: false, out: null, format: null, limit: 8,
+              decisions: {}, compile: false, allowPartial: false, evaluateExpressions: false };
   for (let i = 0; i < argv.length; i++) {
     const x = argv[i];
     if (x === '--ceiling') a.ceiling = Number(argv[++i]);
@@ -23,7 +31,15 @@ function parseArgs(argv) {
     else if (x === '-o' || x === '--out') a.out = argv[++i];
     else if (x === '--format') a.format = argv[++i];
     else if (x === '--limit') a.limit = Number(argv[++i]);
-    else if (!a.input) a.input = x;
+    else if (x === '--compile') a.compile = true;
+    else if (x === '--allow-partial') a.allowPartial = true;
+    else if (x === '--eval-expressions') a.evaluateExpressions = true;
+    else if (x === '--decide') {
+      const kv = argv[++i] || '';
+      const eq = kv.indexOf('=');
+      if (eq === -1) { console.error('--decide wants id=value, got: ' + kv); process.exit(1); }
+      a.decisions[kv.slice(0, eq)] = kv.slice(eq + 1);
+    } else if (!a.input) a.input = x;
   }
   return a;
 }
@@ -100,12 +116,53 @@ function print(plan, ir, limit) {
     console.log('');
   }
 
+  if (plan.unresolved.length) {
+    console.log('  OPEN QUESTIONS — answer with --decide <id>=<value>');
+    for (const q of plan.unresolved) {
+      console.log('     ' + q.id);
+      console.log('        ' + q.question);
+      console.log('        ' + q.evidence);
+      console.log('        answers: ' + q.options.join(' | '));
+    }
+    console.log('');
+  }
+  if (plan.decisionsApplied.length) {
+    console.log('  DECISIONS APPLIED');
+    plan.decisionsApplied.forEach((d) => console.log('     ' + d.id + ' = ' + d.value));
+    if (plan.decisionsUnused.length) {
+      console.log('     (ignored, nothing asked them: ' + plan.decisionsUnused.join(', ') + ')');
+    }
+    console.log('');
+  }
+
   console.log('  VERDICT  ' + (plan.ok
     ? 'projection is unambiguous — safe to apply'
     : 'NEEDS CONFIRMATION — the file does not determine the projection on its own'));
   if (plan.blocked.length) {
     console.log('           partial: ' + plan.blocked.length + ' collection(s) exceed the mode ceiling');
   }
+  console.log('');
+}
+
+function printCompile(res) {
+  if (!res.ok) {
+    console.log('  GATE     REFUSED — no program produced');
+    for (const r of res.refusals) {
+      console.log('     [' + r.kind + '] ' + r.id);
+      console.log('        ' + r.question);
+      if (r.options) console.log('        ' + r.options.join(' | '));
+    }
+    console.log('');
+    return;
+  }
+  const s = res.stats;
+  console.log('  GATE     program produced — ' + res.program.ops.length.toLocaleString() + ' operations');
+  console.log('     ' + s.collections + ' collections, ' + s.modes + ' modes, ' +
+              s.variables.toLocaleString() + ' variables');
+  console.log('     ' + s.literals.toLocaleString() + ' setValue, ' + s.aliases.toLocaleString() + ' setAlias');
+  console.log('     skipped: ' + s.skippedComposite.toLocaleString() + ' composite, ' +
+              s.skippedExpression.toLocaleString() + ' expression, ' +
+              s.skippedUnresolved.toLocaleString() + ' unresolved');
   console.log('');
 }
 
@@ -116,10 +173,22 @@ if (!args.input) {
 }
 const doc = JSON.parse(fs.readFileSync(args.input, 'utf8'));
 const ir = toIR(doc, { format: args.format });
-const plan = derive(ir, { modeCeiling: args.ceiling });
+const plan = derive(ir, { modeCeiling: args.ceiling, decisions: args.decisions });
 
-if (args.out) { fs.writeFileSync(args.out, JSON.stringify(plan, null, 2)); console.error('wrote ' + args.out); }
-if (args.json) console.log(JSON.stringify(plan, null, 2));
-else print(plan, ir, args.limit);
+let compiled = null;
+if (args.compile) {
+  compiled = compile(ir, plan, { allowPartial: args.allowPartial,
+                                 evaluateExpressions: args.evaluateExpressions });
+}
 
-process.exit(plan.ok ? 0 : 2);
+if (args.out) {
+  const payload = compiled && compiled.ok
+    ? { plan, manifest: compiled.manifest, program: compiled.program }
+    : plan;
+  fs.writeFileSync(args.out, JSON.stringify(payload, null, 2));
+  console.error('wrote ' + args.out);
+}
+if (args.json) console.log(JSON.stringify(compiled || plan, null, 2));
+else { print(plan, ir, args.limit); if (compiled) printCompile(compiled); }
+
+process.exit(plan.ok && (!compiled || compiled.ok) ? 0 : 2);

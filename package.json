@@ -10,7 +10,9 @@
     "build:web": "style-dictionary build --config sd.web.js",
     "build:android": "style-dictionary build --config sd.android.js",
     "build:ios": "style-dictionary build --config sd.ios.js",
-    "build:all": "npm run build:web && npm run build:android && npm run build:ios"
+    "build:all": "npm run build:web && npm run build:android && npm run build:ios",
+    "import:selftest": "node scripts/import-selftest.js",
+    "import:plan": "node scripts/import-plan.js"
   },
   "dependencies": {
     "react": "^18.3.1",

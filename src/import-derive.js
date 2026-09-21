@@ -15,12 +15,18 @@
 
   So it is decided by measurement, not by naming: DO THE VARIANTS DEFINE THE
   SAME TOKEN PATHS? Alternative values for one thing are modes. Disjoint path
-  sets are separate namespaces. On a real 31,959-token export this came out
+  sets are separate namespaces. On a real 34,481-token export this came out
   absolute — every group was either 100% or 0%, never in between.
 
   AND WHERE IT IS NOT ABSOLUTE, THE IMPORT STOPS. A group at 61% overlap is not
   a thing to guess at, because the wrong guess is silent. Ambiguity blocks and
   asks; it never picks the likelier reading.
+
+  WHAT AN ANSWER LOOKS LIKE. Every open question gets an id — "group:theme",
+  "type:core/radius.s", "ref:shared.c" — and a caller resolves it by passing a
+  decision under that id. Decisions are the ONLY way past a refusal, they are
+  recorded in the plan, and they serialise into the manifest, so answering a
+  question once answers it for every later import of the same file.
 */
 
 /* Above MODES_MIN the variants are read as modes, at or below SEPARATE_MAX as
@@ -35,13 +41,15 @@ const SEPARATE_MAX = 0;
    disguise or not a variable at all. */
 const FLOAT_TYPES = ['dimension', 'borderRadius', 'fontSizes', 'lineHeights', 'letterSpacing',
                      'number', 'spacing', 'sizing', 'borderWidth', 'opacity', 'paragraphSpacing',
-                     'paragraphIndent', 'fontWeights.numeric'];
+                     'paragraphIndent'];
 const STRING_TYPES = ['fontFamilies', 'fontWeights', 'textCase', 'textDecoration', 'string',
                       'asset', 'text', 'fontFamily', 'fontWeight'];
 /* Not "unsupported" — NOT VARIABLES. A shadow or a type ramp is a Figma STYLE,
    a different API with a different shape. Reported as a loss for the variable
    importer and as the scope of a second one. */
 const COMPOSITE_TYPES = ['typography', 'boxShadow', 'border', 'shadow', 'composition', 'gradient'];
+
+const FIGMA_TYPES = ['COLOR', 'FLOAT', 'STRING', 'BOOLEAN'];
 
 function figmaType(t) {
   if (t == null) return null;
@@ -54,9 +62,13 @@ function figmaType(t) {
 }
 const isComposite = (t) => COMPOSITE_TYPES.indexOf(t) !== -1;
 
+const SEP = '␟';
+const vkey = (col, path) => col + SEP + path;
+
 function derive(ir, opts) {
   opts = opts || {};
   const modeCeiling = opts.modeCeiling || Infinity;
+  const decisions = opts.decisions || {};
 
   const plan = {
     source: ir.source,
@@ -66,9 +78,22 @@ function derive(ir, opts) {
     blocked: [],
     losses: { composites: [], expressions: [], unresolvedRefs: [], typeConflicts: [], emptyCollections: [] },
     refCollisions: [],
+    /* Every open question, by id. compile() refuses while this is non-empty,
+       and each entry names exactly what a decision for it must say. */
+    unresolved: [],
+    decisionsApplied: [],
+    decisionsUnused: [],
     totals: {},
     ok: false,
   };
+
+  const claim = (id) => {
+    if (!Object.prototype.hasOwnProperty.call(decisions, id)) return undefined;
+    plan.decisionsApplied.push({ id, value: decisions[id] });
+    return decisions[id];
+  };
+  const ask = (id, question, options, detail) =>
+    plan.unresolved.push(Object.assign({ id, question, options }, detail || {}));
 
   /* ── 1. group verdicts ─────────────────────────────────────────────────── */
   const groups = new Map();                 // group -> Map(variant -> Set(path))
@@ -79,32 +104,44 @@ function derive(ir, opts) {
     g.get(r.variant).add(r.path);
   }
 
-  const verdict = new Map();                // group -> 'modes' | 'separate' | 'ambiguous'
+  const verdict = new Map();                // group -> 'modes' | 'separate'
   const evidence = new Map();
   for (const [g, variants] of groups) {
     const names = [...variants.keys()];
     if (names.length === 1) {
       verdict.set(g, 'modes');
-      evidence.set(g, { variants: 1, overlap: 1, note: 'single set' });
+      evidence.set(g, { variants: 1, overlap: 1, note: 'single set', decided: false });
       continue;
     }
     const sets = names.map((n) => variants.get(n));
-    /* Intersection over ALL variants, as a fraction of the smallest — using the
+    /* Intersection over ALL variants as a fraction of the SMALLEST — using the
        smallest rather than the first makes the measure order-independent. */
     const smallest = sets.reduce((a, b) => (a.size <= b.size ? a : b));
     let shared = 0;
     for (const p of smallest) if (sets.every((s) => s.has(p))) shared++;
     const overlap = smallest.size ? shared / smallest.size : 0;
-    const v = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : 'ambiguous';
-    verdict.set(g, v);
-    evidence.set(g, { variants: names.length, overlap, shared, of: smallest.size,
-                      note: overlap === 1 ? 'every variant defines the same paths'
-                          : overlap === 0 ? 'no path defined by more than one variant'
-                          : 'partial overlap — cannot be read either way' });
-    if (v === 'ambiguous') {
+
+    let v = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : null;
+    let decided = false;
+    if (v === null) {
+      const answer = claim('group:' + g);
+      if (answer === 'modes' || answer === 'separate') { v = answer; decided = true; }
+    }
+    if (v === null) {
+      v = 'modes';                          // provisional, only so the rest can be reported
       plan.ambiguous.push({ group: g, variants: names, overlap: +(overlap * 100).toFixed(1),
                             shared, of: smallest.size });
+      ask('group:' + g,
+          'Are the ' + names.length + ' variants of "' + g + '" modes of one collection, or separate collections?',
+          ['modes', 'separate'],
+          { evidence: names.length + ' variants share ' + shared + ' of ' + smallest.size +
+                      ' paths (' + (overlap * 100).toFixed(1) + '%)' });
     }
+    verdict.set(g, v);
+    evidence.set(g, { variants: names.length, overlap, shared, of: smallest.size, decided,
+                      note: overlap === 1 ? 'every variant defines the same paths'
+                          : overlap === 0 ? 'no path defined by more than one variant'
+                          : 'partial overlap — cannot be read from the file' });
   }
 
   /* ── 2. address every row to (collection, mode) ────────────────────────── */
@@ -113,16 +150,16 @@ function derive(ir, opts) {
     : { col: r.group, mode: r.variant };      // a mode of the group's collection
 
   /* ── 3. a variable is (collection, path); modes contribute values ──────── */
-  const key = (a, b) => a + '␟' + b;
   const vars = new Map();
   const modesOf = new Map();
+  const groupOfCol = new Map();
   for (const r of ir.rows) {
     const a = address(r);
-    if (!modesOf.has(a.col)) modesOf.set(a.col, []);
+    if (!modesOf.has(a.col)) { modesOf.set(a.col, []); groupOfCol.set(a.col, r.group); }
     const ms = modesOf.get(a.col);
     if (ms.indexOf(a.mode) === -1) ms.push(a.mode);
 
-    const k = key(a.col, r.path);
+    const k = vkey(a.col, r.path);
     let spec = vars.get(k);
     if (!spec) {
       spec = { col: a.col, path: r.path, types: new Set(), values: new Map(),
@@ -134,49 +171,74 @@ function derive(ir, opts) {
     if (!spec.description && r.description) spec.description = r.description;
   }
 
-  /* ── 4. types must be homogeneous across a variable's modes ────────────── */
+  /* ── 4. a variable is ONE type across all its modes ────────────────────── */
   for (const spec of vars.values()) {
     const ts = [...spec.types];
-    if (ts.length > 1) {
-      plan.losses.typeConflicts.push({ collection: spec.col, path: spec.path, types: ts });
-    }
     spec.type = ts[0];
     spec.ft = figmaType(spec.type);
+    if (ts.length > 1) {
+      const id = 'type:' + spec.col + '/' + spec.path;
+      const answer = claim(id);
+      if (answer && FIGMA_TYPES.indexOf(answer) !== -1) { spec.ft = answer; spec.typeDecided = true; }
+      else {
+        plan.losses.typeConflicts.push({ collection: spec.col, path: spec.path, types: ts });
+        ask(id, 'Variable "' + spec.col + '/' + spec.path + '" is ' + ts.join(' in one mode and ') +
+                ' in another. Which Figma type?', FIGMA_TYPES.slice(),
+            { evidence: 'declared types: ' + ts.join(', ') });
+      }
+    }
   }
 
   /* ── 5. reference targets ──────────────────────────────────────────────—
      A reference names a token PATH, not a collection. If that path exists in
      more than one collection the reference is genuinely ambiguous — the source
      format resolved it by which sets a theme had enabled, and that context is
-     gone once the sets have become collections. Reported rather than guessed. */
+     gone once the sets have become collections. Asked, never guessed. */
   const byPath = new Map();
   for (const spec of vars.values()) {
     if (!byPath.has(spec.path)) byPath.set(spec.path, []);
     byPath.get(spec.path).push(spec);
   }
+  /* Only a path something actually POINTS AT can be ambiguous. Two collections
+     holding a variable of the same name is ordinary — Figma allows it and it
+     carries no meaning — so a duplicate nobody references is not a question,
+     and asking about it would bury the real ones. */
+  const referenced = new Set();
+  for (const spec of vars.values()) {
+    for (const v of spec.values.values()) if (v.ref !== undefined) referenced.add(v.ref);
+  }
+
+  const refTarget = new Map();              // path -> the one spec it resolves to
   for (const [p, list] of byPath) {
-    if (list.length > 1) plan.refCollisions.push({ path: p, collections: list.map((s) => s.col) });
+    const live = list.filter((s) => s.ft !== null);
+    if (live.length <= 1) { if (live.length) refTarget.set(p, live[0]); continue; }
+    if (!referenced.has(p)) continue;       // duplicated, but nothing can hit it
+    const id = 'ref:' + p;
+    const answer = claim(id);
+    const picked = answer && live.filter((s) => s.col === answer)[0];
+    if (picked) { refTarget.set(p, picked); continue; }
+    plan.refCollisions.push({ path: p, collections: live.map((s) => s.col) });
+    ask(id, 'Path "' + p + '" is defined in ' + live.length + ' collections. Which one do references to it mean?',
+        live.map((s) => s.col), { evidence: 'defined in: ' + live.map((s) => s.col).join(', ') });
   }
 
   /* ── 6. walk every value, classify what can and cannot land ────────────── */
   let literals = 0, aliases = 0, importable = 0;
-  const compositePaths = new Set();
   for (const spec of vars.values()) {
     if (spec.ft === null) {
-      compositePaths.add(spec.col + '/' + spec.path);
       plan.losses.composites.push({ collection: spec.col, path: spec.path, type: spec.type });
       continue;
     }
     importable++;
     for (const [mode, v] of spec.values) {
       if (v.ref !== undefined) {
-        const targets = byPath.get(v.ref);
-        const live = targets && targets.filter((t) => t.ft !== null);
-        if (!live || !live.length) {
+        const target = refTarget.get(v.ref);
+        if (!target) {
+          const known = byPath.has(v.ref);
           plan.losses.unresolvedRefs.push({ collection: spec.col, path: spec.path, mode, ref: v.ref,
-            reason: targets && targets.length ? 'target is a composite, so it is not a variable'
-                                              : 'no token defines this path' });
-        } else aliases++;
+            reason: known ? 'target is a composite, so it is not a variable'
+                          : 'no token defines this path' });
+        } else { aliases++; spec.resolved = true; }
       } else if (v.expr !== undefined) {
         plan.losses.expressions.push({ collection: spec.col, path: spec.path, mode, expr: v.expr });
       } else if (v.literal && typeof v.literal === 'object') {
@@ -193,16 +255,16 @@ function derive(ir, opts) {
     varsPerCol.set(spec.col, (varsPerCol.get(spec.col) || 0) + 1);
   }
   for (const [name, modes] of modesOf) {
-    const g = ir.rows.find((r) => address(r).col === name).group;
+    const g = groupOfCol.get(name);
     const ev = evidence.get(g) || {};
     const count = varsPerCol.get(name) || 0;
     const entry = {
-      name, modes: modes.slice(), variables: count,
-      fromGroup: g,
+      name, modes: modes.slice(), variables: count, fromGroup: g,
       verdict: verdict.get(g),
       overlap: ev.overlap === undefined ? null : +(ev.overlap * 100).toFixed(1),
       evidence: ev.note,
-      confidence: verdict.get(g) === 'ambiguous' ? 'AMBIGUOUS'
+      confidence: plan.ambiguous.some((a) => a.group === g) ? 'AMBIGUOUS'
+                : ev.decided ? 'decided by caller'
                 : ev.variants === 1 ? 'certain (single set)'
                 : ev.overlap === 1 || ev.overlap === 0 ? 'certain' : 'high',
     };
@@ -212,12 +274,16 @@ function derive(ir, opts) {
     }
     if (modes.length > modeCeiling) {
       plan.blocked.push({ collection: name, needs: modes.length, ceiling: modeCeiling,
-                          reason: 'more modes than this file\'s plan allows' });
+                          reason: "more modes than this file's plan allows" });
       entry.blocked = true;
     }
     plan.collections.push(entry);
   }
   plan.collections.sort((a, b) => b.variables - a.variables);
+
+  for (const id of Object.keys(decisions)) {
+    if (!plan.decisionsApplied.some((d) => d.id === id)) plan.decisionsUnused.push(id);
+  }
 
   plan.totals = {
     rows: ir.rows.length,
@@ -232,17 +298,21 @@ function derive(ir, opts) {
   const t = plan.totals;
   t.importablePct = t.rows ? +(100 * (t.literals + t.aliases) / t.rows).toFixed(1) : 0;
 
-  /* An ambiguous group, a type conflict or a reference collision all mean the
-     projection is not knowable from the file alone. Blocked collections do not
-     make the plan invalid — they make it partial, which is a different thing
-     and is the user's call. */
-  plan.ok = plan.ambiguous.length === 0 &&
-            plan.losses.typeConflicts.length === 0 &&
-            plan.refCollisions.length === 0;
+  /* A blocked collection does not make the plan invalid — it makes it PARTIAL,
+     which is the user's call and is gated separately in compile(). Only an open
+     question makes it unusable. */
+  plan.ok = plan.unresolved.length === 0;
   plan.needsConfirmation = !plan.ok;
+
+  /* Everything compile() needs, kept off the reported surface so a plan stays
+     printable and serialisable. */
+  Object.defineProperty(plan, '_internals', {
+    enumerable: false, value: { vars, modesOf, refTarget, verdict, address },
+  });
 
   return plan;
 }
 
-module.exports = { derive, figmaType, isComposite, MODES_MIN, SEPARATE_MAX,
+module.exports = { derive, figmaType, isComposite, vkey,
+                   MODES_MIN, SEPARATE_MAX, FIGMA_TYPES,
                    FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
