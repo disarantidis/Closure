@@ -712,6 +712,65 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
      keepGoing.failed > 1, 'failed ' + keepGoing.failed);
 }
 
+/* ── a REAL DTCG document, which is the format that broke ────────────────── */
+{
+  /*
+    scripts/__fixtures__/dtcg-resolved-sample.json is a closed slice of an
+    actual 8,312-token W3C DTCG export from this plugin — every value shape
+    that document contains, kept in its own nesting, with every reference
+    target pulled in so nothing dangles.
+
+    IT EXISTS BECAUSE 135 TESTS DID NOT CATCH THIS. Every fixture before it was
+    Tokens Studio format, and the one format never fed to the importer was
+    Closure's own DTCG output. A real file found two bugs on first contact: an
+    object colour read as a composite, and a per-collection variable limit
+    discovered by hitting it. Both are pinned here.
+  */
+  const doc = require('./__fixtures__/dtcg-resolved-sample.json');
+  const ir = toIR(doc);
+  ok('dtcg fixture: detected as DTCG', ir.source === 'dtcg', ir.source);
+
+  const plan = derive(ir, {});
+  const c = compile(ir, plan, { evaluateExpressions: true });
+  ok('dtcg fixture: it compiles', c.ok === true, JSON.stringify((c.refusals || []).slice(0, 2)));
+
+  /* Before the fix this was most of the document: the object-valued colours
+     and dimensions were refused, and everything referencing them cascaded. */
+  ok('dtcg fixture: NOTHING is dropped as valueless',
+     c.stats.skippedEmpty === 0 && c.stats.skippedEmptyCollections.length === 0,
+     JSON.stringify(c.stats));
+
+  /* Before the fix: zero. Every colour in the document was lost. */
+  const colours = c.program.ops.filter((o) => o.op === 'setValue' && o.value && typeof o.value === 'object');
+  ok('dtcg fixture: object colours land as 0..1 rgba',
+     colours.length > 0 && colours.every((o) =>
+       typeof o.value.r === 'number' && o.value.r >= 0 && o.value.r <= 1 &&
+       typeof o.value.a === 'number'),
+     JSON.stringify(colours[0]));
+
+  /* { value, unit } becomes a bare number, the same as "16px" already did. */
+  ok('dtcg fixture: object dimensions land as numbers',
+     c.program.ops.some((o) => o.op === 'setValue' && typeof o.value === 'number') &&
+     c.stats.unitsDropped.indexOf('px') !== -1,
+     JSON.stringify(c.stats.unitsDropped));
+
+  /* Only the genuine composites — shadow and typography — are skipped. Before
+     the fix every colour and dimension was counted here too. */
+  ok('dtcg fixture: only real composites are treated as composites',
+     plan.losses.composites.every((x) => /shadow|typography/.test(x.type)),
+     JSON.stringify(plan.losses.composites.map((x) => x.type)));
+
+  ok('dtcg fixture: every reference resolves',
+     plan.losses.unresolvedRefs.length === 0 && c.stats.aliases > 0,
+     JSON.stringify(plan.losses.unresolvedRefs.slice(0, 3)));
+
+  /* The whole document is accounted for: what lands, plus what genuinely
+     cannot be a variable, equals what came in. */
+  ok('dtcg fixture: nothing goes missing unexplained',
+     c.stats.variables + c.stats.skippedComposite === ir.rows.length,
+     c.stats.variables + ' + ' + c.stats.skippedComposite + ' vs ' + ir.rows.length);
+}
+
 /* ── Figma caps a collection at 5,000 variables ──────────────────────────── */
 {
   /* Found by a real import: 6,195 operations went through and then stopped on
