@@ -48555,11 +48555,11 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [s, setS] = (0, import_react14.useState)({ open: false, title: "", groups: [], more: 0 });
+      const [s, setS] = (0, import_react14.useState)({ open: false, title: "", groups: [], more: 0, note: "" });
       set = setS;
       if (!s.open) return null;
       return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(Alert, { tone: "error", title: s.title, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("p", { className: "closure-warning-subtitle", children: "Not present in this export, but referenced by:" }),
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("p", { className: "closure-warning-subtitle", children: s.note || "Not present in this export, but referenced by:" }),
         /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("ul", { className: "closure-warning-list", children: s.groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("li", { children: [
           /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { className: "closure-warning-missing", children: g.ref }),
           /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "closure-warning-froms", children: [
@@ -48576,7 +48576,7 @@ html[data-theme=dark] {
     }
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(View, {}) }));
     window.PomClosureWarning = {
-      show: (title, groups, more) => set(() => ({ open: true, title, groups, more: more || 0 })),
+      show: (title, groups, more, note) => set(() => ({ open: true, title, groups, more: more || 0, note: note || "" })),
       hide: () => set((s) => ({ ...s, open: false }))
     };
   })();
@@ -51938,7 +51938,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '459187e 14:27:48';
+    var CLOSURE_BUILD = '1298032 15:10:34';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -52577,6 +52577,9 @@ function format(report, limit) {
       projection wholesale — decide that a group is four collections rather
       than four modes and every variable in it moves.
     */
+    /* Set only for the single extract an import triggers — see the closure
+       warning's own note. */
+    var justImported = false;
     var importState = { doc: null, fileName: null, ir: null, plan: null,
                         compiled: null, changes: null, decisions: {}, levels: {}, manifest: null };
 
@@ -54047,13 +54050,33 @@ function format(report, limit) {
           });
           // Most-depended-on missing token first — the one worth fixing first.
           groups.sort(function(a, b) { return b.froms.length - a.froms.length; });
+          /*
+            SAY WHICH DIRECTION THIS IS ABOUT.
+
+            The check is on what an EXPORT of this file would contain. It also
+            runs after an IMPORT, because the document has just changed and is
+            re-read — and arriving there with no framing it read as a verdict
+            on the import, which had in fact resolved every reference it was
+            given. Two different things were being reported in one sentence.
+
+            justImported is cleared as soon as it is used: the NEXT extract is
+            an ordinary one and must not keep wearing the import's label.
+          */
           window.PomClosureWarning.show(
-            groups.length + ' missing token' + (groups.length === 1 ? '' : 's'),
+            groups.length + ' reference' + (groups.length === 1 ? '' : 's') +
+              ' would break on export',
             groups,
-            Math.max(0, closure.brokenCount - sample.length)
+            Math.max(0, closure.brokenCount - sample.length),
+            justImported
+              ? 'The import itself is fine — these variables exist in Figma. ' +
+                'It is exporting them again that would lose them, because this export ' +
+                'does not recognise the collections they are in:'
+              : 'Not present in this export, but referenced by:'
           );
+          justImported = false;
         } else {
           window.PomClosureWarning.hide();
+          justImported = false;
         }
 
         parent.postMessage({
@@ -54093,6 +54116,7 @@ function format(report, limit) {
           /* The document has changed underneath the main screen, so its own
              read of it is now stale. Re-extracting is also what makes a
              second import diff against the new state rather than the old. */
+          justImported = true;
           parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
           closeImport();
         }

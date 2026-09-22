@@ -413,7 +413,7 @@ declare global {
       setSummary: (tokensLabel: string) => void;
     };
     PomJsonFileCard: { setSize: (sizeLabel: string) => void };
-    PomClosureWarning: { show: (title: string, groups: { ref: string; froms: string[] }[], more?: number) => void; hide: () => void };
+    PomClosureWarning: { show: (title: string, groups: { ref: string; froms: string[] }[], more?: number, note?: string) => void; hide: () => void };
     PomCommitMessage: DisabledHandle;
     PomVersionTag: { setLabel: (label: string) => void };
     PomRemoveGithubDialog: { open: () => void; onConfirm: (() => void) | null };
@@ -1067,12 +1067,22 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
   const container = document.getElementById('closure-warning-mount');
   let set: (u: (s: any) => any) => void = () => {};
   function View() {
-    const [s, setS] = useState<{ open: boolean; title: string; groups: { ref: string; froms: string[] }[]; more: number }>({ open: false, title: '', groups: [], more: 0 });
+    const [s, setS] = useState<{ open: boolean; title: string; groups: { ref: string; froms: string[] }[]; more: number; note: string }>({ open: false, title: '', groups: [], more: 0, note: '' });
     set = setS;
     if (!s.open) return null;
     return (
       <Alert tone="error" title={s.title}>
-        <p className="closure-warning-subtitle">Not present in this export, but referenced by:</p>
+        {/*
+          WHICH DIRECTION THIS IS ABOUT. The check runs on what an EXPORT of
+          this file would contain, and it also runs after an IMPORT, because
+          the document has just changed and gets re-read. Landing straight
+          after a successful import with no such framing, it read as a verdict
+          on the import — which had in fact resolved every one of its
+          references. So it says which thing it is talking about.
+        */}
+        <p className="closure-warning-subtitle">
+          {s.note || 'Not present in this export, but referenced by:'}
+        </p>
         <ul className="closure-warning-list">
           {s.groups.map((g) => (
             <li key={g.ref}>
@@ -1087,7 +1097,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
   }
   if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   window.PomClosureWarning = {
-    show: (title, groups, more) => set(() => ({ open: true, title, groups, more: more || 0 })),
+    show: (title, groups, more, note) => set(() => ({ open: true, title, groups, more: more || 0, note: note || '' })),
     hide: () => set((s) => ({ ...s, open: false })),
   };
 })();

@@ -3050,6 +3050,9 @@
       projection wholesale — decide that a group is four collections rather
       than four modes and every variable in it moves.
     */
+    /* Set only for the single extract an import triggers — see the closure
+       warning's own note. */
+    var justImported = false;
     var importState = { doc: null, fileName: null, ir: null, plan: null,
                         compiled: null, changes: null, decisions: {}, levels: {}, manifest: null };
 
@@ -4520,13 +4523,33 @@
           });
           // Most-depended-on missing token first — the one worth fixing first.
           groups.sort(function(a, b) { return b.froms.length - a.froms.length; });
+          /*
+            SAY WHICH DIRECTION THIS IS ABOUT.
+
+            The check is on what an EXPORT of this file would contain. It also
+            runs after an IMPORT, because the document has just changed and is
+            re-read — and arriving there with no framing it read as a verdict
+            on the import, which had in fact resolved every reference it was
+            given. Two different things were being reported in one sentence.
+
+            justImported is cleared as soon as it is used: the NEXT extract is
+            an ordinary one and must not keep wearing the import's label.
+          */
           window.PomClosureWarning.show(
-            groups.length + ' missing token' + (groups.length === 1 ? '' : 's'),
+            groups.length + ' reference' + (groups.length === 1 ? '' : 's') +
+              ' would break on export',
             groups,
-            Math.max(0, closure.brokenCount - sample.length)
+            Math.max(0, closure.brokenCount - sample.length),
+            justImported
+              ? 'The import itself is fine — these variables exist in Figma. ' +
+                'It is exporting them again that would lose them, because this export ' +
+                'does not recognise the collections they are in:'
+              : 'Not present in this export, but referenced by:'
           );
+          justImported = false;
         } else {
           window.PomClosureWarning.hide();
+          justImported = false;
         }
 
         parent.postMessage({
@@ -4566,6 +4589,7 @@
           /* The document has changed underneath the main screen, so its own
              read of it is now stale. Re-extracting is also what makes a
              second import diff against the new state rather than the old. */
+          justImported = true;
           parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
           closeImport();
         }

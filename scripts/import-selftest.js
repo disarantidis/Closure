@@ -1472,6 +1472,123 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
     ok('preflight: and removes the collection it probed with',
        capped.collections.every((c2) => c2.name !== '__closure_preflight__'));
 
+    /* ── the exporter, on a file it was not written against ──────────────
+       toTokenFormat keys most of its rules off the literal collection names
+       of one design system (".core", ".mode", "_restricted", …). Everything
+       here is about what happens to a document that uses none of them — the
+       case that collapsed 33 token sets into 2 and left 246 references
+       dangling while reporting success.
+
+       These run the REAL exporter out of the built code.js, because the bugs
+       were all in the seams between its rules and a reimplementation here
+       would have had none of them. */
+    {
+      const vm = require('vm'), fsx = require('fs'), pathx = require('path');
+      const built = pathx.join(__dirname, '..', 'code.js');
+      if (!fsx.existsSync(built)) {
+        ok('exporter: code.js is built (run npm run ui:build)', false);
+      } else {
+        const noop = () => {};
+        const figmaStub = {
+          variables: { getLocalVariableCollectionsAsync: async () => [], getVariableByIdAsync: async () => null },
+          ui: { onmessage: null, postMessage: noop, resize: noop },
+          showUI: noop, on: noop, closePlugin: noop,
+          root: { name: 'selftest' }, currentPage: {},
+          clientStorage: { getAsync: async () => null, setAsync: async () => {} },
+          getLocalTextStyles: () => [], getLocalEffectStyles: () => [],
+        };
+        const ctx = vm.createContext({ figma: figmaStub, console: { log: noop, warn: noop, error: noop },
+          __html__: '', setTimeout, clearTimeout, Promise, JSON, Math, Object, Array,
+          String, Number, Boolean, RegExp, Date, isNaN, parseFloat, parseInt, Error });
+        vm.runInContext(fsx.readFileSync(built, 'utf8'), ctx, { filename: 'code.js' });
+
+        /* A raw extract, in the shape the plugin hands the transform. `type` is
+           what the transform reads — a graph carrying only `resolvedType` is
+           skipped whole and every set comes out empty. */
+        const colour = (r, g, b) => ({ r, g, b, a: 1 });
+        const rawGraph = (cols) => {
+          const collections = cols.map((c, ci) => ({
+            id: 'C' + ci, name: c.name,
+            modes: c.modes.map((m, mi) => ({ modeId: 'C' + ci + ':' + mi, name: m })),
+            variables: c.vars.map((v, vi) => {
+              const valuesByMode = {};
+              c.modes.forEach((m, mi) => { valuesByMode['C' + ci + ':' + mi] = v.value; });
+              return { id: 'C' + ci + 'V' + vi, name: v.name, type: v.type || 'COLOR',
+                       resolvedType: v.type || 'COLOR', valuesByMode,
+                       description: '', scopes: ['ALL_SCOPES'], codeSyntax: {} };
+            }),
+          }));
+          collections.forEach((c) => c.variables.forEach((v) => {
+            v.resolvedValuesByMode = {}; v.aliasInfo = {};
+            for (const mid of Object.keys(v.valuesByMode)) v.resolvedValuesByMode[mid] = v.valuesByMode[mid];
+          }));
+          return { collections, styles: { textStyles: [], effectStyles: [] } };
+        };
+        const exportOf = (cols) => {
+          const raw = rawGraph(cols);
+          return ctx.toTokenFormat(ctx.transformToFinalFormat(raw, { includeDescriptions: true }).tokens, raw);
+        };
+        const setsOf = (out) => Object.keys(out).filter((k) => k.charAt(0) !== '$');
+
+        /* Names this exporter has no rule for. Every one of them still has to
+           come out, or the export silently loses the file. */
+        const strangers = exportOf([
+          { name: 'palette', modes: ['light', 'dark'],
+            vars: [{ name: 'brand/primary', value: colour(1, 0, 0) },
+                   { name: 'brand/secondary', value: colour(0, 1, 0) }] },
+          { name: 'density', modes: ['comfortable', 'compact'],
+            vars: [{ name: 'gap/row', value: 8, type: 'FLOAT' }] },
+        ]);
+        const strangerSets = setsOf(strangers);
+        ok('exporter: a collection it has no rule for still becomes a set',
+           ['palette/light', 'palette/dark', 'density/comfortable', 'density/compact']
+             .every((n) => strangerSets.indexOf(n) !== -1), strangerSets.join(', '));
+        ok('exporter: and its tokens come with it',
+           !!(strangers['palette/light'] && strangers['palette/light'].brand &&
+              strangers['palette/light'].brand.primary));
+        const strangerClosure = ctx.validateReferenceClosure(strangers);
+        ok('exporter: an unrecognised file still closes',
+           strangerClosure.ok === true, JSON.stringify(strangerClosure.missingRoots));
+
+        /* A collection a named rule DOES consume must not also be passed
+           through — ".white" is published as "base/white", and emitting it a
+           second time under its own name is the duplicate this guards. */
+        const claimedCase = exportOf([
+          { name: '.white', modes: ['.white'], vars: [{ name: 'white/100', value: colour(1, 1, 1) }] },
+        ]);
+        ok('exporter: a collection a rule consumed is not emitted twice',
+           setsOf(claimedCase).indexOf('white') === -1, setsOf(claimedCase).join(', '));
+
+        /* The breakpoint rule renamed "S Mobile" -> "mobile" through a lookup
+           table, and read a miss as "not a mode" — so a collection whose modes
+           were already called "mobile" emitted nothing at all, while still
+           counting as handled. */
+        const bp = exportOf([
+          { name: 'breakpoint', modes: ['mobile', 'desktop'],
+            vars: [{ name: 'breakpoint/viewport/minimum', value: 0, type: 'FLOAT' },
+                   { name: 'breakpoint/spacing/component/0', value: 4, type: 'FLOAT' }] },
+        ]);
+        ok('exporter: breakpoint modes that need no renaming still emit',
+           setsOf(bp).indexOf('breakpoint/mobile') !== -1, setsOf(bp).join(', '));
+        ok('exporter: and are not double-rooted under their own name',
+           !!(bp['breakpoint/mobile'] && bp['breakpoint/mobile'].breakpoint &&
+              bp['breakpoint/mobile'].breakpoint.viewport &&
+              !bp['breakpoint/mobile'].breakpoint.breakpoint),
+           JSON.stringify(Object.keys((bp['breakpoint/mobile'] || {}).breakpoint || {})));
+        ok('exporter: a breakpoint collection closes',
+           ctx.validateReferenceClosure(bp).ok === true,
+           JSON.stringify(ctx.validateReferenceClosure(bp).missingRoots));
+
+        /* foundation.typography is generated — every scale times a fixed list
+           of ten props — so on scales that carry fewer it named tokens that
+           were never written. */
+        const ft = (bp['foundation'] || {}).typography;
+        ok('exporter: no generated foundation typography without a target',
+           ft === undefined || Object.keys(ft).length === 0,
+           JSON.stringify(ft && Object.keys(ft)));
+      }
+    }
+
     console.log('');
     console.log(pass + '/' + (pass + fail) + ' passed');
     process.exit(fail ? 1 : 0);

@@ -10,7 +10,19 @@ function normalizeVariableName(name, collectionName) {
   // because those create separate groups that would collide if merged)
   normalized = normalized.replace(/^(Light|Dark)\//i, '');
 
-  // Remove collection name prefix for dot-collections (.breakpoint, .core, .mode)
+  /*
+    Remove a collection-name prefix the variable repeats: ".breakpoint" holding
+    "breakpoint/viewport/minimum" means the token "viewport.minimum".
+
+    GATED ON THE DOT ON PURPOSE, and it must stay that way: buildAliasPath()
+    gates the identical strip on the identical condition, and the two have to
+    agree or every reference misses. Making this one generic while that one
+    stayed dot-only stripped the root out of the CONTENT while the REFERENCES
+    kept pointing at it — 180 broken references became 1,552.
+
+    A non-dot collection therefore keeps its prefix in both, which is a
+    consistent convention rather than a better one.
+  */
   if (collectionName && collectionName.startsWith('.')) {
     var baseCollectionName = collectionName.substring(1);
     var prefixPattern = new RegExp('^' + baseCollectionName + '/', 'i');
@@ -285,13 +297,25 @@ var NATO_TYPO_LINE_HEIGHT_MULT_KEY = {
   'microcopy-bold': '130', 'microcopy-regular': '130'
 };
 
-function injectBreakpointTypographyLineHeightFormulas(breakpointContent) {
+/*
+  Rewrites each scale's line-height as "size / 100 * {line-heights.<mult>}".
+
+  ONLY WHERE THAT MULTIPLIER EXISTS. core['line-heights'] is a group one design
+  system happens to define; the formula is worthless without it, and worse than
+  worthless in place of a value that WAS there — this overwrote 55 imported
+  literal line-heights with references to a group the file does not contain,
+  turning working values into dangling ones.
+*/
+function injectBreakpointTypographyLineHeightFormulas(breakpointContent, core) {
   if (!breakpointContent || !breakpointContent.typography) return breakpointContent;
+  var mults = core && core['line-heights'];
+  if (!mults || typeof mults !== 'object') return breakpointContent;
   var typo = breakpointContent.typography;
   Object.keys(typo).forEach(function(scale) {
     var scaleObj = typo[scale];
     if (!scaleObj || !scaleObj['line-height']) return;
     var mult = NATO_TYPO_LINE_HEIGHT_MULT_KEY[scale] || '100';
+    if (mults[mult] === undefined) return;      // no such multiplier here
     var lhRef = '{line-heights.' + mult + '}';
     scaleObj['line-height'] = {
       value: '( {breakpoint.typography.' + scale + '.size} / 100 ) * ' + lhRef,
@@ -1977,7 +2001,7 @@ var TS_RAW_SETS = [
   { col: '.magenta-light', prefix: 'base/',      by: 'col'  }, // base/magenta-light
   { col: '.magenta-dark',  prefix: 'base/',      by: 'col'  }  // base/magenta-dark
 ];
-function emitRawNameSets(out, native, rawData) {
+function emitRawNameSets(out, native, rawData, claimed) {
   TS_RAW_SETS.forEach(function(cfg) {
     if (!native[cfg.col]) return;
     var rawCol = null;
@@ -1985,6 +2009,7 @@ function emitRawNameSets(out, native, rawData) {
       if (stripIcons(rawData.collections[i].name) === cfg.col) { rawCol = rawData.collections[i]; break; }
     }
     if (!rawCol) return;
+    if (claimed) claimed[cfg.col] = 1;   // taken — the pass-through must not repeat it
     Object.keys(native[cfg.col]).forEach(function(modeName) {
       if (modeName === 'typography') return; // collection-level typography, not a mode
       var setName = cfg.by === 'mode' ? (cfg.prefix + modeName) : (cfg.prefix + cfg.col.slice(1));
@@ -2150,8 +2175,34 @@ function completeThemeSelections(out) {
 function toTokenFormat(native, rawData) {
   var out = {};
 
+  /*
+    WHICH COLLECTIONS THE RULES BELOW TOOK.
+
+    Recorded AT THE READ, by the rule doing the reading, because both other
+    ways of knowing were tried and both were wrong.
+
+    A hand-kept list of claimed names, written in one place away from the
+    rules, rotted on contact: it missed ".white", ".black" and the two
+    magentas, which emitRawNameSets emits as "base/white" and friends, so each
+    was written out a second time under its own name.
+
+    Probing the OUTPUT for a collection's tokens — "if its content is already
+    somewhere, a rule took it" — was worse. These rules RENAME as they read:
+    fixCoreTokens rewrites, the scheme rule re-roots under "scheme", the
+    breakpoint rule restructures typography. So the probe missed the big
+    collections, the pass-through emitted them a second time on top of their
+    own renamed output, and the ODS export went from 0 broken references to
+    1,992 with 16k refs appearing from nowhere.
+
+    A claim marked next to its read cannot drift from the rule that made it.
+    The pass-through at the bottom then handles exactly what is left.
+  */
+  var claimed = {};
+  function claim(k) { if (k) claimed[k] = 1; }
+
   // Rule 2: core — unwrap double nesting + type corrections (Nato-style camel primitives) + dimension math
   if (native['.core'] && native['.core']['.core']) {
+    claim('.core');
     out['core'] = fixCoreTokens(native['.core']['.core']);
     applyDimensionBaseExpressions(out['core']);
   }
@@ -2161,6 +2212,7 @@ function toTokenFormat(native, rawData) {
 
   // Rule 8 (spec): foundation — unwrap double nesting
   if (native['foundation'] && native['foundation']['foundation']) {
+    claim('foundation');
     out['foundation'] = native['foundation']['foundation'];
   }
 
@@ -2208,12 +2260,18 @@ function toTokenFormat(native, rawData) {
   // Elevation composites for every set (incl. foundation) are injected in a
   // single deep pass at the end of this function — see addElevationCompositesDeep.
 
-  // Fix 9: foundation.variant.breakpoint
-  if (!out['foundation']['variant']) out['foundation']['variant'] = {};
-  out['foundation']['variant']['breakpoint'] = {
-    value: '{breakpoint.breakpoint-string}',
-    type: 'text'
-  };
+  // Fix 9: foundation.variant.breakpoint — only when there is a breakpoint
+  // collection for it to name. See the note on typScales below.
+  var hasBreakpointCollection = !!native['.breakpoint'] || Object.keys(native).some(function (k) {
+    return k.replace(/^[._]+/, '').toLowerCase() === 'breakpoint';
+  });
+  if (hasBreakpointCollection) {
+    if (!out['foundation']['variant']) out['foundation']['variant'] = {};
+    out['foundation']['variant']['breakpoint'] = {
+      value: '{breakpoint.breakpoint-string}',
+      type: 'text'
+    };
+  }
 
   // Fix 8: foundation.typography — N scales × 10 props, each an alias to breakpoint.typography.*
   // Scale list is derived from the actual breakpoint typography so new styles
@@ -2221,21 +2279,59 @@ function toTokenFormat(native, rawData) {
   // dropped by a stale hardcoded list. Falls back to the known set if absent.
   var typScales;
   var bpTypoSource = null;
+  /*
+    THE BREAKPOINT COLLECTION, FOUND RATHER THAN NAMED. ".breakpoint" is what
+    one design system calls it; another calls it "breakpoint". Everything
+    below aliases INTO it, so failing to find it does not degrade the output —
+    it invents references to a set that is not there.
+  */
+  var bpKey = native['.breakpoint'] ? '.breakpoint'
+    : Object.keys(native).filter(function (k) {
+        return k.replace(/^[._]+/, '').toLowerCase() === 'breakpoint';
+      })[0] || null;
+  if (bpKey) native['.breakpoint'] = native['.breakpoint'] || native[bpKey];
   if (native['.breakpoint']) {
-    // typography is now per-mode; pull the scale list from any breakpoint mode
-    // (or the legacy collection-level group if present).
-    if (native['.breakpoint'].typography) bpTypoSource = native['.breakpoint'].typography;
-    else {
+    /*
+      typography is now per-mode; pull the scale list from any breakpoint mode
+      (or the legacy collection-level group if present).
+
+      AND FROM UNDER THE COLLECTION'S OWN ROOT, because a non-dot collection
+      keeps its name in the token path (see normalizeVariableName): the
+      scales of a collection called "breakpoint" sit at
+      [mode].breakpoint.typography, not [mode].typography. Looking only at the
+      shallow spot found nothing, fell through to the hardcoded scale list
+      below, and invented 146 references to ODS scale names — "title-L" — that
+      this file has never heard of.
+    */
+    var bpBase = bpKey ? bpKey.replace(/^[._]+/, '') : '';
+    var typoIn = function (node) {
+      if (!node || typeof node !== 'object') return null;
+      if (node.typography) return node.typography;
+      if (bpBase && node[bpBase] && node[bpBase].typography) return node[bpBase].typography;
+      return null;
+    };
+    bpTypoSource = typoIn(native['.breakpoint']);
+    if (!bpTypoSource) {
       Object.keys(native['.breakpoint']).some(function(m) {
-        if (native['.breakpoint'][m] && native['.breakpoint'][m].typography) {
-          bpTypoSource = native['.breakpoint'][m].typography; return true;
-        }
-        return false;
+        bpTypoSource = typoIn(native['.breakpoint'][m]);
+        return !!bpTypoSource;
       });
     }
   }
   if (bpTypoSource) {
     typScales = Object.keys(bpTypoSource);
+  } else if (!bpKey) {
+    /*
+      NO BREAKPOINT COLLECTION AT ALL, so there is nothing for these aliases to
+      point at. The fallback list below exists for a file that HAS one whose
+      scales could not be read; using it when the collection is simply absent
+      manufactured 146 dangling references — foundation.typography.display.display
+      pointing at a breakpoint.typography that was never written.
+
+      An export that omits what it cannot express is honest. One that emits
+      references to nothing is not.
+    */
+    typScales = [];
   } else {
     typScales = [
       'display', 'title-L', 'title-M', 'title-S', 'subtitle', 'paragraph',
@@ -2255,6 +2351,17 @@ function toTokenFormat(native, rawData) {
     { name: 'text-case',         type: 'textCase' },
     { name: 'text-decoration',   type: 'textDecoration' }
   ];
+  /*
+    Emitted for every prop in the list, then PRUNED against what was actually
+    written — see pruneSynthesisedFoundationRefs at the end of this function.
+
+    Filtering here instead, on the raw breakpoint source, was tried and is
+    wrong: the composite and the text-case / text-decoration props do not
+    exist in that source at all. fixBreakpointTypography() invents them later,
+    so a scale legitimately carrying ten props looked like it carried five and
+    54 real ODS tokens were dropped. The emitted set is the only honest
+    authority, and it does not exist yet at this point in the function.
+  */
   var foundTypography = {};
   typScales.forEach(function(scale) {
     foundTypography[scale] = {};
@@ -2282,6 +2389,7 @@ function toTokenFormat(native, rawData) {
   // Rule 4: mode — flat slash keys, keep mode-inverted as a sibling wrapper.
   // Elevation composites are added later by the deep pass.
   if (native['.mode']) {
+    claim('.mode');
     Object.keys(native['.mode']).forEach(function(name) {
       var content = native['.mode'][name];
       var modeInverted = content['mode-inverted'];
@@ -2297,6 +2405,7 @@ function toTokenFormat(native, rawData) {
 
   // Rule 3: scheme — flat slash keys. Elevation composites added by deep pass.
   if (native['.scheme']) {
+    claim('.scheme');
     Object.keys(native['.scheme']).forEach(function(name) {
       out['scheme/' + name] = { scheme: native['.scheme'][name] };
     });
@@ -2306,7 +2415,7 @@ function toTokenFormat(native, rawData) {
   // are emitted with RAW variable names → set names secondary/<palette> and
   // base/<leaf>, with token roots matching the raw leaf references. Elevation
   // composites are added by the deep pass.
-  emitRawNameSets(out, native, rawData);
+  emitRawNameSets(out, native, rawData, claimed);
 
   // Section / Card — middle links of the chain
   //   foundation → .scheme → .mode → .section → .card → leaf → .core
@@ -2314,11 +2423,13 @@ function toTokenFormat(native, rawData) {
   // from .mode (and broke subtle / black resolution downstream). Wrapped to match
   // the alias roots produced by buildAliasPath (root = section / card).
   if (native['.section']) {
+    claim('.section');
     Object.keys(native['.section']).forEach(function(name) {
       out['section/' + name] = { section: native['.section'][name] };
     });
   }
   if (native['.card']) {
+    claim('.card');
     Object.keys(native['.card']).forEach(function(name) {
       out['card/' + name] = { card: native['.card'][name] };
     });
@@ -2329,12 +2440,25 @@ function toTokenFormat(native, rawData) {
 
   // Rule 7: restrictions — flat slash keys
   if (native['_restricted']) {
+    claim('_restricted');
     Object.keys(native['_restricted']).forEach(function(name) {
       out['restrictions/' + name] = native['_restricted'][name];
     });
   }
 
   // Rule 5: breakpoints — flat slash keys + semantic types (Fix F) + typography composites (Fix G)
+  /*
+    The ODS breakpoint modes are named "S Mobile", "M Tablet" and so on, and
+    the export publishes them as "mobile", "tablet". This map is that rename
+    and nothing more — so a mode NOT in it is not a stranger to skip, it is a
+    mode that already reads the way the export wants to publish it.
+
+    Reading it as a whitelist is what broke: every mode of an imported
+    breakpoint collection was already called "mobile"/"tablet", so every one
+    of them failed `bpMap[name]` and the rule emitted no sets at all — while
+    still claiming the collection, so the generic pass-through skipped it too.
+    75 variables vanished and 180 references to "breakpoint.*" dangled.
+  */
   var bpMap = {
     'S Mobile': 'mobile',
     'M Tablet': 'tablet',
@@ -2342,18 +2466,27 @@ function toTokenFormat(native, rawData) {
     'XL Desktop': 'desktop',
     'XXL Large Desktop': 'large-desktop'
   };
+  var bpSlug = function (name) {
+    if (bpMap[name]) return bpMap[name];
+    return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  };
   // the token format key order for breakpoint content
   var BP_KEY_ORDER = ['spacing', 'sizing', 'typography', 'grid', 'stretch-grid', 'overflow-grid', 
                       'fixed-grid', 'columns', 'layout', 'breakpoint-string'];
   
+  var bpEmitted = 0;
+  var bpIsDotted = !bpKey || bpKey.charAt(0) === '.' || bpKey.charAt(0) === '_';
   if (native['.breakpoint']) {
     // Typography tokens are written at collection level (not inside each mode)
     // They're at native['.breakpoint'].typography, not native['.breakpoint']['S Mobile'].typography
     var collectionLevelTypography = native['.breakpoint'].typography;
     
     Object.keys(native['.breakpoint']).forEach(function(name) {
-      if (!bpMap[name]) return; // skip non-mode keys like 'typography'
-      var slug = bpMap[name];
+      if (name === 'typography') return;   // the collection-level group, not a mode
+      var bpNode = native['.breakpoint'][name];
+      if (!bpNode || typeof bpNode !== 'object') return;
+      var slug = bpSlug(name);
+      if (!slug) return;
       var content = fixBreakpointTypes(native['.breakpoint'][name], []);
 
       // Inject typography from collection level if this breakpoint mode lacks it
@@ -2382,13 +2515,29 @@ function toTokenFormat(native, rawData) {
         if (orderedContent[k] === undefined) orderedContent[k] = content[k];
       });
       
-      out['breakpoint/' + slug] = { breakpoint: orderedContent };
+      /*
+        The wrapper puts back exactly what normalizeVariableName took off, and
+        it only takes anything off a DOT-collection. A plain "breakpoint"
+        collection keeps its prefix in the token path, so wrapping again
+        published "breakpoint.breakpoint.viewport.minimum" and left every
+        reference to "breakpoint.*" pointing at nothing.
+      */
+      out['breakpoint/' + slug] = orderedContent.breakpoint && !bpIsDotted
+        ? orderedContent
+        : { breakpoint: orderedContent };
+      bpEmitted++;
     });
   }
+  /* Claimed only because it PRODUCED something. A rule that matched nothing
+     has not handled the collection, and saying it did is what silently drops
+     it — the pass-through is the safety net and it only works if the claim is
+     honest about what came out. */
+  if (bpEmitted) { claim('.breakpoint'); claim(bpKey); }
 
   // layout passthrough — unwrap 'columns' mode wrapper, fix column token types (number → sizing)
   var layoutRoot = native['layout'] || native['Layout'];
   if (layoutRoot && layoutRoot['columns']) {
+    claim('layout'); claim('Layout');
     var layoutMode = layoutRoot['columns'];
     var layoutContent = layoutMode['columns'] || layoutMode;
     out['layout/layout'] = { columns: fixLayoutColumnTypes(layoutContent) };
@@ -2407,7 +2556,7 @@ function toTokenFormat(native, rawData) {
     alignBreakpointTypographyToNato(core, bp);
     normalizeTypographyCompositeCamelRefs(core, bp);
     normalizeBreakpointTypographyStandaloneRefs(bp);
-    injectBreakpointTypographyLineHeightFormulas(bp);
+    injectBreakpointTypographyLineHeightFormulas(bp, core);
     coerceBreakpointSpacingSizingToDimensionExpressions(bp, core);
   });
 
@@ -2450,6 +2599,93 @@ function toTokenFormat(native, rawData) {
       applyCanonicalBreakpointTypography(out[legacyKey].breakpoint);
     }
   });
+
+  /*
+    EVERY COLLECTION THE RULES ABOVE DID NOT CLAIM, EMITTED AS ITS OWN SET.
+
+    Everything before this line is keyed to literal collection names — ".core",
+    ".mode", ".breakpoint" and seven more — because each carries a rule that is
+    genuinely specific to one design system: core's double unwrap, the
+    dimension-math layer, the typography scale list. Those rules are correct
+    and stay exactly as they are.
+
+    What was wrong is what happened to a collection matching NONE of them: it
+    was dropped, silently and completely. A Figma file whose collections are
+    called "brand" and "theme" exported as two empty sets, and every reference
+    into them dangled. transformToFinalFormat had kept them; this function
+    threw them away. That is not a rule being specific, it is a file being lost.
+
+    So the named rules run first and claim what they know, and whatever is left
+    passes through verbatim: one set per mode for a multi-mode collection,
+    named "collection/mode" the way .mode and .breakpoint already are, and a
+    single set named after the collection when it has one mode. The leading
+    "." or "_" a Figma collection often wears is dropped, because a set name
+    never carries it — which is the same normalisation buildAliasPath already
+    applies to the references that point at them.
+  */
+  /*
+    EVERYTHING THE RULES ABOVE DID NOT TAKE.
+
+    Every rule above is keyed to a collection this exporter was written
+    against — ".core", ".mode", ".scheme", "_restricted" and the rest. Against
+    a file built by anyone else, almost none of them fire: one real import had
+    the collections "core mode fill base level foundation breakpoint scheme
+    interaction tense master", which overlaps that list on "foundation" alone.
+    33 sets collapsed to 2 and 246 references dangled, while the export
+    reported success.
+
+    So what is left over is emitted on its own terms: one set per mode, named
+    "collection/mode", with the leading "." or "_" that marks a Figma helper
+    collection stripped. No interpretation, no renaming — a set the exporter
+    does not understand is still a set, and a token nobody claimed is better
+    passed through verbatim than dropped.
+  */
+  var passedThrough = [];
+  Object.keys(native).forEach(function (colName) {
+    if (claimed[colName]) return;
+    var byMode = native[colName];
+    if (!byMode || typeof byMode !== 'object') return;
+    var modes = Object.keys(byMode).filter(function (m) {
+      return byMode[m] && typeof byMode[m] === 'object';
+    });
+    if (!modes.length) return;
+
+    var base = colName.replace(/^[._]+/, '') || colName;
+    /* A single mode named after its own collection is Figma's way of saying
+       "this collection has no axis" — one set, not "base/base". */
+    var single = modes.length === 1 && modes[0].replace(/^[._]+/, '') === base;
+    modes.forEach(function (m) {
+      var setName = single ? base : base + '/' + m.replace(/^[._]+/, '');
+      var incoming = byMode[m];
+      if (out[setName]) {
+        /* Merged, not skipped. out['core'] and out['foundation'] are created
+           unconditionally above and FILLED with primitives this exporter
+           synthesises, so the set is neither absent nor empty — it holds
+           invented tokens and none of the file's own. Skipping on "it exists"
+           lost 2,156 references while reporting 33 sets exported. */
+        var target = out[setName];
+        Object.keys(incoming).forEach(function (k) {
+          if (target[k] === undefined) target[k] = incoming[k];
+          else deepMerge(target[k], incoming[k]);
+        });
+      } else {
+        out[setName] = incoming;
+      }
+      passedThrough.push(setName);
+    });
+  });
+  if (passedThrough.length) {
+    console.log('[Closure] ' + passedThrough.length + ' set(s) passed through from ' +
+      'collections this export has no specific rule for: ' + passedThrough.slice(0, 8).join(', ') +
+      (passedThrough.length > 8 ? ' …' : ''));
+  }
+
+  /* Last, so it sees every set: see pruneSynthesisedFoundationRefs. */
+  var prunedRefs = pruneSynthesisedFoundationRefs(out);
+  if (prunedRefs) {
+    console.log('[Closure] dropped ' + prunedRefs + ' generated foundation reference(s) ' +
+      'whose target this document does not contain');
+  }
 
   out['$metadata'] = { tokenSetOrder: buildTokenSetOrder(out) };
 
@@ -2500,6 +2736,69 @@ function toTokenFormat(native, rawData) {
 // The real alias chain is foundation → .scheme → .mode → .section → .card →
 // leaf → .core, so omitting any middle set breaks subtle / elevation / black.
 // ============================================================================
+/*
+  Drop the aliases toTokenFormat INVENTS when their target was never written.
+
+  foundation.typography is a cross-product — every scale in the breakpoint
+  collection times a fixed list of ten props — and foundation.variant.breakpoint
+  names a breakpoint-string token. Both are generated, not read from the file,
+  so on a document shaped differently from the one they were written against
+  they name tokens that do not exist. In one real import that was 56 dangling
+  references sitting in the set a consumer reads typography from.
+
+  Pruned rather than not emitted, because the targets only exist once every set
+  is built: fixBreakpointTypography() adds the composite and the text-case /
+  text-decoration props well after foundation.typography is assembled. Run last,
+  this reads the finished output and asks the same question a consumer will.
+
+  DELIBERATELY NARROW. It touches only these two generated branches. A dangling
+  reference anywhere else is a bug to find, not a line to quietly delete, and
+  validateReferenceClosure still reports it.
+*/
+function pruneSynthesisedFoundationRefs(out) {
+  var index = {};
+  Object.keys(out).forEach(function (setName) {
+    if (setName.charAt(0) === '$') return;
+    (function walk(node, path) {
+      if (!node || typeof node !== 'object') return;
+      if (('value' in node) || ('$value' in node)) { index[path.replace(/\//g, '.')] = true; return; }
+      for (var k in node) if (node.hasOwnProperty(k)) walk(node[k], path ? path + '/' + k : k);
+    })(out[setName], '');
+  });
+
+  var f = out['foundation'];
+  if (!f) return 0;
+  var dropped = 0;
+  var refOf = function (node) {
+    if (!node || typeof node.value !== 'string') return null;
+    var m = node.value.match(/^\{([A-Za-z0-9_.\- ]+)\}$/);
+    return m ? m[1] : null;
+  };
+
+  if (f.typography) {
+    Object.keys(f.typography).forEach(function (scale) {
+      var props = f.typography[scale];
+      if (!props || typeof props !== 'object') return;
+      Object.keys(props).forEach(function (prop) {
+        var ref = refOf(props[prop]);
+        if (ref && !index[ref]) { delete props[prop]; dropped++; }
+      });
+      if (!Object.keys(props).length) delete f.typography[scale];
+    });
+    if (!Object.keys(f.typography).length) delete f.typography;
+  }
+
+  if (f.variant && f.variant.breakpoint) {
+    var vref = refOf(f.variant.breakpoint);
+    if (vref && !index[vref]) {
+      delete f.variant.breakpoint;
+      dropped++;
+      if (!Object.keys(f.variant).length) delete f.variant;
+    }
+  }
+  return dropped;
+}
+
 function validateReferenceClosure(tokens) {
   // Any $-prefixed root key is metadata, not a token set — an allowlist would
   // have to be extended for every new one ($figmaStructure was the first).
