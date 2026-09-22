@@ -49857,6 +49857,96 @@ function buildManifest(rawCollections) {
 }
 
 /*
+  ── $themes IS ALREADY AN ARCHITECTURE ─────────────────────────────────────
+
+  Every Tokens Studio document carries one, and it says more than the set
+  names ever could:
+
+      { "name": "light", "group": ".mode",
+        "selectedTokenSets": { "mode/light": "enabled",
+                               "restrictions/unrestricted": "source" } }
+
+      group   the Figma COLLECTION, under its real name - dots and all
+      name    the MODE within it
+      enabled the sets that collection owns; `source` is a dependency it
+              merely reads, and belongs to somebody else
+
+  A theme with no group is a collection of its own with a single mode, named
+  after the theme.
+
+  WHY THIS OUTRANKS EVERYTHING ELSE HERE. It is a declaration rather than an
+  inference, it is present on every Tokens Studio export rather than only on
+  ones this plugin wrote, and it carries names nothing else can reach: the
+  ".breakpoint" collection declares its modes as "S Mobile" and "M Tablet",
+  while the SET names had already flattened those to "mobile" and "tablet".
+  Measured against the file it came from, 10 of the 12 collections it declares
+  match Figma exactly, mode names included.
+
+  IT IS NOT COMPLETE, AND MUST NOT PRETEND TO BE. In that same document eight
+  sets are enabled by no theme at all, and three of Figma's collections are
+  never mentioned. So this binds what it covers and says nothing about the
+  rest, which then falls through to being measured like any other document.
+*/
+function bindThemes(ir) {
+  const themes = ir && ir.themes;
+  if (!Array.isArray(themes) || !themes.length) return null;
+
+  const collections = new Map();      // collection -> modes, in declaration order
+  const setMap = new Map();           // set name -> { collection, mode }
+
+  for (const t of themes) {
+    if (!t || !t.name) continue;
+    const collection = t.group || t.name;
+    if (!collections.has(collection)) collections.set(collection, []);
+    const modes = collections.get(collection);
+    if (modes.indexOf(t.name) === -1) modes.push(t.name);
+
+    const sets = t.selectedTokenSets || {};
+    for (const set of Object.keys(sets)) {
+      /* `enabled` is ownership; `source` is a set this theme READS and
+         another one owns. Treating source as ownership would hand the same
+         set to every theme that depends on it. */
+      if (sets[set] !== 'enabled') continue;
+      if (setMap.has(set)) continue;                  // first claim wins
+      setMap.set(set, { collection, mode: t.name });
+    }
+  }
+
+  if (!setMap.size) return null;
+  const covered = new Set([...setMap.keys()]);
+  const all = (ir.sets || []).filter((x) => x);
+
+  /*
+    WHICH COLLECTION A FORGOTTEN SET BELONGS TO.
+
+    A theme list can be incomplete — eight of forty-six sets in the document
+    this was built against are enabled by no theme at all. Left alone,
+    "scheme/magenta" becomes a collection named `scheme` sitting beside the
+    declared `.scheme`, and then every path they share is a reference
+    collision: the same token defined twice, and the import stops.
+
+    But its set name says exactly where it belongs. The sets a collection DOES
+    own share a prefix, so the prefix identifies the collection, and the set's
+    own variant is the mode the theme list forgot to declare. That is reading
+    the declaration further, not guessing past it.
+  */
+  const groupOfCollection = new Map();
+  for (const [set, where] of setMap) {
+    const i = set.indexOf('/');
+    if (i === -1) continue;
+    const g = norm(set.slice(0, i));
+    if (!groupOfCollection.has(g)) groupOfCollection.set(g, where.collection);
+    else if (groupOfCollection.get(g) !== where.collection) groupOfCollection.set(g, null); // ambiguous
+  }
+
+  return {
+    collections, setMap, groupOfCollection,
+    covered: covered.size,
+    uncovered: all.filter((x) => !covered.has(x)),
+  };
+}
+
+/*
   IMPORT SIDE. Bind each of the IR's groups to a manifest collection.
 
   A group binds one of two ways, and which one IS the verdict — no measuring
@@ -49964,7 +50054,7 @@ function bindManifest(ir, manifest) {
   return { bindings, bound, unbound, collections: cols.length };
 }
 
-  var api = { buildManifest, bindManifest, norm };
+  var api = { buildManifest, bindManifest, bindThemes, norm };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.PomImportManifest = api;
@@ -50013,6 +50103,8 @@ function bindManifest(ir, manifest) {
     ? require('./import-manifest.js')
     : global.PomImportManifest;
   var bindManifest = __dep.bindManifest;
+  var bindThemes = __dep.bindThemes;
+  var normName = __dep.norm;
 /* Above MODES_MIN the variants are read as modes, at or below SEPARATE_MAX as
    separate collections, and anything between is refused. The band is wide on
    purpose: real axes share ~all their paths and real namespaces share ~none, so
@@ -50117,6 +50209,12 @@ const vkey = (col, path) => col + SEP + path;
   direction the dependency runs. So promoting a second depth is refused rather
   than approximated.
 */
+/* A level entry is a bare role, or { role, axis } when whoever wrote it knew
+   which Figma axis the depth came from. */
+function roleOf(entry) {
+  return (entry && typeof entry === 'object') ? entry.role : entry;
+}
+
 function applyLevels(ir, levels) {
   if (!levels || !Object.keys(levels).length) return ir;
   const rows = ir.rows.map((r) => {
@@ -50132,8 +50230,13 @@ function applyLevels(ir, levels) {
     for (const key of Object.keys(spec)) {
       const i = Number(key);
       if (!(i >= 0 && i < segs.length)) continue;
-      if (spec[key] === 'collection') { group = segs[i]; drop.add(i); movedCollection = true; }
-      else if (spec[key] === 'mode') { variant = segs[i]; drop.add(i); movedMode = true; }
+      /* Either a bare role or { role, axis } — the EXPORTER writes the second,
+         because it knows which Figma axis it put at this depth and that is
+         worth recording even though applyLevels only needs the role. */
+      const entry = spec[key];
+      const role = (entry && typeof entry === 'object') ? entry.role : entry;
+      if (role === 'collection') { group = segs[i]; drop.add(i); movedCollection = true; }
+      else if (role === 'mode') { variant = segs[i]; drop.add(i); movedMode = true; }
     }
     if (!drop.size) return r;
 
@@ -50299,6 +50402,29 @@ function derive(ir, opts) {
   plan.usedManifest = !!bound;
   if (bound) plan.manifestBinding = { bound: bound.bound, measured: bound.unbound };
 
+  /*
+    $themes, WHICH EVERY TOKENS STUDIO DOCUMENT ALREADY CARRIES.
+
+    It maps SETS to (collection, mode) by declaration — theme.group is the
+    Figma collection under its real name, theme.name is the mode, and the
+    `enabled` sets are the ones that collection owns. That is strictly better
+    than anything derivable from set names, because it survives the renaming
+    the exporter does: ".breakpoint" declares its modes as "S Mobile" and
+    "M Tablet" while the set names had already flattened those to "mobile"
+    and "tablet".
+
+    Ranked below $figmaStructure, which is this tool's own and therefore
+    exact, and above the measurement, which is a last resort. Per SET rather
+    than per group, so the sets a theme list forgets — eight of forty-six in
+    the document this was built against — still get measured.
+  */
+  const themeBound = opts.ignoreThemes ? null : bindThemes(ir);
+  plan.usedThemes = !!themeBound;
+  if (themeBound) {
+    plan.themeBinding = { sets: themeBound.covered, measured: themeBound.uncovered.length,
+                          uncovered: themeBound.uncovered };
+  }
+
   const verdict = new Map();                // group -> 'modes' | 'separate'
   const naming = new Map();                 // group -> how the manifest names it
   const evidence = new Map();
@@ -50352,6 +50478,19 @@ function derive(ir, opts) {
 
   /* ── 2. address every row to (collection, mode) ────────────────────────── */
   const address = (r) => {
+    /* A set the themes claim is addressed by DECLARATION, and nothing derived
+       from its name applies — that is the whole point of the declaration.
+       $figmaStructure still outranks it, since that one is exact. */
+    if (themeBound && !naming.get(r.group)) {
+      const decl = themeBound.setMap.get(r.set);
+      if (decl) return { col: decl.collection, mode: decl.mode };
+      /* A set no theme claimed, but whose PREFIX belongs to one that is
+         declared — the theme list forgot a mode rather than a collection.
+         Without this it becomes a rival collection of the same name and every
+         path the two share turns into a reference collision. */
+      const owner = themeBound.groupOfCollection.get(normName(r.group));
+      if (owner) return { col: owner, mode: r.variant };
+    }
     const n = naming.get(r.group);
     if (n) {
       /* The manifest's own names — this is the only route by which ".core"
@@ -50530,14 +50669,17 @@ function derive(ir, opts) {
      rather than additions — which is a thing to show, not to hide. */
   plan.levelCandidates = candidates.map((c) => {
     const spec = levels[c.group] || {};
-    const role = spec[String(c.depth)] || 'name';
+    const role = roleOf(spec[String(c.depth)]) || 'name';
     return Object.assign({}, c, {
       role,
       applied: role !== 'name',
       /* Only a MODE elsewhere in this group rules out a mode here. Reading
          this depth as collections stays available either way. */
       modeTakenBySibling: Object.keys(spec)
-        .some((d) => spec[d] === 'mode' && String(c.depth) !== d),
+        .some((d) => roleOf(spec[d]) === 'mode' && String(c.depth) !== d),
+      /* Present only when a DECLARATION named the Figma axis this depth came
+         from — the measurement can never know that, only the exporter can. */
+      axis: (spec[String(c.depth)] && spec[String(c.depth)].axis) || null,
     });
   });
 
@@ -50573,7 +50715,7 @@ function derive(ir, opts) {
   return plan;
 }
 
-  var api = { derive, applyLevels, levelCandidates, figmaType, isComposite, isDtcgScalar, vkey,
+  var api = { derive, applyLevels, levelCandidates, roleOf, figmaType, isComposite, isDtcgScalar, vkey,
                    MODES_MIN, SEPARATE_MAX, FIGMA_TYPES, VARIABLE_CEILING,
                    FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
 
@@ -51491,7 +51633,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '60e4a44 10:08:49';
+    var CLOSURE_BUILD = 'eed8ee9 10:14:07';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

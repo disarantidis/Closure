@@ -9,7 +9,7 @@
 const { toIR, detect } = require('../src/import-ir.js');
 const { derive, applyLevels, levelCandidates } = require('../src/import-derive.js');
 const { compile, toColor, evaluate } = require('../src/import-compile.js');
-const { buildManifest, bindManifest } = require('../src/import-manifest.js');
+const { buildManifest, bindManifest, bindThemes } = require('../src/import-manifest.js');
 const { materialise, fromRawGraph, compare, fingerprint } = require('../src/import-verify.js');
 const { apply, preflight } = require('../src/import-apply.js');
 const { diff, format } = require('../src/import-diff.js');
@@ -994,6 +994,94 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
      Object.keys(imported.collections[0]).join(','));
   ok('manifest: and what an import writes, an import can read back',
      !!bindManifest(toIR(doc), imported));
+}
+
+/* ── $themes is already an architecture ──────────────────────────────────── */
+{
+  /*
+    Every Tokens Studio document carries a $themes list, and it says more than
+    the set names ever could: `group` is the Figma COLLECTION under its real
+    name, `name` is the MODE, and the `enabled` sets are the ones that
+    collection owns. `source` is a set the theme merely reads.
+
+    It outranks measurement because it is a declaration, it is present on
+    every such export rather than only ones this plugin wrote, and it carries
+    names nothing else can reach — ".breakpoint" declares modes "S Mobile"
+    and "M Tablet" where the SET names had already flattened those to "mobile"
+    and "tablet". Against the file this was built from it takes the
+    collections matching Figma exactly from 2 of 14 to 11.
+  */
+  const doc = {
+    $metadata: { tokenSetOrder: ['core', 'mode/light', 'mode/dark', 'bp/small', 'bp/large'] },
+    core: { red: tok('#ff0000') },
+    'mode/light': { bg: tok('{red}') },
+    'mode/dark': { bg: tok('#330000') },
+    'bp/small': { gap: tok(4, 'dimension') },
+    'bp/large': { gap: tok(8, 'dimension') },
+    $themes: [
+      { id: '1', name: '.core', selectedTokenSets: { core: 'enabled' } },
+      { id: '2', name: 'light', group: '.mode', selectedTokenSets: { 'mode/light': 'enabled', core: 'source' } },
+      { id: '3', name: 'dark', group: '.mode', selectedTokenSets: { 'mode/dark': 'enabled', core: 'source' } },
+      { id: '4', name: 'S Mobile', group: '.breakpoint', selectedTokenSets: { 'bp/small': 'enabled' } },
+      { id: '5', name: 'L Large', group: '.breakpoint', selectedTokenSets: { 'bp/large': 'enabled' } },
+    ],
+  };
+  const ir = toIR(doc);
+  const b = bindThemes(ir);
+  ok('themes: group is the collection, name is the mode',
+     b.collections.get('.mode').join(',') === 'light,dark' &&
+     b.collections.get('.breakpoint').join(',') === 'S Mobile,L Large',
+     JSON.stringify([...b.collections]));
+  ok('themes: `source` is a dependency, not ownership — core belongs to one theme only',
+     b.setMap.get('core').collection === '.core',
+     JSON.stringify(b.setMap.get('core')));
+
+  const plan = derive(ir, {});
+  ok('themes: the declaration is used', plan.usedThemes === true);
+  ok('themes: the real Figma names come back, dots and all',
+     plan.collections.map((c) => c.name).sort().join(',') === '.breakpoint,.core,.mode',
+     JSON.stringify(plan.collections.map((c) => c.name)));
+  ok('themes: and the mode names the SET names had flattened',
+     plan.collections.find((c) => c.name === '.breakpoint').modes.join(',') === 'S Mobile,L Large',
+     JSON.stringify(plan.collections.find((c) => c.name === '.breakpoint').modes));
+
+  /* Measured instead, the same file loses both. */
+  const measured = derive(ir, { ignoreThemes: true });
+  ok('themes: without them it is set names all the way down',
+     measured.collections.map((c) => c.name).sort().join(',') === 'bp,core,mode' &&
+     measured.collections.find((c) => c.name === 'bp').modes.join(',') === 'small,large',
+     JSON.stringify(measured.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+}
+{
+  /* A theme list can be INCOMPLETE — eight of forty-six sets in the real
+     document are enabled by no theme. A forgotten set whose prefix belongs to
+     a declared collection is a forgotten MODE, not a new collection: left
+     alone it becomes a rival of the same name and every path the two share is
+     a reference collision. */
+  const doc = {
+    $metadata: { tokenSetOrder: ['s/a', 's/b', 's/forgotten'] },
+    's/a': { x: tok('#111111') },
+    's/b': { x: tok('#222222') },
+    's/forgotten': { x: tok('#333333') },
+    $themes: [
+      { id: '1', name: 'a', group: '.s', selectedTokenSets: { 's/a': 'enabled' } },
+      { id: '2', name: 'b', group: '.s', selectedTokenSets: { 's/b': 'enabled' } },
+    ],
+  };
+  const plan = derive(toIR(doc), {});
+  ok('themes: a forgotten set joins the collection its prefix names',
+     plan.collections.length === 1 && plan.collections[0].name === '.s' &&
+     plan.collections[0].modes.join(',') === 'a,b,forgotten',
+     JSON.stringify(plan.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+  ok('themes: so it does not become a rival collection and collide',
+     compile(toIR(doc), plan, {}).ok === true);
+  ok('themes: and the gap is reported rather than hidden',
+     plan.themeBinding.measured === 1 && plan.themeBinding.uncovered[0] === 's/forgotten',
+     JSON.stringify(plan.themeBinding));
+}
+{
+  ok('themes: a document without them is unaffected', bindThemes({ themes: null }) === null);
+  ok('themes: and one whose themes enable nothing', bindThemes({ themes: [{ name: 'x', selectedTokenSets: {} }] }) === null);
 }
 
 /* ── the EXPORT declares its own nesting ─────────────────────────────────── */

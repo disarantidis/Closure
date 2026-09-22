@@ -61,6 +61,96 @@ function buildManifest(rawCollections) {
 }
 
 /*
+  ── $themes IS ALREADY AN ARCHITECTURE ─────────────────────────────────────
+
+  Every Tokens Studio document carries one, and it says more than the set
+  names ever could:
+
+      { "name": "light", "group": ".mode",
+        "selectedTokenSets": { "mode/light": "enabled",
+                               "restrictions/unrestricted": "source" } }
+
+      group   the Figma COLLECTION, under its real name - dots and all
+      name    the MODE within it
+      enabled the sets that collection owns; `source` is a dependency it
+              merely reads, and belongs to somebody else
+
+  A theme with no group is a collection of its own with a single mode, named
+  after the theme.
+
+  WHY THIS OUTRANKS EVERYTHING ELSE HERE. It is a declaration rather than an
+  inference, it is present on every Tokens Studio export rather than only on
+  ones this plugin wrote, and it carries names nothing else can reach: the
+  ".breakpoint" collection declares its modes as "S Mobile" and "M Tablet",
+  while the SET names had already flattened those to "mobile" and "tablet".
+  Measured against the file it came from, 10 of the 12 collections it declares
+  match Figma exactly, mode names included.
+
+  IT IS NOT COMPLETE, AND MUST NOT PRETEND TO BE. In that same document eight
+  sets are enabled by no theme at all, and three of Figma's collections are
+  never mentioned. So this binds what it covers and says nothing about the
+  rest, which then falls through to being measured like any other document.
+*/
+function bindThemes(ir) {
+  const themes = ir && ir.themes;
+  if (!Array.isArray(themes) || !themes.length) return null;
+
+  const collections = new Map();      // collection -> modes, in declaration order
+  const setMap = new Map();           // set name -> { collection, mode }
+
+  for (const t of themes) {
+    if (!t || !t.name) continue;
+    const collection = t.group || t.name;
+    if (!collections.has(collection)) collections.set(collection, []);
+    const modes = collections.get(collection);
+    if (modes.indexOf(t.name) === -1) modes.push(t.name);
+
+    const sets = t.selectedTokenSets || {};
+    for (const set of Object.keys(sets)) {
+      /* `enabled` is ownership; `source` is a set this theme READS and
+         another one owns. Treating source as ownership would hand the same
+         set to every theme that depends on it. */
+      if (sets[set] !== 'enabled') continue;
+      if (setMap.has(set)) continue;                  // first claim wins
+      setMap.set(set, { collection, mode: t.name });
+    }
+  }
+
+  if (!setMap.size) return null;
+  const covered = new Set([...setMap.keys()]);
+  const all = (ir.sets || []).filter((x) => x);
+
+  /*
+    WHICH COLLECTION A FORGOTTEN SET BELONGS TO.
+
+    A theme list can be incomplete — eight of forty-six sets in the document
+    this was built against are enabled by no theme at all. Left alone,
+    "scheme/magenta" becomes a collection named `scheme` sitting beside the
+    declared `.scheme`, and then every path they share is a reference
+    collision: the same token defined twice, and the import stops.
+
+    But its set name says exactly where it belongs. The sets a collection DOES
+    own share a prefix, so the prefix identifies the collection, and the set's
+    own variant is the mode the theme list forgot to declare. That is reading
+    the declaration further, not guessing past it.
+  */
+  const groupOfCollection = new Map();
+  for (const [set, where] of setMap) {
+    const i = set.indexOf('/');
+    if (i === -1) continue;
+    const g = norm(set.slice(0, i));
+    if (!groupOfCollection.has(g)) groupOfCollection.set(g, where.collection);
+    else if (groupOfCollection.get(g) !== where.collection) groupOfCollection.set(g, null); // ambiguous
+  }
+
+  return {
+    collections, setMap, groupOfCollection,
+    covered: covered.size,
+    uncovered: all.filter((x) => !covered.has(x)),
+  };
+}
+
+/*
   IMPORT SIDE. Bind each of the IR's groups to a manifest collection.
 
   A group binds one of two ways, and which one IS the verdict — no measuring
@@ -168,7 +258,7 @@ function bindManifest(ir, manifest) {
   return { bindings, bound, unbound, collections: cols.length };
 }
 
-  var api = { buildManifest, bindManifest, norm };
+  var api = { buildManifest, bindManifest, bindThemes, norm };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.PomImportManifest = api;

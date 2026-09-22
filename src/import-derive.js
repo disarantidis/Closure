@@ -40,6 +40,8 @@
     ? require('./import-manifest.js')
     : global.PomImportManifest;
   var bindManifest = __dep.bindManifest;
+  var bindThemes = __dep.bindThemes;
+  var normName = __dep.norm;
 /* Above MODES_MIN the variants are read as modes, at or below SEPARATE_MAX as
    separate collections, and anything between is refused. The band is wide on
    purpose: real axes share ~all their paths and real namespaces share ~none, so
@@ -337,6 +339,29 @@ function derive(ir, opts) {
   plan.usedManifest = !!bound;
   if (bound) plan.manifestBinding = { bound: bound.bound, measured: bound.unbound };
 
+  /*
+    $themes, WHICH EVERY TOKENS STUDIO DOCUMENT ALREADY CARRIES.
+
+    It maps SETS to (collection, mode) by declaration — theme.group is the
+    Figma collection under its real name, theme.name is the mode, and the
+    `enabled` sets are the ones that collection owns. That is strictly better
+    than anything derivable from set names, because it survives the renaming
+    the exporter does: ".breakpoint" declares its modes as "S Mobile" and
+    "M Tablet" while the set names had already flattened those to "mobile"
+    and "tablet".
+
+    Ranked below $figmaStructure, which is this tool's own and therefore
+    exact, and above the measurement, which is a last resort. Per SET rather
+    than per group, so the sets a theme list forgets — eight of forty-six in
+    the document this was built against — still get measured.
+  */
+  const themeBound = opts.ignoreThemes ? null : bindThemes(ir);
+  plan.usedThemes = !!themeBound;
+  if (themeBound) {
+    plan.themeBinding = { sets: themeBound.covered, measured: themeBound.uncovered.length,
+                          uncovered: themeBound.uncovered };
+  }
+
   const verdict = new Map();                // group -> 'modes' | 'separate'
   const naming = new Map();                 // group -> how the manifest names it
   const evidence = new Map();
@@ -390,6 +415,19 @@ function derive(ir, opts) {
 
   /* ── 2. address every row to (collection, mode) ────────────────────────── */
   const address = (r) => {
+    /* A set the themes claim is addressed by DECLARATION, and nothing derived
+       from its name applies — that is the whole point of the declaration.
+       $figmaStructure still outranks it, since that one is exact. */
+    if (themeBound && !naming.get(r.group)) {
+      const decl = themeBound.setMap.get(r.set);
+      if (decl) return { col: decl.collection, mode: decl.mode };
+      /* A set no theme claimed, but whose PREFIX belongs to one that is
+         declared — the theme list forgot a mode rather than a collection.
+         Without this it becomes a rival collection of the same name and every
+         path the two share turns into a reference collision. */
+      const owner = themeBound.groupOfCollection.get(normName(r.group));
+      if (owner) return { col: owner, mode: r.variant };
+    }
     const n = naming.get(r.group);
     if (n) {
       /* The manifest's own names — this is the only route by which ".core"
