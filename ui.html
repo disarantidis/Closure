@@ -52405,7 +52405,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '16c0f74 17:04:03';
+    var CLOSURE_BUILD = 'a88b7b1 17:09:16';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -54556,6 +54556,31 @@ function format(report, limit) {
         if (msg.collections.length === 0) {
           emptyState.style.display = 'flex';
           collectionsWrap.classList.add('visible');
+          /*
+            PUT THE COLLECTIONS CARD AWAY, and clear what it was holding.
+
+            This branch only ever ran on a file that was empty when the plugin
+            opened, where collections-list still had its initial inline
+            display:none and there was nothing to undo. Reaching it from the
+            OTHER direction — a file that had collections until Delete all
+            removed them — leaves the card at the display:flex the previous
+            extract set, so the accordion sat above "No variable collections
+            found" still naming the file and still tagged "5k Tokens". Two
+            statements about the same document, one of them false.
+
+            The error path three handlers down has always reset this; this one
+            simply never did, because until there was a way to empty a file
+            from inside the plugin it could not be reached from a populated
+            state.
+
+            The React state is cleared as well as hidden. Hiding alone fixes
+            what is on screen now, but leaves 2,765 variables' worth of rows
+            and a stale token count to flash on the next extract that finds
+            something, before its own data arrives.
+          */
+          collectionsList.style.display = 'none';
+          window.PomCollectionsAccordion.setCollections([]);
+          window.PomCollectionsAccordion.setSummary('');
           // Nothing to export, so nothing downstream of this message has
           // anything to act on: .is-empty drops the Json file card, the
           // push-settings card and the wire between them in one go (see
