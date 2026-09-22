@@ -28,6 +28,7 @@ import { ListControlItem } from '../vendor/pomegranate/panel/node/ListControlIte
 import { SegmentedControl } from '../vendor/pomegranate/panel/node/SegmentedControl';
 import { Checkbox } from '../vendor/pomegranate/panel/node/Checkbox';
 import { DropDownSelect } from '../vendor/pomegranate/panel/node/DropDownSelect';
+import { Combobox } from '../vendor/pomegranate/panel/node/Combobox';
 import { Dialog } from '../vendor/pomegranate/panel/node/Dialog';
 import { InteractiveCard } from '../vendor/pomegranate/panel/node/InteractiveCard';
 import { Toast } from '../vendor/pomegranate/panel/node/Toast';
@@ -186,8 +187,21 @@ function mountOnce(mountId: string, node: ReactNode, level: Level = GROUND) {
 function PomTextField(props: any) {
   const {
     id, type = 'text', label, placeholder, size = 'small', readonly = false,
-    defaultValue, icon, style, tabIndex, title, onInput, onBlur,
+    defaultValue, value, icon, style, tabIndex, title, onInput, onBlur,
   } = props;
+  /*
+    UNCONTROLLED BY DEFAULT — every field in this app writes through
+    setFieldValue()'s native-setter trick, which needs the input to own its
+    own value. `value` opts one field out of that: the file name field's
+    value lives on window.PomPrimaryFilename (it has to be readable
+    synchronously mid-push), and an uncontrolled input would quietly ignore
+    every programmatic set.
+
+    onChange, not onInput, on the controlled path: React warns about a
+    `value` with no `onChange` and, more to the point, refuses to let the
+    input show a keystroke the state never came back with.
+  */
+  const controlled = value !== undefined;
   const wrapClass = ['nd-textfield-wrap', `s-${size}`, 'is-block', readonly ? 'is-readonly' : '']
     .filter(Boolean).join(' ');
   const fieldClass = ['nd-textfield', `s-${size}`, readonly ? 'is-readonly' : '']
@@ -200,7 +214,7 @@ function PomTextField(props: any) {
         className={fieldClass}
         id={id}
         type={type}
-        defaultValue={defaultValue}
+        {...(controlled ? { value: value } : { defaultValue: defaultValue })}
         placeholder={placeholder}
         readOnly={readonly}
         tabIndex={tabIndex}
@@ -210,7 +224,9 @@ function PomTextField(props: any) {
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="none"
-        onInput={onInput ? (e) => onInput((e.target as HTMLInputElement).value) : undefined}
+        {...(controlled
+          ? { onChange: (e: any) => onInput?.((e.target as HTMLInputElement).value) }
+          : { onInput: onInput ? (e: any) => onInput((e.target as HTMLInputElement).value) : undefined })}
         onBlur={onBlur ? (e) => onBlur((e.target as HTMLInputElement).value) : undefined}
         onPointerDown={(e) => e.stopPropagation()}
       />
@@ -473,6 +489,26 @@ declare global {
       onClearVariables: (() => void) | null;
     };
     PomJsonFileCard: { setSize: (sizeLabel: string) => void };
+    /* The file name field, which is a plain TextField until the repo turns
+       out to hold JSON files to choose from and a Combobox after that.
+       `get` is synchronous and exact — it reads the value this bridge owns,
+       not React state, because callers ask for it in the middle of building
+       a push. */
+    PomCompare: {
+      /* One setter per state the page can be in, rather than one setter with
+         a mode flag — the page cannot then be busy AND showing a report, which
+         is the state three sibling containers taking turns produce. */
+      setBusy: (label: string) => void;
+      setSides: (figma: string, figmaDetail: string, repo: string, repoDetail: string) => void;
+      setProblem: (title: string, message: string, fix?: string) => void;
+      setReport: (report: any, copyText: string) => void;
+    };
+    PomPrimaryFilename: {
+      get: () => string;
+      set: (value: string) => void;
+      setOptions: (names: string[]) => void;
+      onChange: ((value: string) => void) | null;
+    };
     PomClosureWarning: {
       show: (title: string, groups: { ref: string; froms: string[] }[], more?: number, note?: string,
              copyText?: string) => void;
@@ -689,7 +725,88 @@ mountVersionTag('version-tag-mount');
 /* ── text fields (filenames read-only, folder-new, connection fields) ──────── */
 function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(mountId, <PomTextField {...props} />, level); }
 
-mountTextField('primary-filename-mount', { id: 'primary-filename', label: 'File name', defaultValue: 'tokens.json', placeholder: 'tokens.json', title: 'JSON file name — used for both Download and every push destination. ".json" is added automatically if you leave it out.' }, CARD_LEVEL);
+/*
+  THE FILE NAME FIELD, WHICH GROWS A DROPDOWN WHEN THERE IS SOMETHING TO PICK.
+
+  It was a plain TextField, and for a repo holding exactly one JSON that was
+  right. It is wrong the moment the repo holds two: the name in this field is
+  what the comparison goes looking for, and typing it from memory against a
+  repo you cannot see is how you end up being told "no tokens.json on main"
+  about a repo whose file is called tokens_dtcg.json.
+
+  So when the repo is readable the plugin lists the JSON files actually in it
+  (listRepoJsonFiles() in ui.template.html) and hands them here. With names to
+  offer this is a Combobox — type to filter, or pick from the list. With none
+  it stays the TextField it was, because a combobox whose list is empty is a
+  text field that also says "nothing found" every time you focus it.
+
+  Either way it is STILL FREE TEXT. The name you push to does not have to
+  exist yet — the first push to a new repo creates it — so the list is an
+  offer, never a constraint.
+
+  THE VALUE LIVES HERE, NOT IN REACT STATE. `get()` is called in the middle of
+  composing a push, and a setState is not visible until the next render; the
+  bridge keeps the authoritative copy and React follows it.
+*/
+(function mountPrimaryFilename() {
+  const container = document.getElementById('primary-filename-mount');
+  type S = { value: string; all: string[] };
+  let state: S = { value: 'tokens.json', all: [] };
+  let apply: ((s: S) => void) | null = null;
+  const push = (next: Partial<S>, tell?: boolean) => {
+    state = { ...state, ...next };
+    apply?.(state);
+    if (tell) window.PomPrimaryFilename.onChange?.(state.value);
+  };
+  function View() {
+    const [s, setS] = useState<S>(state);
+    apply = setS;
+    const shared = {
+      label: 'File name',
+      size: 'small' as const,
+      block: true,
+      placeholder: 'tokens.json',
+    };
+    if (!s.all.length) {
+      return (
+        <PomTextField
+          {...shared}
+          id="primary-filename"
+          value={s.value}
+          onInput={(v: string) => push({ value: v }, true)}
+          title={'JSON file name — used for both Download and every push destination. ' +
+                 '".json" is added automatically if you leave it out.'}
+        />
+      );
+    }
+    /* THE CALLER FILTERS — Combobox's decision 4. Substring, not prefix: the
+       name you half-remember is as often the middle of it ("dtcg") as the
+       start. */
+    const q = s.value.trim().toLowerCase();
+    const options = q ? s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1) : s.all;
+    return (
+      <Combobox
+        {...shared}
+        value={s.value}
+        onChange={(v: string) => push({ value: v }, true)}
+        options={options}
+        getKey={(o: string) => o}
+        onPick={(o: string) => push({ value: o }, true)}
+        renderOption={(o: string, st: { active: boolean }) => (
+          <span style={{ fontWeight: st.active ? 600 : 400 }}>{o}</span>
+        )}
+        emptyMessage={'No JSON in the repo matches that — it will be created on the first push'}
+      />
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomPrimaryFilename = {
+    get: () => state.value,
+    set: (value: string) => push({ value: value }),
+    setOptions: (names: string[]) => push({ all: names || [] }),
+    onChange: null,
+  };
+})();
 
 window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false, CARD_LEVEL);
 
@@ -1206,57 +1323,67 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
    references it listed underneath — so the list answers "what's missing"
    first, "what does it break" second, matching how it'd actually get
    fixed: rename/restore the one variable, not chase N separate reports. */
+/*
+  COPY THE WHOLE THING, not the rows on screen.
+
+  A plugin UI is a sandboxed iframe with no allow-same-origin, where
+  navigator.clipboard is commonly absent and throws where it is not, and
+  execCommand — deprecated everywhere — is often the only one that works.
+  Neither can be relied on and neither can be tested from outside Figma, so
+  the LAST resort is built to be a real answer rather than an apology: a
+  selected, read-only box holding the whole report, which Cmd-C copies.
+
+  The box is part of the component that uses this, not a detached node
+  appended to the body. The first version did the latter and left one behind
+  on every failed click — two clicks, two textareas, growing for as long as
+  someone kept trying.
+
+  EXTRACTED because there are two of these now (the broken-reference alert and
+  the Compare page) and the subtle half is the fallback, which is exactly the
+  half that would have been copied wrong the second time.
+*/
+function useClipboard() {
+  const [copied, setCopied] = useState<'' | 'ok' | 'fail'>('');
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
+  const copy = async (text: string) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text || '');
+        setCopied('ok'); setTimeout(() => setCopied(''), 2000);
+        return;
+      }
+    } catch { /* fall through to the box */ }
+    setCopied('fail');
+    /* After the render that creates it: select, then try execCommand while
+       the selection is live. If that works the box has done its job
+       invisibly; if not it stays, selected, for the person to copy. */
+    setTimeout(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.focus(); ta.select();
+      let worked = false;
+      try { worked = document.execCommand('copy'); } catch { worked = false; }
+      if (worked) { setCopied('ok'); setTimeout(() => setCopied(''), 2000); }
+    }, 0);
+  };
+  const label = copied === 'ok' ? 'Copied' : copied === 'fail' ? 'Select and copy below' : 'Copy all';
+  const icon = copied === 'ok' ? IconCheck(16) : IconCopy(16);
+  return { copied, taRef, copy, label, icon };
+}
+
 (function mountClosureWarning() {
   const container = document.getElementById('closure-warning-mount');
   let set: (u: (s: any) => any) => void = () => {};
   function View() {
     const [s, setS] = useState<{ open: boolean; title: string; groups: { ref: string; froms: string[] }[]; more: number; note: string; copyText: string }>({ open: false, title: '', groups: [], more: 0, note: '', copyText: '' });
-    const [copied, setCopied] = useState<'' | 'ok' | 'fail'>('');
     /* ABOVE the early return: this component renders null until something is
        wrong, and a hook after that return runs on some renders and not others
        — which is not a style point, it throws and the whole Alert stops
        mounting. */
-    const taRef = useRef<HTMLTextAreaElement | null>(null);
+    const clip = useClipboard();
     set = setS;
     if (!s.open) return null;
 
-    /*
-      COPY THE WHOLE LIST, not the fifteen on screen.
-
-      A plugin UI is a sandboxed iframe with no allow-same-origin, where
-      navigator.clipboard is commonly absent and throws where it is not, and
-      execCommand — deprecated everywhere — is often the only one that works.
-      Neither can be relied on and neither can be tested from outside Figma,
-      so the LAST resort is built to be a real answer rather than an apology:
-      a selected, read-only box holding the whole report, which Cmd-C copies.
-
-      The box is part of this component, not a detached node appended to the
-      body. The first version did the latter and left one behind on every
-      failed click — two clicks, two textareas, growing for as long as someone
-      kept trying.
-    */
-    const copy = async () => {
-      const text = s.copyText || '';
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          setCopied('ok'); setTimeout(() => setCopied(''), 2000);
-          return;
-        }
-      } catch { /* fall through to the box */ }
-      setCopied('fail');
-      /* After the render that creates it: select, then try execCommand while
-         the selection is live. If that works the box has done its job
-         invisibly; if not it stays, selected, for the person to copy. */
-      setTimeout(() => {
-        const ta = taRef.current;
-        if (!ta) return;
-        ta.focus(); ta.select();
-        let worked = false;
-        try { worked = document.execCommand('copy'); } catch { worked = false; }
-        if (worked) { setCopied('ok'); setTimeout(() => setCopied(''), 2000); }
-      }, 0);
-    };
     return (
       <Alert tone="error" title={s.title}>
         {/*
@@ -1279,9 +1406,9 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
           ))}
         </ul>
         {s.more > 0 && <p className="closure-warning-more">+{s.more} more affected</p>}
-        {copied === 'fail' && (
+        {clip.copied === 'fail' && (
           <textarea
-            ref={taRef}
+            ref={clip.taRef}
             className="closure-warning-copybox"
             readOnly
             value={s.copyText}
@@ -1295,10 +1422,10 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
               id="closure-copy-btn"
               variant="tonal"
               size="small"
-              label={copied === 'ok' ? 'Copied' : copied === 'fail' ? 'Select and copy below' : 'Copy all'}
+              label={clip.label}
               leftIcon
-              buttonLeftIcon={copied === 'ok' ? IconCheck(16) : IconCopy(16)}
-              onClick={copy}
+              buttonLeftIcon={clip.icon}
+              onClick={() => clip.copy(s.copyText)}
             />
           </div>
         ) : null}
@@ -1312,6 +1439,231 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     hide: () => set((s) => ({ ...s, open: false })),
   };
 })();
+
+/* ── the Compare page ──────────────────────────────────────────────────────── */
+/*
+  WHAT DIFFERS BETWEEN THIS FILE'S EXPORT AND THE REPO'S JSON.
+
+  The engine is src/json-diff.js and it is deliberately not in here: the
+  comparison is testable without a browser and this is only its rendering.
+  What this file decides is what a person can actually read.
+
+  THREE NUMBERS FIRST, then groups, then leaves. A real comparison of a real
+  design system is tens of thousands of leaves, and a list that long is not a
+  report — so the shape is a summary you read in a second, a per-group roll-up
+  you scan, and a capped sample you drill into. The whole thing, uncapped, is
+  one button away on the clipboard, which is the only place a list that long
+  is any use.
+
+  THE SIDES ARE NAMED AT THE TOP AND NEVER IMPLIED. "Only here" and "only in
+  the repo" are opposites, and a reader who has to work out which way round
+  the page is has already been failed by it.
+*/
+const COMPARE_SAMPLE = 40;
+
+(function mountCompare() {
+  const container = document.getElementById('compare-mount');
+  type Sides = { figma: string; figmaDetail: string; repo: string; repoDetail: string };
+  type S = {
+    busy: string;
+    sides: Sides;
+    problem: { title: string; message: string; fix?: string } | null;
+    report: any | null;
+    copyText: string;
+  };
+  let set: (u: (s: S) => S) => void = () => {};
+  function View() {
+    const [s, setS] = useState<S>({
+      busy: '', sides: { figma: 'This Figma file', figmaDetail: '', repo: 'The repo', repoDetail: '' },
+      problem: null, report: null, copyText: '',
+    });
+    const clip = useClipboard();
+    set = setS;
+    const r = s.report;
+
+    const sides = (
+      <div className="json-download-card" data-level={4}>
+        <div className="compare-sides">
+          <div className="compare-side">
+            <span className="compare-side-name">{s.sides.figma}</span>
+            <span className="compare-side-detail">{s.sides.figmaDetail}</span>
+          </div>
+          <div className="compare-side-arrow">compared with</div>
+          <div className="compare-side">
+            <span className="compare-side-name">{s.sides.repo}</span>
+            <span className="compare-side-detail">{s.sides.repoDetail}</span>
+          </div>
+        </div>
+      </div>
+    );
+
+    if (s.busy) {
+      return (
+        <>
+          {sides}
+          <div className="json-download-card" data-level={4}>
+            <div className="compare-busy">
+              <Spinner size={20} />
+              <span className="compare-busy-label">{s.busy}</span>
+            </div>
+          </div>
+        </>
+      );
+    }
+
+    if (s.problem) {
+      return (
+        <>
+          {sides}
+          <Alert tone="warning" title={s.problem.title}>
+            <p className="closure-warning-subtitle">{s.problem.message}</p>
+            {s.problem.fix ? <p className="closure-warning-more">{s.problem.fix}</p> : null}
+          </Alert>
+        </>
+      );
+    }
+
+    if (!r) return sides;
+
+    if (r.identical) {
+      return (
+        <>
+          {sides}
+          <Alert tone="success" title="Identical">
+            <p className="closure-warning-subtitle">
+              {`All ${r.sameCount.toLocaleString()} token${r.sameCount === 1 ? '' : 's'} ` +
+               `match${r.sameCount === 1 ? 'es' : ''}. Pushing right now would change nothing.`}
+            </p>
+          </Alert>
+        </>
+      );
+    }
+
+    /* A leaf list, capped. The count in the heading is the REAL one, not the
+       length of what is shown — a heading that said 40 when there were 13,137
+       would be the page quietly lying about the size of the difference. */
+    const leaves = (title: string, rows: any[], render: (row: any) => ReactNode) => {
+      if (!rows.length) return null;
+      return (
+        <div className="json-download-card" data-level={4} key={title}>
+          <div className="json-download-header">
+            <div className="json-download-title-group">
+              <p className="json-download-title">{title}</p>
+            </div>
+            <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
+          </div>
+          <div className="compare-leaves">{rows.slice(0, COMPARE_SAMPLE).map(render)}</div>
+          {rows.length > COMPARE_SAMPLE && (
+            <p className="compare-more">
+              {`… and ${(rows.length - COMPARE_SAMPLE).toLocaleString()} more — Copy all has every one`}
+            </p>
+          )}
+        </div>
+      );
+    };
+
+    return (
+      <>
+        {sides}
+
+        <div className="json-download-card" data-level={4}>
+          <div className="compare-stats">
+            <div className="compare-stat">
+              <div className="compare-stat-n">{r.onlyInFigma.length.toLocaleString()}</div>
+              <div className="compare-stat-label">only here</div>
+            </div>
+            <div className="compare-stat">
+              <div className="compare-stat-n">{r.onlyInRepo.length.toLocaleString()}</div>
+              <div className="compare-stat-label">only in the repo</div>
+            </div>
+            <div className="compare-stat">
+              <div className="compare-stat-n">{r.changed.length.toLocaleString()}</div>
+              <div className="compare-stat-label">changed</div>
+            </div>
+            <div className="compare-stat is-quiet">
+              <div className="compare-stat-n">{r.sameCount.toLocaleString()}</div>
+              <div className="compare-stat-label">identical</div>
+            </div>
+          </div>
+
+          <div className="compare-groups">
+            {r.groups.map((g: any) => (
+              <div className="compare-group" key={g.name}>
+                <span className="compare-group-name">{g.name}</span>
+                <span className="compare-group-counts">
+                  <span className={'compare-count' + (g.onlyInFigma ? '' : ' is-zero')} title="only here">
+                    {'+' + g.onlyInFigma}
+                  </span>
+                  <span className={'compare-count' + (g.onlyInRepo ? '' : ' is-zero')} title="only in the repo">
+                    {'-' + g.onlyInRepo}
+                  </span>
+                  <span className={'compare-count' + (g.changed ? '' : ' is-zero')} title="changed">
+                    {'~' + g.changed}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {leaves('Changed', r.changed, (x: any) => (
+          <div className="compare-leaf" key={'c' + x.path}>
+            <div className="compare-leaf-path">{x.path}</div>
+            <div className="compare-leaf-val">{'repo:  ' + x.repo}</div>
+            <div className="compare-leaf-val">{'here:  ' + x.figma}</div>
+          </div>
+        ))}
+        {leaves('Only here', r.onlyInFigma, (x: any) => (
+          <div className="compare-leaf" key={'f' + x.path}>
+            <div className="compare-leaf-path">{x.path}</div>
+            <div className="compare-leaf-val">{x.value}</div>
+          </div>
+        ))}
+        {leaves('Only in the repo', r.onlyInRepo, (x: any) => (
+          <div className="compare-leaf" key={'r' + x.path}>
+            <div className="compare-leaf-path">{x.path}</div>
+            <div className="compare-leaf-val">{x.value}</div>
+          </div>
+        ))}
+
+        <div className="json-download-card" data-level={4}>
+          <PomButton
+            id="compare-copy-btn"
+            variant="tonal"
+            size="medium"
+            block
+            label={clip.label}
+            leftIcon
+            buttonLeftIcon={clip.icon}
+            onClick={() => clip.copy(s.copyText)}
+          />
+          {clip.copied === 'fail' && (
+            <textarea
+              ref={clip.taRef}
+              className="compare-copybox"
+              readOnly
+              value={s.copyText}
+              onFocus={(e) => e.currentTarget.select()}
+              aria-label="The full comparison, ready to copy"
+            />
+          )}
+        </div>
+      </>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomCompare = {
+    setBusy: (label) => set((s) => ({ ...s, busy: label, problem: null, report: null })),
+    setSides: (figma, figmaDetail, repo, repoDetail) =>
+      set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail } })),
+    setProblem: (title, message, fix) =>
+      set((s) => ({ ...s, busy: '', report: null, problem: { title, message, fix } })),
+    setReport: (report, copyText) =>
+      set((s) => ({ ...s, busy: '', problem: null, report, copyText })),
+  };
+})();
+
+mountIconButton('compare-back-btn-mount', { id: 'compare-back-btn', variant: 'tonal', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
 
 /* ── confirm / onboarding dialogs ──────────────────────────────────────────── */
 function confirmDialog(mountId: string, cfg: { title: string; text: string; confirmLabel: string; onConfirm: () => void }, register: (open: () => void) => void) {

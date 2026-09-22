@@ -1818,8 +1818,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           }
           return null;
         };
-        const names = ['repoFilePath', 'probeRepoFile', 'repoSizeLabel', 'activeRepoProvider',
-                       'repoAddressKey'];
+        const names = ['repoFilePath', 'listRepoJsonFiles', 'activeRepoProvider', 'repoAddressKey'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1837,67 +1836,75 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                                    ctx.__gh_over),
             isGitLabReady: () => ctx.__gl, isGitHubReady: () => ctx.__gh,
             gitlabAdded: false, githubAdded: false, mainProviderTab: 'gitlab',
-            Promise, JSON, Math, parseInt, isFinite, encodeURIComponent,
+            Promise, JSON, Math, parseInt, isFinite, encodeURIComponent, Array, Object, String, RegExp,
           };
           ctx.window = ctx;
           vmx.createContext(ctx);
           vmx.runInContext(lifted.join('\n'), ctx);
 
-          const res = (status, headers) => ({
+          const res = (status, headers, body) => ({
             status, ok: status >= 200 && status < 300,
             headers: { get: (h) => (headers || {})[h] || null },
+            json: () => Promise.resolve(body),
+            text: () => Promise.resolve(JSON.stringify(body)),
           });
           const rejects = async (p) => { try { await p; return null; } catch (e) { return e; } };
 
-          ctx.__res = res(200, { 'content-length': '771308' });
-          let r = await ctx.probeRepoFile('github');
-          ok('repo probe: GitHub is a HEAD on the contents endpoint for the configured filename',
-             calls[0].url === 'https://api.github.com/repos/acme/tokens/contents/tokens_dtcg.json?ref=main' &&
-             calls[0].opts.method === 'HEAD' &&
-             calls[0].opts.headers.Accept === 'application/vnd.github.raw',
-             calls[0].url + ' ' + calls[0].opts.method);
-          ok('repo probe: 200 reports found, sized off content-length',
-             r.found === true && r.bytes === 771308 && r.branch === 'main', JSON.stringify(r));
+          /* The listing, and what it is allowed to conclude from each
+             answer. A wrong URL fails exactly like an empty repo, which is
+             why these pin the address rather than only the behaviour. */
+          ctx.__res = res(200, {}, [
+            { type: 'file', name: 'tokens_dtcg.json', path: 'tokens_dtcg.json', size: 771308 },
+            { type: 'file', name: 'README.md', path: 'README.md', size: 12 },
+            { type: 'dir', name: 'nested', path: 'nested' },
+            { type: 'file', name: 'other.json', path: 'other.json', size: 40 },
+          ]);
+          let files = await ctx.listRepoJsonFiles('github');
+          ok('repo listing: GitHub lists the contents endpoint for the configured folder',
+             calls[0].url === 'https://api.github.com/repos/acme/tokens/contents/?ref=main',
+             calls[0].url);
+          ok('repo listing: only .json files, sorted, with directories dropped',
+             files.map((f) => f.name).join(',') === 'other.json,tokens_dtcg.json',
+             JSON.stringify(files.map((f) => f.name)));
 
           calls.length = 0;
-          r = await ctx.probeRepoFile('gitlab');
-          ok('repo probe: GitLab is a HEAD on the raw endpoint, project and path both encoded',
-             calls[0].url === 'https://gitlab.com/api/v4/projects/me%2Fmy%20repo/repository/files/' +
-                              'tokens%2Fout%2Ftokens_dtcg.json/raw?ref=main' &&
-             calls[0].opts.method === 'HEAD',
+          ctx.__gh_over = { folder: 'tokens/out' };
+          await ctx.listRepoJsonFiles('github');
+          ctx.__gh_over = null;
+          ok('repo listing: a folder is listed at its own path, url-encoded',
+             calls[0].url === 'https://api.github.com/repos/acme/tokens/contents/tokens/out?ref=main',
              calls[0].url);
-          ok('repo probe: the reported path keeps the folder it was read from',
-             r.path === 'tokens/out/tokens_dtcg.json', r.path);
 
+          calls.length = 0;
+          ctx.__res = res(200, {}, [
+            { type: 'blob', name: 'tokens.json', path: 'tokens/out/tokens.json' },
+            { type: 'tree', name: 'sub', path: 'tokens/out/sub' },
+          ]);
+          files = await ctx.listRepoJsonFiles('gitlab');
+          ok('repo listing: GitLab uses the tree endpoint, project and path encoded',
+             calls[0].url === 'https://gitlab.com/api/v4/projects/me%2Fmy%20repo/repository/tree' +
+                              '?per_page=100&ref=main&path=tokens%2Fout',
+             calls[0].url);
+          /* GitHub says 'file', GitLab says 'blob'. Reading only one of the
+             two spellings returns an empty list from a repo that is full. */
+          ok('repo listing: GitLab\'s "blob" counts as a file, and "tree" does not',
+             files.length === 1 && files[0].name === 'tokens.json',
+             JSON.stringify(files));
+
+          /* An empty repo, or a folder nothing has been pushed to, is where
+             every repo starts — not a failure to report. */
           ctx.__res = res(404);
-          r = await ctx.probeRepoFile('github');
-          ok('repo probe: 404 is "not there yet", not a failure', r.found === false, JSON.stringify(r));
+          ok('repo listing: 404 is an empty repo, not an error',
+             (await ctx.listRepoJsonFiles('github')).length === 0);
 
           ctx.__res = res(401);
-          let e = await rejects(ctx.probeRepoFile('github'));
-          ok('repo probe: 401 rejects as a refused token', !!e && /refused/.test(e.message), e && e.message);
+          let e = await rejects(ctx.listRepoJsonFiles('github'));
+          ok('repo listing: 401 rejects as a refused token', !!e && /refused/.test(e.message), e && e.message);
 
-          /* A host that does not route HEAD answers 405. Reading that as "no
-             file" would send someone looking for a push that already
-             happened, which is why only 404 means absent. */
-          ctx.__res = res(405);
-          e = await rejects(ctx.probeRepoFile('github'));
-          ok('repo probe: a non-404 failure is not reported as a missing file',
-             !!e && /405/.test(e.message), e && e.message);
-
-          /* content-length is CORS-safelisted, so it should survive the
-             plugin iframe — but the size is decoration and its absence must
-             not turn a found file into an unknown one. */
-          ctx.__res = res(200, {});
-          r = await ctx.probeRepoFile('github');
-          ok('repo probe: no readable size still reports the file as found',
-             r.found === true && r.bytes === null, JSON.stringify(r));
-
-          ok('repo probe: sizes read in the Json file card\'s own units',
-             ctx.repoSizeLabel(771308) === '753 KB' &&
-             ctx.repoSizeLabel(9 * 1024 * 1024) === '9.00 MB' &&
-             ctx.repoSizeLabel(12) === '1 KB',
-             ctx.repoSizeLabel(771308) + ' ' + ctx.repoSizeLabel(12));
+          ctx.__res = res(500);
+          e = await rejects(ctx.listRepoJsonFiles('github'));
+          ok('repo listing: a server error is not reported as an empty repo',
+             !!e && /500/.test(e.message), e && e.message);
 
           const prov = (gl, gh, glR, ghR, tab) => {
             ctx.gitlabAdded = gl; ctx.githubAdded = gh;
@@ -1944,6 +1951,114 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              ctx.repoAddressKey('gitlab') !== ctx.repoAddressKey('github'));
         }
       }
+    }
+
+    /* ── document against document (the Compare page's engine) ───────────
+       Separate from import-diff.js above, and the separation is the point:
+       that one asks what applying a JSON would do to a Figma file and has to
+       compile a projection to answer. This one asks what differs between two
+       documents the same exporter produced, which is leaf against leaf with
+       nothing inferred. */
+    {
+      const JD = require('../src/json-diff.js');
+
+      const doc = (o) => o;
+      const tok = (v, t) => ({ value: v, type: t || 'color' });
+      const dtok = (v, t) => ({ $value: v, $type: t || 'color' });
+
+      const A = doc({
+        core: { blue: { 500: tok('#0000FF'), 600: tok('#0000AA') }, size: { s: tok(4, 'spacing') } },
+        extra: { a: tok('{core.blue.500}') },
+        $metadata: { tokenSetOrder: ['core', 'extra'] },
+        $extensions: { 'com.closure': { build: 'abc', format: 'legacy' } },
+      });
+      const B = doc({
+        core: { blue: { 500: tok('#0000ff'), 600: tok('#111111') }, size: { s: tok('4', 'spacing'), l: tok(16, 'spacing') } },
+        $metadata: { tokenSetOrder: ['core'] },
+        $extensions: { 'com.closure': { build: 'zzz', format: 'legacy' } },
+      });
+      const r = JD.compare(A, B);
+
+      ok('compare: a token only this side is "only in Figma"',
+         r.onlyInFigma.length === 1 && r.onlyInFigma[0].path === 'extra.a',
+         JSON.stringify(r.onlyInFigma));
+      ok('compare: a token only in the repo is not reported as a deletion here',
+         r.onlyInRepo.length === 1 && r.onlyInRepo[0].path === 'core.size.l',
+         JSON.stringify(r.onlyInRepo));
+      ok('compare: a real value change is reported with both sides, named',
+         r.changed.length === 1 && r.changed[0].path === 'core.blue.600' &&
+         r.changed[0].repo === '#111111' && r.changed[0].figma === '#0000aa',
+         JSON.stringify(r.changed));
+
+      /* The two normalisations, and they are the only two. A file that has
+         been through another tool comes back spelled differently without
+         having changed, and reporting that as a difference is how a report
+         of 30,000 changes turns out to contain nothing. */
+      ok('compare: #0000FF and #0000ff are one colour, not a difference',
+         !r.changed.some((c) => c.path === 'core.blue.500'));
+      ok('compare: 4 and "4" are one number, not a difference',
+         !r.changed.some((c) => c.path === 'core.size.s'));
+      ok('compare: both of those still count as identical', r.sameCount === 2, String(r.sameCount));
+
+      /* $metadata, $themes and $extensions differ between two exports of an
+         IDENTICAL file — the build stamp alone guarantees it — so comparing
+         them would report a difference every single time. */
+      ok('compare: metadata and the build stamp are not tokens and are not compared',
+         r.changed.every((c) => c.path.indexOf('$') === -1) && r.figmaTokens === 4 && r.repoTokens === 4,
+         r.figmaTokens + '/' + r.repoTokens);
+
+      ok('compare: the group roll-up counts what is under each top-level name',
+         JSON.stringify(r.groups) ===
+         JSON.stringify([{ name: 'core', onlyInFigma: 0, onlyInRepo: 1, changed: 1, same: 2 },
+                         { name: 'extra', onlyInFigma: 1, onlyInRepo: 0, changed: 0, same: 0 }]),
+         JSON.stringify(r.groups));
+
+      const same = JD.compare(A, A);
+      ok('compare: a document against itself is identical', same.identical === true && same.sameCount === 4);
+      ok('compare: identical means the page can say so without checking three lists',
+         same.onlyInFigma.length === 0 && same.onlyInRepo.length === 0 && same.changed.length === 0);
+
+      /* LEGACY vs DTCG IS TWO NOTATIONS, NOT A DIFFERENCE — toDtcg rewrites a
+         dimension into a { value, unit } composite, so diffing across them
+         reports every dimension in the file as changed. Refused with the fix
+         rather than answered wrongly. */
+      const D = doc({ core: { blue: { 500: dtok('#0000ff') } } });
+      const mixed = JD.compare(A, D);
+      ok('compare: legacy against DTCG is refused, not diffed',
+         mixed.comparable === false && mixed.problem.kind === 'format-mismatch',
+         JSON.stringify(mixed.problem));
+      ok('compare: and the refusal names the format to switch to',
+         /W3C DTCG/.test(mixed.problem.fix), mixed.problem.fix);
+
+      const R = doc({ $extensions: { 'com.closure': { format: 'resolved' } }, a: { b: tok('#fff') } });
+      ok('compare: a resolved export is refused — its tree is a cross-product of modes',
+         JD.compare(A, R).problem.kind === 'resolved');
+
+      ok('compare: format is believed off the export\'s own marker first',
+         JD.detectFormat(R) === 'resolved' && JD.detectFormat(A) === 'legacy');
+      ok('compare: and inferred from the leaves when there is no marker',
+         JD.detectFormat(D) === 'dtcg' && JD.detectFormat({ nothing: {} }) === 'unknown');
+
+      /* The count on the repo card and the count in the report come from this
+         one walk, so the two can never disagree. */
+      ok('compare: countTokens is the same walk the report counts with',
+         JD.countTokens(A) === r.figmaTokens && JD.countTokens(B) === r.repoTokens);
+
+      /* A composite's key order is an artefact of how it was built. */
+      ok('compare: a composite compares by content, not key order',
+         JD.renderValue({ a: 1, b: 2 }) === JD.renderValue({ b: 2, a: 1 }));
+
+      /* The clipboard copy is the only place the full list exists — the page
+         caps every list it draws. */
+      const text = JD.format(r, { figmaLabel: 'my file', repoLabel: 'GitHub tokens.json' });
+      ok('compare: the copied report names both sides and carries every row',
+         /my file/.test(text) && /GitHub tokens.json/.test(text) &&
+         /extra\.a/.test(text) && /core\.size\.l/.test(text) && /core\.blue\.600/.test(text),
+         text.slice(0, 120));
+      ok('compare: an identical report says so instead of printing three empty lists',
+         /Identical/.test(JD.format(same, {})) && !/ONLY/.test(JD.format(same, {})));
+      ok('compare: a refusal copies the reason, not an empty diff',
+         /NOT COMPARABLE/.test(JD.format(mixed, {})));
     }
 
     console.log('');

@@ -1089,6 +1089,93 @@
     /* ── Import page ──────────────────────────────────────────────────────
        Borrows .settings-page's scrolling and content inset wholesale — it is
        the same kind of screen and there is no reason for the two to differ. */
+    /* Same scrolling treatment as the import page — they are siblings and
+       switching between them should not change how the page scrolls. */
+    .compare-page { overflow-y: auto; overflow-x: hidden; }
+    .compare-page::-webkit-scrollbar { width: 8px; }
+    .compare-page::-webkit-scrollbar-track { background: transparent; }
+    .compare-page::-webkit-scrollbar-thumb { background: var(--app-border); border-radius: 4px; }
+
+    /* THE TWO SIDES, NAMED. A diff that does not say what it is between is a
+       list of numbers — and the direction matters here, because "only here"
+       and "only in the repo" mean opposite things. */
+    .compare-sides { display: flex; flex-direction: column; gap: 8px; }
+    /* Stacked, not a row: the detail is a file path and a count, which at
+       this width wraps under the name anyway — and wrapped half under and
+       half beside reads as two unrelated fragments. */
+    .compare-side { display: flex; flex-direction: column; gap: 2px; }
+    .compare-side-name { font-weight: 700; }
+    .compare-side-detail {
+      font-size: 11px;
+      opacity: 0.7;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+    }
+    .compare-side-arrow { opacity: 0.5; font-size: 11px; margin: 2px 0 2px 2px; }
+
+    /* The four numbers that are the whole answer at a glance.
+
+       A 2x2 GRID, NOT A FLEX ROW. Four equal cells across a 400px panel do
+       not fit, so the row wrapped 3 + 1 and the fourth stretched to the full
+       width — which made "identical" look like the headline rather than the
+       quietest of the four. A grid keeps them equal whatever the panel is
+       doing. */
+    .compare-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .compare-stat {
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: var(--nd-field-fill, var(--app-surface-soft));
+    }
+    .compare-stat-n { font-size: 18px; font-weight: 700; line-height: 1.2; }
+    .compare-stat-label { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+    .compare-stat.is-quiet .compare-stat-n { opacity: 0.55; font-weight: 600; }
+
+    /* Per top-level group, because thirty thousand changed leaves is a wall
+       and the group is the level someone actually reads at. */
+    .compare-groups { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+    .compare-group {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--app-border);
+    }
+    .compare-group:last-child { border-bottom: none; }
+    .compare-group-name {
+      flex: 1; min-width: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      overflow-wrap: anywhere;
+    }
+    .compare-group-counts { display: flex; gap: 6px; flex-shrink: 0; font-size: 11px; }
+    .compare-count { opacity: 0.75; }
+    .compare-count.is-zero { opacity: 0.25; }
+
+    /* The leaves themselves. Monospaced, because every one of them is a token
+       path that can be pasted into a search of the source and found. */
+    .compare-leaves { display: flex; flex-direction: column; gap: 6px; }
+    .compare-leaf {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      overflow-wrap: anywhere;
+    }
+    .compare-leaf-path { opacity: 0.9; }
+    .compare-leaf-val { opacity: 0.65; padding-left: 12px; }
+    .compare-more { font-size: 11px; opacity: 0.6; margin: 2px 0 0; }
+    .compare-copybox {
+      width: 100%;
+      min-height: 72px;
+      margin-top: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      background: var(--app-surface-soft);
+      color: var(--app-text);
+      border: 1px solid var(--app-border);
+      border-radius: 8px;
+      padding: 8px;
+      resize: vertical;
+    }
+    .compare-busy { display: flex; align-items: center; gap: 10px; }
+    .compare-busy-label { font-size: 12px; opacity: 0.8; }
+
     .import-page { overflow-y: auto; overflow-x: hidden; }
     .import-page::-webkit-scrollbar { width: 8px; }
     .import-page::-webkit-scrollbar-track { background: transparent; }
@@ -2307,6 +2394,45 @@
     </div>
   </div>
 
+  <!--
+    THE COMPARE PAGE.
+
+    A DIFFERENT QUESTION FROM THE IMPORT PAGE, which is why it is a different
+    page rather than a section of that one. Import asks "what would happen to
+    my Figma file if I applied this JSON" and has to compile the incoming
+    document into collections and modes to answer — a projection, with every
+    judgement derive() makes about a file it has never seen.
+
+    This asks what differs between the JSON this file exports and the JSON in
+    the repo. Both sides came out of the same exporter, so it is leaf against
+    leaf with nothing inferred and nothing to get wrong, and the answer is in
+    the terms the person already thinks in: token paths.
+
+    Everything inside is rendered by mountCompare() in buttons.tsx. One mount,
+    because the page is one state machine — reading, then either a reason it
+    cannot be compared or the comparison — and three sibling containers taking
+    turns being `hidden` is how those get out of step.
+  -->
+  <div class="page compare-page" id="compare-page">
+    <header class="header-settings">
+      <div class="header-panel">
+        <div class="git-logo">
+          <!-- IconCompare in src/ui-react/buttons.tsx, hand-inlined: the page
+               header and the button that opens it have to be the same glyph.
+               Keep them in step. -->
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 3L4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/>
+          </svg>
+        </div>
+        <h1 class="title">Compare</h1>
+        <span id="compare-back-btn-mount"></span>
+      </div>
+    </header>
+    <div class="settings-page-content">
+      <div id="compare-mount"></div>
+    </div>
+  </div>
+
   <div class="page settings-page" id="settings-page">
     <header class="header-settings">
       <div class="header-panel">
@@ -2669,11 +2795,28 @@
     function dtcgFilename(name) {
       return withSuffix(name, activeSuffix());
     }
+    /*
+      THE FILE NAME FIELD IS NO LONGER A DOM NODE YOU CAN LOOK UP.
+
+      It is a TextField until the repo turns out to hold JSON files worth
+      choosing between and a Combobox after that (see mountPrimaryFilename in
+      buttons.tsx), and Combobox generates its own input id from useId() —
+      there is no 'primary-filename' element to read once it swaps. So the
+      value lives on the bridge and these two are the only way to it, which
+      is stricter than what was here before and would have caught the swap at
+      the first call site rather than the fifth.
+    */
+    function filenameFieldValue() {
+      return (window.PomPrimaryFilename.get() || '').trim();
+    }
+    function setFilenameField(value) {
+      window.PomPrimaryFilename.set(value);
+    }
+
     // What a given format WOULD write, whichever one is active right now —
     // so each card can name its own file rather than the current one's.
     function filenameForShape(shape) {
-      var base = ensureJsonExtension(
-        document.getElementById('primary-filename').value.trim() || DEFAULT_FILENAME);
+      var base = ensureJsonExtension(filenameFieldValue() || DEFAULT_FILENAME);
       if (shape === 'themes') return withSuffix(base, DTCG_SUFFIX);
       if (shape === 'resolved') return withSuffix(base, RESOLVED_SUFFIX);
       return withSuffix(base, null);
@@ -2693,11 +2836,9 @@
     // Rewrite the one file name field for the format just picked. Runs off
     // the field itself, so a customised name keeps its stem.
     function applyFilenameForFormat() {
-      var el = document.getElementById('primary-filename');
-      if (!el) return;
-      var current = el.value.trim();
+      var current = filenameFieldValue();
       if (!current) return;
-      setFieldValue('primary-filename', dtcgShape ? dtcgFilename(current) : plainFilename(current));
+      setFilenameField(dtcgShape ? dtcgFilename(current) : plainFilename(current));
     }
 
     // Full repo path pushed to Git = per-provider folder + the one shared
@@ -2716,7 +2857,7 @@
     // is what lets the field itself skip ".json" entirely — this is the one
     // place every consumer actually goes through.
     function primaryFilename() {
-      return ensureJsonExtension(document.getElementById('primary-filename').value.trim() || defaultFilename());
+      return ensureJsonExtension(filenameFieldValue() || defaultFilename());
     }
 
     // ── GitLab settings: empty by default, filled in per install ─────────────
@@ -3121,7 +3262,7 @@
         // (gitlab preferred, matching primaryFilename()'s own fallback
         // order) so an existing install's customised name survives the
         // upgrade instead of silently resetting to the default.
-        setFieldValue('primary-filename',
+        setFilenameField(
           config.filename ||
           (config.gitlab && config.gitlab.filename) ||
           (config.github && config.github.filename) ||
@@ -3340,9 +3481,104 @@
     document.getElementById('repo-read-btn').addEventListener('click', function () {
       var which = activeRepoProvider();
       if (!which) return;                 // the button is hidden in this state
-      openImport();
-      pullFromRepo(which);
+      openCompare(which);
     });
+
+    /*
+      THE COMPARE PAGE — the repo's JSON against this file's export.
+
+      NOT THE IMPORT PAGE, which is where this button used to go. That page
+      answers "what would happen to my Figma file if I applied this JSON", and
+      to answer it the incoming document has to be compiled into collections
+      and modes — a projection, with every judgement derive() makes about a
+      file it has never seen before.
+
+      This is the smaller, sharper question: the repo's file came out of this
+      plugin, so both sides are the same kind of document and the comparison
+      is leaf against leaf with nothing inferred. What you get is what would
+      change in the repo if you pushed right now.
+
+      Both routes still exist and neither is redundant — the import page is
+      the way to bring a repo's tokens INTO Figma, this is the way to see how
+      far the two have drifted.
+    */
+    function closeCompare() {
+      document.getElementById('compare-page').classList.remove('visible');
+      document.getElementById('main-page').classList.remove('hidden');
+    }
+    document.getElementById('compare-back-btn').addEventListener('click', closeCompare);
+
+    function openCompare(which) {
+      which = which || activeRepoProvider();
+      if (!which) return;
+      document.getElementById('main-page').classList.add('hidden');
+      document.getElementById('compare-page').classList.add('visible');
+      runCompare(which);
+    }
+
+    function runCompare(which) {
+      var key = repoAddressKey(which);
+      var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
+      var branch = (which === 'gitlab' ? gitlabConfig() : githubConfig()).branch;
+      var repoWhere = repoFilePath(which) + ' @ ' + branch;
+      var figmaWhere = primaryFilename();
+      window.PomCompare.setSides(
+        lastFigmaFileName || 'This Figma file', figmaWhere, label, repoWhere);
+
+      /*
+        THE EXACT BYTES DOWNLOAD WRITES AND PUSH SENDS — getTokensToExport(),
+        not a second rendering of the same variables. If this page compared
+        anything else, it would be answering about a file that does not exist.
+      */
+      var figmaDoc = getTokensToExport();
+      if (!figmaDoc) {
+        window.PomCompare.setProblem(
+          'Nothing to compare yet',
+          'This file has not finished producing its export — or it holds no variables at all, in ' +
+          'which case there is nothing on this side of the comparison.',
+          'Close this page and wait for the file to finish loading.');
+        return;
+      }
+
+      window.PomCompare.setBusy('Reading ' + repoFilePath(which) + '…');
+      /* Free when the check on open already pulled it, which is the usual
+         case — see fetchRepoDoc's cache. */
+      fetchRepoDoc(which, key).then(function (got) {
+        window.PomCompare.setBusy('Comparing…');
+        /* The same yield the import page needs: comparing two documents of
+           30,000 leaves is real work, and without letting a frame through
+           the spinner never turns. */
+        requestAnimationFrame(function () { setTimeout(function () {
+          var report;
+          try { report = window.PomJsonDiff.compare(figmaDoc, got.doc); }
+          catch (err) {
+            window.PomCompare.setProblem('Could not compare these two',
+              String((err && err.message) || err), '');
+            return;
+          }
+          if (!report.comparable) {
+            window.PomCompare.setProblem('These two cannot be compared',
+              report.problem.message, report.problem.fix);
+            return;
+          }
+          /* The counts are worth saying on the sides themselves: two numbers
+             side by side is how "the repo is behind" reads at a glance. */
+          window.PomCompare.setSides(
+            lastFigmaFileName || 'This Figma file',
+            figmaWhere + '  ·  ' + tokensLabel(report.figmaTokens),
+            label,
+            repoWhere + '  ·  ' + tokensLabel(report.repoTokens));
+          window.PomCompare.setReport(report, window.PomJsonDiff.format(report, {
+            figmaLabel: (lastFigmaFileName || 'this Figma file') + ' (' + figmaWhere + ')',
+            repoLabel: label + ' ' + repoWhere,
+          }));
+        }, 0); });
+      }, function (err) {
+        window.PomCompare.setProblem('Could not read ' + label,
+          (err && err.message) || 'the request failed',
+          'Check the repo settings, then try again.');
+      });
+    }
     function closeImport() {
       document.getElementById('import-page').classList.remove('visible');
       document.getElementById('main-page').classList.remove('hidden');
@@ -3788,14 +4024,16 @@
         refreshRepoReadRow();
       }, 400);
     }
-    // Same auto-save, same debounce — 'primary-filename' lives on the main
-    // screen now, not in Settings, but it's persisted the same way as
-    // every other field here (see gitSettings.getState()).
+    // Same auto-save, same debounce. The file name field is NOT in this list
+    // any more — it has no stable element id once it becomes a Combobox (see
+    // filenameFieldValue()), so it reports through its own bridge instead,
+    // one line below, into exactly the same debounce.
     ['gl-token', 'gl-host', 'gl-project', 'gl-branch',
-     'gh-token', 'gh-repo', 'gh-branch', 'primary-filename'].forEach(function(id) {
+     'gh-token', 'gh-repo', 'gh-branch'].forEach(function(id) {
       var el = document.getElementById(id);
       if (el) el.addEventListener('input', scheduleSettingsSave);
     });
+    window.PomPrimaryFilename.onChange = scheduleSettingsSave;
     // Show/hide each Clear button as its token field gains or loses content.
     // Immediate, not debounced — this is pure UI, nothing is written here.
     ['gl-token', 'gh-token'].forEach(function(id) {
@@ -4449,13 +4687,11 @@
       return composeFilePath(c.folder, c.filename);
     }
 
-    /* MB above a megabyte, KB below it — the same two-decimal MB the Json
-       file card shows for the export, so the size in the repo and the size
-       about to be pushed are read in the same unit and can be compared by
-       eye. */
-    function repoSizeLabel(bytes) {
-      if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-      return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+    /* "1 tokens" is the kind of thing that makes a panel look unfinished, and
+       a count of one is the normal state of a file someone is still setting
+       up. formatTokenCount does the thousands separator; this does the noun. */
+    function tokensLabel(n) {
+      return formatTokenCount(n) + ' token' + (n === 1 ? '' : 's');
     }
 
     function repoReadStatus(text, tone) {
@@ -4467,56 +4703,80 @@
     }
 
     /*
-      IS THE FILE THERE, WITHOUT DOWNLOADING IT.
+      WHAT JSON IS ACTUALLY IN THERE.
 
-      HEAD, not GET, and that is the whole point of this function. The file
-      this plugin produces is megabytes — the ODS export is 9 — and a check
-      that runs on every open has no business pulling that down to answer a
-      question the status line already answers. HEAD returns the status and
-      the headers and no body at all: verified against the real repo, 200
-      with content-length 771308 for a file that is there, 404 for one that
-      is not.
+      A directory listing, not a guess at a name. The plugin used to look for
+      exactly the name in the File name field and report "No tokens.json on
+      main yet" when the repo's file was called tokens_dtcg.json — technically
+      true, and useless, because the tokens were right there under a name
+      nobody had typed.
 
-      `content-length` is readable cross-origin without the server opting in
-      — it is one of the seven CORS-safelisted response headers — so the size
-      survives the iframe. Anything else might not, which is why every field
-      below is optional and the line still reads correctly without it.
+      So the folder is listed and every .json in it is offered in the File
+      name field itself (mountPrimaryFilename in buttons.tsx). One request and
+      no file bodies: GitHub's contents endpoint on a directory returns an
+      array of entries with names and sizes, and GitLab's tree endpoint does
+      the same.
 
-      A NON-404 FAILURE IS NOT "MISSING". If HEAD is refused (a host that
-      does not route it answers 405) the answer is "could not check", not
-      "no file" — reporting an absent file because the method was wrong
-      would send someone looking for a push that already happened.
+      NOT RECURSIVE, ON PURPOSE. It lists the folder the push writes to, which
+      is the folder the comparison is about. A repo-wide crawl would offer
+      files from directories this plugin has nothing to do with, and would
+      cost a whole tree walk to do it.
     */
-    function probeRepoFile(which) {
-      var filePath = repoFilePath(which);
-      var url, headers, branch;
+    function listRepoJsonFiles(which) {
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      var folder = (c.folder || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
+      var url, headers;
       if (which === 'gitlab') {
-        var c = gitlabConfig();
         url = c.host.replace(/\/+$/, '') + '/api/v4/projects/' + encodeURIComponent(c.project) +
-              '/repository/files/' + encodeURIComponent(filePath) +
-              '/raw?ref=' + encodeURIComponent(c.branch);
+              '/repository/tree?per_page=100&ref=' + encodeURIComponent(c.branch) +
+              (folder ? '&path=' + encodeURIComponent(folder) : '');
         headers = { 'PRIVATE-TOKEN': c.token };
-        branch = c.branch;
       } else {
-        var h = githubConfig();
-        var parts = h.repo.split('/');
+        var parts = (c.repo || '').split('/');
         if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
         url = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
               encodeURIComponent(parts[1]) + '/contents/' +
-              filePath.split('/').map(encodeURIComponent).join('/') +
-              '?ref=' + encodeURIComponent(h.branch);
-        headers = { 'Authorization': 'token ' + h.token, 'Accept': 'application/vnd.github.raw' };
-        branch = h.branch;
+              (folder ? folder.split('/').map(encodeURIComponent).join('/') : '') +
+              '?ref=' + encodeURIComponent(c.branch);
+        headers = { 'Authorization': 'token ' + c.token, 'Accept': 'application/vnd.github+json' };
       }
-      return fetch(url, { method: 'HEAD', headers: headers }).then(function (r) {
-        if (r.status === 404) return { found: false, path: filePath, branch: branch };
+      return fetch(url, { method: 'GET', headers: headers }).then(function (r) {
+        /* An empty repo, or a folder nothing has been written to, is not a
+           failure — it is where every repo starts. */
+        if (r.status === 404) return [];
         if (r.status === 401 || r.status === 403) throw { status: r.status, message: 'the token was refused' };
         if (!r.ok) throw { status: r.status, message: 'the repo answered ' + r.status };
-        var len = parseInt(r.headers.get('content-length') || '', 10);
-        return {
-          found: true, path: filePath, branch: branch,
-          bytes: isFinite(len) ? len : null,
-        };
+        return r.json();
+      }).then(function (rows) {
+        if (!Array.isArray(rows)) return [];
+        return rows.filter(function (e) {
+          /* GitHub says type 'file', GitLab says 'blob'. */
+          var isFile = e.type === 'file' || e.type === 'blob';
+          return isFile && /\.json$/i.test(e.name || '');
+        }).map(function (e) {
+          return { name: e.name, path: e.path, bytes: typeof e.size === 'number' ? e.size : null };
+        }).sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+      });
+    }
+
+    /*
+      The repo's document, parsed, and kept.
+
+      THE COMPARISON NEEDS THE BYTES AND SO DOES THE TOKEN COUNT, so this is
+      the one place that pulls them and both read what it got. Keyed by the
+      address it was read from (repoAddressKey), so a second look at the same
+      file is free and a look at a different one can never be answered with
+      the previous file's contents.
+    */
+    var repoDocCache = null;   // { key, doc, where, bytes }
+    function fetchRepoDoc(which, key) {
+      if (repoDocCache && repoDocCache.key === key) return Promise.resolve(repoDocCache);
+      return (which === 'gitlab' ? fetchGitLabFile() : fetchGitHubFile()).then(function (res) {
+        var doc;
+        try { doc = JSON.parse(res.text); }
+        catch (err) { throw { message: 'the file in the repo is not valid JSON' }; }
+        repoDocCache = { key: key, doc: doc, where: res.where, bytes: res.text.length };
+        return repoDocCache;
       });
     }
 
@@ -4580,24 +4840,31 @@
     /*
       THE CHECK THAT RUNS ON OPEN.
 
-      One HEAD per plugin load, against the file this card names, so the
-      answer to "is what I pushed still what is up there" is on screen
-      without anyone having to ask for it.
+      Two things, in one pass, because they come from the same place: what
+      JSON files the repo holds (which fill the File name field's dropdown)
+      and how many tokens are in the one this card is pointing at.
 
       IT DOES NOT NAVIGATE and it does not open a dialog. An automatic thing
       that moved the user to another page on load would be a worse version of
-      the button — the check reports, the button acts.
+      the Compare button — the check reports, the button acts.
 
       IT NEVER NAGS. A file that is not in the repo yet is the ordinary state
-      before the first push, so it is stated flatly and quietly; a failure is
-      one dimmed line and not a toast. The one thing this must not become is
-      an error the user has to dismiss on every open of a plugin they were
-      using for something else entirely.
+      before the first push, so it is stated flatly and quietly, and it names
+      what IS there instead — which is how you find out the tokens you were
+      looking for are sitting under a name you never typed. A failure is one
+      dimmed line, not a toast. The one thing this must not become is an
+      error to dismiss on every open of a plugin opened for something else.
+
+      WHAT IT COSTS, SAID PLAINLY. A listing, which is small, and then the
+      file itself, which is not — a token count cannot be had without the
+      bytes, and the count is what was asked for. The bytes are kept
+      (repoDocCache), so the Compare button that follows spends nothing and
+      answers immediately; the cost buys the page as well as the line.
 
       Once per ADDRESS, not once per load: refreshRepoReadRow() only calls
       this when the file being compared against has actually changed, so
       repeated settings churn costs nothing and a deliberate change to the
-      folder or the filename gets a fresh answer.
+      folder or the file name gets a fresh answer.
     */
     function checkRepo(which, key) {
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
@@ -4605,18 +4872,32 @@
          nobody is looking at any more. Two edits in quick succession can land
          out of order, and the older one would win by arriving last. */
       var current = function () { return repoCheckedFor === key; };
-      repoReadStatus('Checking ' + repoFilePath(which) + '…');
-      probeRepoFile(which).then(function (res) {
-        if (!current()) return;
-        if (!res.found) {
-          repoReadStatus('No ' + res.path + ' on ' + res.branch + ' yet');
-          return;
+      var branch = (which === 'gitlab' ? gitlabConfig() : githubConfig()).branch;
+      var wanted = repoFilePath(which).split('/').pop();
+      repoReadStatus('Reading ' + wanted + '…');
+      listRepoJsonFiles(which).then(function (files) {
+        if (!current()) return null;
+        /* The field learns what is actually in the repo whether or not the
+           name it is holding is one of them. */
+        window.PomPrimaryFilename.setOptions(files.map(function (f) { return f.name; }));
+        if (!files.some(function (f) { return f.name === wanted; })) {
+          repoReadStatus(files.length
+            ? 'No ' + wanted + ' — the repo holds ' + files.map(function (f) { return f.name; }).join(', ')
+            : 'No ' + wanted + ' on ' + branch + ' yet');
+          return null;
         }
-        repoReadStatus(res.path + ' @ ' + res.branch +
-                       (res.bytes === null ? '' : '  ·  ' + repoSizeLabel(res.bytes)));
-      }, function (err) {
+        return fetchRepoDoc(which, key).then(function (got) {
+          if (!current()) return;
+          /* THE COUNT, NOT THE NAME. The card above already names this file;
+             repeating it here told nobody anything they could not see. How
+             many tokens the repo's copy holds is the one number that answers
+             "is the repo behind" at a glance — and it is the same walk the
+             Compare page counts with, so the two can never disagree. */
+          repoReadStatus(tokensLabel(window.PomJsonDiff.countTokens(got.doc)) + '  ·  ' + branch);
+        });
+      }).then(null, function (err) {
         if (!current()) return;
-        repoReadStatus('Could not check ' + label + ' — ' + ((err && err.message) || 'the request failed'),
+        repoReadStatus('Could not read ' + label + ' — ' + ((err && err.message) || 'the request failed'),
                        'error');
       });
     }
@@ -5503,10 +5784,9 @@
           request when the address has actually changed) and says out loud
           that an open is one of the moments this runs.
 
-          It costs one HEAD carrying the token per plugin open. That is the
-          deliberate price of the answer being on screen without being asked
-          for; probeRepoFile() is a HEAD precisely so it stays that cheap
-          whatever the file grows to.
+          What an open costs is set out on checkRepo() itself: a directory
+          listing, and then the repo's file, which is kept so the Compare
+          button spends nothing.
         */
         refreshRepoReadRow();
       }

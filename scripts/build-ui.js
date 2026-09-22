@@ -94,6 +94,12 @@ async function main() {
     'src/import-compile.js',
     'src/import-verify.js',
     'src/import-diff.js',
+    /* Not part of the import pipeline at all — it is the Compare page's
+       engine, and it rides in here because this is the list of modules the
+       UI gets. It answers a different question from import-diff.js (document
+       against document, rather than document against the live variable
+       graph); see its own header. */
+    'src/json-diff.js',
   ];
   const importPipeline = IMPORT_MODULES
     .map((m) => '// ===== ' + m + ' =====\n' + fs.readFileSync(path.join(ROOT, m), 'utf8'))
