@@ -1570,15 +1570,34 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             modes: c.modes.map((m, mi) => ({ modeId: 'C' + ci + ':' + mi, name: m })),
             variables: c.vars.map((v, vi) => {
               const valuesByMode = {};
-              c.modes.forEach((m, mi) => { valuesByMode['C' + ci + ':' + mi] = v.value; });
+              c.modes.forEach((m, mi) => {
+                valuesByMode['C' + ci + ':' + mi] = v.aliasTo
+                  ? { type: 'VARIABLE_ALIAS', id: v.aliasTo }
+                  : v.value;
+              });
               return { id: 'C' + ci + 'V' + vi, name: v.name, type: v.type || 'COLOR',
                        resolvedType: v.type || 'COLOR', valuesByMode,
                        description: '', scopes: ['ALL_SCOPES'], codeSyntax: {} };
             }),
           }));
+          /* aliasInfo is what the transform actually reads for a reference —
+             a graph carrying only the VARIABLE_ALIAS value exports as a
+             literal and tests nothing. */
+          const byId = {};
+          collections.forEach((c) => c.variables.forEach((v) => { byId[v.id] = { v, col: c.name }; }));
           collections.forEach((c) => c.variables.forEach((v) => {
             v.resolvedValuesByMode = {}; v.aliasInfo = {};
-            for (const mid of Object.keys(v.valuesByMode)) v.resolvedValuesByMode[mid] = v.valuesByMode[mid];
+            for (const mid of Object.keys(v.valuesByMode)) {
+              const val = v.valuesByMode[mid];
+              if (val && val.type === 'VARIABLE_ALIAS' && byId[val.id]) {
+                const t = byId[val.id];
+                v.aliasInfo[mid] = { isAlias: true, aliasedVarId: val.id, aliasedVarCollection: t.col,
+                  aliasPath: ctx.buildAliasPath(t.v, t.col, c.name, collections) };
+                v.resolvedValuesByMode[mid] = null;
+              } else {
+                v.resolvedValuesByMode[mid] = val;
+              }
+            }
           }));
           return { collections, styles: { textStyles: [], effectStyles: [] } };
         };
@@ -1636,6 +1655,31 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
         ok('exporter: a breakpoint collection closes',
            ctx.validateReferenceClosure(bp).ok === true,
            JSON.stringify(ctx.validateReferenceClosure(bp).missingRoots));
+
+        /* "core." IS NOT ALWAYS NOISE. fixAliasPaths strips that prefix off
+           every reference, which is right when ".core" is a dot-collection
+           whose variables are named "dimension/0" — the token is published at
+           "dimension.0" and the strip is what makes ref and token meet.
+
+           A resolved DTCG tree inverts it: "core" is a GROUP, its variables
+           are named "core/dimension/0", nothing is stripped from the token
+           path, and the token really does live at "core.dimension.0". The
+           unconditional strip broke every one — 645 of 645 references in a
+           real import. */
+        /* The referencing token has to sit in a set the NAMED rules emit —
+           breakpoint here. fixAliasPaths runs before the generic pass-through,
+           so a reference living in a passed-through set is never reached by it
+           and a fixture built that way passes whatever the strip does. */
+        const coreGroup = exportOf([
+          { name: 'core', modes: ['core'],
+            vars: [{ name: 'core/dimension/0', value: 4, type: 'FLOAT' }] },
+          { name: 'breakpoint', modes: ['breakpoint'],
+            vars: [{ name: 'breakpoint/mobile/spacing/component/0', value: 4, type: 'FLOAT', aliasTo: 'C0V0' }] },
+        ]);
+        const coreClosure = ctx.validateReferenceClosure(coreGroup);
+        ok('exporter: a "core" GROUP keeps its prefix in references',
+           coreClosure.ok === true,
+           JSON.stringify(coreClosure.missingRoots) + ' ' + JSON.stringify(coreClosure.sampleBroken));
 
         /* foundation.typography is generated — every scale times a fixed list
            of ten props — so on scales that carry fewer it named tokens that

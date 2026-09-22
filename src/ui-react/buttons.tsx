@@ -17,7 +17,7 @@
   node.css) around a plain uncontrolled <input>/<textarea> carrying the caller's
   id. The field still paints from the DS; the template still reads it by id.
 */
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
@@ -118,6 +118,9 @@ const IconArrowLeft = svg('M19 12H5M12 19l-7-7 7-7');
 */
 const IconImport = svg('M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M4 12h11m0 0l-4-4m4 4l-4 4');
 const IconDownload = svg('M12 3v11m0 0l-4-4m4 4l4-4M5 20h14');
+/* Two sheets, the back one offset — the ordinary copy glyph. IconCheck is
+   already declared a few lines below, beside the gear. */
+const IconCopy = svg('M9 9h9a2 2 0 012 2v9a2 2 0 01-2 2H9a2 2 0 01-2-2v-9a2 2 0 012-2M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1');
 // The exact gear glyph the Settings page's own header uses (ui.template.html,
 // the decorative .git-logo icon) — same path, so "Settings" reads as one
 // glyph everywhere instead of this button showing sliders and the page it
@@ -440,7 +443,11 @@ declare global {
       setSummary: (tokensLabel: string) => void;
     };
     PomJsonFileCard: { setSize: (sizeLabel: string) => void };
-    PomClosureWarning: { show: (title: string, groups: { ref: string; froms: string[] }[], more?: number, note?: string) => void; hide: () => void };
+    PomClosureWarning: {
+      show: (title: string, groups: { ref: string; froms: string[] }[], more?: number, note?: string,
+             copyText?: string) => void;
+      hide: () => void;
+    };
     PomCommitMessage: DisabledHandle;
     PomVersionTag: { setLabel: (label: string) => void };
     PomRemoveGithubDialog: { open: () => void; onConfirm: (() => void) | null };
@@ -1115,9 +1122,53 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
   const container = document.getElementById('closure-warning-mount');
   let set: (u: (s: any) => any) => void = () => {};
   function View() {
-    const [s, setS] = useState<{ open: boolean; title: string; groups: { ref: string; froms: string[] }[]; more: number; note: string }>({ open: false, title: '', groups: [], more: 0, note: '' });
+    const [s, setS] = useState<{ open: boolean; title: string; groups: { ref: string; froms: string[] }[]; more: number; note: string; copyText: string }>({ open: false, title: '', groups: [], more: 0, note: '', copyText: '' });
+    const [copied, setCopied] = useState<'' | 'ok' | 'fail'>('');
+    /* ABOVE the early return: this component renders null until something is
+       wrong, and a hook after that return runs on some renders and not others
+       — which is not a style point, it throws and the whole Alert stops
+       mounting. */
+    const taRef = useRef<HTMLTextAreaElement | null>(null);
     set = setS;
     if (!s.open) return null;
+
+    /*
+      COPY THE WHOLE LIST, not the fifteen on screen.
+
+      A plugin UI is a sandboxed iframe with no allow-same-origin, where
+      navigator.clipboard is commonly absent and throws where it is not, and
+      execCommand — deprecated everywhere — is often the only one that works.
+      Neither can be relied on and neither can be tested from outside Figma,
+      so the LAST resort is built to be a real answer rather than an apology:
+      a selected, read-only box holding the whole report, which Cmd-C copies.
+
+      The box is part of this component, not a detached node appended to the
+      body. The first version did the latter and left one behind on every
+      failed click — two clicks, two textareas, growing for as long as someone
+      kept trying.
+    */
+    const copy = async () => {
+      const text = s.copyText || '';
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          setCopied('ok'); setTimeout(() => setCopied(''), 2000);
+          return;
+        }
+      } catch { /* fall through to the box */ }
+      setCopied('fail');
+      /* After the render that creates it: select, then try execCommand while
+         the selection is live. If that works the box has done its job
+         invisibly; if not it stays, selected, for the person to copy. */
+      setTimeout(() => {
+        const ta = taRef.current;
+        if (!ta) return;
+        ta.focus(); ta.select();
+        let worked = false;
+        try { worked = document.execCommand('copy'); } catch { worked = false; }
+        if (worked) { setCopied('ok'); setTimeout(() => setCopied(''), 2000); }
+      }, 0);
+    };
     return (
       <Alert tone="error" title={s.title}>
         {/*
@@ -1140,12 +1191,36 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
           ))}
         </ul>
         {s.more > 0 && <p className="closure-warning-more">+{s.more} more affected</p>}
+        {copied === 'fail' && (
+          <textarea
+            ref={taRef}
+            className="closure-warning-copybox"
+            readOnly
+            value={s.copyText}
+            onFocus={(e) => e.currentTarget.select()}
+            aria-label="The full list of broken references, ready to copy"
+          />
+        )}
+        {s.copyText ? (
+          <div className="closure-warning-actions">
+            <PomButton
+              id="closure-copy-btn"
+              variant="tonal"
+              size="small"
+              label={copied === 'ok' ? 'Copied' : copied === 'fail' ? 'Select and copy below' : 'Copy all'}
+              leftIcon
+              buttonLeftIcon={copied === 'ok' ? IconCheck(16) : IconCopy(16)}
+              onClick={copy}
+            />
+          </div>
+        ) : null}
       </Alert>
     );
   }
   if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   window.PomClosureWarning = {
-    show: (title, groups, more, note) => set(() => ({ open: true, title, groups, more: more || 0, note: note || '' })),
+    show: (title, groups, more, note, copyText) =>
+      set(() => ({ open: true, title, groups, more: more || 0, note: note || '', copyText: copyText || '' })),
     hide: () => set((s) => ({ ...s, open: false })),
   };
 })();

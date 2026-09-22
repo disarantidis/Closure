@@ -1740,6 +1740,24 @@
     /* Only shown once the backend's own 15-item sample cap is reached
        (validateReferenceClosure's sampleBroken) — plain text, not
        monospace, since it's a count/sentence, not a path. */
+    .closure-warning-actions { margin-top: 10px; display: flex; }
+    /* The last-resort copy box: shown only when neither clipboard route
+       worked, holding the whole report with its text already selected. */
+    .closure-warning-copybox {
+      margin-top: 10px;
+      width: 100%;
+      height: 120px;
+      resize: vertical;
+      background: var(--app-bg, #1a1a1a);
+      color: var(--app-text);
+      border: 1px solid var(--app-border);
+      border-radius: 8px;
+      padding: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      white-space: pre;
+    }
     .closure-warning-more {
       margin: 6px 0 0;
       font-size: 12px;
@@ -4791,6 +4809,45 @@
         window.PomCollectionsAccordion.setSummary(formatTokenCount(msg.validation.actual.totalTokens) + ' Tokens');
         window.PomJsonFileCard.setSize(exportMB + ' MB');
 
+        /*
+          THE WHOLE LIST AS TEXT, for the Copy button.
+
+          Built from closure.broken — everything, up to the cap
+          validateReferenceClosure applies — rather than from the fifteen the
+          panel shows. Fifteen is the right number to READ; it is the wrong
+          number to hand to whoever can fix it, because the tail is where the
+          unfamiliar names are.
+
+          Grouped by the missing ref, most-depended-on first, same as the
+          panel — so what is pasted has the same shape as what was on screen.
+        */
+        function buildClosureReport(closure) {
+          var all = closure.broken || closure.sampleBroken || [];
+          if (!all.length) return '';
+          var byRef = {}, order = [];
+          all.forEach(function (item) {
+            if (!byRef[item.ref]) { byRef[item.ref] = []; order.push(item.ref); }
+            byRef[item.ref].push(item.from);
+          });
+          order.sort(function (a, b) { return byRef[b].length - byRef[a].length; });
+          var lines = [
+            closure.brokenCount.toLocaleString() + ' broken reference(s) of ' +
+              closure.totalRefs.toLocaleString() + ', across ' + order.length + ' missing token(s)',
+            'file: ' + (lastFigmaFileName || 'unknown'),
+            '',
+          ];
+          order.forEach(function (ref) {
+            lines.push(ref + '  (' + byRef[ref].length + ')');
+            byRef[ref].forEach(function (from) { lines.push('    used by ' + from); });
+            lines.push('');
+          });
+          if (closure.brokenCount > all.length) {
+            lines.push('… and ' + (closure.brokenCount - all.length).toLocaleString() +
+                       ' more, beyond the ' + all.length.toLocaleString() + ' this report carries');
+          }
+          return lines.join('\n');
+        }
+
         // Reference-closure check: warn when the export ships dangling {refs}.
         // validateReferenceClosure() (code.js) returns the exact broken
         // token path for every dangling reference as sampleBroken —
@@ -4839,7 +4896,8 @@
               ? 'The import itself is fine — these variables exist in Figma. ' +
                 'It is exporting them again that would lose them, because this export ' +
                 'does not recognise the collections they are in:'
-              : 'Not present in this export, but referenced by:'
+              : 'Not present in this export, but referenced by:',
+            buildClosureReport(closure)
           );
           justImported = false;
         } else {

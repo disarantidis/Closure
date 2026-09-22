@@ -1740,6 +1740,24 @@
     /* Only shown once the backend's own 15-item sample cap is reached
        (validateReferenceClosure's sampleBroken) — plain text, not
        monospace, since it's a count/sentence, not a path. */
+    .closure-warning-actions { margin-top: 10px; display: flex; }
+    /* The last-resort copy box: shown only when neither clipboard route
+       worked, holding the whole report with its text already selected. */
+    .closure-warning-copybox {
+      margin-top: 10px;
+      width: 100%;
+      height: 120px;
+      resize: vertical;
+      background: var(--app-bg, #1a1a1a);
+      color: var(--app-text);
+      border: 1px solid var(--app-border);
+      border-radius: 8px;
+      padding: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      white-space: pre;
+    }
     .closure-warning-more {
       margin: 6px 0 0;
       font-size: 12px;
@@ -23460,7 +23478,7 @@ html[data-theme=dark] {
             var dispatcher = resolveDispatcher();
             return dispatcher.useReducer(reducer, initialArg, init);
           }
-          function useRef4(initialValue) {
+          function useRef5(initialValue) {
             var dispatcher = resolveDispatcher();
             return dispatcher.useRef(initialValue);
           }
@@ -24254,7 +24272,7 @@ html[data-theme=dark] {
           exports.useLayoutEffect = useLayoutEffect;
           exports.useMemo = useMemo;
           exports.useReducer = useReducer;
-          exports.useRef = useRef4;
+          exports.useRef = useRef5;
           exports.useState = useState3;
           exports.useSyncExternalStore = useSyncExternalStore;
           exports.useTransition = useTransition;
@@ -48144,6 +48162,7 @@ html[data-theme=dark] {
   var IconArrowLeft = svg("M19 12H5M12 19l-7-7 7-7");
   var IconImport = svg("M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M4 12h11m0 0l-4-4m4 4l-4 4");
   var IconDownload = svg("M12 3v11m0 0l-4-4m4 4l4-4M5 20h14");
+  var IconCopy = svg("M9 9h9a2 2 0 012 2v9a2 2 0 01-2 2H9a2 2 0 01-2-2v-9a2 2 0 012-2M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1");
   var IconSettings = svg(
     "m14 1 .5 2.75a.992.992 0 0 0 1.448.71l.102-.06 2.3-1.6 2.85 2.85-1.6 2.3c-.378.567-.087 1.312.537 1.52l.113.03L23 10v4l-2.75.5a.992.992 0 0 0-.71 1.448l.06.102 1.6 2.3-2.85 2.85-2.3-1.6c-.567-.378-1.312-.087-1.52.537l-.03.113L14 23h-4l-.5-2.75c-.142-.661-.863-1.01-1.448-.71l-.102.06-2.3 1.6-2.85-2.85 1.6-2.3c.378-.567.087-1.312-.537-1.52l-.113-.03L1 14v-4l2.75-.5a.992.992 0 0 0 .71-1.448L4.4 7.95l-1.6-2.3L5.65 2.8l2.3 1.6c.567.378 1.312.087 1.52-.537l.03-.113L10 1zm-1.25 1.5h-1.5l-.3 1.5c-.2 1.2-1.25 2.05-2.45 2.05-.437 0-.875-.115-1.246-.345L5.8 4.7 4.75 5.75l.9 1.3c.464.65.584 1.472.318 2.227L5.9 9.45c-.279.743-.902 1.27-1.67 1.462l-.18.038-1.55.3v1.5l1.55.25c.85.15 1.5.7 1.85 1.5a2.43 2.43 0 0 1-.149 2.247l-.101.153-.9 1.3 1.05 1.05 1.3-.9c.4-.3.9-.45 1.4-.45 1.145 0 2.154.774 2.418 1.889l.332 1.711h1.5l.3-1.55c.2-1.2 1.25-2.05 2.45-2.05.438 0 .875.115 1.245.345L18.2 19.25l1.05-1.05-.9-1.3c-.5-.7-.55-1.6-.25-2.3.279-.743.902-1.27 1.67-1.462l.18-.038 1.55-.3v-1.5l-1.55-.3c-.85-.15-1.5-.7-1.85-1.5a2.43 2.43 0 0 1 .149-2.247l.101-.153.9-1.3-1.05-1.05-1.3.9c-.4.3-.9.45-1.4.45a2.474 2.474 0 0 1-2.418-1.889zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6",
     { fill: true, fillRule: "evenodd" }
@@ -48815,9 +48834,40 @@ html[data-theme=dark] {
     let set = () => {
     };
     function View() {
-      const [s, setS] = (0, import_react16.useState)({ open: false, title: "", groups: [], more: 0, note: "" });
+      const [s, setS] = (0, import_react16.useState)({ open: false, title: "", groups: [], more: 0, note: "", copyText: "" });
+      const [copied, setCopied] = (0, import_react16.useState)("");
+      const taRef = (0, import_react16.useRef)(null);
       set = setS;
       if (!s.open) return null;
+      const copy = async () => {
+        const text = s.copyText || "";
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            setCopied("ok");
+            setTimeout(() => setCopied(""), 2e3);
+            return;
+          }
+        } catch {
+        }
+        setCopied("fail");
+        setTimeout(() => {
+          const ta = taRef.current;
+          if (!ta) return;
+          ta.focus();
+          ta.select();
+          let worked = false;
+          try {
+            worked = document.execCommand("copy");
+          } catch {
+            worked = false;
+          }
+          if (worked) {
+            setCopied("ok");
+            setTimeout(() => setCopied(""), 2e3);
+          }
+        }, 0);
+      };
       return /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)(Alert, { tone: "error", title: s.title, children: [
         /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("p", { className: "closure-warning-subtitle", children: s.note || "Not present in this export, but referenced by:" }),
         /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("ul", { className: "closure-warning-list", children: s.groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("li", { children: [
@@ -48831,12 +48881,35 @@ html[data-theme=dark] {
           "+",
           s.more,
           " more affected"
-        ] })
+        ] }),
+        copied === "fail" && /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
+          "textarea",
+          {
+            ref: taRef,
+            className: "closure-warning-copybox",
+            readOnly: true,
+            value: s.copyText,
+            onFocus: (e) => e.currentTarget.select(),
+            "aria-label": "The full list of broken references, ready to copy"
+          }
+        ),
+        s.copyText ? /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { className: "closure-warning-actions", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
+          PomButton,
+          {
+            id: "closure-copy-btn",
+            variant: "tonal",
+            size: "small",
+            label: copied === "ok" ? "Copied" : copied === "fail" ? "Select and copy below" : "Copy all",
+            leftIcon: true,
+            buttonLeftIcon: copied === "ok" ? IconCheck(16) : IconCopy(16),
+            onClick: copy
+          }
+        ) }) : null
       ] });
     }
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) }));
     window.PomClosureWarning = {
-      show: (title, groups, more, note) => set(() => ({ open: true, title, groups, more: more || 0, note: note || "" })),
+      show: (title, groups, more, note, copyText) => set(() => ({ open: true, title, groups, more: more || 0, note: note || "", copyText: copyText || "" })),
       hide: () => set((s) => ({ ...s, open: false }))
     };
   })();
@@ -52405,7 +52478,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'a88b7b1 17:09:16';
+    var CLOSURE_BUILD = '1e7fa68 17:26:58';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -54656,6 +54729,45 @@ function format(report, limit) {
         window.PomCollectionsAccordion.setSummary(formatTokenCount(msg.validation.actual.totalTokens) + ' Tokens');
         window.PomJsonFileCard.setSize(exportMB + ' MB');
 
+        /*
+          THE WHOLE LIST AS TEXT, for the Copy button.
+
+          Built from closure.broken — everything, up to the cap
+          validateReferenceClosure applies — rather than from the fifteen the
+          panel shows. Fifteen is the right number to READ; it is the wrong
+          number to hand to whoever can fix it, because the tail is where the
+          unfamiliar names are.
+
+          Grouped by the missing ref, most-depended-on first, same as the
+          panel — so what is pasted has the same shape as what was on screen.
+        */
+        function buildClosureReport(closure) {
+          var all = closure.broken || closure.sampleBroken || [];
+          if (!all.length) return '';
+          var byRef = {}, order = [];
+          all.forEach(function (item) {
+            if (!byRef[item.ref]) { byRef[item.ref] = []; order.push(item.ref); }
+            byRef[item.ref].push(item.from);
+          });
+          order.sort(function (a, b) { return byRef[b].length - byRef[a].length; });
+          var lines = [
+            closure.brokenCount.toLocaleString() + ' broken reference(s) of ' +
+              closure.totalRefs.toLocaleString() + ', across ' + order.length + ' missing token(s)',
+            'file: ' + (lastFigmaFileName || 'unknown'),
+            '',
+          ];
+          order.forEach(function (ref) {
+            lines.push(ref + '  (' + byRef[ref].length + ')');
+            byRef[ref].forEach(function (from) { lines.push('    used by ' + from); });
+            lines.push('');
+          });
+          if (closure.brokenCount > all.length) {
+            lines.push('… and ' + (closure.brokenCount - all.length).toLocaleString() +
+                       ' more, beyond the ' + all.length.toLocaleString() + ' this report carries');
+          }
+          return lines.join('\n');
+        }
+
         // Reference-closure check: warn when the export ships dangling {refs}.
         // validateReferenceClosure() (code.js) returns the exact broken
         // token path for every dangling reference as sampleBroken —
@@ -54704,7 +54816,8 @@ function format(report, limit) {
               ? 'The import itself is fine — these variables exist in Figma. ' +
                 'It is exporting them again that would lose them, because this export ' +
                 'does not recognise the collections they are in:'
-              : 'Not present in this export, but referenced by:'
+              : 'Not present in this export, but referenced by:',
+            buildClosureReport(closure)
           );
           justImported = false;
         } else {
