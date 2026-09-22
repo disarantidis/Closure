@@ -189,7 +189,13 @@ function applyLevels(ir, levels) {
        then be re-addressed by a declaration — see address(). Without this the
        $themes set map silently won, and choosing "modes" or "collections"
        produced the same document: only the NAME change survived. */
+    /* originGroup survives the rewrite. A `collection` reading replaces the
+       group with the segment's own value — "restrictions" becomes "normal" and
+       "subtle" — and without this the collections it produced could no longer
+       be traced back to the choice that produced them, which is exactly what a
+       per-group preview has to do. */
     return Object.assign({}, r, { group, variant, leveled: true,
+                                  originGroup: r.originGroup || r.group,
                                   path: rest.join('.') || segs[segs.length - 1] });
   });
   return Object.assign({}, ir, { rows });
@@ -475,7 +481,7 @@ function derive(ir, opts) {
   const groupOfCol = new Map();
   for (const r of ir.rows) {
     const a = address(r);
-    if (!modesOf.has(a.col)) { modesOf.set(a.col, []); groupOfCol.set(a.col, r.group); }
+    if (!modesOf.has(a.col)) { modesOf.set(a.col, []); groupOfCol.set(a.col, r.originGroup || r.group); }
     const ms = modesOf.get(a.col);
     if (ms.indexOf(a.mode) === -1) ms.push(a.mode);
 

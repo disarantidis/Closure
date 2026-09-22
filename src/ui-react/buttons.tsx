@@ -1233,63 +1233,74 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
     /*
       GROUPED BY THE GROUP, because that is the thing being described. A flat
       list repeats "restrictions" once per depth and buries the fact that the
-      depths belong to one tree — the first of them is the outer level and the
-      rest sit inside it.
+      depths belong to one tree — the first is the outer level and the rest sit
+      inside it.
     */
     const byGroup: Record<string, any[]> = {};
     candidates.forEach((c) => { (byGroup[c.group] = byGroup[c.group] || []).push(c); });
 
     return (
-      <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-5)' }}>
-        {Object.keys(byGroup).map((group) => (
-          <span key={group} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text)' }}>{group}</span>
-            {byGroup[group].map((c) => {
-              const role = c.role || 'name';
-              const modeTaken = !!c.modeTakenBySibling;
-              return (
-                <span key={c.depth} className="import-level-row">
-                  <span className="import-level-values" title={c.values.join(', ')}>
-                    {c.values.slice(0, 4).join(', ')}
-                    {c.values.length > 4 ? ', \u2026 (' + c.values.length + ')' : ''}
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-6)' }}>
+        {Object.keys(byGroup).map((group) => {
+          /* Only the collections THIS group produced. The preview belongs
+             beside the choice that determines it, not in one pile at the
+             bottom where it answers for everything at once. */
+          const mine = collections.filter((x) => x.fromGroup === group);
+          return (
+            <span key={group} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text)' }}>{group}</span>
+
+              {byGroup[group].map((c) => {
+                const role = c.role || 'name';
+                const modeTaken = !!c.modeTakenBySibling;
+                const shown = c.values.slice(0, 5);
+                return (
+                  <span key={c.depth} className="import-level-row">
+                    {/* The values, one per line. Run together on a single line
+                        they read as prose and nobody counts them; as a list the
+                        shape of the axis is visible at a glance. */}
+                    <ul className="import-level-values">
+                      {shown.map((v: string) => <li key={v} title={v}>{v}</li>)}
+                      {c.values.length > shown.length && (
+                        <li className="is-more">+{c.values.length - shown.length} more</li>
+                      )}
+                    </ul>
+                    <span className="import-level-control">
+                      <DropDownSelect
+                        /* DropDownSelect RENDERS its label — there is no
+                           labelHidden, and hiding it in CSS would leave the
+                           control unnamed, since the component drops aria-label
+                           when a visible <label> owns the name. Kept to two
+                           words because it repeats down the column. */
+                        label="read as"
+                        size="small"
+                        block
+                        value={role}
+                        options={[
+                          { value: 'name', label: ROLE_LABEL.name },
+                          { value: 'mode', label: ROLE_LABEL.mode + (modeTaken ? ' \u2014 axis taken' : ''), disabled: modeTaken },
+                          { value: 'collection', label: ROLE_LABEL.collection },
+                        ]}
+                        onChange={(v: string) => window.PomImportLevels.onToggle?.(c.group, c.depth, v)}
+                      />
+                    </span>
                   </span>
-                  <span className="import-level-control">
-                    <DropDownSelect
-                      /* DropDownSelect RENDERS its label — there is no
-                         labelHidden, and hiding it in CSS would leave the
-                         control unnamed, since the component drops aria-label
-                         when a visible <label> owns the name. So it gets a
-                         real one, kept to two words because it repeats down
-                         the column and the values to its left are the row's
-                         actual identity. */
-                      label="read as"
-                      size="small"
-                      block
-                      value={role}
-                      options={[
-                        { value: 'name', label: ROLE_LABEL.name },
-                        { value: 'mode', label: ROLE_LABEL.mode + (modeTaken ? ' \u2014 axis taken' : ''), disabled: modeTaken },
-                        { value: 'collection', label: ROLE_LABEL.collection },
-                      ]}
-                      onChange={(v: string) => window.PomImportLevels.onToggle?.(c.group, c.depth, v)}
-                    />
-                  </span>
+                );
+              })}
+
+              {mine.length > 0 && (
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <span className="import-fig-label">How this lands in Figma</span>
+                  <Preview collections={mine} />
                 </span>
-              );
-            })}
-          </span>
-        ))}
-        {collections.length > 0 && (
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--app-text)' }}>
-              How this lands in Figma
+              )}
             </span>
-            <Preview collections={collections} />
-          </span>
-        )}
+          );
+        })}
       </span>
     );
   }
+
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomImportLevels = { set: (c, a, cols) => set(c, a, cols || []), onToggle: null };
 })();

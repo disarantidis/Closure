@@ -1150,6 +1150,26 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
      Array.isArray(plan.collections[0].sample) && plan.collections[0].sample[0] === 'a/b',
      JSON.stringify(plan.collections[0].sample));
 }
+{
+  /* Each group's preview shows the collections THAT group produced, so every
+     collection has to remember where it came from. A `collection` reading
+     replaces the group with the segment's own value — "restrictions" becomes
+     "normal" and "subtle" — and without originGroup surviving that rewrite,
+     the collections could no longer be traced to the choice that made them. */
+  const doc = { $metadata: { tokenSetOrder: ['r'] },
+    r: { normal: { x: tok('#111111') }, subtle: { x: tok('#222222') } } };
+  const ir = toIR(doc);
+  const split = derive(ir, { levels: { r: { 0: 'collection' } } });
+  ok('preview: a split still traces back to the group that chose it',
+     split.collections.length === 2 &&
+     split.collections.every((c) => c.fromGroup === 'r'),
+     JSON.stringify(split.collections.map((c) => c.name + '<-' + c.fromGroup)));
+
+  const folded = derive(ir, { levels: { r: { 0: 'mode' } } });
+  ok('preview: and so does a fold',
+     folded.collections.every((c) => c.fromGroup === 'r'),
+     JSON.stringify(folded.collections.map((c) => c.name + '<-' + c.fromGroup)));
+}
 
 /* ── the EXPORT declares its own nesting ─────────────────────────────────── */
 {
