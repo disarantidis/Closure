@@ -1180,6 +1180,25 @@
     }
     .import-drop-hint { margin: 0 0 10px; font-size: 11px; opacity: 0.75; }
 
+    /* Sits under the drop target as the second route in, quieter than it —
+       the drop zone is the thing to try first on a file you already have. */
+    .import-repo {
+      margin-top: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--app-border);
+      border-radius: 16px;
+      text-align: center;
+    }
+    .import-repo-title { margin: 0 0 2px; font-size: 12px; font-weight: 600; color: var(--app-text); }
+    .import-repo-hint {
+      margin: 0 0 10px;
+      font-size: 11px;
+      opacity: 0.7;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+    }
+    .import-repo-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
     .import-card {
       background: var(--background);
       border-radius: 24px;
@@ -2222,6 +2241,21 @@
         <input type="file" id="import-file" accept=".json,application/json" hidden>
       </div>
 
+      <!-- The other way in. The repo settings already name a file, a folder and
+           a branch, and the push already writes there — so "what is in the
+           repo" is an address this plugin knows. Both providers get their own
+           button rather than a guess: a push goes to both, a comparison has to
+           be against one of them, and only the person knows which. Hidden
+           whole when neither is configured. -->
+      <div class="import-repo" id="import-repo" hidden>
+        <p class="import-repo-title">…or read the one in the repo</p>
+        <p class="import-repo-hint" id="import-repo-hint"></p>
+        <div class="import-repo-actions">
+          <span id="import-pull-gitlab-mount"></span>
+          <span id="import-pull-github-mount"></span>
+        </div>
+      </div>
+
       <!-- Step 2. What arrived. -->
       <!-- Step 2a. WHICH FILE — its own card, and separate from the facts
            below on purpose. The two answer different questions and arrive at
@@ -3233,7 +3267,81 @@
     function openImport() {
       document.getElementById('main-page').classList.add('hidden');
       document.getElementById('import-page').classList.add('visible');
+      refreshImportRepoRow();
     }
+
+    /*
+      The repo route appears only when there is a repo to read. Recomputed on
+      every open rather than once at load, because the settings can change
+      between two visits to this page and a button pointing at a repo that is
+      no longer configured is worse than no button.
+    */
+    function refreshImportRepoRow() {
+      var row = document.getElementById('import-repo');
+      if (!row) return;
+      var gl = isGitLabReady(), gh = isGitHubReady();
+      document.getElementById('import-pull-gitlab-mount').hidden = !gl;
+      document.getElementById('import-pull-github-mount').hidden = !gh;
+      row.hidden = !gl && !gh;
+      if (row.hidden) return;
+      /* The exact address, because "read from the repo" is a promise about a
+         specific file and showing which one is how it stays checkable. */
+      var where = [];
+      if (gl) { var c = gitlabConfig(); where.push(composeFilePath(c.folder, c.filename) + ' @ ' + c.branch); }
+      if (gh) { var h = githubConfig(); where.push(composeFilePath(h.folder, h.filename) + ' @ ' + h.branch); }
+      document.getElementById('import-repo-hint').textContent =
+        where.filter(function (w, i, a) { return a.indexOf(w) === i; }).join('   ·   ');
+    }
+
+    /*
+      PULL, THEN THE ORDINARY IMPORT PATH. Everything after the fetch —
+      detecting the shape, measuring the architecture, compiling, and diffing
+      against what is in Figma right now — is the same code a dropped file
+      goes through. The repo is a source of bytes, not a second pipeline.
+    */
+    function pullFromRepo(which) {
+      var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
+      showToast('Reading from ' + label + '…');
+      (which === 'gitlab' ? fetchGitLabFile() : fetchGitHubFile()).then(function (res) {
+        importState.fileName = res.where;
+        importState.fileBytes = res.text.length;
+        showImportFile({ busy: true });
+        importDrop.hidden = true;
+        /* The same yield a dropped file needs: everything below this is
+           synchronous and the spinner would never turn without it. */
+        requestAnimationFrame(function () { setTimeout(function () {
+          var doc;
+          try { doc = JSON.parse(res.text); }
+          catch (err) { importProblem('Not valid JSON', String(err.message || err)); return; }
+          /*
+            A RESOLVED EXPORT CANNOT BE COMPARED, and saying so is the only
+            honest answer. It is a materialised cross-product: the aliases that
+            carried the architecture were evaluated away, so reading it back
+            reconstructs a DIFFERENT shape — one real file came back as 2
+            collections where the document has 14. Diffing that would report a
+            near-total rewrite of a file nobody has touched, which is not a
+            difference, it is an artefact of the format.
+
+            The export says which it is, so this is a fact rather than a guess.
+          */
+          var ext = doc && doc.$extensions && doc.$extensions['com.closure'];
+          if (ext && ext.format === 'resolved') {
+            importProblem('That is a resolved export',
+              'A resolved document has had its references evaluated away, so the collections and ' +
+              'modes it came from cannot be read back out of it — comparing it would report a ' +
+              'rewrite of everything rather than what actually differs. Push the legacy or DTCG ' +
+              'shape to the repo and read that instead.');
+            return;
+          }
+          importState.decisions = {}; importState.levels = {};
+          runImport(doc, res.where);
+        }, 0); });
+      }, function (err) {
+        showToast((err && err.message) || ('Could not read from ' + label), true);
+      });
+    }
+    document.getElementById('import-pull-gitlab-btn').addEventListener('click', function () { pullFromRepo('gitlab'); });
+    document.getElementById('import-pull-github-btn').addEventListener('click', function () { pullFromRepo('github'); });
     function closeImport() {
       document.getElementById('import-page').classList.remove('visible');
       document.getElementById('main-page').classList.remove('hidden');
@@ -4451,6 +4559,74 @@
 
     function encodeContent(tokens) {
       return btoa(unescape(encodeURIComponent(JSON.stringify(tokens, null, 2))));
+    }
+
+    /*
+      ── READING THE REPO BACK ────────────────────────────────────────────────
+
+      The same address the push writes to, composed the same way from the same
+      settings, so "what is in the repo" can never mean a different file from
+      "where we put it". Both of these return the file's TEXT; parsing and
+      comparing is the import pipeline's job, unchanged.
+
+      RAW, NOT THE JSON WRAPPER, and on GitHub that is not a preference.
+      GitHub's contents endpoint returns `content` only for files of 1 MB or
+      less; between 1 MB and 100 MB it needs the raw media type, and with the
+      default JSON accept it hands back metadata with an empty content and
+      encoding "none". A real export is well past that — the one in front of me
+      is 9.24 MB — so the default would silently return nothing to compare.
+      (This is also why pushing still works: the push only reads the `sha`.)
+      Past 100 MB neither works and the Git Trees API is the documented route;
+      nothing this plugin produces is near that, and if it ever is, the error
+      below says so rather than pretending.
+
+      On GitLab the raw endpoint has no documented size cap. Its base64 sibling
+      is rate-limited to 5 requests a minute for blobs over 10 MB, which is
+      another reason to take the raw one.
+
+      Both hosts are already in manifest.json's allowedDomains. A self-hosted
+      GitLab is not, and needs adding there — the manifest's own note says so.
+    */
+    function fetchGitLabFile() {
+      var c = gitlabConfig();
+      if (!c.token || !c.project) return Promise.reject({ message: 'GitLab is not configured' });
+      var host = c.host.replace(/\/+$/, '');
+      var filePath = composeFilePath(c.folder, c.filename);
+      var url = host + '/api/v4/projects/' + encodeURIComponent(c.project) +
+                '/repository/files/' + encodeURIComponent(filePath) +
+                '/raw?ref=' + encodeURIComponent(c.branch);
+      return fetch(url, { method: 'GET', headers: { 'PRIVATE-TOKEN': c.token } })
+        .then(function (r) {
+          if (r.status === 404) throw { status: 404, message: 'No ' + filePath + ' on ' + c.branch + ' yet' };
+          if (r.status === 401 || r.status === 403) throw { status: r.status, message: 'GitLab refused the token' };
+          if (!r.ok) throw { status: r.status, message: 'GitLab returned ' + r.status };
+          return r.text();
+        })
+        .then(function (text) { return { text: text, where: 'GitLab ' + filePath + ' @ ' + c.branch }; });
+    }
+
+    function fetchGitHubFile() {
+      var c = githubConfig();
+      if (!c.token || !c.repo) return Promise.reject({ message: 'GitHub is not configured' });
+      var parts = c.repo.split('/');
+      if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
+      var filePath = composeFilePath(c.folder, c.filename);
+      var url = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
+                encodeURIComponent(parts[1]) + '/contents/' +
+                filePath.split('/').map(encodeURIComponent).join('/') +
+                '?ref=' + encodeURIComponent(c.branch);
+      return fetch(url, { method: 'GET', headers: {
+        'Authorization': 'token ' + c.token,
+        /* The whole reason this reads at all above 1 MB. */
+        'Accept': 'application/vnd.github.raw'
+      } })
+        .then(function (r) {
+          if (r.status === 404) throw { status: 404, message: 'No ' + filePath + ' on ' + c.branch + ' yet' };
+          if (r.status === 401 || r.status === 403) throw { status: r.status, message: 'GitHub refused the token' };
+          if (!r.ok) throw { status: r.status, message: 'GitHub returned ' + r.status };
+          return r.text();
+        })
+        .then(function (text) { return { text: text, where: 'GitHub ' + filePath + ' @ ' + c.branch }; });
     }
 
     // Push to GitLab (incl. self-hosted). Returns a promise; no button UI here.

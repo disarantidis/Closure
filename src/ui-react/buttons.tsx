@@ -572,6 +572,11 @@ mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'fill
   header's icon-only twin instead of the one obvious action on an empty screen.
   The labelled form puts the icon in the leading slot and keeps the text.
 */
+/* One per provider, because a comparison is against ONE repo and only the
+   person knows which. The page hides whichever is not configured. */
+mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'tonal', size: 'small', label: 'Read from GitLab' });
+mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'tonal', size: 'small', label: 'Read from GitHub' });
+
 mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', leftIcon: true, buttonLeftIcon: IconImport(16) });
 
 /* ── Settings header: light/dark theme toggle ────────────────────────────── */
