@@ -1582,13 +1582,21 @@
        InteractiveCard's hit target is a separate, empty,
        absolutely-stretched sibling (its own "hit layer" pattern), so this
        is free to just be its natural content width. */
-    /* Right-aligned and given room above, so it reads as an afterword to the
-       list rather than another row of it. */
-    .clear-variables-row {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 4px;
-      padding: 0 4px;
+    /*
+      THE COLLECTIONS DIALOG, AS WIDE AS THE CARDS BEHIND IT.
+
+      .nd-dialog sets max-inline-size and no inline-size, so it shrinks to its
+      content — a list of short collection names and three-digit counts came
+      out about 180px, a narrow column floating over cards four hundred wide.
+
+      The cards get their width from .collections-wrap's own 0 16px padding, so
+      the dialog takes the same arithmetic rather than a number copied from it.
+      max- is overridden too: the kit's min(92vw, …) would otherwise clamp two
+      pixels narrower and the edges would not line up.
+    */
+    #collections-list .nd-dialog {
+      inline-size: calc(100vw - 32px);
+      max-inline-size: calc(100vw - 32px);
     }
 
     .collections-header {
@@ -21851,14 +21859,6 @@ html[data-theme=dark] {
     </div>
     <div class="collections-list" id="collections-list" style="display: none;"></div>
 
-    <!-- Sits under the list of the very collections it deletes, because that
-         list is the only honest preview of what "all" means here. Hidden
-         whenever there is nothing to delete — an empty file already shows the
-         empty state, and a destructive control with no target is just a trap
-         to misclick. -->
-    <div class="clear-variables-row" id="clear-variables-row" hidden>
-      <span id="clear-variables-btn-mount"></span>
-    </div>
     <div class="empty-state" id="empty-state" style="display: none;">
       <!-- The Closure variable mark (Pomegranate Identity, node 16:31) — a
            hexagon with a centred dot, the same glyph the brand uses for "a
@@ -48481,7 +48481,6 @@ html[data-theme=dark] {
   mountIconButton("import-back-btn-mount", { id: "import-back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
   mountButton("import-copy-btn-mount", { id: "import-copy-btn", variant: "outline", size: "small", label: "Copy", block: true }, CARD_LEVEL);
   mountButton("import-choose-btn-mount", { id: "import-choose-btn", variant: "filled", size: "large", label: "Choose a JSON file" });
-  mountButton("clear-variables-btn-mount", { id: "clear-variables-btn", variant: "ghost", destructive: true, size: "small", label: "Delete all variables", leftIcon: true, buttonLeftIcon: IconTrash(16) });
   mountButton("import-empty-btn-mount", { id: "import-empty-btn", variant: "tonal", size: "medium", label: "Import from JSON", leftIcon: true, buttonLeftIcon: IconImport(16) });
   (function mountThemeToggle() {
     const container = document.getElementById("theme-toggle-btn-mount");
@@ -48802,18 +48801,41 @@ html[data-theme=dark] {
           /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "collections-summary", children: state.title }),
           /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { className: "collections-summary-tags", children: state.summary.tokens ? /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Tag, { variant: "tonal", size: "small", children: state.summary.tokens }) : null })
         ] }) }) }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Dialog, { open, onClose: () => setOpen(false), title: state.title, size: "large", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { className: "collections-readonly-list", children: state.collections.map((c) => /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "collection-item", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "collection-item-check", children: IconCheck(14) }),
-          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "name", children: c.name }),
-          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Tag, { variant: "tonal", size: "small", children: c.count })
-        ] }, c.name)) }) })
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
+          Dialog,
+          {
+            open,
+            onClose: () => setOpen(false),
+            title: state.title,
+            size: "large",
+            actions: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { style: { display: "flex", justifyContent: "flex-end", width: "100%" }, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
+              PomButton,
+              {
+                id: "clear-variables-btn",
+                variant: "ghost",
+                destructive: true,
+                size: "small",
+                label: "Delete all variables",
+                leftIcon: true,
+                buttonLeftIcon: IconTrash(16),
+                onClick: () => window.PomCollectionsAccordion.onClearVariables?.()
+              }
+            ) }),
+            children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { className: "collections-readonly-list", children: state.collections.map((c) => /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "collection-item", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "collection-item-check", children: IconCheck(14) }),
+              /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "name", children: c.name }),
+              /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Tag, { variant: "tonal", size: "small", children: c.count })
+            ] }, c.name)) })
+          }
+        )
       ] });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
     window.PomCollectionsAccordion = {
       setTitle: (title) => set((s) => ({ ...s, title })),
       setCollections: (collections) => set((s) => ({ ...s, collections })),
-      setSummary: (tokens) => set((s) => ({ ...s, summary: { tokens } }))
+      setSummary: (tokens) => set((s) => ({ ...s, summary: { tokens } })),
+      onClearVariables: null
     };
   })();
   (function mountJsonFileCard() {
@@ -52558,7 +52580,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '55454e6 18:07:27';
+    var CLOSURE_BUILD = '1612729 18:09:12';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -54668,7 +54690,10 @@ function format(report, limit) {
       displayed, and a confirmation that does not match what you are looking
       at is worse than no number at all.
     */
-    document.getElementById('clear-variables-btn').addEventListener('click', function() {
+    /* The button is inside the collections dialog now, rendered by React, so
+       there is no stable element to bind to — the dialog calls this instead.
+       Same handler, same counts, same source of truth. */
+    window.PomCollectionsAccordion.onClearVariables = function() {
       if (!rawData || !rawData.collections || !rawData.collections.length) return;
       var variables = rawData.collections.reduce(function(n, c) { return n + (c.variables || []).length; }, 0);
       window.PomClearVariablesDialog.open({
@@ -54677,7 +54702,7 @@ function format(report, limit) {
         names: rawData.collections.map(function(c) { return c.name; }),
         fileName: lastFigmaFileName || 'this file',
       });
-    });
+    };
     window.PomClearVariablesDialog.onConfirm = function() {
       setActionsLoading(true);
       parent.postMessage({ pluginMessage: { type: 'clearVariables' } }, '*');
@@ -54746,7 +54771,6 @@ function format(report, limit) {
           // the class comes off below and they are already correct rather
           // than revealing as stale skeletons.
           document.querySelector('.flow-wrap').classList.add('is-empty');
-          document.getElementById('clear-variables-row').hidden = true;
           setActionsLoading(false);   // nothing to transform — reveal now
           return;
         }
@@ -54754,7 +54778,6 @@ function format(report, limit) {
         // A previous extract may have emptied the screen (file switched, or
         // variables added since) — put the pipeline back.
         document.querySelector('.flow-wrap').classList.remove('is-empty');
-        document.getElementById('clear-variables-row').hidden = false;
         /* There is something to push now. If the settings asked for the
            onboarding while the document was empty or unknown, this is the
            moment it was waiting for. */

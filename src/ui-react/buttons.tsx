@@ -441,6 +441,9 @@ declare global {
       setTitle: (title: string) => void;
       setCollections: (collections: { name: string; count: number }[]) => void;
       setSummary: (tokensLabel: string) => void;
+      /* The Delete-all control lives in this dialog now; the page owns what it
+         does, the same way the level rows own their own toggles. */
+      onClearVariables: (() => void) | null;
     };
     PomJsonFileCard: { setSize: (sizeLabel: string) => void };
     PomClosureWarning: {
@@ -569,11 +572,6 @@ mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'fill
   header's icon-only twin instead of the one obvious action on an empty screen.
   The labelled form puts the icon in the leading slot and keeps the text.
 */
-/* Ghost + destructive: present where the collections it deletes are listed,
-   and quiet enough that it is never the thing the eye lands on first. The
-   dialog above is what actually guards it. */
-mountButton('clear-variables-btn-mount', { id: 'clear-variables-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Delete all variables', leftIcon: true, buttonLeftIcon: IconTrash(16) });
-
 mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', leftIcon: true, buttonLeftIcon: IconImport(16) });
 
 /* ── Settings header: light/dark theme toggle ────────────────────────────── */
@@ -1056,7 +1054,32 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
             panel's own width regardless — so this is "as wide as the panel
             allows," not a fixed 760px, and scales with however wide the
             user's own resizable panel (the drag-handle in this file) is. */}
-        <Dialog open={open} onClose={() => setOpen(false)} title={state.title} size="large">
+        <Dialog open={open} onClose={() => setOpen(false)} title={state.title} size="large"
+          /*
+            DELETING IS ABOUT THESE COLLECTIONS, SO IT BELONGS WITH THEM.
+
+            The control used to sit on the main screen under the card. It is
+            the most destructive thing this plugin does and it was one click
+            from the surface, with nothing between it and a mis-click but the
+            confirmation. Here it is behind a deliberate open, directly under
+            the list of exactly what it will remove — which is the only honest
+            preview of what "all" means.
+          */
+          actions={
+            <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+              <PomButton
+                id="clear-variables-btn"
+                variant="ghost"
+                destructive
+                size="small"
+                label="Delete all variables"
+                leftIcon
+                buttonLeftIcon={IconTrash(16)}
+                onClick={() => window.PomCollectionsAccordion.onClearVariables?.()}
+              />
+            </div>
+          }
+        >
           <div className="collections-readonly-list">
             {state.collections.map((c: any) => (
               <div key={c.name} className="collection-item">
@@ -1082,6 +1105,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     setTitle: (title) => set((s) => ({ ...s, title })),
     setCollections: (collections) => set((s) => ({ ...s, collections })),
     setSummary: (tokens) => set((s) => ({ ...s, summary: { tokens } })),
+    onClearVariables: null,
   };
 })();
 
