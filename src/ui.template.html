@@ -2523,6 +2523,33 @@
     })();
 
     var rawData = null;
+
+    /*
+      THE ONBOARDING DIALOG NEEDS SOMETHING TO PUSH.
+
+      It asks where to send your tokens, and on a file with no variables there
+      are none — so it arrived over the "No variable collections found" empty
+      state asking a question with no subject, and every answer to it was
+      premature.
+
+      IT CANNOT SIMPLY READ rawData. The settings load and the extract are two
+      independent round trips to the plugin, and GIT_SETTINGS_LOADED regularly
+      wins: rawData is still null then, which is not "no variables", it is "not
+      known yet". Treating those as the same thing would suppress the dialog on
+      every file, which is the opposite mistake and a quieter one to miss.
+
+      So the question is deferred rather than answered early. `pending` means
+      the settings said it is wanted and the document has not reported yet;
+      the extract handler is what finally decides, and it decides again on
+      every later extract — so importing into an empty file brings the dialog
+      back at the moment there is finally something to push.
+    */
+    var onboardingPending = false;
+    function maybeShowOnboarding() {
+      if (!rawData) { onboardingPending = true; return; }   // not known yet
+      if (rawData.collections && rawData.collections.length) window.PomOnboardingDialog.open();
+      else onboardingPending = true;                        // empty for now, ask again later
+    }
     var transformedData = null;
     var selectedCollections = [];
 
@@ -4707,6 +4734,9 @@
         emptyState.style.display = 'none';
 
         if (msg.collections.length === 0) {
+          /* Still nothing to push, so the dialog keeps waiting rather than
+             being cancelled — a later import is exactly when it becomes
+             worth asking. */
           emptyState.style.display = 'flex';
           collectionsWrap.classList.add('visible');
           /*
@@ -4752,6 +4782,15 @@
         // variables added since) — put the pipeline back.
         document.querySelector('.flow-wrap').classList.remove('is-empty');
         document.getElementById('clear-variables-row').hidden = false;
+        /* There is something to push now. If the settings asked for the
+           onboarding while the document was empty or unknown, this is the
+           moment it was waiting for. */
+        if (onboardingPending && computePushReadiness().needsBigSetup) {
+          onboardingPending = false;
+          window.PomOnboardingDialog.open();
+        } else {
+          onboardingPending = false;
+        }
         
         collectionsList.style.display = 'flex';
         // Collections card + modal (buttons.tsx): one row per collection in
@@ -5010,9 +5049,7 @@
         // comment in buttons.tsx). Re-derived from readiness every load,
         // not a one-time flag, so it correctly reappears if the user later
         // removes every provider and ends up fully unconfigured again.
-        if (computePushReadiness().needsBigSetup) {
-          window.PomOnboardingDialog.open();
-        }
+        if (computePushReadiness().needsBigSetup) maybeShowOnboarding();
       }
       
       if (msg.type === 'GIT_SETTINGS_SAVED') {
