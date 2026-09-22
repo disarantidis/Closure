@@ -996,6 +996,89 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
      !!bindManifest(toIR(doc), imported));
 }
 
+/* ── a DTCG document that also declares its sets ─────────────────────────── */
+{
+  /*
+    scripts/__fixtures__/dtcg-with-metadata-sample.json — a closed slice of a
+    real 771 KB file that imported as ZERO tokens.
+
+    detect() returned 'legacy' the moment it saw $metadata.tokenSetOrder, on
+    the assumption that only Tokens Studio writes one. Not so: this plugin's
+    own DTCG export keeps $themes and $metadata at the root by design, so a
+    downstream build step can still read them. The legacy adapter then looked
+    for `value` and `type` rather than `$value` and `$type`, found nothing, and
+    the UI said "no tokens in that file" about a document full of them.
+
+    A set list says how a document is ORGANISED. It says nothing about how its
+    tokens are spelled.
+  */
+  const doc = require('./__fixtures__/dtcg-with-metadata-sample.json');
+  ok('metadata+dtcg: $metadata no longer overrules the token shape',
+     detect(doc) === 'dtcg', detect(doc));
+
+  const ir = toIR(doc);
+  ok('metadata+dtcg: the tokens are actually found', ir.rows.length > 20, String(ir.rows.length));
+
+  /* And when a document declares its sets, a top-level key IS a set — so it is
+     stripped from the path, "/" or no "/". Its references read
+     {core-colours.neutral.150}, which resolves only once "core" is gone. */
+  const plan = derive(ir, {});
+  ok('metadata+dtcg: every reference resolves',
+     plan.losses.unresolvedRefs.length === 0,
+     JSON.stringify(plan.losses.unresolvedRefs.slice(0, 3)));
+  ok('metadata+dtcg: and it compiles',
+     compile(ir, plan, { evaluateExpressions: true }).ok === true);
+}
+{
+  /* NOT EVERY $themes IS AN ARCHITECTURE. An ungrouped theme enabling nine
+     sets across as many axes is one complete LOOK, not a collection — it says
+     which sets are on together. Read as a declaration it produced a
+     collection called "light" with seventeen modes, because every set either
+     theme enabled went to whichever claimed it first, including the four both
+     of them enable. */
+  const selections = {
+    $metadata: { tokenSetOrder: ['a', 'b', 'mode/light', 'mode/dark'] },
+    a: { x: tok('#111111') }, b: { y: tok('#222222') },
+    'mode/light': { bg: tok('#333333') }, 'mode/dark': { bg: tok('#444444') },
+    $themes: [
+      { id: '1', name: 'light', selectedTokenSets: { a: 'enabled', b: 'enabled', 'mode/light': 'enabled' } },
+      { id: '2', name: 'dark', selectedTokenSets: { a: 'enabled', b: 'enabled', 'mode/dark': 'enabled' } },
+    ],
+  };
+  const plan = derive(toIR(selections), {});
+  ok('themes: a multi-set ungrouped theme declares nothing',
+     plan.usedThemes === false,
+     JSON.stringify(plan.collections.map((c) => c.name + '[' + c.modes.length + ']')));
+  ok('themes: so the file is measured, and mode/light+dark still become an axis',
+     plan.collections.some((c) => c.name === 'mode' && c.modes.join(',') === 'light,dark'),
+     JSON.stringify(plan.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+
+  /* One set enabled is unambiguous: the set and the collection are the same
+     thing, and the theme's name is its only mode. That is the shape the ODS
+     document uses, and it still binds. */
+  const declarations = {
+    $metadata: { tokenSetOrder: ['core'] },
+    core: { x: tok('#111111') },
+    $themes: [{ id: '1', name: '.core', selectedTokenSets: { core: 'enabled' } }],
+  };
+  const d2 = derive(toIR(declarations), {});
+  ok('themes: a single-set ungrouped theme still declares',
+     d2.usedThemes === true && d2.collections[0].name === '.core',
+     JSON.stringify(d2.collections.map((c) => c.name)));
+}
+{
+  /* DTCG has a duration type and Figma does not; the value is milliseconds,
+     so a unitless FLOAT carries it honestly. It used to fall through to
+     STRING, which made "100" un-arithmetic. */
+  const doc = { m: { fast: { $value: '100', $type: 'duration' } } };
+  const ir = toIR(doc);
+  const c = compile(ir, derive(ir, {}), {});
+  const op = c.program.ops.find((o) => o.op === 'createVariable');
+  ok('duration: lands as a FLOAT, not a string', op && op.type === 'FLOAT', JSON.stringify(op));
+  ok('duration: and keeps its number',
+     c.program.ops.some((o) => o.op === 'setValue' && o.value === 100));
+}
+
 /* ── $themes is already an architecture ──────────────────────────────────── */
 {
   /*

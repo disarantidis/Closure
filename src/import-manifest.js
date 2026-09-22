@@ -98,8 +98,39 @@ function bindThemes(ir) {
   const collections = new Map();      // collection -> modes, in declaration order
   const setMap = new Map();           // set name -> { collection, mode }
 
-  for (const t of themes) {
-    if (!t || !t.name) continue;
+  /*
+    NOT EVERY $themes IS AN ARCHITECTURE, and reading one that is not does
+    real damage. Two shapes wear the same key:
+
+      GROUPED        { name: "light", group: ".mode", enabled: ["mode/light"] }
+                     a collection and one of its modes. A declaration.
+
+      A SELECTION    { name: "light", enabled: ["master","fill/glass","base",
+                                                "mode/light","scheme/neutral", …] }
+                     one complete look assembled from nine sets across as many
+                     axes. It says which sets are ON TOGETHER, not what any of
+                     them IS.
+
+    Read as declarations, the second kind produced a collection called "light"
+    with seventeen modes, because every set either theme enabled was handed to
+    whichever claimed it first — including the four both of them enable.
+
+    So an UNGROUPED theme is trusted only when it enables exactly ONE set:
+    then the set and the collection are the same thing and the theme's name is
+    its only mode. Enabling several means it is a selection, and it declares
+    nothing. A grouped theme is always a declaration — that is what the group
+    is for.
+  */
+  const usable = themes.filter((t) => {
+    if (!t || !t.name) return false;
+    if (t.group) return true;
+    const enabled = Object.keys(t.selectedTokenSets || {})
+      .filter((k) => t.selectedTokenSets[k] === 'enabled');
+    return enabled.length === 1;
+  });
+  if (!usable.length) return null;
+
+  for (const t of usable) {
     const collection = t.group || t.name;
     if (!collections.has(collection)) collections.set(collection, []);
     const modes = collections.get(collection);

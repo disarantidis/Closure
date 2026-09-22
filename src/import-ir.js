@@ -115,11 +115,18 @@ function fromLegacy(doc) {
 function fromDtcg(doc) {
   const rows = [];
   const seenSets = [];
+  /* A DOCUMENT THAT DECLARES ITS SETS HAS NO ROOT GROUPS — every top-level key
+     is a set, whether or not its name happens to contain a "/", and a set name
+     is never part of a token's path. Checked against a real file before being
+     written this way: its references read {core-colours.neutral.150}, which
+     resolves only once the top-level "core" is stripped. Without this every
+     one of its 4,874 references dangled. */
+  const declaresSets = !!(doc.$metadata && Array.isArray(doc.$metadata.tokenSetOrder));
   for (const top of Object.keys(doc)) {
     if (top.charAt(0) === '$') continue;
     seenSets.push(top);
     const { group, variant, grouped } = splitSet(top);
-    const base = grouped ? [] : [top];
+    const base = (grouped || declaresSets) ? [] : [top];
     (function walk(o, path, inheritedType) {
       const t = o.$type || inheritedType;
       for (const k of Object.keys(o)) {
@@ -169,10 +176,23 @@ function fromFlat(doc, name) {
   return { source: 'flat', rows, sets: [group], themes: null, manifest: null };
 }
 
-/* Which adapter — decided by what the document actually contains, not by a
-   file name or a flag the caller might get wrong. */
+/*
+  Which adapter — decided by what the document actually contains, not by a
+  file name or a flag the caller might get wrong.
+
+  THE TOKEN SHAPE IS PROBED FIRST, and $metadata only breaks a tie. It used to
+  be the other way round: `$metadata.tokenSetOrder` returned 'legacy'
+  immediately, on the assumption that only Tokens Studio writes one. It is not
+  only Tokens Studio — this plugin's OWN DTCG export keeps $themes and
+  $metadata at the root, by design, so a downstream build step can still read
+  them. Such a file was handed to the legacy adapter, which looks for `value`
+  and `type` rather than `$value` and `$type`, found nothing at all, and
+  reported "no tokens in that file" about a 771 KB document full of them.
+
+  A set list says how a document is ORGANISED. It says nothing about how its
+  tokens are spelled, and those are independent.
+*/
 function detect(doc) {
-  if (doc.$metadata && doc.$metadata.tokenSetOrder) return 'legacy';
   let sawDollarValue = false, sawPlainValue = false;
   (function probe(o, depth) {
     if (!o || typeof o !== 'object' || depth > 6) return;
@@ -186,6 +206,9 @@ function detect(doc) {
   })(doc, 0);
   if (sawDollarValue) return 'dtcg';
   if (sawPlainValue) return 'legacy';
+  /* No token found either way — a set list is then the only evidence there is
+     of how this document is meant to be read. */
+  if (doc.$metadata && doc.$metadata.tokenSetOrder) return 'legacy';
   return 'flat';
 }
 

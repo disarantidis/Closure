@@ -73,7 +73,12 @@ const VARIABLE_CEILING = 5000;
    disguise or not a variable at all. */
 const FLOAT_TYPES = ['dimension', 'borderRadius', 'fontSizes', 'lineHeights', 'letterSpacing',
                      'number', 'spacing', 'sizing', 'borderWidth', 'opacity', 'paragraphSpacing',
-                     'paragraphIndent'];
+                     'paragraphIndent',
+                     /* DTCG has a duration type and Figma does not. The value
+                        is a count of milliseconds, so a unitless FLOAT is the
+                        honest carrier — better than the STRING it fell through
+                        to, which would have made "100" un-arithmetic. */
+                     'duration'];
 const STRING_TYPES = ['fontFamilies', 'fontWeights', 'textCase', 'textDecoration', 'string',
                       'asset', 'text', 'fontFamily', 'fontWeight'];
 /* Not "unsupported" — NOT VARIABLES. A shadow or a type ramp is a Figma STYLE,

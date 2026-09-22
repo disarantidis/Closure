@@ -1,0 +1,285 @@
+{
+  "core": {
+    "core-colours": {
+      "base": {
+        "black": {
+          "$type": "color",
+          "$value": "#000000"
+        },
+        "white": {
+          "$type": "color",
+          "$value": "#FFFFFF"
+        },
+        "black-40": {
+          "$type": "color",
+          "$value": "rgba(0,0,0,0.4)"
+        },
+        "white-40": {
+          "$type": "color",
+          "$value": "rgba(255,255,255,0.4)"
+        },
+        "pale-12": {
+          "$type": "color",
+          "$value": "rgba(238,238,238,0.12)"
+        },
+        "pale-22": {
+          "$type": "color",
+          "$value": "rgba(238,238,238,0.22)"
+        }
+      },
+      "neutral": {
+        "75": {
+          "$type": "color",
+          "$value": "#EDEDED"
+        },
+        "175": {
+          "$type": "color",
+          "$value": "#CECECB"
+        },
+        "200": {
+          "$type": "color",
+          "$value": "#C4C4C2"
+        },
+        "425": {
+          "$type": "color",
+          "$value": "#818181"
+        },
+        "600": {
+          "$type": "color",
+          "$value": "#494949"
+        },
+        "650": {
+          "$type": "color",
+          "$value": "#383838"
+        },
+        "775": {
+          "$type": "color",
+          "$value": "#1D1D1D"
+        },
+        "825": {
+          "$type": "color",
+          "$value": "#111111"
+        }
+      }
+    }
+  },
+  "master": {
+    "core-dimensions": {
+      "base": {
+        "$type": "dimension",
+        "$value": "4"
+      }
+    },
+    "core-motion": {
+      "base": {
+        "$type": "duration",
+        "$value": "100"
+      }
+    },
+    "core-typography": {
+      "base": {
+        "$type": "dimension",
+        "$value": "16"
+      }
+    }
+  },
+  "mode/light": {
+    "mode": {
+      "neutral": {
+        "basic": {
+          "background": {
+            "$type": "color",
+            "$value": "{white.basic.background}"
+          },
+          "accent": {
+            "$type": "color",
+            "$value": "{white.basic.accent}"
+          },
+          "text": {
+            "$type": "color",
+            "$value": "{white.basic.text}"
+          },
+          "text-dominant": {
+            "$type": "color",
+            "$value": "{white.basic.text-dominant}"
+          }
+        }
+      }
+    }
+  },
+  "mode/dark": {
+    "mode": {
+      "neutral": {
+        "basic": {
+          "background": {
+            "$type": "color",
+            "$value": "{black.basic.background}"
+          },
+          "accent": {
+            "$type": "color",
+            "$value": "{black.basic.accent}"
+          },
+          "text": {
+            "$type": "color",
+            "$value": "{black.basic.text}"
+          },
+          "text-dominant": {
+            "$type": "color",
+            "$value": "{black.basic.text-dominant}"
+          }
+        }
+      }
+    }
+  },
+  "base": {
+    "white": {
+      "basic": {
+        "background": {
+          "$type": "color",
+          "$value": "{level.white.basic.background}"
+        },
+        "accent": {
+          "$type": "color",
+          "$value": "{level.white.basic.accent}"
+        },
+        "text": {
+          "$type": "color",
+          "$value": "{core-colours.neutral.775}"
+        },
+        "text-dominant": {
+          "$type": "color",
+          "$value": "{core-colours.neutral.650}"
+        }
+      }
+    },
+    "black": {
+      "basic": {
+        "background": {
+          "$type": "color",
+          "$value": "{level.black.basic.background}"
+        },
+        "accent": {
+          "$type": "color",
+          "$value": "{level.black.basic.accent}"
+        },
+        "text": {
+          "$type": "color",
+          "$value": "{core-colours.neutral.75}"
+        },
+        "text-dominant": {
+          "$type": "color",
+          "$value": "{core-colours.neutral.175}"
+        }
+      }
+    }
+  },
+  "level/1": {
+    "level": {
+      "white": {
+        "basic": {
+          "background": {
+            "$type": "color",
+            "$value": "{fill.white.basic.container-subtle}"
+          },
+          "accent": {
+            "$type": "color",
+            "$value": "{fill.white.basic.accent-subtle}"
+          }
+        }
+      },
+      "black": {
+        "basic": {
+          "background": {
+            "$type": "color",
+            "$value": "{fill.black.basic.container-subtle}"
+          },
+          "accent": {
+            "$type": "color",
+            "$value": "{fill.black.basic.accent-subtle}"
+          }
+        }
+      }
+    }
+  },
+  "fill/solid": {
+    "fill": {
+      "white": {
+        "basic": {
+          "container-subtle": {
+            "$type": "color",
+            "$value": "{core-colours.neutral.200}"
+          },
+          "accent-subtle": {
+            "$type": "color",
+            "$value": "{core-colours.neutral.425}"
+          }
+        }
+      },
+      "black": {
+        "basic": {
+          "container-subtle": {
+            "$type": "color",
+            "$value": "{core-colours.neutral.825}"
+          },
+          "accent-subtle": {
+            "$type": "color",
+            "$value": "{core-colours.neutral.600}"
+          }
+        }
+      }
+    }
+  },
+  "$themes": [
+    {
+      "name": "light",
+      "selectedTokenSets": {
+        "master": "enabled",
+        "core": "source",
+        "fill/glass": "enabled",
+        "level/2": "enabled",
+        "base": "enabled",
+        "mode/light": "enabled",
+        "scheme/neutral": "enabled",
+        "interaction/default": "enabled",
+        "tense/tonal": "enabled",
+        "foundation": "enabled",
+        "breakpoint/mobile": "source",
+        "breakpoint/tablet": "source",
+        "breakpoint/laptop": "source",
+        "breakpoint/desktop": "source",
+        "breakpoint/large-desktop": "source"
+      }
+    },
+    {
+      "name": "dark",
+      "selectedTokenSets": {
+        "master": "enabled",
+        "core": "source",
+        "fill/glass": "enabled",
+        "level/2": "enabled",
+        "base": "enabled",
+        "mode/dark": "enabled",
+        "scheme/neutral": "enabled",
+        "interaction/default": "enabled",
+        "tense/tonal": "enabled",
+        "foundation": "enabled",
+        "breakpoint/mobile": "source",
+        "breakpoint/tablet": "source",
+        "breakpoint/laptop": "source",
+        "breakpoint/desktop": "source",
+        "breakpoint/large-desktop": "source"
+      }
+    }
+  ],
+  "$metadata": {
+    "tokenSetOrder": [
+      "core",
+      "master",
+      "mode/light",
+      "mode/dark",
+      "base",
+      "level/1",
+      "fill/solid"
+    ]
+  }
+}
