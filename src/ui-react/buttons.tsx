@@ -319,6 +319,26 @@ function mountLiveIconButton(mountId: string, base: any, initialDisabled: boolea
 // label like mountLiveButton's setLabel. Built for the Repository settings
 // Add/Remove pills: same control, same position, the icon and its
 // title/aria-label change in place instead of the row disappearing.
+/* Icon-only button whose accessible name is rewritten from outside — the
+   glyph is fixed, the title is not. Kept separate from
+   mountLiveToggleIconButton above, which swaps BOTH and between two fixed
+   states; this one's title is an arbitrary string that is only known at
+   runtime (a file path). title and aria-label move together on purpose: for
+   an icon-only button they are the only name it has, and letting them drift
+   would leave the tooltip and the screen reader describing different
+   buttons. */
+type LiveTitleIconHandle = { setTitle: (t: string) => void };
+function mountLiveTitleIconButton(mountId: string, base: any, initialTitle: string, level: Level = GROUND): LiveTitleIconHandle {
+  const container = document.getElementById(mountId);
+  let set: (t: string) => void = () => {};
+  function View() {
+    const [title, setT] = useState(initialTitle); set = setT;
+    return <PomButton {...base} title={title} aria-label={title} />;
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
+  return { setTitle: (t) => set(t) };
+}
+
 type LiveToggleIconHandle = { setMode: (mode: 'add' | 'remove') => void };
 function mountLiveToggleIconButton(
   mountId: string,
@@ -429,6 +449,7 @@ declare global {
       onRemove: (() => void) | null;
     };
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
+    PomRepoReadBtn: LiveTitleIconHandle;
     PomAddGitlabBtn: LiveToggleIconHandle;
     PomAddGithubBtn: LiveToggleIconHandle;
     PomExportMode: { onChange: ((index: number) => void) | null };
@@ -574,6 +595,31 @@ mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'fill
 */
 /* One per provider, because a comparison is against ONE repo and only the
    person knows which. The page hides whichever is not configured. */
+/*
+  The repo card's own read button, top-right of that card's header on the
+  main screen. Icon-only and tonal, matching the back/gear pills rather than
+  the filled Download beside it: Download is the Json file card's own action
+  and should stay the one filled control in that column, while this is a way
+  of looking at the repository, in the corner the Json file card keeps its
+  size tag in.
+
+  IconImport, NOT a refresh glyph, and the same one the empty state's
+  "Import from JSON" button wears. In this plugin that arrow-into-a-container
+  means one thing — bring a document in — and this button does exactly that,
+  from the repo instead of from disk. A refresh glyph would have invented a
+  second meaning for the same action.
+
+  Live, for setTitle: the title names the exact path it will read, and that
+  path changes when the folder or the provider tab does (see
+  refreshRepoReadRow()).
+*/
+window.PomRepoReadBtn = mountLiveTitleIconButton(
+  'repo-read-btn-mount',
+  { id: 'repo-read-btn', variant: 'tonal', size: 'small', icon: IconImport(16) },
+  'Read from the repo',
+  CARD_LEVEL,
+);
+
 mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'tonal', size: 'small', label: 'Read from GitLab' });
 mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'tonal', size: 'small', label: 'Read from GitHub' });
 

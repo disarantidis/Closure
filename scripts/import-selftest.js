@@ -1783,6 +1783,141 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       }
     }
 
+    /* ── the repo probe, out of the built ui.html ───────────────────────
+       The check that runs on every plugin open, and the button beside it,
+       are the only code here that composes a URL against somebody else's
+       API — the one kind of mistake that cannot be seen by reading the
+       screen, because a wrong address fails exactly like a missing file.
+
+       The functions are LIFTED OUT OF THE BUILT ui.html rather than
+       reimplemented, for the same reason the exporter block above runs the
+       real code.js: a copy of the URL builder would agree with itself
+       forever and with the plugin never. Its collaborators (the config
+       getters, fetch) are stubbed, so this asserts the address and the
+       reading of the response, which is all it claims to.
+
+       Verified against the real API before it was written: HEAD on GitHub's
+       contents endpoint answers 200 with content-length and no body, and
+       404 for a path that is not there. */
+    {
+      const fsx = require('fs'), pathx = require('path'), vmx = require('vm');
+      const builtUi = pathx.join(__dirname, '..', 'ui.html');
+      if (!fsx.existsSync(builtUi)) {
+        ok('repo probe: ui.html is built (run npm run ui:build)', false);
+      } else {
+        const html = fsx.readFileSync(builtUi, 'utf8');
+        /* Brace-matched from the declaration, so the test breaks loudly if a
+           function is renamed rather than quietly testing nothing. */
+        const grab = (name) => {
+          const i = html.indexOf('function ' + name + '(');
+          if (i < 0) return null;
+          let d = 0;
+          for (let k = html.indexOf('{', i); k < html.length; k++) {
+            if (html[k] === '{') d++;
+            else if (html[k] === '}') { d--; if (!d) return html.slice(i, k + 1); }
+          }
+          return null;
+        };
+        const names = ['repoFilePath', 'probeRepoFile', 'repoSizeLabel', 'activeRepoProvider'];
+        const lifted = names.map(grab);
+        if (lifted.some((x) => !x)) {
+          ok('repo probe: ui.html still declares ' + names.join(', '), false,
+             JSON.stringify(names.filter((n, i) => !lifted[i])));
+        } else {
+          const calls = [];
+          const ctx = {
+            fetch: (url, opts) => { calls.push({ url, opts }); return Promise.resolve(ctx.__res); },
+            composeFilePath: (folder, file) => (folder ? folder.replace(/\/+$/, '') + '/' : '') + file,
+            gitlabConfig: () => ({ host: 'https://gitlab.com/', project: 'me/my repo', folder: 'tokens/out',
+                                   filename: 'tokens_dtcg.json', branch: 'main', token: 'GLT' }),
+            githubConfig: () => ({ repo: 'acme/tokens', folder: '', filename: 'tokens_dtcg.json',
+                                   branch: 'main', token: 'GHT' }),
+            isGitLabReady: () => ctx.__gl, isGitHubReady: () => ctx.__gh,
+            gitlabAdded: false, githubAdded: false, mainProviderTab: 'gitlab',
+            Promise, JSON, Math, parseInt, isFinite, encodeURIComponent,
+          };
+          ctx.window = ctx;
+          vmx.createContext(ctx);
+          vmx.runInContext(lifted.join('\n'), ctx);
+
+          const res = (status, headers) => ({
+            status, ok: status >= 200 && status < 300,
+            headers: { get: (h) => (headers || {})[h] || null },
+          });
+          const rejects = async (p) => { try { await p; return null; } catch (e) { return e; } };
+
+          ctx.__res = res(200, { 'content-length': '771308' });
+          let r = await ctx.probeRepoFile('github');
+          ok('repo probe: GitHub is a HEAD on the contents endpoint for the configured filename',
+             calls[0].url === 'https://api.github.com/repos/acme/tokens/contents/tokens_dtcg.json?ref=main' &&
+             calls[0].opts.method === 'HEAD' &&
+             calls[0].opts.headers.Accept === 'application/vnd.github.raw',
+             calls[0].url + ' ' + calls[0].opts.method);
+          ok('repo probe: 200 reports found, sized off content-length',
+             r.found === true && r.bytes === 771308 && r.branch === 'main', JSON.stringify(r));
+
+          calls.length = 0;
+          r = await ctx.probeRepoFile('gitlab');
+          ok('repo probe: GitLab is a HEAD on the raw endpoint, project and path both encoded',
+             calls[0].url === 'https://gitlab.com/api/v4/projects/me%2Fmy%20repo/repository/files/' +
+                              'tokens%2Fout%2Ftokens_dtcg.json/raw?ref=main' &&
+             calls[0].opts.method === 'HEAD',
+             calls[0].url);
+          ok('repo probe: the reported path keeps the folder it was read from',
+             r.path === 'tokens/out/tokens_dtcg.json', r.path);
+
+          ctx.__res = res(404);
+          r = await ctx.probeRepoFile('github');
+          ok('repo probe: 404 is "not there yet", not a failure', r.found === false, JSON.stringify(r));
+
+          ctx.__res = res(401);
+          let e = await rejects(ctx.probeRepoFile('github'));
+          ok('repo probe: 401 rejects as a refused token', !!e && /refused/.test(e.message), e && e.message);
+
+          /* A host that does not route HEAD answers 405. Reading that as "no
+             file" would send someone looking for a push that already
+             happened, which is why only 404 means absent. */
+          ctx.__res = res(405);
+          e = await rejects(ctx.probeRepoFile('github'));
+          ok('repo probe: a non-404 failure is not reported as a missing file',
+             !!e && /405/.test(e.message), e && e.message);
+
+          /* content-length is CORS-safelisted, so it should survive the
+             plugin iframe — but the size is decoration and its absence must
+             not turn a found file into an unknown one. */
+          ctx.__res = res(200, {});
+          r = await ctx.probeRepoFile('github');
+          ok('repo probe: no readable size still reports the file as found',
+             r.found === true && r.bytes === null, JSON.stringify(r));
+
+          ok('repo probe: sizes read in the Json file card\'s own units',
+             ctx.repoSizeLabel(771308) === '753 KB' &&
+             ctx.repoSizeLabel(9 * 1024 * 1024) === '9.00 MB' &&
+             ctx.repoSizeLabel(12) === '1 KB',
+             ctx.repoSizeLabel(771308) + ' ' + ctx.repoSizeLabel(12));
+
+          const prov = (gl, gh, glR, ghR, tab) => {
+            ctx.gitlabAdded = gl; ctx.githubAdded = gh;
+            ctx.__gl = glR; ctx.__gh = ghR; ctx.mainProviderTab = tab;
+            return ctx.activeRepoProvider();
+          };
+          ok('repo probe: no provider added means no read button',
+             prov(false, false, false, false, 'gitlab') === null);
+          ok('repo probe: added but not yet tokened means no read button',
+             prov(false, true, false, false, 'github') === null);
+          ok('repo probe: one ready provider is the one the button reads',
+             prov(false, true, false, true, 'gitlab') === 'github');
+          /* The button has to be about the service the card is TITLED for —
+             a read of GitLab under the word "GitHub" is worse than none. */
+          ok('repo probe: with both added the button follows the card tab',
+             prov(true, true, true, true, 'github') === 'github' &&
+             prov(true, true, true, true, 'gitlab') === 'gitlab');
+          ok('repo probe: the selected provider not being ready hides the button rather than reading the other',
+             prov(true, true, true, false, 'github') === null);
+        }
+      }
+    }
+
     console.log('');
     console.log(pass + '/' + (pass + fail) + ' passed');
     process.exit(fail ? 1 : 0);

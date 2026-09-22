@@ -1865,6 +1865,25 @@
       color: var(--app-text);
     }
     .json-download-title-icon { flex-shrink: 0; }
+    /*
+      The one line under the repo card's header that says what the last read
+      found. Monospaced and dimmed like .import-repo-hint, for the same
+      reason: most of what it says is a file path, and a path is only
+      checkable if it is rendered as one.
+
+      --app-danger only when the read actually failed. A file that is simply
+      not in the repo yet is NOT an error — it is the normal state before the
+      first push — so that case stays in the ordinary dimmed colour and only
+      a refused token or a dead request goes red.
+    */
+    .repo-read-status {
+      margin: 8px 0 0;
+      font-size: 11px;
+      opacity: 0.7;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+    }
+    .repo-read-status[data-tone="error"] { color: var(--app-danger); opacity: 1; }
     /* Same section-title treatment as .target-row-title ("GitLab"/
        "GitHub") — this card is another named block on the same screen, so
        it reads as one family of titles rather than a one-off style. */
@@ -2135,7 +2154,31 @@
             </svg>
             <p class="json-download-title" id="repo-card-title">Repo settings</p>
           </div>
+          <!--
+            READ THE REPO. Top-right of this card's own header, the same
+            corner the Json file card puts its size tag in — this card is
+            about one repository, so the control that reads that repository
+            belongs on it rather than buried on the import page.
+
+            It reads THE FILE THIS CARD ALREADY NAMES: composeFilePath of the
+            selected folder and primaryFilename(), which is the exact path
+            Push writes and Download produces. So "read the repo" is the
+            round trip of the two things beside it, not a search for
+            whatever JSON happens to be lying around — and the file it went
+            looking for is always the one already on screen.
+
+            Hidden until a provider is actually readable (isGitLabReady /
+            isGitHubReady) — see refreshRepoReadRow().
+          -->
+          <span id="repo-read-btn-mount" hidden></span>
         </div>
+        <!--
+          What the last read found. Written by repoReadStatus() and filled
+          both by the button and by the check that runs on open, so there is
+          one line saying what is in the repo rather than two ways of
+          finding out that disagree.
+        -->
+        <p class="repo-read-status" id="repo-read-status" hidden></p>
         <!-- Only meaningful once BOTH providers are actually added (see
              updatePushTargetUI()'s tabMode — same gitlabAdded && githubAdded
              gate the Settings page's own GitLab/GitHub tab switcher uses).
@@ -3355,6 +3398,23 @@
     }
     document.getElementById('import-pull-gitlab-btn').addEventListener('click', function () { pullFromRepo('gitlab'); });
     document.getElementById('import-pull-github-btn').addEventListener('click', function () { pullFromRepo('github'); });
+    /*
+      THE REPO CARD'S OWN READ BUTTON, on the main screen.
+
+      It goes through openImport() first and then the SAME pullFromRepo the
+      two buttons above call. The import page is where the answer is shown —
+      the file row, the architecture questions, the diff against what is in
+      Figma right now — so a second rendering of all that on the main screen
+      would be a copy of a screen that already exists, free to disagree with
+      it. This button is a shortcut into that screen, not a second version
+      of it.
+    */
+    document.getElementById('repo-read-btn').addEventListener('click', function () {
+      var which = activeRepoProvider();
+      if (!which) return;                 // the button is hidden in this state
+      openImport();
+      pullFromRepo(which);
+    });
     function closeImport() {
       document.getElementById('import-page').classList.remove('visible');
       document.getElementById('main-page').classList.remove('hidden');
@@ -4414,9 +4474,172 @@
       show('repo-card-icon-github', which === 'github');
     }
 
+    /*
+      WHICH REPOSITORY THIS CARD IS ABOUT, and whether it can actually be
+      read. Split out of nameRepoCard() rather than written twice, because
+      the card's title, its logo and its read button all have to be talking
+      about the SAME service — a button that reads GitLab under the word
+      "GitHub" is worse than no button.
+
+      nameRepoCard() names the card from what has been ADDED. This asks for
+      more than that: added tells you which service the card is about, ready
+      tells you whether there is a token and a repo to go and ask. So a card
+      correctly titled "GitHub" with no token yet gets the title and no
+      button, which is the honest pair.
+    */
+    function activeRepoProvider() {
+      var which = null;
+      if (gitlabAdded && githubAdded) which = mainProviderTab === 'github' ? 'github' : 'gitlab';
+      else if (gitlabAdded) which = 'gitlab';
+      else if (githubAdded) which = 'github';
+      if (which === 'gitlab') return isGitLabReady() ? 'gitlab' : null;
+      if (which === 'github') return isGitHubReady() ? 'github' : null;
+      return null;
+    }
+
+    /* The address the read is about — the file this card already names, so
+       the two can never drift apart. */
+    function repoFilePath(which) {
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      return composeFilePath(c.folder, c.filename);
+    }
+
+    /* MB above a megabyte, KB below it — the same two-decimal MB the Json
+       file card shows for the export, so the size in the repo and the size
+       about to be pushed are read in the same unit and can be compared by
+       eye. */
+    function repoSizeLabel(bytes) {
+      if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+      return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+    }
+
+    function repoReadStatus(text, tone) {
+      var el = document.getElementById('repo-read-status');
+      if (!el) return;
+      el.hidden = !text;
+      el.textContent = text || '';
+      if (tone) el.setAttribute('data-tone', tone); else el.removeAttribute('data-tone');
+    }
+
+    /*
+      IS THE FILE THERE, WITHOUT DOWNLOADING IT.
+
+      HEAD, not GET, and that is the whole point of this function. The file
+      this plugin produces is megabytes — the ODS export is 9 — and a check
+      that runs on every open has no business pulling that down to answer a
+      question the status line already answers. HEAD returns the status and
+      the headers and no body at all: verified against the real repo, 200
+      with content-length 771308 for a file that is there, 404 for one that
+      is not.
+
+      `content-length` is readable cross-origin without the server opting in
+      — it is one of the seven CORS-safelisted response headers — so the size
+      survives the iframe. Anything else might not, which is why every field
+      below is optional and the line still reads correctly without it.
+
+      A NON-404 FAILURE IS NOT "MISSING". If HEAD is refused (a host that
+      does not route it answers 405) the answer is "could not check", not
+      "no file" — reporting an absent file because the method was wrong
+      would send someone looking for a push that already happened.
+    */
+    function probeRepoFile(which) {
+      var filePath = repoFilePath(which);
+      var url, headers, branch;
+      if (which === 'gitlab') {
+        var c = gitlabConfig();
+        url = c.host.replace(/\/+$/, '') + '/api/v4/projects/' + encodeURIComponent(c.project) +
+              '/repository/files/' + encodeURIComponent(filePath) +
+              '/raw?ref=' + encodeURIComponent(c.branch);
+        headers = { 'PRIVATE-TOKEN': c.token };
+        branch = c.branch;
+      } else {
+        var h = githubConfig();
+        var parts = h.repo.split('/');
+        if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
+        url = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
+              encodeURIComponent(parts[1]) + '/contents/' +
+              filePath.split('/').map(encodeURIComponent).join('/') +
+              '?ref=' + encodeURIComponent(h.branch);
+        headers = { 'Authorization': 'token ' + h.token, 'Accept': 'application/vnd.github.raw' };
+        branch = h.branch;
+      }
+      return fetch(url, { method: 'HEAD', headers: headers }).then(function (r) {
+        if (r.status === 404) return { found: false, path: filePath, branch: branch };
+        if (r.status === 401 || r.status === 403) throw { status: r.status, message: 'the token was refused' };
+        if (!r.ok) throw { status: r.status, message: 'the repo answered ' + r.status };
+        var len = parseInt(r.headers.get('content-length') || '', 10);
+        return {
+          found: true, path: filePath, branch: branch,
+          bytes: isFinite(len) ? len : null,
+        };
+      });
+    }
+
+    /*
+      The read button belongs to whichever provider the card is currently
+      about, so it is re-derived on every updatePushTargetUI() rather than
+      wired once — switching the provider tab switches which repository the
+      card names, and the button has to move with it.
+    */
+    function refreshRepoReadRow() {
+      var mount = document.getElementById('repo-read-btn-mount');
+      if (!mount) return;
+      var which = activeRepoProvider();
+      mount.hidden = !which;
+      if (!which) { repoReadStatus(''); return; }
+      if (window.PomRepoReadBtn) {
+        window.PomRepoReadBtn.setTitle('Read ' + repoFilePath(which) + ' from ' +
+                                       (which === 'gitlab' ? 'GitLab' : 'GitHub'));
+      }
+    }
+
+    /*
+      THE CHECK THAT RUNS ON OPEN.
+
+      One HEAD per plugin load, against the file this card names, so the
+      answer to "is what I pushed still what is up there" is on screen
+      without anyone having to ask for it.
+
+      IT DOES NOT NAVIGATE and it does not open a dialog. An automatic thing
+      that moved the user to another page on load would be a worse version of
+      the button — the check reports, the button acts.
+
+      IT NEVER NAGS. A file that is not in the repo yet is the ordinary state
+      before the first push, so it is stated flatly and quietly; a failure is
+      one dimmed line and not a toast. The one thing this must not become is
+      an error the user has to dismiss on every open of a plugin they were
+      using for something else entirely.
+
+      Once per load, guarded — GIT_SETTINGS_LOADED is the only caller today,
+      but a second settings message would otherwise spend a second request
+      saying the same thing.
+    */
+    var repoCheckDone = false;
+    function checkRepoOnOpen() {
+      if (repoCheckDone) return;
+      var which = activeRepoProvider();
+      if (!which) return;
+      repoCheckDone = true;
+      var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
+      repoReadStatus('Checking ' + repoFilePath(which) + '…');
+      probeRepoFile(which).then(function (res) {
+        if (!res.found) {
+          repoReadStatus('No ' + res.path + ' on ' + res.branch + ' yet');
+          return;
+        }
+        repoReadStatus(res.path + ' @ ' + res.branch +
+                       (res.bytes === null ? '' : '  ·  ' + repoSizeLabel(res.bytes)) +
+                       '  ·  read it to compare');
+      }, function (err) {
+        repoReadStatus('Could not check ' + label + ' — ' + ((err && err.message) || 'the request failed'),
+                       'error');
+      });
+    }
+
     function updatePushTargetUI() {
       var r = computePushReadiness();
       nameRepoCard();
+      refreshRepoReadRow();
       var tabMode = gitlabAdded && githubAdded;
       document.getElementById('main-provider-tabs-row').hidden = !tabMode;
       if (tabMode) {
@@ -5284,6 +5507,19 @@
         // not a one-time flag, so it correctly reappears if the user later
         // removes every provider and ends up fully unconfigured again.
         if (computePushReadiness().needsBigSetup) maybeShowOnboarding();
+        /*
+          HERE AND NOT AT LOAD, because at load there are no settings yet:
+          this message IS the moment the token and the repo become known, and
+          a check fired before it would have nothing to check against. Same
+          reason the onboarding dialog waits for this line rather than
+          running from the script's own end.
+
+          It costs one HEAD carrying the token per plugin open. That is the
+          deliberate price of the answer being on screen without being asked
+          for; probeRepoFile() is a HEAD precisely so it stays that cheap
+          whatever the file grows to.
+        */
+        checkRepoOnOpen();
       }
       
       if (msg.type === 'GIT_SETTINGS_SAVED') {
