@@ -1325,6 +1325,9 @@
     /* The last segment is the token's own name and never an axis — dimmer
        again, so the path does not look like it has one more choice in it. */
     .import-level-path .seg.is-leaf { opacity: 0.35; font-style: italic; }
+    /* The sets row names an axis that no single token name shows, so its
+       marker is a count rather than a segment of a path. */
+    .import-level-path.is-sets .seg.is-axis { font-variant-numeric: tabular-nums; }
 
     .import-level-row {
       display: grid;
@@ -3466,8 +3469,13 @@
       var shown = plan.levelCandidates || [];
       /* The resulting collections go in too — the preview draws what the
          current reading actually produces, not a description of it. */
-      window.PomImportLevels.set(shown, importState.levels, plan.collections || []);
-      el.hidden = !shown.length;
+      /* The SETS axis travels alongside the depths — a group can have one,
+         the other, or both, and "tense" has only the first. Ordered by the
+         document so a section lands where the file put it. */
+      var groupCands = plan.groupCandidates || [];
+      window.PomImportLevels.set(shown, importState.levels, plan.collections || [],
+                                 groupCands, plan.groupOrder || []);
+      el.hidden = !shown.length && !groupCands.length;
     }
 
     window.PomImportLevels.onToggle = function(group, depth, role) {
@@ -3483,6 +3491,18 @@
         importState.levels[group] = importState.levels[group] || {};
         importState.levels[group][String(depth)] = role;
       }
+      if (importState.doc) runImport(importState.doc, importState.fileName);
+    };
+
+    /*
+      THE SETS AXIS. Stored as a `group:<name>` decision, which is the same
+      key derive() has always used for this question — it was simply never
+      asked unless the measurement gave up. Writing it here is what makes the
+      answer durable: it goes into $figmaStructure with everything else, so a
+      re-import reads the choice rather than measuring again.
+    */
+    window.PomImportLevels.onGroupToggle = function(group, verdict) {
+      importState.decisions['group:' + group] = verdict;
       if (importState.doc) runImport(importState.doc, importState.fileName);
     };
 

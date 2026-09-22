@@ -8,7 +8,7 @@
 //
 const { toIR, detect } = require('../src/import-ir.js');
 const { derive, applyLevels, levelCandidates } = require('../src/import-derive.js');
-const { compile, toColor, evaluate } = require('../src/import-compile.js');
+const { compile, toColor, evaluate, toManifest } = require('../src/import-compile.js');
 const { buildManifest, bindManifest, bindThemes } = require('../src/import-manifest.js');
 const { materialise, fromRawGraph, compare, fingerprint } = require('../src/import-verify.js');
 const { apply, preflight } = require('../src/import-apply.js');
@@ -1471,6 +1471,64 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
        JSON.stringify(p4.problems));
     ok('preflight: and removes the collection it probed with',
        capped.collections.every((c2) => c2.name !== '__closure_preflight__'));
+
+    /* ── the SETS axis, offered whether or not the measurement was sure ───
+       A group's variants are an axis exactly as a depth inside a token path
+       is, and for a group whose paths are two segments deep they are the ONLY
+       one it has. The override existed but was reachable only when the
+       measurement gave up, so a confidently-measured group could not be
+       re-read — and a group with no depths rendered nothing at all. */
+    {
+      const sets = {
+        $metadata: { tokenSetOrder: ['tense/tonal', 'tense/strong', 'solo'] },
+        'tense/tonal':  { tense: { background: tok('#111111'), text: tok('#eeeeee') } },
+        'tense/strong': { tense: { background: tok('#222222'), text: tok('#dddddd') } },
+        'solo':         { solo:  { a: tok('#333333') } },
+      };
+      const sir = toIR(sets);
+
+      const measured = derive(sir, {});
+      const gc = measured.groupCandidates.find((c) => c.group === 'tense');
+      ok('sets: a multi-variant group is offered even when measured confidently',
+         !!gc && gc.variants.join(',') === 'tonal,strong' && gc.overlap === 100 &&
+         gc.measured === 'modes' && gc.verdict === 'modes' && gc.decided === false,
+         JSON.stringify(gc));
+
+      /* A group holding one set has no axis to choose, so offering it a
+         dropdown would be offering a control with one answer. */
+      ok('sets: a single-set group is not offered',
+         !measured.groupCandidates.some((c) => c.group === 'solo'),
+         JSON.stringify(measured.groupCandidates.map((c) => c.group)));
+
+      /* The whole point: the measurement is CERTAIN here (100% overlap) and
+         the answer still wins. This is the line that used to sit inside
+         `if (v === null)`. */
+      const forced = derive(sir, { decisions: { 'group:tense': 'separate' } });
+      const tense = forced.collections.filter((c) => c.fromGroup === 'tense');
+      ok('sets: an explicit answer overrides a confident measurement',
+         tense.length === 2 && tense.map((c) => c.name).sort().join(',') === 'strong,tonal',
+         JSON.stringify(forced.collections.map((c) => c.name + '[' + c.modes.join('|') + ']')));
+      ok('sets: and the default is still what was measured',
+         measured.collections.filter((c) => c.fromGroup === 'tense').length === 1,
+         JSON.stringify(measured.collections.map((c) => c.name + '[' + c.modes.join('|') + ']')));
+
+      /* Reported as applied, which is what carries it into $figmaStructure —
+         a choice that had to be made once and then re-measured on every later
+         import is not a decision, it is a prompt. */
+      ok('sets: the answer is recorded for the manifest',
+         forced.decisionsApplied.some((d) => d.id === 'group:tense' && d.value === 'separate'),
+         JSON.stringify(forced.decisionsApplied));
+      ok('sets: and reaches toManifest',
+         (toManifest(forced).decisions || []).some((d) => d.id === 'group:tense'),
+         JSON.stringify(toManifest(forced).decisions));
+
+      /* Document order, because a section can come from either list and
+         ordering by whichever is longer puts a depth-less group wherever it
+         happens to land rather than where the file put it. */
+      ok('sets: groupOrder is the order the document introduces them',
+         measured.groupOrder.join(',') === 'tense,solo',
+         JSON.stringify(measured.groupOrder));
+    }
 
     /* ── the exporter, on a file it was not written against ──────────────
        toTokenFormat keys most of its rules off the literal collection names

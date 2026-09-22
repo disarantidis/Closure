@@ -406,8 +406,13 @@ declare global {
   interface Window {
     PomImportApplyBtn: any;
     PomImportLevels: {
-      set: (candidates: any[], applied: Record<string, Record<string, string>>, collections?: any[]) => void;
+      set: (candidates: any[], applied: Record<string, Record<string, string>>, collections?: any[],
+            groupCandidates?: any[], groupOrder?: string[]) => void;
       onToggle: ((group: string, depth: number, role: string) => void) | null;
+      /* The SETS axis — 'modes' (one collection, a mode each) or 'separate'
+         (a collection each). Distinct from onToggle, which moves a depth
+         inside a token's path. */
+      onGroupToggle: ((group: string, verdict: string) => void) | null;
     };
     PomImportQuestions: {
       set: (questions: any[]) => void;
@@ -1192,7 +1197,7 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
 */
 (function mountImportLevels() {
   const container = document.getElementById('import-levels-mount');
-  let set: (c: any[], a: any, cols: any[]) => void = () => {};
+  let set: (c: any[], a: any, cols: any[], gc: any[], ord: string[]) => void = () => {};
 
   const ROLE_LABEL: Record<string, string> = {
     name: 'group', mode: 'modes', collection: 'collections',
@@ -1280,8 +1285,13 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
   function View() {
     const [candidates, setCandidates] = useState<any[]>([]);
     const [collections, setCollections] = useState<any[]>([]);
-    set = (c, _a, cols) => { setCandidates(c || []); setCollections(cols || []); };
-    if (!candidates.length) return null;
+    const [groupCands, setGroupCands] = useState<any[]>([]);
+    const [order, setOrder] = useState<string[]>([]);
+    set = (c, _a, cols, gc, ord) => {
+      setCandidates(c || []); setCollections(cols || []);
+      setGroupCands(gc || []); setOrder(ord || []);
+    };
+    if (!candidates.length && !groupCands.length) return null;
 
     /*
       GROUPED BY THE GROUP, because that is the thing being described. A flat
@@ -1291,10 +1301,26 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
     */
     const byGroup: Record<string, any[]> = {};
     candidates.forEach((c) => { (byGroup[c.group] = byGroup[c.group] || []).push(c); });
+    /*
+      THE SETS ARE AN AXIS TOO, and for a group whose token paths are only two
+      segments deep they are the ONLY one. "tense" and "interaction" have no
+      depth inside their paths to offer, so they produced no rows and the
+      sections simply did not exist — two real collections, invisible in the
+      panel that decides how collections are read.
+    */
+    const gcOf: Record<string, any> = {};
+    groupCands.forEach((c) => { gcOf[c.group] = c; });
+
+    /* Document order, so a section lands where the file put it rather than
+       wherever the longer of the two lists happens to place it. */
+    const seen = new Set<string>();
+    const groupsInOrder = (order.length ? order : Object.keys(byGroup))
+      .filter((g) => (byGroup[g] || gcOf[g]) && !seen.has(g) && seen.add(g) !== undefined);
+    Object.keys(byGroup).forEach((g) => { if (!seen.has(g)) { seen.add(g); groupsInOrder.push(g); } });
 
     return (
       <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-6)' }}>
-        {Object.keys(byGroup).map((group) => {
+        {groupsInOrder.map((group) => {
           /* Only the collections THIS group produced. The preview belongs
              beside the choice that determines it, not in one pile at the
              bottom where it answers for everything at once. */
@@ -1303,7 +1329,44 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
             <span key={group} className="import-level-section">
               <span className="import-level-title">{group}</span>
 
-              {byGroup[group].map((c) => {
+              {gcOf[group] && (() => {
+                const gc = gcOf[group];
+                const shown = gc.variants.slice(0, 5);
+                return (
+                  <span className="import-level-row">
+                    {/* Not a path — these are the file's own sets. Said in
+                        words because there is no segment to mark: the axis is
+                        WHICH SET a token came from, which no single token
+                        name shows. */}
+                    <span className="import-level-path is-sets" aria-hidden="true">
+                      <span className="seg is-axis">{gc.variants.length} sets</span>
+                      <span className="sep">/</span>
+                      <span className="seg is-leaf">{gc.measured ? 'read from the file' : 'not certain from the file'}</span>
+                    </span>
+                    <ul className="import-level-values">
+                      {shown.map((v: string) => <li key={v} title={v}>{v}</li>)}
+                      {gc.variants.length > shown.length && (
+                        <li className="is-more">+{gc.variants.length - shown.length} more</li>
+                      )}
+                    </ul>
+                    <span className="import-level-control">
+                      <DropDownSelect
+                        label="read as"
+                        size="small"
+                        block
+                        value={gc.verdict}
+                        options={[
+                          { value: 'modes', label: 'modes' },
+                          { value: 'separate', label: 'collections' },
+                        ]}
+                        onChange={(v: string) => window.PomImportLevels.onGroupToggle?.(group, v)}
+                      />
+                    </span>
+                  </span>
+                );
+              })()}
+
+              {(byGroup[group] || []).map((c) => {
                 const role = c.role || 'name';
                 const modeTaken = !!c.modeTakenBySibling;
                 const shown = c.values.slice(0, 5);
@@ -1373,7 +1436,11 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
   }
 
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
-  window.PomImportLevels = { set: (c, a, cols) => set(c, a, cols || []), onToggle: null };
+  window.PomImportLevels = {
+    set: (c, a, cols, gc, ord) => set(c, a, cols || [], gc || [], ord || []),
+    onToggle: null,
+    onGroupToggle: null,
+  };
 })();
 
 /* ── the file that was chosen ───────────────────────────────────────────────

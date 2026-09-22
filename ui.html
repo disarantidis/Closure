@@ -1325,6 +1325,9 @@
     /* The last segment is the token's own name and never an axis — dimmer
        again, so the path does not look like it has one more choice in it. */
     .import-level-path .seg.is-leaf { opacity: 0.35; font-style: italic; }
+    /* The sets row names an axis that no single token name shows, so its
+       marker is a count rather than a segment of a path. */
+    .import-level-path.is-sets .seg.is-axis { font-variant-numeric: tabular-nums; }
 
     .import-level-row {
       display: grid;
@@ -48929,20 +48932,72 @@ html[data-theme=dark] {
     function View() {
       const [candidates, setCandidates] = (0, import_react16.useState)([]);
       const [collections, setCollections] = (0, import_react16.useState)([]);
-      set = (c, _a, cols) => {
+      const [groupCands, setGroupCands] = (0, import_react16.useState)([]);
+      const [order, setOrder] = (0, import_react16.useState)([]);
+      set = (c, _a, cols, gc, ord) => {
         setCandidates(c || []);
         setCollections(cols || []);
+        setGroupCands(gc || []);
+        setOrder(ord || []);
       };
-      if (!candidates.length) return null;
+      if (!candidates.length && !groupCands.length) return null;
       const byGroup = {};
       candidates.forEach((c) => {
         (byGroup[c.group] = byGroup[c.group] || []).push(c);
       });
-      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-6)" }, children: Object.keys(byGroup).map((group) => {
+      const gcOf = {};
+      groupCands.forEach((c) => {
+        gcOf[c.group] = c;
+      });
+      const seen = /* @__PURE__ */ new Set();
+      const groupsInOrder = (order.length ? order : Object.keys(byGroup)).filter((g) => (byGroup[g] || gcOf[g]) && !seen.has(g) && seen.add(g) !== void 0);
+      Object.keys(byGroup).forEach((g) => {
+        if (!seen.has(g)) {
+          seen.add(g);
+          groupsInOrder.push(g);
+        }
+      });
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-6)" }, children: groupsInOrder.map((group) => {
         const mine = collections.filter((x) => x.fromGroup === group);
         return /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("span", { className: "import-level-section", children: [
           /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "import-level-title", children: group }),
-          byGroup[group].map((c) => {
+          gcOf[group] && (() => {
+            const gc = gcOf[group];
+            const shown = gc.variants.slice(0, 5);
+            return /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("span", { className: "import-level-row", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("span", { className: "import-level-path is-sets", "aria-hidden": "true", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("span", { className: "seg is-axis", children: [
+                  gc.variants.length,
+                  " sets"
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "sep", children: "/" }),
+                /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "seg is-leaf", children: gc.measured ? "read from the file" : "not certain from the file" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("ul", { className: "import-level-values", children: [
+                shown.map((v) => /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("li", { title: v, children: v }, v)),
+                gc.variants.length > shown.length && /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("li", { className: "is-more", children: [
+                  "+",
+                  gc.variants.length - shown.length,
+                  " more"
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("span", { className: "import-level-control", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
+                DropDownSelect,
+                {
+                  label: "read as",
+                  size: "small",
+                  block: true,
+                  value: gc.verdict,
+                  options: [
+                    { value: "modes", label: "modes" },
+                    { value: "separate", label: "collections" }
+                  ],
+                  onChange: (v) => window.PomImportLevels.onGroupToggle?.(group, v)
+                }
+              ) })
+            ] });
+          })(),
+          (byGroup[group] || []).map((c) => {
             const role = c.role || "name";
             const modeTaken = !!c.modeTakenBySibling;
             const shown = c.values.slice(0, 5);
@@ -48992,7 +49047,11 @@ html[data-theme=dark] {
       }) });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) })));
-    window.PomImportLevels = { set: (c, a, cols) => set(c, a, cols || []), onToggle: null };
+    window.PomImportLevels = {
+      set: (c, a, cols, gc, ord) => set(c, a, cols || [], gc || [], ord || []),
+      onToggle: null,
+      onGroupToggle: null
+    };
   })();
   (function mountImportFile() {
     const container = document.getElementById("import-file-item-mount");
@@ -51004,6 +51063,8 @@ function derive(ir, opts) {
     /* Depths that measure like axes but have not been promoted. Reported so a
        caller can offer them; never applied on their own. */
     levelCandidates: [],
+    groupCandidates: [],
+    groupOrder: [],
     levelsApplied: levels,
     /* Whether this reading came from the file or from the caller — worth
        reporting, because "the document says so" and "you just chose it" are
@@ -51066,6 +51127,18 @@ function derive(ir, opts) {
   const verdict = new Map();                // group -> 'modes' | 'separate'
   const naming = new Map();                 // group -> how the manifest names it
   const evidence = new Map();
+  /*
+    ONE ROW PER GROUP THAT HAS A VARIANT AXIS — see plan.groupCandidates.
+
+    A group's SETS are an axis just as much as a depth inside a token's path
+    is, and for a group whose paths are only two segments deep ("tense.background",
+    "interaction.background") they are the ONLY axis it has. Those groups
+    produced no level candidates at all and so rendered nothing, which is how
+    two real collections came to be invisible in the panel that decides how
+    collections are read.
+  */
+  const groupChoices = [];
+
   for (const [g, variants] of groups) {
     const names = [...variants.keys()];
 
@@ -51091,12 +51164,28 @@ function derive(ir, opts) {
     for (const p of smallest) if (sets.every((s) => s.has(p))) shared++;
     const overlap = smallest.size ? shared / smallest.size : 0;
 
-    let v = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : null;
-    let decided = false;
-    if (v === null) {
-      const answer = claim('group:' + g);
-      if (answer === 'modes' || answer === 'separate') { v = answer; decided = true; }
-    }
+    /*
+      AN EXPLICIT ANSWER IS CONSULTED FIRST, not only when the measurement
+      gives up.
+
+      It used to be reached only inside `if (v === null)` — so the override
+      existed but could only ever be used on a group the file could not settle
+      by itself. Every group in a real export measures at an extreme (three
+      variants of "tense" share 100% of their paths), resolves confidently,
+      and the question was therefore never asked, never rendered, and could
+      not be answered. A panel titled "How should this be read?" that silently
+      omits the axis for two of eleven groups is not offering a choice.
+
+      The measurement is not wrong when it is confident — 100% overlap IS the
+      evidence for modes. But "correct about the bytes" and "what the system
+      means" are different questions, which is exactly why the DEPTH rows have
+      always been overridable regardless of what they measured. This makes the
+      variant axis behave the same way.
+    */
+    const answer = claim('group:' + g);
+    let v = (answer === 'modes' || answer === 'separate') ? answer : null;
+    let decided = v !== null;
+    if (v === null) v = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : null;
     if (v === null) {
       v = 'modes';                          // provisional, only so the rest can be reported
       plan.ambiguous.push({ group: g, variants: names, overlap: +(overlap * 100).toFixed(1),
@@ -51108,6 +51197,9 @@ function derive(ir, opts) {
                       ' paths (' + (overlap * 100).toFixed(1) + '%)' });
     }
     verdict.set(g, v);
+    const measured = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : null;
+    groupChoices.push({ group: g, variants: names, verdict: v, measured, decided,
+                        overlap: +(overlap * 100).toFixed(1), shared, of: smallest.size });
     evidence.set(g, { variants: names.length, overlap, shared, of: smallest.size, decided,
                       note: overlap === 1 ? 'every variant defines the same paths'
                           : overlap === 0 ? 'no path defined by more than one variant'
@@ -51337,6 +51429,16 @@ function derive(ir, opts) {
   /* Every candidate, each marked with whether it is the one in force. A
      collection has one mode axis, so the others in its group are alternatives
      rather than additions — which is a thing to show, not to hide. */
+  /* Groups whose reading came from $figmaStructure or that hold a single set
+     are deliberately absent: there is nothing to choose in either case. */
+  plan.groupCandidates = groupChoices;
+  /* Every group, in the order the document introduces them. The panel needs
+     it because a section can now come from either list — a group with a
+     variant axis and no depths ("tense") appears in one and not the other,
+     and ordering by whichever list is longer puts it wherever it happens to
+     land rather than where the file put it. */
+  plan.groupOrder = [...groups.keys()];
+
   plan.levelCandidates = candidates.map((c) => {
     const spec = levels[c.group] || {};
     const role = roleOf(spec[String(c.depth)]) || 'name';
@@ -52303,7 +52405,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'c627683 16:27:21';
+    var CLOSURE_BUILD = '16c0f74 17:04:03';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -53232,8 +53334,13 @@ function format(report, limit) {
       var shown = plan.levelCandidates || [];
       /* The resulting collections go in too — the preview draws what the
          current reading actually produces, not a description of it. */
-      window.PomImportLevels.set(shown, importState.levels, plan.collections || []);
-      el.hidden = !shown.length;
+      /* The SETS axis travels alongside the depths — a group can have one,
+         the other, or both, and "tense" has only the first. Ordered by the
+         document so a section lands where the file put it. */
+      var groupCands = plan.groupCandidates || [];
+      window.PomImportLevels.set(shown, importState.levels, plan.collections || [],
+                                 groupCands, plan.groupOrder || []);
+      el.hidden = !shown.length && !groupCands.length;
     }
 
     window.PomImportLevels.onToggle = function(group, depth, role) {
@@ -53249,6 +53356,18 @@ function format(report, limit) {
         importState.levels[group] = importState.levels[group] || {};
         importState.levels[group][String(depth)] = role;
       }
+      if (importState.doc) runImport(importState.doc, importState.fileName);
+    };
+
+    /*
+      THE SETS AXIS. Stored as a `group:<name>` decision, which is the same
+      key derive() has always used for this question — it was simply never
+      asked unless the measurement gave up. Writing it here is what makes the
+      answer durable: it goes into $figmaStructure with everything else, so a
+      re-import reads the choice rather than measuring again.
+    */
+    window.PomImportLevels.onGroupToggle = function(group, verdict) {
+      importState.decisions['group:' + group] = verdict;
       if (importState.doc) runImport(importState.doc, importState.fileName);
     };
 

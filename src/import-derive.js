@@ -333,6 +333,8 @@ function derive(ir, opts) {
     /* Depths that measure like axes but have not been promoted. Reported so a
        caller can offer them; never applied on their own. */
     levelCandidates: [],
+    groupCandidates: [],
+    groupOrder: [],
     levelsApplied: levels,
     /* Whether this reading came from the file or from the caller — worth
        reporting, because "the document says so" and "you just chose it" are
@@ -395,6 +397,18 @@ function derive(ir, opts) {
   const verdict = new Map();                // group -> 'modes' | 'separate'
   const naming = new Map();                 // group -> how the manifest names it
   const evidence = new Map();
+  /*
+    ONE ROW PER GROUP THAT HAS A VARIANT AXIS — see plan.groupCandidates.
+
+    A group's SETS are an axis just as much as a depth inside a token's path
+    is, and for a group whose paths are only two segments deep ("tense.background",
+    "interaction.background") they are the ONLY axis it has. Those groups
+    produced no level candidates at all and so rendered nothing, which is how
+    two real collections came to be invisible in the panel that decides how
+    collections are read.
+  */
+  const groupChoices = [];
+
   for (const [g, variants] of groups) {
     const names = [...variants.keys()];
 
@@ -420,12 +434,28 @@ function derive(ir, opts) {
     for (const p of smallest) if (sets.every((s) => s.has(p))) shared++;
     const overlap = smallest.size ? shared / smallest.size : 0;
 
-    let v = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : null;
-    let decided = false;
-    if (v === null) {
-      const answer = claim('group:' + g);
-      if (answer === 'modes' || answer === 'separate') { v = answer; decided = true; }
-    }
+    /*
+      AN EXPLICIT ANSWER IS CONSULTED FIRST, not only when the measurement
+      gives up.
+
+      It used to be reached only inside `if (v === null)` — so the override
+      existed but could only ever be used on a group the file could not settle
+      by itself. Every group in a real export measures at an extreme (three
+      variants of "tense" share 100% of their paths), resolves confidently,
+      and the question was therefore never asked, never rendered, and could
+      not be answered. A panel titled "How should this be read?" that silently
+      omits the axis for two of eleven groups is not offering a choice.
+
+      The measurement is not wrong when it is confident — 100% overlap IS the
+      evidence for modes. But "correct about the bytes" and "what the system
+      means" are different questions, which is exactly why the DEPTH rows have
+      always been overridable regardless of what they measured. This makes the
+      variant axis behave the same way.
+    */
+    const answer = claim('group:' + g);
+    let v = (answer === 'modes' || answer === 'separate') ? answer : null;
+    let decided = v !== null;
+    if (v === null) v = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : null;
     if (v === null) {
       v = 'modes';                          // provisional, only so the rest can be reported
       plan.ambiguous.push({ group: g, variants: names, overlap: +(overlap * 100).toFixed(1),
@@ -437,6 +467,9 @@ function derive(ir, opts) {
                       ' paths (' + (overlap * 100).toFixed(1) + '%)' });
     }
     verdict.set(g, v);
+    const measured = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : null;
+    groupChoices.push({ group: g, variants: names, verdict: v, measured, decided,
+                        overlap: +(overlap * 100).toFixed(1), shared, of: smallest.size });
     evidence.set(g, { variants: names.length, overlap, shared, of: smallest.size, decided,
                       note: overlap === 1 ? 'every variant defines the same paths'
                           : overlap === 0 ? 'no path defined by more than one variant'
@@ -666,6 +699,16 @@ function derive(ir, opts) {
   /* Every candidate, each marked with whether it is the one in force. A
      collection has one mode axis, so the others in its group are alternatives
      rather than additions — which is a thing to show, not to hide. */
+  /* Groups whose reading came from $figmaStructure or that hold a single set
+     are deliberately absent: there is nothing to choose in either case. */
+  plan.groupCandidates = groupChoices;
+  /* Every group, in the order the document introduces them. The panel needs
+     it because a section can now come from either list — a group with a
+     variant axis and no depths ("tense") appears in one and not the other,
+     and ordering by whichever list is longer puts it wherever it happens to
+     land rather than where the file put it. */
+  plan.groupOrder = [...groups.keys()];
+
   plan.levelCandidates = candidates.map((c) => {
     const spec = levels[c.group] || {};
     const role = roleOf(spec[String(c.depth)]) || 'name';
