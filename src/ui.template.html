@@ -3516,6 +3516,44 @@
       runCompare(which);
     }
 
+    /*
+      THE REFUSAL, ACTED ON.
+
+      A page that says "set the output format to W3C DTCG" and then makes you
+      find Settings, change it, come back and press Compare again is three
+      steps of doing what the page already worked out. This does them.
+
+      IT KEEPS THE FILE NAME. That is the whole care in this function.
+      setFormat rewrites the name field for the format being switched to —
+      adding or stripping the `_dtcg` suffix — which is right when someone
+      picks a format for a file they are about to write, and wrong here: the
+      comparison is about a file that ALREADY EXISTS in the repo under a name
+      it already has. Letting the switch rename it would quietly point the
+      second comparison at a different file (or at nothing), which is a worse
+      failure than the one being fixed, because it looks like an answer.
+
+      It waits for the transform because the export has to be rebuilt in the
+      new shape first — comparing before that lands would compare the old one
+      and refuse all over again for the same reason.
+    */
+    function switchFormatAndCompare(which, shape, label) {
+      var keep = window.PomPrimaryFilename.get();
+      window.PomCompare.setBusy('Switching to ' + label + '…');
+      setFormat(shape, function () {
+        window.PomCompare.setBusy('Comparing…');
+        runCompare(which);
+      });
+      if (window.PomPrimaryFilename.get() !== keep) {
+        window.PomPrimaryFilename.set(keep);
+        persistSettings();          // setFormat already saved the renamed one
+      }
+    }
+
+    /* json-diff names formats the way a person would; the output-format
+       control names them the way it stores them. One map, at the one place
+       the two meet. */
+    var SHAPE_FOR_FORMAT = { legacy: null, dtcg: 'themes' };
+
     function runCompare(which) {
       var key = repoAddressKey(which);
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
@@ -3557,8 +3595,20 @@
             return;
           }
           if (!report.comparable) {
+            /* Only a format mismatch is fixable from here, and only when the
+               repo is in a shape this plugin can actually export. A resolved
+               document on either side is not a setting to change — it is a
+               different kind of file — and an unrecognised one has nothing to
+               switch to. */
+            var canSwitch = report.problem.kind === 'format-mismatch' &&
+                            Object.prototype.hasOwnProperty.call(SHAPE_FOR_FORMAT, report.repoFormat);
+            window.PomCompare.onAction = canSwitch ? function () {
+              switchFormatAndCompare(which, SHAPE_FOR_FORMAT[report.repoFormat], report.repoFormatLabel);
+            } : null;
             window.PomCompare.setProblem('These two cannot be compared',
-              report.problem.message, report.problem.fix);
+              report.problem.message,
+              canSwitch ? '' : report.problem.fix,
+              canSwitch ? 'Switch to ' + report.repoFormatLabel + ' and compare' : '');
             return;
           }
           /* The counts are worth saying on the sides themselves: two numbers
@@ -5070,7 +5120,15 @@
       because a radio group needs a value for every option including the
       default one.
     */
-    function setFormat(shape) {
+    /*
+      `andThen` runs once the sandbox has rebuilt the export in the new shape.
+
+      It is threaded through requestTransform rather than assigned around this
+      call, because setFormat's own requestTransform() sets afterTransform to
+      null — anything hooked up beforehand would be cleared by the line that
+      was supposed to honour it.
+    */
+    function setFormat(shape, andThen) {
       dtcgShape = shape;
       window.PomOutputFormat.setValue(shape || 'legacy');
       // Rewrite the file names BEFORE persisting, so the saved config and the
@@ -5078,7 +5136,7 @@
       applyFilenameForFormat();
       updateOutputFormatHint();
       persistSettings();
-      requestTransform();
+      requestTransform(andThen);
     }
 
     window.PomOutputFormat.onChange = function(shape) {

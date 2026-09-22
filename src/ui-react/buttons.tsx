@@ -500,8 +500,12 @@ declare global {
          is the state three sibling containers taking turns produce. */
       setBusy: (label: string) => void;
       setSides: (figma: string, figmaDetail: string, repo: string, repoDetail: string) => void;
-      setProblem: (title: string, message: string, fix?: string) => void;
+      /* `actionLabel` puts a button in the warning. A refusal that names the
+         fix and then makes you go and do it somewhere else is a worse version
+         of one that just does it. */
+      setProblem: (title: string, message: string, fix?: string, actionLabel?: string) => void;
       setReport: (report: any, copyText: string) => void;
+      onAction: (() => void) | null;
     };
     PomPrimaryFilename: {
       get: () => string;
@@ -1467,7 +1471,7 @@ const COMPARE_SAMPLE = 40;
   type S = {
     busy: string;
     sides: Sides;
-    problem: { title: string; message: string; fix?: string } | null;
+    problem: { title: string; message: string; fix?: string; actionLabel?: string } | null;
     report: any | null;
     copyText: string;
   };
@@ -1518,6 +1522,17 @@ const COMPARE_SAMPLE = 40;
           <Alert tone="warning" title={s.problem.title}>
             <p className="closure-warning-subtitle">{s.problem.message}</p>
             {s.problem.fix ? <p className="closure-warning-more">{s.problem.fix}</p> : null}
+            {s.problem.actionLabel ? (
+              <div className="closure-warning-actions">
+                <PomButton
+                  id="compare-fix-btn"
+                  variant="tonal"
+                  size="small"
+                  label={s.problem.actionLabel}
+                  onClick={() => window.PomCompare.onAction?.()}
+                />
+              </div>
+            ) : null}
           </Alert>
         </>
       );
@@ -1656,10 +1671,11 @@ const COMPARE_SAMPLE = 40;
     setBusy: (label) => set((s) => ({ ...s, busy: label, problem: null, report: null })),
     setSides: (figma, figmaDetail, repo, repoDetail) =>
       set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail } })),
-    setProblem: (title, message, fix) =>
-      set((s) => ({ ...s, busy: '', report: null, problem: { title, message, fix } })),
+    setProblem: (title, message, fix, actionLabel) =>
+      set((s) => ({ ...s, busy: '', report: null, problem: { title, message, fix, actionLabel } })),
     setReport: (report, copyText) =>
       set((s) => ({ ...s, busy: '', problem: null, report, copyText })),
+    onAction: null,
   };
 })();
 

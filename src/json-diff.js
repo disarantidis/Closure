@@ -109,6 +109,20 @@ function flatten(doc) {
   return out;
 }
 
+/*
+  THE TOP-LEVEL NAME A PATH IS UNDER.
+
+  THE LEADING DOT IS PART OF THE NAME, not a separator. This codebase's whole
+  convention is dot-prefixed collections — .core, .mode, .scheme, .white —
+  and splitting at the first dot found put every one of them under the empty
+  string: one nameless group holding most of the document, on the very files
+  this page exists for.
+*/
+function rootOf(path) {
+  var i = path.indexOf('.', path.charAt(0) === '.' ? 1 : 0);
+  return i === -1 ? path : path.slice(0, i);
+}
+
 /* How many tokens a document holds. The same walk, so the number on the card
    and the number in the report can never disagree. */
 function countTokens(doc) { return flatten(doc).size; }
@@ -121,9 +135,32 @@ function countTokens(doc) { return flatten(doc).size; }
   is a statement rather than an inference. Older files, and files from other
   tools, are read off their own leaves instead.
 */
+/*
+  THE EXPORTER'S WORD FOR EACH SHAPE IS NOT THIS FILE'S WORD.
+
+  stampExport writes $extensions["com.closure"].format from the UI's own
+  output-format state, whose three values are 'legacy', 'themes' and
+  'resolved' — 'themes' being what the DTCG switch has been called since it
+  was a themes-only toggle. This module talks about 'dtcg', because that is
+  what the format is.
+
+  Passing the marker through untranslated meant every DTCG export this plugin
+  has ever written identified as 'themes', matched no label, and was reported
+  to the user as "an unrecognised shape" — the plugin failing to recognise its
+  own output. It survived the unit tests because every fixture in them was
+  hand-written with the word this module uses, and it survived the first
+  browser run because the file in the repo predates the stamp entirely and so
+  was read off its leaves instead.
+*/
+var MARKER_FORMAT = { legacy: 'legacy', dtcg: 'dtcg', themes: 'dtcg', resolved: 'resolved' };
+
 function detectFormat(doc) {
   var ext = doc && doc.$extensions && doc.$extensions['com.closure'];
-  if (ext && ext.format) return ext.format === 'resolved' ? 'resolved' : ext.format;
+  /* A marker this file does not know is NOT believed — it falls through to
+     the leaves, which are a fact about the document rather than a word about
+     it. A future build naming a fourth shape should read as whatever it
+     actually is, not as "unrecognised". */
+  if (ext && ext.format && MARKER_FORMAT[ext.format]) return MARKER_FORMAT[ext.format];
   var found = null;
   (function walk(node) {
     if (found || !node || typeof node !== 'object' || Array.isArray(node)) return;
@@ -198,6 +235,76 @@ function compare(figmaDoc, repoDoc) {
     };
     return report;
   }
+  var F = flatten(figmaDoc), R = flatten(repoDoc);
+  report.figmaTokens = F.size;
+  report.repoTokens = R.size;
+
+  /*
+    A SIDE WITH NO TOKENS IS NOT A DIFFERENCE, IT IS A MISSING DOCUMENT.
+
+    Left to the leaf comparison below, an empty side comes out as "every token
+    in the other one is only there" — which renders as thousands of deletions
+    and reads as someone having wiped the file. It is the most alarming report
+    this page can produce and it is never the true one.
+
+    Both sides can reach it. The export side: the DTCG 'themes' shape emits one
+    document per $themes entry, so a file with no themes defined converts to a
+    document holding nothing but its own $extensions. The repo side: the file
+    name field now offers every .json in the repo, so it is one click to point
+    this at a package.json.
+  */
+  if (F.size === 0 || R.size === 0) {
+    report.comparable = false;
+    report.problem = F.size === 0 && R.size === 0 ? {
+      kind: 'both-empty',
+      message: 'Neither of these documents holds any design tokens.',
+      fix: 'Check that the file name points at a token JSON.',
+    } : F.size === 0 ? {
+      kind: 'empty-figma',
+      message: 'This file\'s export came out holding no tokens at all, while the repo\'s copy holds ' +
+               R.size.toLocaleString() + '. That is an export that did not produce anything, not ' +
+               R.size.toLocaleString() + ' deleted tokens.',
+      fix: 'The DTCG "themes" shape writes one document per $themes entry, so a file with no themes ' +
+           'defined exports an empty one — try Legacy JSON.',
+    } : {
+      kind: 'empty-repo',
+      message: 'The file in the repo holds no design tokens. It parsed as JSON, but nothing in it is a ' +
+               'token, so there is nothing to compare this file\'s ' + F.size.toLocaleString() +
+               ' against.',
+      fix: 'Pick a different file in the File name field — it lists every .json in the repo, ' +
+           'including ones that are not token files.',
+    };
+    return report;
+  }
+
+  /*
+    TWO DOCUMENTS THAT SHARE NO TOP-LEVEL NAME ARE NOT TWO VERSIONS OF ONE
+    THING, and diffing them produces the same useless wall as an empty side:
+    everything on both sides, unmatched.
+
+    The case this exists for is REAL and is not a user error. The DTCG export
+    has two shapes with different roots — 'sets' keys the document by token set
+    (core, mode/light) and 'themes' keys it by theme (.core, .white) — so a
+    repo file written by one and an export written by the other are both valid,
+    both DTCG, and share nothing to line up. Detected by the symptom rather
+    than by the marker, because the marker only arrived in recent builds and
+    the files already in people's repos predate it.
+  */
+  var topOf = function (m) {
+    var t = {};
+    m.forEach(function (_v, path) { t[rootOf(path)] = 1; });
+    return Object.keys(t);
+  };
+  /*
+    AFTER THE EMPTINESS CHECK, NOT BEFORE IT.
+
+    A document with no tokens in it has no format to detect, so detectFormat
+    calls it 'unknown' — and read as a format mismatch that produced the
+    instruction "Set the output format to an unrecognised shape", which is
+    not a thing anyone can do. Emptiness is the more basic fact and is
+    established first; by here both sides are known to hold tokens, so a
+    disagreement about format is a real one.
+  */
   if (!formatsComparable(figmaFormat, repoFormat)) {
     report.comparable = false;
     report.problem = {
@@ -211,14 +318,24 @@ function compare(figmaDoc, repoDoc) {
     return report;
   }
 
-  var F = flatten(figmaDoc), R = flatten(repoDoc);
-  report.figmaTokens = F.size;
-  report.repoTokens = R.size;
+  var fTop = topOf(F), rTop = topOf(R);
+  var shared = fTop.filter(function (k) { return rTop.indexOf(k) !== -1; });
+  if (shared.length === 0) {
+    report.comparable = false;
+    report.problem = {
+      kind: 'no-common-root',
+      message: 'These two documents have nothing in common at the top level — this file exports ' +
+               fTop.slice(0, 3).join(', ') + (fTop.length > 3 ? ', …' : '') +
+               ' and the repo holds ' + rTop.slice(0, 3).join(', ') + (rTop.length > 3 ? ', …' : '') +
+               '. Every token on both sides would be reported as unmatched, which says nothing.',
+      fix: 'The DTCG export has two shapes — one keyed by token set, one keyed by theme — and a file ' +
+           'written in one cannot be lined up against the other. Check that both were written the ' +
+           'same way.',
+    };
+    return report;
+  }
 
-  var groupOf = function (path) {
-    var i = path.indexOf('.');
-    return i === -1 ? path : path.slice(0, i);
-  };
+  var groupOf = rootOf;
   var groups = new Map();
   var bump = function (path, field) {
     var g = groupOf(path);

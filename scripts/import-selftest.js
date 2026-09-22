@@ -2013,6 +2013,25 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                          { name: 'extra', onlyInFigma: 1, onlyInRepo: 0, changed: 0, same: 0 }]),
          JSON.stringify(r.groups));
 
+      /*
+        THE LEADING DOT IS PART OF THE COLLECTION NAME, NOT A SEPARATOR.
+
+        Splitting the path at the first dot found put .core, .mode, .scheme and
+        .white all under the empty string — one nameless group holding most of
+        the document, on exactly the dot-prefixed systems this page exists for.
+        Caught only as a side effect of an unrelated assertion about a message,
+        which is why it is pinned directly here.
+      */
+      const dotted = JD.compare(
+        { '.core': { a: tok('#fff'), b: tok('#eee') }, '.white': { c: tok('#111') }, plain: { d: tok('#222') } },
+        { '.core': { a: tok('#fff') }, '.white': { c: tok('#000') }, plain: { d: tok('#222') } });
+      ok('compare: a dot-prefixed collection is its own group, not a nameless one',
+         dotted.groups.map((g) => g.name).join(',') === '.core,.white,plain',
+         JSON.stringify(dotted.groups.map((g) => g.name)));
+      ok('compare: and its counts land on it rather than pooling',
+         dotted.groups[0].onlyInFigma === 1 && dotted.groups[1].changed === 1,
+         JSON.stringify(dotted.groups));
+
       const same = JD.compare(A, A);
       ok('compare: a document against itself is identical', same.identical === true && same.sameCount === 4);
       ok('compare: identical means the page can say so without checking three lists',
@@ -2039,6 +2058,25 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       ok('compare: and inferred from the leaves when there is no marker',
          JD.detectFormat(D) === 'dtcg' && JD.detectFormat({ nothing: {} }) === 'unknown');
 
+      /* THE MARKER THE PLUGIN ACTUALLY WRITES IS 'themes', not 'dtcg' —
+         stampExport takes it from the output-format control, whose DTCG value
+         has been called 'themes' since it was a themes-only toggle. Passing it
+         through untranslated made every DTCG export this plugin has ever
+         written report as "an unrecognised shape": the plugin refusing to
+         recognise its own output. Every fixture above is hand-written with
+         this module's own vocabulary, which is exactly why none of them
+         caught it. */
+      const stamped = (fmt, leaf) => ({ $extensions: { 'com.closure': { build: 'x', format: fmt } }, core: { a: leaf } });
+      ok('compare: the exporter\'s own "themes" marker is DTCG',
+         JD.detectFormat(stamped('themes', dtok('#fff'))) === 'dtcg',
+         JD.detectFormat(stamped('themes', dtok('#fff'))));
+      ok('compare: a DTCG export compares against a DTCG repo file rather than being refused',
+         JD.compare(stamped('themes', dtok('#fff')), stamped('themes', dtok('#fff'))).comparable === true);
+      /* A marker this module does not know is not believed — the leaves are a
+         fact about the document, the word is only a claim about it. */
+      ok('compare: an unknown marker falls through to the leaves, not to "unrecognised"',
+         JD.detectFormat(stamped('martian', dtok('#fff'))) === 'dtcg');
+
       /* The count on the repo card and the count in the report come from this
          one walk, so the two can never disagree. */
       ok('compare: countTokens is the same walk the report counts with',
@@ -2047,6 +2085,47 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       /* A composite's key order is an artefact of how it was built. */
       ok('compare: a composite compares by content, not key order',
          JD.renderValue({ a: 1, b: 2 }) === JD.renderValue({ b: 2, a: 1 }));
+
+      /*
+        AN EMPTY SIDE IS THE MOST ALARMING REPORT THIS PAGE CAN PRODUCE and it
+        is never the true one: left to the leaf comparison it renders as every
+        token in the other document having been deleted. Both sides can reach
+        it — the DTCG 'themes' shape emits nothing for a file with no $themes,
+        and the file name field now lists every .json in the repo, so a
+        package.json is one click away.
+      */
+      const empty = JD.compare({ $extensions: { 'com.closure': { format: 'legacy' } } }, B);
+      ok('compare: an export holding nothing is a failed export, not a mass deletion',
+         empty.comparable === false && empty.problem.kind === 'empty-figma',
+         JSON.stringify(empty.problem));
+      ok('compare: and it says which is empty rather than listing the other as deletions',
+         empty.onlyInRepo.length === 0 && /did not produce/.test(empty.problem.message));
+      const emptyRepo = JD.compare(A, { name: 'a-package-json', version: '1.0.0' });
+      ok('compare: a repo file with no tokens in it is refused, not reported as 4 additions',
+         emptyRepo.comparable === false && emptyRepo.problem.kind === 'empty-repo',
+         JSON.stringify(emptyRepo.problem));
+
+      /*
+        THE DTCG EXPORT HAS TWO SHAPES WITH DIFFERENT ROOTS — 'sets' keys the
+        document by token set (core, mode/light), 'themes' by theme (.core,
+        .white). Both are valid DTCG and they share nothing to line up, so
+        diffing one against the other reports every token on both sides as
+        unmatched. Detected by the symptom, because the shape marker only
+        arrived in recent builds and the files already in repos predate it.
+      */
+      const setsShaped = { core: { a: tok('#fff') }, 'mode/light': { b: tok('#000') } };
+      const themeShaped = { '.core': { a: tok('#fff') }, '.white': { b: tok('#000') } };
+      const shapes = JD.compare(themeShaped, setsShaped);
+      ok('compare: two documents sharing no top-level name are refused, not diffed',
+         shapes.comparable === false && shapes.problem.kind === 'no-common-root',
+         JSON.stringify(shapes.problem));
+      ok('compare: and the refusal names what each side actually holds',
+         /\.core/.test(shapes.problem.message) && /mode\/light|core/.test(shapes.problem.message),
+         shapes.problem.message);
+      /* One shared root is enough — a set added on one side is an ordinary
+         difference, not a different document. */
+      ok('compare: one root in common is still a comparison',
+         JD.compare({ core: { a: tok('#fff') }, brandnew: { c: tok('#eee') } }, setsShaped).comparable === true);
 
       /* The clipboard copy is the only place the full list exists — the page
          caps every list it draws. */
