@@ -445,7 +445,20 @@
       border-radius: 4px;
     }
     
-    .settings-page .settings-page-content {
+    /*
+      SCOPED TO THE CLASS, NOT TO .settings-page.
+
+      Two pages use this box — Settings and Import — and the selector named
+      only the first, so the Import page took the class, inherited none of its
+      padding, and ran its cards flush to both panel edges while the Settings
+      page beside it sat inset by 16. The headers matched all along (both come
+      from .header-settings), which is what made the difference read as a
+      layout bug on one page rather than a missing rule.
+
+      The inset is a property of THIS box wherever it is used. A page that
+      wants a different one can still say so; none does.
+    */
+    .settings-page-content {
       overflow: visible;
       /* Deliberately NOT flex:1/min-height:0. Those existed to push the old
          sticky action bar down to the bottom of a short page; with that bar
@@ -457,7 +470,8 @@
          it reads.
          Left/right/bottom replace what used to come from .settings-page's
          own padding; top stays the extra 20px (vs the header's own 14px
-         bottom padding) that was already there. Bottom is larger than the
+         bottom padding) that was already there. The same numbers now reach
+         the Import page, which is the point of the selector above. Bottom is larger than the
          sides on purpose, so the last card has real run-out below it
          rather than ending flush with the panel edge. */
       padding: 20px 16px 40px;
@@ -52090,7 +52104,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'f10d2e5 15:41:33';
+    var CLOSURE_BUILD = '3353ad5 15:43:39';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
