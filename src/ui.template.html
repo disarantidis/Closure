@@ -1785,8 +1785,7 @@
           <div id="version-tag-mount" class="version-tag-mount"></div>
         </div>
         <div class="header-right">
-          <span id="import-btn-mount"></span>
-        <span id="settings-btn-mount"></span>
+          <span id="settings-btn-mount"></span>
         </div>
       </div>
     </header>
@@ -1855,8 +1854,9 @@
       <p>No variable collections found.</p>
       <p class="hint">Add variables in Figma to see them here.</p>
       <!-- The one screen where importing is unambiguously the right next
-           move, so it is offered here directly rather than leaving someone
-           to find the header. Same destination as the header button. -->
+           move, and now the only place it is offered: the header carried an
+           icon-only twin of this button and it read as a second download
+           control, so it was removed rather than relabelled. -->
       <span id="import-empty-btn-mount" class="empty-state-action"></span>
     </div>
   </div>
@@ -3066,7 +3066,11 @@
       document.getElementById('import-page').classList.remove('visible');
       document.getElementById('main-page').classList.remove('hidden');
     }
-    document.getElementById('import-btn').addEventListener('click', openImport);
+    /* No header entry any more — import is offered on the empty state, which
+       is the screen where it is the obvious next move. There is deliberately
+       no `import-btn` listener here: the element does not exist, and
+       addEventListener on the null it returns throws, which would take out
+       every listener registered after this line. */
     document.getElementById('import-back-btn').addEventListener('click', closeImport);
     var importEmptyBtn = document.getElementById('import-empty-btn');
     if (importEmptyBtn) importEmptyBtn.addEventListener('click', openImport);

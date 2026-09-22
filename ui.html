@@ -21667,8 +21667,7 @@ html[data-theme=dark] {
           <div id="version-tag-mount" class="version-tag-mount"></div>
         </div>
         <div class="header-right">
-          <span id="import-btn-mount"></span>
-        <span id="settings-btn-mount"></span>
+          <span id="settings-btn-mount"></span>
         </div>
       </div>
     </header>
@@ -21737,8 +21736,9 @@ html[data-theme=dark] {
       <p>No variable collections found.</p>
       <p class="hint">Add variables in Figma to see them here.</p>
       <!-- The one screen where importing is unambiguously the right next
-           move, so it is offered here directly rather than leaving someone
-           to find the header. Same destination as the header button. -->
+           move, and now the only place it is offered: the header carried an
+           icon-only twin of this button and it read as a second download
+           control, so it was removed rather than relabelled. -->
       <span id="import-empty-btn-mount" class="empty-state-action"></span>
     </div>
   </div>
@@ -48201,11 +48201,10 @@ html[data-theme=dark] {
   mountButton("remove-gitlab-btn-mount", { id: "remove-gitlab-btn", variant: "ghost", destructive: true, size: "small", label: "Remove GitLab" }, CARD_LEVEL);
   mountIconButton("back-btn-mount", { id: "back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
   mountIconButton("settings-btn-mount", { id: "settings-btn", variant: "ghost", size: "large", title: "Git settings", "aria-label": "Git settings", icon: IconSettings(24) });
-  mountIconButton("import-btn-mount", { id: "import-btn", variant: "ghost", size: "large", title: "Import tokens from JSON", "aria-label": "Import tokens from JSON", icon: IconImport(24) });
   mountIconButton("import-back-btn-mount", { id: "import-back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
   mountButton("import-copy-btn-mount", { id: "import-copy-btn", variant: "outline", size: "small", label: "Copy", block: true }, CARD_LEVEL);
   mountButton("import-choose-btn-mount", { id: "import-choose-btn", variant: "filled", size: "large", label: "Choose a JSON file" });
-  mountButton("import-empty-btn-mount", { id: "import-empty-btn", variant: "tonal", size: "medium", label: "Import from JSON", icon: IconImport(16) });
+  mountButton("import-empty-btn-mount", { id: "import-empty-btn", variant: "tonal", size: "medium", label: "Import from JSON", leftIcon: true, buttonLeftIcon: IconImport(16) });
   (function mountThemeToggle() {
     const container = document.getElementById("theme-toggle-btn-mount");
     function View() {
@@ -51940,7 +51939,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '5950bff 15:35:40';
+    var CLOSURE_BUILD = '33a47f2 15:38:09';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -52593,7 +52592,11 @@ function format(report, limit) {
       document.getElementById('import-page').classList.remove('visible');
       document.getElementById('main-page').classList.remove('hidden');
     }
-    document.getElementById('import-btn').addEventListener('click', openImport);
+    /* No header entry any more — import is offered on the empty state, which
+       is the screen where it is the obvious next move. There is deliberately
+       no `import-btn` listener here: the element does not exist, and
+       addEventListener on the null it returns throws, which would take out
+       every listener registered after this line. */
     document.getElementById('import-back-btn').addEventListener('click', closeImport);
     var importEmptyBtn = document.getElementById('import-empty-btn');
     if (importEmptyBtn) importEmptyBtn.addEventListener('click', openImport);

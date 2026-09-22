@@ -524,13 +524,25 @@ mountIconButton('settings-btn-mount', { id: 'settings-btn', variant: 'ghost', si
    import runs the other way. Putting it in that column would make the arrow
    ambiguous. Ghost like the gear beside it: both are ways OUT of this screen,
    neither is the screen's own action. */
-mountIconButton('import-btn-mount', { id: 'import-btn', variant: 'ghost', size: 'large', title: 'Import tokens from JSON', 'aria-label': 'Import tokens from JSON', icon: IconImport(24) });
+/* The header's import button is gone on purpose — see the note on the empty
+   state's mount in ui.template.html. Nothing mounts into 'import-btn-mount'
+   because that span no longer exists. */
 mountIconButton('import-back-btn-mount', { id: 'import-back-btn', variant: 'tonal', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
 mountButton('import-copy-btn-mount', { id: 'import-copy-btn', variant: 'outline', size: 'small', label: 'Copy', block: true }, CARD_LEVEL);
 mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'filled', size: 'large', label: 'Choose a JSON file' });
 /* The empty state is where an import is most obviously the right thing to do,
    so it gets its own way in rather than making someone find the header. */
-mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', icon: IconImport(16) });
+/*
+  leftIcon + buttonLeftIcon, NOT `icon`.
+
+  PomButton reads `icon` as "this is an icon-button" (see iconOnly above), and
+  from there the label stops being a label — it becomes the aria-label and the
+  tooltip. So this button was passing a perfectly good "Import from JSON" and
+  rendering a bare glyph with no text, which is what made it look like the
+  header's icon-only twin instead of the one obvious action on an empty screen.
+  The labelled form puts the icon in the leading slot and keeps the text.
+*/
+mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', leftIcon: true, buttonLeftIcon: IconImport(16) });
 
 /* ── Settings header: light/dark theme toggle ────────────────────────────── */
 // Flips <html>'s own data-theme attribute directly: every colour in this
