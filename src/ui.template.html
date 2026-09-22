@@ -1129,6 +1129,10 @@
     .compare-stat-n { font-size: 18px; font-weight: 700; line-height: 1.2; }
     .compare-stat-label { font-size: 11px; opacity: 0.7; margin-top: 2px; }
     .compare-stat.is-quiet .compare-stat-n { opacity: 0.55; font-weight: 600; }
+    /* The four kinds of difference sit 2x2; "identical" runs the full width
+       under them, because it is a footnote to the four rather than a fifth
+       one — and five equal cells in a two-column grid leave a hole. */
+    .compare-stat.is-wide { grid-column: 1 / -1; }
 
     /* Per top-level group, because thirty thousand changed leaves is a wall
        and the group is the level someone actually reads at. */

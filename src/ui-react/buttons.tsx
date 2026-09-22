@@ -1582,6 +1582,15 @@ const COMPARE_SAMPLE = 40;
         {sides}
 
         <div className="json-download-card" data-level={4}>
+          {/*
+            FOUR KINDS OF DIFFERENCE, AND "REFERENCE REPOINTED" IS ITS OWN.
+
+            On two exports of one design system two months apart, 1,090 of the
+            1,392 differences were a single mechanical re-rooting of references
+            and 302 were values. Under one "changed" heading the 302 were
+            invisible. Identical runs full width underneath, because it is the
+            one number nobody is here to read.
+          */}
           <div className="compare-stats">
             <div className="compare-stat">
               <div className="compare-stat-n">{r.onlyInFigma.length.toLocaleString()}</div>
@@ -1593,9 +1602,13 @@ const COMPARE_SAMPLE = 40;
             </div>
             <div className="compare-stat">
               <div className="compare-stat-n">{r.changed.length.toLocaleString()}</div>
-              <div className="compare-stat-label">changed</div>
+              <div className="compare-stat-label">value changed</div>
             </div>
-            <div className="compare-stat is-quiet">
+            <div className="compare-stat">
+              <div className="compare-stat-n">{(r.repointed || []).length.toLocaleString()}</div>
+              <div className="compare-stat-label">reference repointed</div>
+            </div>
+            <div className="compare-stat is-quiet is-wide">
               <div className="compare-stat-n">{r.sameCount.toLocaleString()}</div>
               <div className="compare-stat-label">identical</div>
             </div>
@@ -1612,8 +1625,13 @@ const COMPARE_SAMPLE = 40;
                   <span className={'compare-count' + (g.onlyInRepo ? '' : ' is-zero')} title="only in the repo">
                     {'-' + g.onlyInRepo}
                   </span>
-                  <span className={'compare-count' + (g.changed ? '' : ' is-zero')} title="changed">
+                  <span className={'compare-count' + (g.changed ? '' : ' is-zero')} title="value changed">
                     {'~' + g.changed}
+                  </span>
+                  {/* An arrow, because that is what a reference that moved
+                      did — it still points, just somewhere else. */}
+                  <span className={'compare-count' + (g.repointed ? '' : ' is-zero')} title="reference repointed">
+                    {'\u2192' + (g.repointed || 0)}
                   </span>
                 </span>
               </div>
@@ -1621,8 +1639,18 @@ const COMPARE_SAMPLE = 40;
           </div>
         </div>
 
-        {leaves('Changed', r.changed, (x: any) => (
+        {leaves('Value changed', r.changed, (x: any) => (
           <div className="compare-leaf" key={'c' + x.path}>
+            <div className="compare-leaf-path">{x.path}</div>
+            <div className="compare-leaf-val">{'repo:  ' + x.repo}</div>
+            <div className="compare-leaf-val">{'here:  ' + x.figma}</div>
+          </div>
+        ))}
+        {/* Last of the three lists on purpose: it is usually the longest and
+            almost always the least interesting, because a re-rooting moves
+            thousands of references without anyone having decided anything. */}
+        {leaves('Reference repointed', r.repointed || [], (x: any) => (
+          <div className="compare-leaf" key={'p' + x.path}>
             <div className="compare-leaf-path">{x.path}</div>
             <div className="compare-leaf-val">{'repo:  ' + x.repo}</div>
             <div className="compare-leaf-val">{'here:  ' + x.figma}</div>

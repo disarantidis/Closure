@@ -2009,9 +2009,53 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
 
       ok('compare: the group roll-up counts what is under each top-level name',
          JSON.stringify(r.groups) ===
-         JSON.stringify([{ name: 'core', onlyInFigma: 0, onlyInRepo: 1, changed: 1, same: 2 },
-                         { name: 'extra', onlyInFigma: 1, onlyInRepo: 0, changed: 0, same: 0 }]),
+         JSON.stringify([{ name: 'core', onlyInFigma: 0, onlyInRepo: 1, changed: 1, repointed: 0, same: 2 },
+                         { name: 'extra', onlyInFigma: 1, onlyInRepo: 0, changed: 0, repointed: 0, same: 0 }]),
          JSON.stringify(r.groups));
+
+      /*
+        A REFERENCE THAT MOVED IS NOT A VALUE THAT CHANGED.
+
+        On two exports of one design system two months apart: 1,392
+        differences, 1,090 of them one mechanical re-rooting
+        ({section.white.x} -> {white.x} when section/* was removed) and 302
+        actual values. Under a single "changed" heading the 302 were
+        invisible, which is the whole reason for the split.
+      */
+      /* NOT a token named `value`: in the legacy shape a group holding a child
+         called `value` is indistinguishable from a token, so naming one that
+         collapses the whole group to a single leaf. DTCG's `$value` does not
+         have this problem; this is a hazard of the older format, and the
+         first draft of this fixture walked straight into it. */
+      const moved = JD.compare(
+        { a: { keeps: tok('{core.blue.500}'), stops: tok('#ff0000'), starts: tok('{core.red}'),
+               plain: tok('#111111'), math: tok('{core.base} * 2') } },
+        { a: { keeps: tok('{other.blue.500}'), stops: tok('{core.blue.500}'), starts: tok('#00ff00'),
+               plain: tok('#222222'), math: tok('{core.base} * 3') } });
+      ok('compare: a reference pointing somewhere new is repointed, not changed',
+         moved.repointed.map((x) => x.path).sort().join(',') === 'a.keeps,a.math',
+         JSON.stringify(moved.repointed.map((x) => x.path)));
+      /* BOTH sides have to be references. A token that stopped pointing and
+         now holds a literal — or started pointing when it did not — has had
+         its value changed in the way that matters. */
+      ok('compare: starting or stopping pointing is a value change, not a repoint',
+         moved.changed.map((x) => x.path).sort().join(',') === 'a.plain,a.starts,a.stops',
+         JSON.stringify(moved.changed.map((x) => x.path)));
+      ok('compare: the roll-up counts the two separately',
+         moved.groups[0].repointed === 2 && moved.groups[0].changed === 3,
+         JSON.stringify(moved.groups));
+      ok('compare: a repoint alone still means the documents are not identical',
+         JD.compare({ a: { x: tok('{one.two}') } }, { a: { x: tok('{three.four}') } }).identical === false);
+      /* The rendered forms collide — a reference is {core.blue} and a
+         composite renders as {alpha:1,hex:#000} — so the classification is
+         made on the raw value, before rendering, not by a regex afterwards. */
+      ok('compare: a composite value is not mistaken for a reference',
+         JD.compare({ a: { d: { value: { value: 4, unit: 'px' }, type: 'dimension' } } },
+                    { a: { d: { value: { value: 8, unit: 'px' }, type: 'dimension' } } })
+           .changed.length === 1);
+      ok('compare: the copied report lists the two under their own headings',
+         /VALUE CHANGED/.test(JD.format(moved, {})) && /REFERENCE REPOINTED/.test(JD.format(moved, {})),
+         JD.format(moved, {}).slice(0, 80));
 
       /*
         THE LEADING DOT IS PART OF THE COLLECTION NAME, NOT A SEPARATOR.
