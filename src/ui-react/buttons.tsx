@@ -1300,15 +1300,33 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
              bottom where it answers for everything at once. */
           const mine = collections.filter((x) => x.fromGroup === group);
           return (
-            <span key={group} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text)' }}>{group}</span>
+            <span key={group} className="import-level-section">
+              <span className="import-level-title">{group}</span>
 
               {byGroup[group].map((c) => {
                 const role = c.role || 'name';
                 const modeTaken = !!c.modeTakenBySibling;
                 const shown = c.values.slice(0, 5);
+                const segs: string[] = c.segments || [];
                 return (
                   <span key={c.depth} className="import-level-row">
+                    {/* WHICH PART OF THE NAME THIS ROW MOVES. Two depths of one
+                        group render two lists that look alike and are not —
+                        marking the segment each one owns is what makes the
+                        second dropdown read as a second axis rather than a
+                        repeat of the first. See .import-level-path. */}
+                    {segs.length > 0 && (
+                      <span className="import-level-path" aria-hidden="true">
+                        {segs.map((seg, i) => (
+                          <span key={i} style={{ display: 'contents' }}>
+                            {i > 0 && <span className="sep">/</span>}
+                            <span className={'seg' + (i === c.depth ? ' is-axis' : '') +
+                                             (i === segs.length - 1 && i !== c.depth ? ' is-leaf' : '')}
+                                  title={seg}>{seg}</span>
+                          </span>
+                        ))}
+                      </span>
+                    )}
                     {/* The values, one per line. Run together on a single line
                         they read as prose and nobody counts them; as a list the
                         shape of the axis is visible at a glance. */}

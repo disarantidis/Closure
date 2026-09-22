@@ -259,8 +259,22 @@ function levelCandidates(ir, opts) {
       const suggests = overlap >= MODES_MIN ? 'mode'
                      : overlap <= SEPARATE_MAX ? 'collection' : null;
       if (suggests) {
+        /*
+          ONE REAL PATH, so the UI can show WHERE this choice bites.
+
+          A group with two candidates renders two identical-looking lists of
+          names, and nothing on screen says they are different DEPTHS of the
+          same path — so the two dropdowns read as a duplicated control rather
+          than as two positions that move independently. The segments let the
+          row draw the path with its own one marked.
+
+          The first path long enough to contain this depth: every path in this
+          branch shares the segment at `d` by construction, so any of them
+          shows the same thing and the first is as representative as the last.
+        */
+        const sample = paths.find((p) => p.length > d + 1) || paths[0];
         out.push({ group, depth: d, values, distinct: values.length,
-                   overlap: +(overlap * 100).toFixed(1), suggests,
+                   segments: sample.slice(), overlap: +(overlap * 100).toFixed(1), suggests,
                    variablesIfPromoted: suggests === 'mode'
                      ? smallest.size
                      : Math.round(sets.reduce((n, t) => n + t.size, 0) / sets.length) });
