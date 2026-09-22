@@ -1818,7 +1818,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           }
           return null;
         };
-        const names = ['repoFilePath', 'probeRepoFile', 'repoSizeLabel', 'activeRepoProvider'];
+        const names = ['repoFilePath', 'probeRepoFile', 'repoSizeLabel', 'activeRepoProvider',
+                       'repoAddressKey'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1828,10 +1829,12 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           const ctx = {
             fetch: (url, opts) => { calls.push({ url, opts }); return Promise.resolve(ctx.__res); },
             composeFilePath: (folder, file) => (folder ? folder.replace(/\/+$/, '') + '/' : '') + file,
-            gitlabConfig: () => ({ host: 'https://gitlab.com/', project: 'me/my repo', folder: 'tokens/out',
-                                   filename: 'tokens_dtcg.json', branch: 'main', token: 'GLT' }),
-            githubConfig: () => ({ repo: 'acme/tokens', folder: '', filename: 'tokens_dtcg.json',
-                                   branch: 'main', token: 'GHT' }),
+            gitlabConfig: () => Object.assign({ host: 'https://gitlab.com/', project: 'me/my repo',
+                                   folder: 'tokens/out', filename: 'tokens_dtcg.json',
+                                   branch: 'main', token: 'GLT' }, ctx.__gl_over),
+            githubConfig: () => Object.assign({ repo: 'acme/tokens', folder: '',
+                                   filename: 'tokens_dtcg.json', branch: 'main', token: 'GHT' },
+                                   ctx.__gh_over),
             isGitLabReady: () => ctx.__gl, isGitHubReady: () => ctx.__gh,
             gitlabAdded: false, githubAdded: false, mainProviderTab: 'gitlab',
             Promise, JSON, Math, parseInt, isFinite, encodeURIComponent,
@@ -1914,6 +1917,31 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              prov(true, true, true, true, 'gitlab') === 'gitlab');
           ok('repo probe: the selected provider not being ready hides the button rather than reading the other',
              prov(true, true, true, false, 'github') === null);
+
+          /* The status line under the button is only allowed to describe the
+             file the button is pointing at. Everything that can move that
+             file has to move this key, or the line goes stale describing a
+             path nobody is about to compare — which is what happened when
+             the key was only the provider. */
+          ctx.__gh_over = null; ctx.__gl_over = null;
+          const base = ctx.repoAddressKey('github');
+          const moves = (over, why) => {
+            ctx.__gh_over = over;
+            const k = ctx.repoAddressKey('github');
+            ctx.__gh_over = null;
+            ok('repo probe: the address key moves when ' + why, k !== base, k);
+          };
+          moves({ folder: 'tokens/out' }, 'the folder changes');
+          moves({ filename: 'other.json' }, 'the filename field changes');
+          moves({ branch: 'next' }, 'the branch changes');
+          moves({ repo: 'acme/other' }, 'the repository changes');
+          /* Not addressing, but a refused token leaves a red line that
+             fixing the token would otherwise never clear. */
+          moves({ token: 'GHT2' }, 'the token changes');
+          ok('repo probe: the address key is stable when nothing moved',
+             ctx.repoAddressKey('github') === base);
+          ok('repo probe: the two providers never share an address key',
+             ctx.repoAddressKey('gitlab') !== ctx.repoAddressKey('github'));
         }
       }
     }

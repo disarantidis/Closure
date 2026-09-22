@@ -118,6 +118,12 @@ const IconArrowLeft = svg('M19 12H5M12 19l-7-7 7-7');
 */
 const IconImport = svg('M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M4 12h11m0 0l-4-4m4 4l-4 4');
 const IconDownload = svg('M12 3v11m0 0l-4-4m4 4l4-4M5 20h14');
+/* Two arrows, one each way — the ordinary compare/exchange glyph.
+   Deliberately NOT IconImport, which this button wore while the action was
+   called "read": that arrow-into-a-container means "bring a document in",
+   which is what the empty state's Import button does and is exactly the
+   wrong promise here. Nothing is brought in by a comparison. */
+const IconCompare = svg('M8 3L4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4');
 /* Two sheets, the back one offset — the ordinary copy glyph. IconCheck is
    already declared a few lines below, beside the gear. */
 const IconCopy = svg('M9 9h9a2 2 0 012 2v9a2 2 0 01-2 2H9a2 2 0 01-2-2v-9a2 2 0 012-2M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1');
@@ -535,8 +541,12 @@ mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outlin
 mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountIconButton('gl-clear-token-btn-mount', { id: 'gl-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitLab token', 'aria-label': 'Clear GitLab token', icon: IconTrash(16) }, CARD_LEVEL);
 mountIconButton('gh-clear-token-btn-mount', { id: 'gh-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitHub token', 'aria-label': 'Clear GitHub token', icon: IconTrash(16) }, CARD_LEVEL);
-mountIconButton('gitlab-empty-add-btn-mount', { id: 'gitlab-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
-mountIconButton('github-empty-add-btn-mount', { id: 'github-empty-add-btn', variant: 'tonal', size: 'small', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
+/* The two "Add folder path (optional)" pills that used to mount here are
+   gone with the row that held them (see the note where .target-row-empty's
+   CSS used to live). They only ever jumped to the Settings page, which is
+   where folder paths are managed — so the offer was a second door to a room
+   that already had one, taking up a line on the card that now says what is
+   actually in the repo. */
 // Live (not one-shot mountButton) because this pill no longer disappears
 // once a provider is added — it now stays put side by side with the other
 // provider's, and just swaps its glyph Add(+) -> Remove(trash) in place
@@ -593,35 +603,38 @@ mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'fill
   header's icon-only twin instead of the one obvious action on an empty screen.
   The labelled form puts the icon in the leading slot and keeps the text.
 */
-/* One per provider, because a comparison is against ONE repo and only the
-   person knows which. The page hides whichever is not configured. */
 /*
-  The repo card's own read button, top-right of that card's header on the
+  The repo card's own Compare button, top-right of that card's header on the
   main screen. Icon-only and tonal, matching the back/gear pills rather than
   the filled Download beside it: Download is the Json file card's own action
   and should stay the one filled control in that column, while this is a way
   of looking at the repository, in the corner the Json file card keeps its
   size tag in.
 
-  IconImport, NOT a refresh glyph, and the same one the empty state's
-  "Import from JSON" button wears. In this plugin that arrow-into-a-container
-  means one thing — bring a document in — and this button does exactly that,
-  from the repo instead of from disk. A refresh glyph would have invented a
-  second meaning for the same action.
+  IconCompare, and the word throughout is COMPARE. It wore IconImport while
+  this was called "reading the repo", which was the wrong promise twice over:
+  that glyph means "bring a document in" (it is the empty state's Import
+  button), and nothing is brought in here. Reading the file is how the action
+  works; the difference between the repo and the variables live in this
+  document is what it is for.
 
-  Live, for setTitle: the title names the exact path it will read, and that
-  path changes when the folder or the provider tab does (see
+  Live, for setTitle: the title names the exact path it compares against, and
+  that path changes when the folder or the provider tab does (see
   refreshRepoReadRow()).
 */
 window.PomRepoReadBtn = mountLiveTitleIconButton(
   'repo-read-btn-mount',
-  { id: 'repo-read-btn', variant: 'tonal', size: 'small', icon: IconImport(16) },
-  'Read from the repo',
+  { id: 'repo-read-btn', variant: 'tonal', size: 'small', icon: IconCompare(16) },
+  'Compare this file with the one in the repo',
   CARD_LEVEL,
 );
 
-mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'tonal', size: 'small', label: 'Read from GitLab' });
-mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'tonal', size: 'small', label: 'Read from GitHub' });
+/* One per provider, because a comparison is against ONE repo and only the
+   person knows which. The page hides whichever is not configured. Same word
+   as the repo card's own button above, because it is the same action reached
+   from a different screen — two names for it would read as two features. */
+mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'tonal', size: 'small', label: 'Compare with GitLab' });
+mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'tonal', size: 'small', label: 'Compare with GitHub' });
 
 mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', leftIcon: true, buttonLeftIcon: IconImport(16) });
 

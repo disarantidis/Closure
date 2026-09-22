@@ -574,77 +574,21 @@
        when a second block can follow it; .commit-input-wrap's own 4px is
        enough otherwise, so this is additive, not a replacement. */
     .target-block + .target-block { margin-top: 12px; }
-    /* The title and the empty-state "+ Add folder path" share one line —
-       title on the left, the add-affordance flush right, so a provider
-       with nothing saved yet still reads as one coherent row instead of
-       two stacked ones. */
-    .target-row-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      /* 16px, not 6px — matches the title-to-content gap every other
-         section title on the Settings page uses (.output-format's own
-         .folder-paths-title, margin-bottom: 16px); this title reads as the
-         same kind of section title now (see the font rule below), so it
-         gets the same gap before its own content. */
-      margin: 0 0 16px;
-      /* This --spacing-component-6 (22px) inset was confirmed against the
-         real plugin back when .export-panel's own padding was a plain
-         12px — this row's outer edge sat 22px inside the field row below
-         it, so the title needed the same 22px to read as one column with
-         it. .export-panel's padding is now --spacing-component-6 itself
-         (matched to the collections card above it, see that rule's own
-         comment), so this row's outer edge already lines up with the
-         field row directly — restating the same 22px here just pushed the
-         title a second 22px past both the fields below it AND the card
-         above it (measured: title at 60px, fields and the card's own
-         title both at 38px). Removed rather than re-tuned: with the
-         panel's own edge doing this job now, the title/fields/card all
-         share one line with no padding needed here at all. */
-    }
-    .target-row-title {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      /* Was `font: var(--microcopy-bold); letter-spacing:
-         var(--microcopy-bold-letter-spacing);` — --microcopy-bold and its
-         letter-spacing pair are not defined ANYWHERE in tokens.css/
-         node.css, only referenced here, the exact same "undefined custom
-         property invalidates the whole shorthand" bug already fixed on
-         .folder-paths-title (--body-m-bold) and .folder-paths-subtitle
-         (--microcopy-regular) earlier in this file's history — so this
-         text was silently falling back to the page's plain inherited
-         font this whole time, not any deliberate microcopy style.
-         Reported from the real plugin as reading too small and too muted
-         to work as a section title. This IS a section title — "GitLab" /
-         "GitHub" here is the exact same heading .provider-section-heading
-         .folder-paths-title already renders on the Settings page's own
-         connection cards — so it gets that class's real, working
-         treatment instead: --type-body-m-* at 700 weight, --app-text
-         (not --app-text-muted — a section title isn't recessive copy). */
-      font-family: var(--type-body-m-font-family);
-      font-size: var(--type-body-m-size);
-      line-height: var(--type-body-m-line-height);
-      font-weight: 700;
-      letter-spacing: var(--type-body-m-letter-spacing);
-      color: var(--app-text);
-    }
-    .target-row-title-icon { flex-shrink: 0; }
-    /* Shown instead of the dropdown+filename row when a provider has zero
-       saved folder paths (e.g. freshly-added GitHub, before its first
-       folder is added in Settings) — an empty dropdown with nothing to
-       select read as broken, not "not configured yet". */
-    .target-row-empty {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .target-row-empty-label {
-      font: var(--microcopy-regular);
-      letter-spacing: var(--microcopy-regular-letter-spacing);
-      color: var(--app-text-muted);
-    }
+    /*
+      .target-row-header / .target-row-title / .target-row-empty lived here.
+
+      The header inside each provider block held two things and has outlived
+      both. Its title said "GitHub" directly under a card header that now
+      says GitHub, in GitHub's own mark (see nameRepoCard) — the same word
+      twice, four pixels apart. And its empty state offered "Add folder path
+      (optional)" whose button only ever jumped to the Settings page, which
+      is where folder paths are managed anyway.
+
+      What is left in the block is the one control it exists for: the
+      folder-path select. With no saved paths there is no select either, so
+      the whole block hides rather than drawing an empty box — see
+      updateTargetRow().
+    */
 
     /* Read-only list of saved folder paths in Settings (managed via Edit). */
     .folder-list {
@@ -1637,7 +1581,7 @@
        this row fill .collections-header the same way .collections-summary
        already fills this row, so the tags land flush against the card's
        actual edge, matching every other title-row-with-a-trailing-tag on
-       this screen (.target-row-header, .json-download-header). */
+       this screen (.json-download-header). */
     .collections-header-top {
       display: flex;
       align-items: center;
@@ -1663,16 +1607,16 @@
        spacing); color: var(--app-heading);` — --subtitle is not defined
        ANYWHERE in tokens.css/node.css, the same "undefined custom property
        invalidates the whole shorthand" bug fixed repeatedly elsewhere in
-       this file (.folder-paths-title, .folder-paths-subtitle,
-       .target-row-title) — so this, the plugin's single most prominent
+       this file (.folder-paths-title, .folder-paths-subtitle) — so
+       this, the plugin's single most prominent
        piece of text (the Figma file name), was silently rendering at
        whatever default inherited font applied, never a deliberate style.
        Was then briefly matched to --type-title-s-* (20px/600, .nd-dialog-
        title's own size) since this card is a collapsed view of the same
        heading the modal shows expanded — asked instead to read at the
-       same size as every OTHER title on this screen ("GitLab"/"GitHub",
-       "Json file"), so now spelled out in the same --type-body-m-* family
-       those use (.target-row-title / .json-download-title), at their same
+       same size as every OTHER title on this screen ("GitHub", "Json
+       file"), so now spelled out in the same --type-body-m-* family
+       those use (.json-download-title), at their same
        700 weight, for one consistent title size across the whole app
        rather than this one card alone reading larger. color: var(--text)
        directly, not --app-heading, for the same frozen-alias reason as
@@ -1846,18 +1790,17 @@
       padding: var(--spacing-component-6);
       margin: 0 16px 16px;
     }
-    /* Title left, file-size tag flush right — same title-row shape as
-       .target-row-header below (title + trailing affordance), 16px gap to
-       its own content below matching that row's own margin-bottom. */
+    /* Title left, trailing affordance flush right — the file-size tag on
+       the Json file card, the read button on the repo card. */
     .json-download-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
     }
-    /* Icon + text as one group, colored together — same shape as
-       .target-row-title (icon and label both read currentColor off this
-       shared color, not the icon separately). */
+    /* Icon + text as one group, colored together: the icon and the label
+       both read currentColor off this shared color, rather than the icon
+       carrying one of its own. */
     .json-download-title-group {
       display: flex;
       align-items: center;
@@ -1884,9 +1827,9 @@
       overflow-wrap: anywhere;
     }
     .repo-read-status[data-tone="error"] { color: var(--app-danger); opacity: 1; }
-    /* Same section-title treatment as .target-row-title ("GitLab"/
-       "GitHub") — this card is another named block on the same screen, so
-       it reads as one family of titles rather than a one-off style. */
+    /* The section-title treatment every named card on this screen wears —
+       "Json file", "GitHub" — so they read as one family of titles rather
+       than three one-off styles. */
     .json-download-title {
       font-family: var(--type-body-m-font-family);
       font-size: var(--type-body-m-size);
@@ -21964,7 +21907,7 @@ html[data-theme=dark] {
       <div class="json-download-header">
         <div class="json-download-title-group">
           <!-- Plain inline SVG, not React-mounted — same reasoning as the
-               GitLab/GitHub logos on .target-row-title below: this card's
+               GitLab/GitHub marks on the repo card below: this card's
                title row is static markup, not a React root. Lucide's
                "file-text" glyph — a document, reading as "this is the
                file" the way the collections card's braces icon reads as
@@ -22008,7 +21951,6 @@ html[data-theme=dark] {
         <div class="json-download-header">
           <div class="json-download-title-group">
             <!-- Plain inline SVG, not React-mounted — same reasoning as the
-                 GitLab/GitHub marks on .target-row-title below and the
                  file-text glyph on the Json file card: these title rows are
                  static markup, not React roots. Lucide's "git-branch" — a
                  repository, reading as "this is where it gets pushed", and
@@ -22018,10 +21960,10 @@ html[data-theme=dark] {
             <!-- Three marks, one shown at a time — see nameRepoCard(). The
                  generic branch glyph is only correct while no provider has
                  been added; once one has, this card is about a named service
-                 and says which, in its own logo. The two provider paths are
-                 the SAME ones .target-row-title uses a few lines below, so
-                 the card and the row inside it cannot end up wearing
-                 different marks for the same thing. -->
+                 and says which, in its own logo. This is now the ONLY place
+                 the provider is named on this screen: the row below used to
+                 repeat the same word and the same mark a few pixels down,
+                 which is the duplication that removed it. -->
             <svg id="repo-card-icon-generic" class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M6 3v12"/>
               <circle cx="18" cy="6" r="3"/>
@@ -22037,17 +21979,22 @@ html[data-theme=dark] {
             <p class="json-download-title" id="repo-card-title">Repo settings</p>
           </div>
           <!--
-            READ THE REPO. Top-right of this card's own header, the same
-            corner the Json file card puts its size tag in — this card is
-            about one repository, so the control that reads that repository
+            COMPARE. Top-right of this card's own header, the same corner the
+            Json file card puts its size tag in — this card is about one
+            repository, so the control that compares against that repository
             belongs on it rather than buried on the import page.
 
-            It reads THE FILE THIS CARD ALREADY NAMES: composeFilePath of the
-            selected folder and primaryFilename(), which is the exact path
-            Push writes and Download produces. So "read the repo" is the
-            round trip of the two things beside it, not a search for
-            whatever JSON happens to be lying around — and the file it went
-            looking for is always the one already on screen.
+            WHAT IT IS FOR, not how it works. Reading the file is a step; the
+            answer is the difference between what is in the repo and the
+            variables live in this Figma document right now. Nothing is
+            written and nothing is kept unless the import page's own Apply is
+            pressed afterwards.
+
+            It compares against THE FILE THIS CARD ALREADY NAMES:
+            composeFilePath of the selected folder and primaryFilename(),
+            which is the exact path Push writes and Download produces. So the
+            two sides are this document and the last thing pushed out of it,
+            not this document and whatever JSON happens to be lying around.
 
             Hidden until a provider is actually readable (isGitLabReady /
             isGitHubReady) — see refreshRepoReadRow().
@@ -22055,10 +22002,10 @@ html[data-theme=dark] {
           <span id="repo-read-btn-mount" hidden></span>
         </div>
         <!--
-          What the last read found. Written by repoReadStatus() and filled
-          both by the button and by the check that runs on open, so there is
-          one line saying what is in the repo rather than two ways of
-          finding out that disagree.
+          WHAT IS IN THE REPO — the other side of the comparison, named
+          before it is asked for. Written by repoReadStatus() off the check
+          that runs on open, so the button above says "compare" to something
+          already on screen rather than to an unknown.
         -->
         <p class="repo-read-status" id="repo-read-status" hidden></p>
         <!-- Only meaningful once BOTH providers are actually added (see
@@ -22085,41 +22032,17 @@ html[data-theme=dark] {
              shapes are this project's own pre-Pom icons (see git history —
              this repo used to show the GitHub one here before it became
              GitLab-only, then GitLab's own). When a provider has zero saved
-             folder paths, .filename-row hides and .target-row-empty shows
-             instead of an empty, nothing-selected dropdown (see
-             updatePushTargetUI()). Once the tab switcher above is active,
+             folder paths the whole block hides rather than showing an empty,
+             nothing-selected dropdown (see updateTargetRow()). Once the tab
+             switcher above is active,
              only the selected provider's block is ever shown — see
              updatePushTargetUI(). -->
         <div class="commit-input-wrap target-block" id="gitlab-target-wrap">
-          <div class="target-row-header">
-            <div class="target-row-title" id="gitlab-target-title" hidden>
-              <svg class="target-row-title-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024"/>
-              </svg>
-              <span>GitLab</span>
-            </div>
-            <div class="target-row-empty" id="gitlab-target-empty" hidden>
-              <span class="target-row-empty-label">Add folder path (optional)</span>
-              <span id="gitlab-empty-add-btn-mount"></span>
-            </div>
-          </div>
           <div class="filename-row" id="gitlab-filename-row">
             <span id="folder-select-mount"></span>
           </div>
         </div>
         <div class="commit-input-wrap target-block" id="github-target-wrap" hidden>
-          <div class="target-row-header">
-            <div class="target-row-title" id="github-target-title" hidden>
-              <svg class="target-row-title-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-              </svg>
-              <span>GitHub</span>
-            </div>
-            <div class="target-row-empty" id="github-target-empty" hidden>
-              <span class="target-row-empty-label">Add folder path (optional)</span>
-              <span id="github-empty-add-btn-mount"></span>
-            </div>
-          </div>
           <div class="filename-row" id="github-filename-row">
             <span id="github-folder-select-mount"></span>
           </div>
@@ -22184,9 +22107,14 @@ html[data-theme=dark] {
            repo" is an address this plugin knows. Both providers get their own
            button rather than a guess: a push goes to both, a comparison has to
            be against one of them, and only the person knows which. Hidden
-           whole when neither is configured. -->
+           whole when neither is configured.
+
+           COMPARE, not "read". Reading is how it works, not what it is for:
+           nothing is written to Figma by it and nothing is kept — what comes
+           back is the difference between the file in the repo and the
+           variables live in this document right now. -->
       <div class="import-repo" id="import-repo" hidden>
-        <p class="import-repo-title">…or read the one in the repo</p>
+        <p class="import-repo-title">…or compare against the one in the repo</p>
         <p class="import-repo-hint" id="import-repo-hint"></p>
         <div class="import-repo-actions">
           <span id="import-pull-gitlab-mount"></span>
@@ -48252,6 +48180,7 @@ html[data-theme=dark] {
   var IconArrowLeft = svg("M19 12H5M12 19l-7-7 7-7");
   var IconImport = svg("M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M4 12h11m0 0l-4-4m4 4l-4 4");
   var IconDownload = svg("M12 3v11m0 0l-4-4m4 4l4-4M5 20h14");
+  var IconCompare = svg("M8 3L4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4");
   var IconCopy = svg("M9 9h9a2 2 0 012 2v9a2 2 0 01-2 2H9a2 2 0 01-2-2v-9a2 2 0 012-2M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1");
   var IconSettings = svg(
     "m14 1 .5 2.75a.992.992 0 0 0 1.448.71l.102-.06 2.3-1.6 2.85 2.85-1.6 2.3c-.378.567-.087 1.312.537 1.52l.113.03L23 10v4l-2.75.5a.992.992 0 0 0-.71 1.448l.06.102 1.6 2.3-2.85 2.85-2.3-1.6c-.567-.378-1.312-.087-1.52.537l-.03.113L14 23h-4l-.5-2.75c-.142-.661-.863-1.01-1.448-.71l-.102.06-2.3 1.6-2.85-2.85 1.6-2.3c.378-.567.087-1.312-.537-1.52l-.113-.03L1 14v-4l2.75-.5a.992.992 0 0 0 .71-1.448L4.4 7.95l-1.6-2.3L5.65 2.8l2.3 1.6c.567.378 1.312.087 1.52-.537l.03-.113L10 1zm-1.25 1.5h-1.5l-.3 1.5c-.2 1.2-1.25 2.05-2.45 2.05-.437 0-.875-.115-1.246-.345L5.8 4.7 4.75 5.75l.9 1.3c.464.65.584 1.472.318 2.227L5.9 9.45c-.279.743-.902 1.27-1.67 1.462l-.18.038-1.55.3v1.5l1.55.25c.85.15 1.5.7 1.85 1.5a2.43 2.43 0 0 1-.149 2.247l-.101.153-.9 1.3 1.05 1.05 1.3-.9c.4-.3.9-.45 1.4-.45 1.145 0 2.154.774 2.418 1.889l.332 1.711h1.5l.3-1.55c.2-1.2 1.25-2.05 2.45-2.05.438 0 .875.115 1.245.345L18.2 19.25l1.05-1.05-.9-1.3c-.5-.7-.55-1.6-.25-2.3.279-.743.902-1.27 1.67-1.462l.18-.038 1.55-.3v-1.5l-1.55-.3c-.85-.15-1.5-.7-1.85-1.5a2.43 2.43 0 0 1 .149-2.247l.101-.153.9-1.3-1.05-1.05-1.3.9c-.4.3-.9.45-1.4.45a2.474 2.474 0 0 1-2.418-1.889zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6",
@@ -48554,8 +48483,6 @@ html[data-theme=dark] {
   mountIconButton("github-folder-add-btn-mount", { id: "github-folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
   mountIconButton("gl-clear-token-btn-mount", { id: "gl-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitLab token", "aria-label": "Clear GitLab token", icon: IconTrash(16) }, CARD_LEVEL);
   mountIconButton("gh-clear-token-btn-mount", { id: "gh-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitHub token", "aria-label": "Clear GitHub token", icon: IconTrash(16) }, CARD_LEVEL);
-  mountIconButton("gitlab-empty-add-btn-mount", { id: "gitlab-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
-  mountIconButton("github-empty-add-btn-mount", { id: "github-empty-add-btn", variant: "tonal", size: "small", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
   window.PomAddGithubBtn = mountLiveToggleIconButton(
     "add-github-btn-mount",
     { id: "add-github-btn", variant: "tonal", size: "small" },
@@ -48585,12 +48512,12 @@ html[data-theme=dark] {
   mountButton("import-choose-btn-mount", { id: "import-choose-btn", variant: "filled", size: "large", label: "Choose a JSON file" });
   window.PomRepoReadBtn = mountLiveTitleIconButton(
     "repo-read-btn-mount",
-    { id: "repo-read-btn", variant: "tonal", size: "small", icon: IconImport(16) },
-    "Read from the repo",
+    { id: "repo-read-btn", variant: "tonal", size: "small", icon: IconCompare(16) },
+    "Compare this file with the one in the repo",
     CARD_LEVEL
   );
-  mountButton("import-pull-gitlab-mount", { id: "import-pull-gitlab-btn", variant: "tonal", size: "small", label: "Read from GitLab" });
-  mountButton("import-pull-github-mount", { id: "import-pull-github-btn", variant: "tonal", size: "small", label: "Read from GitHub" });
+  mountButton("import-pull-gitlab-mount", { id: "import-pull-gitlab-btn", variant: "tonal", size: "small", label: "Compare with GitLab" });
+  mountButton("import-pull-github-mount", { id: "import-pull-github-btn", variant: "tonal", size: "small", label: "Compare with GitHub" });
   mountButton("import-empty-btn-mount", { id: "import-empty-btn", variant: "tonal", size: "medium", label: "Import from JSON", leftIcon: true, buttonLeftIcon: IconImport(16) });
   (function mountThemeToggle() {
     const container = document.getElementById("theme-toggle-btn-mount");
@@ -52690,7 +52617,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'f366eee 18:52:45';
+    var CLOSURE_BUILD = '4daf11b 19:06:42';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -53372,7 +53299,7 @@ function format(report, limit) {
     */
     function pullFromRepo(which) {
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
-      showToast('Reading from ' + label + '…');
+      showToast('Comparing with ' + label + '…');
       (which === 'gitlab' ? fetchGitLabFile() : fetchGitHubFile()).then(function (res) {
         importState.fileName = res.where;
         importState.fileBytes = res.text.length;
@@ -53408,7 +53335,7 @@ function format(report, limit) {
           runImport(doc, res.where);
         }, 0); });
       }, function (err) {
-        showToast((err && err.message) || ('Could not read from ' + label), true);
+        showToast((err && err.message) || ('Could not read from ' + label + ' to compare'), true);
       });
     }
     document.getElementById('import-pull-gitlab-btn').addEventListener('click', function () { pullFromRepo('gitlab'); });
@@ -53867,6 +53794,12 @@ function format(report, limit) {
         // A token or repo may have just been filled in, which is what
         // decides whether pushing is possible at all.
         updateActionUI();
+        /* The same fields that decide where a push GOES decide which file the
+           comparison is against — repo, branch, and the filename field. This
+           debounce is exactly the right moment to ask again: the address has
+           settled, so it costs one request per finished edit rather than one
+           per keystroke. */
+        refreshRepoReadRow();
       }, 400);
     }
     // Same auto-save, same debounce — 'primary-filename' lives on the main
@@ -53933,6 +53866,7 @@ function format(report, limit) {
       glActiveFolder = value;
       renderFolderList();   // refresh the "in use" marker in Settings
       persistSettings();    // remember the pick
+      refreshRepoReadRow(); // a different folder is a different file to compare
     };
 
     // Add a new folder path to GitHub's own list.
@@ -53954,6 +53888,7 @@ function format(report, limit) {
       ghActiveFolder = value;
       renderGithubFolderList();
       persistSettings();
+      refreshRepoReadRow(); // a different folder is a different file to compare
     };
 
     // ── GitHub connection: optional, add/remove ────────────────────────────
@@ -54430,12 +54365,21 @@ function format(report, limit) {
     // (no token/project or repo), the whole thing is replaced by nothing —
     // updateActionUI()'s big "Add Repo Settings" covers that case globally
     // now that there's only ever one target to be not-ready about.
+    /*
+      ONE CONTROL, so the block is shown exactly when that control has
+      something to show.
+
+      It used to have three states, because a provider with no saved folder
+      paths still had a title to draw and an "Add folder path (optional)"
+      offer to make. Both are gone — the card's own header names the
+      provider, and the add button only ever jumped to Settings — so an
+      empty folder list now leaves nothing in the block at all, and the
+      honest rendering of that is no block rather than an empty box.
+    */
     function updateTargetRow(prefix, wanted, ready, isEmpty) {
-      var showNormal = wanted && ready;
-      document.getElementById(prefix + '-target-wrap').hidden = !showNormal;
-      document.getElementById(prefix + '-target-title').hidden = !showNormal;
-      document.getElementById(prefix + '-filename-row').hidden = !showNormal || isEmpty;
-      document.getElementById(prefix + '-target-empty').hidden = !showNormal || !isEmpty;
+      var show = wanted && ready && !isEmpty;
+      document.getElementById(prefix + '-target-wrap').hidden = !show;
+      document.getElementById(prefix + '-filename-row').hidden = !show;
     }
 
     // Once both providers are added, the folder-path blocks below are
@@ -54591,21 +54535,60 @@ function format(report, limit) {
     }
 
     /*
-      The read button belongs to whichever provider the card is currently
-      about, so it is re-derived on every updatePushTargetUI() rather than
-      wired once — switching the provider tab switches which repository the
-      card names, and the button has to move with it.
+      THE EXACT ADDRESS, as one string.
+
+      Several separate things move it — the provider, the repository, the
+      branch and the file path (which is itself the folder plus the filename
+      field) — so "is this still the same file" is one string compare rather
+      than four, and cannot be got right in one place and wrong in another.
+
+      THE TOKEN IS IN HERE TOO, which is not about addressing. A rejected
+      token leaves a red line on the card, and fixing it moves nothing else:
+      same repo, same branch, same path, so without this the line would say
+      the token was refused for the rest of the session, about a token that
+      now works. It is compared in memory and never rendered, logged or sent
+      — it is the same string the field beside it is already holding.
+    */
+    function repoAddressKey(which) {
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      var where = which === 'gitlab' ? c.host + '#' + c.project : c.repo;
+      return which + '|' + where + '|' + c.branch + '|' + repoFilePath(which) + '|' + c.token;
+    }
+
+    /* The address the line on screen is describing. null means it describes
+       nothing, which is also the state after the provider goes away. */
+    var repoCheckedFor = null;
+
+    /*
+      The button and the line under it both belong to whichever provider the
+      card is currently about, so both are re-derived here rather than wired
+      once — switching the provider tab switches which repository the card
+      names, and they have to move with it.
+
+      AND THE LINE IS NEVER LEFT DESCRIBING A DIFFERENT FILE. Picking another
+      folder, or editing the filename field, changes what the button compares
+      against; a status line still naming the old path would be pointing at a
+      file nobody is about to compare. Caught by address rather than by
+      remembering to call something: anything that moves the address gets a
+      fresh answer, and anything that does not costs nothing.
     */
     function refreshRepoReadRow() {
       var mount = document.getElementById('repo-read-btn-mount');
       if (!mount) return;
       var which = activeRepoProvider();
       mount.hidden = !which;
-      if (!which) { repoReadStatus(''); return; }
+      if (!which) { repoCheckedFor = null; repoReadStatus(''); return; }
+      /* The title names BOTH sides, because that is what makes it a
+         comparison rather than a download: the file in the repo, and the
+         variables in this Figma document. */
       if (window.PomRepoReadBtn) {
-        window.PomRepoReadBtn.setTitle('Read ' + repoFilePath(which) + ' from ' +
-                                       (which === 'gitlab' ? 'GitLab' : 'GitHub'));
+        window.PomRepoReadBtn.setTitle('Compare this file with ' + repoFilePath(which) +
+                                       ' in ' + (which === 'gitlab' ? 'GitLab' : 'GitHub'));
       }
+      var key = repoAddressKey(which);
+      if (key === repoCheckedFor) return;
+      repoCheckedFor = key;
+      checkRepo(which, key);
     }
 
     /*
@@ -54625,27 +54608,28 @@ function format(report, limit) {
       an error the user has to dismiss on every open of a plugin they were
       using for something else entirely.
 
-      Once per load, guarded — GIT_SETTINGS_LOADED is the only caller today,
-      but a second settings message would otherwise spend a second request
-      saying the same thing.
+      Once per ADDRESS, not once per load: refreshRepoReadRow() only calls
+      this when the file being compared against has actually changed, so
+      repeated settings churn costs nothing and a deliberate change to the
+      folder or the filename gets a fresh answer.
     */
-    var repoCheckDone = false;
-    function checkRepoOnOpen() {
-      if (repoCheckDone) return;
-      var which = activeRepoProvider();
-      if (!which) return;
-      repoCheckDone = true;
+    function checkRepo(which, key) {
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
+      /* A reply that arrives after the address has moved on describes a file
+         nobody is looking at any more. Two edits in quick succession can land
+         out of order, and the older one would win by arriving last. */
+      var current = function () { return repoCheckedFor === key; };
       repoReadStatus('Checking ' + repoFilePath(which) + '…');
       probeRepoFile(which).then(function (res) {
+        if (!current()) return;
         if (!res.found) {
           repoReadStatus('No ' + res.path + ' on ' + res.branch + ' yet');
           return;
         }
         repoReadStatus(res.path + ' @ ' + res.branch +
-                       (res.bytes === null ? '' : '  ·  ' + repoSizeLabel(res.bytes)) +
-                       '  ·  read it to compare');
+                       (res.bytes === null ? '' : '  ·  ' + repoSizeLabel(res.bytes)));
       }, function (err) {
+        if (!current()) return;
         repoReadStatus('Could not check ' + label + ' — ' + ((err && err.message) || 'the request failed'),
                        'error');
       });
@@ -54697,12 +54681,11 @@ function format(report, limit) {
         field.focus();
       }, 30);
     }
-    document.getElementById('gitlab-empty-add-btn').addEventListener('click', function() {
-      goToProviderSettingsField('gitlab', 'folder-new');
-    });
-    document.getElementById('github-empty-add-btn').addEventListener('click', function() {
-      goToProviderSettingsField('github', 'github-folder-new');
-    });
+    /* No listeners for gitlab-empty-add-btn / github-empty-add-btn: those
+       buttons are gone with the row that held them, and addEventListener on
+       the null getElementById returns throws — taking out every listener
+       registered after this line, the same way removing the header's import
+       button would have. */
     // Replaces the Push button itself when nothing workable is configured
     // yet (see updateActionUI()) — jumps to whichever wanted provider isn't
     // ready (GitLab first, matching this app's usual gitlab-first default).
@@ -55529,12 +55512,17 @@ function format(report, limit) {
           reason the onboarding dialog waits for this line rather than
           running from the script's own end.
 
+          setState() above already reaches this through updatePushTargetUI();
+          saying it again here is free (refreshRepoReadRow only spends a
+          request when the address has actually changed) and says out loud
+          that an open is one of the moments this runs.
+
           It costs one HEAD carrying the token per plugin open. That is the
           deliberate price of the answer being on screen without being asked
           for; probeRepoFile() is a HEAD precisely so it stays that cheap
           whatever the file grows to.
         */
-        checkRepoOnOpen();
+        refreshRepoReadRow();
       }
       
       if (msg.type === 'GIT_SETTINGS_SAVED') {
