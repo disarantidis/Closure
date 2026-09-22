@@ -99,10 +99,21 @@ const svg = (d: string, opts?: { fill?: boolean; fillRule?: 'evenodd'; viewBox?:
   );
 };
 const IconArrowLeft = svg('M19 12H5M12 19l-7-7 7-7');
-/* An arrow coming DOWN INTO a tray — the mirror of IconDownload's arrow
-   leaving one. The two live on the same screen and read as a pair: tokens
-   out of Figma, tokens back in. */
-const IconImport = svg('M12 3v12m0 0l-4-4m4 4l4-4M3 17v2a2 2 0 002 2h14a2 2 0 002-2v-2');
+/*
+  An arrow travelling RIGHT, INTO a container open on the side it enters.
+
+  It used to be an arrow coming down into a tray, described here as the mirror
+  of IconDownload's arrow leaving one. On paper that pairs; on screen it does
+  not. Both are a downward arrow of the same weight at the same size, and in
+  the header they sit close enough together that the import button simply
+  reads as a second download button — which is the one thing it must not do,
+  since one sends tokens out of Figma and the other brings them in.
+
+  A different AXIS is what separates them, not a different arrowhead. Down
+  means "out of here" everywhere else in this UI; sideways-into-a-box is the
+  same glyph a login control uses, and it means arriving.
+*/
+const IconImport = svg('M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3M4 12h11m0 0l-4-4m4 4l-4 4');
 const IconDownload = svg('M12 3v11m0 0l-4-4m4 4l4-4M5 20h14');
 // The exact gear glyph the Settings page's own header uses (ui.template.html,
 // the decorative .git-logo icon) — same path, so "Settings" reads as one
