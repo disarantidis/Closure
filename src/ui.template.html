@@ -1225,6 +1225,117 @@
     /* Separated from the counts above it — it is a commitment, not another
        line of the report. */
     .import-apply { margin-top: 8px; }
+
+    /* ── a candidate row: values on the left, the choice on the right ─────
+       Two columns rather than a stack, so the depths of one group read as a
+       list of things being decided rather than as separate cards. */
+    .import-level-row {
+      display: grid;
+      grid-template-columns: 1fr 132px;
+      align-items: center;
+      gap: 10px;
+      padding: 3px 0;
+    }
+    .import-level-values {
+      font-size: 11px;
+      color: var(--app-text-muted);
+      line-height: 1.4;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .import-level-control { min-width: 0; }
+
+    /* ── Figma's variables panel, in miniature ────────────────────────────
+       Same anatomy as the real one: the collections rail with its counts on
+       the left, the selected collection's table on the right with a column
+       per mode. Small, but the SHAPE is the message — modes add columns,
+       collections add rail entries. */
+    .import-fig {
+      display: grid;
+      grid-template-columns: 104px 1fr;
+      gap: 0;
+      border: 1px solid var(--app-border);
+      border-radius: 10px;
+      overflow: hidden;
+      font-size: 10px;
+    }
+    .import-fig-rail {
+      display: flex;
+      flex-direction: column;
+      background: var(--app-surface);
+      border-right: 1px solid var(--app-border);
+      max-height: 168px;
+      overflow-y: auto;
+    }
+    .import-fig-rail-head {
+      padding: 6px 8px 4px;
+      font-weight: 700;
+      color: var(--app-text);
+      position: sticky;
+      top: 0;
+      background: var(--app-surface);
+    }
+    .import-fig-rail-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      align-items: center;
+      padding: 4px 8px;
+      border: 0;
+      background: transparent;
+      color: var(--app-text-muted);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .import-fig-rail-item.is-on { background: var(--background); color: var(--app-text); }
+    .import-fig-rail-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .import-fig-rail-count { opacity: 0.6; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+    .import-fig-table { display: flex; flex-direction: column; min-width: 0; max-height: 168px; overflow: auto; }
+    .import-fig-title {
+      padding: 6px 8px 4px;
+      font-weight: 700;
+      color: var(--app-text);
+      position: sticky;
+      top: 0;
+      background: var(--background);
+    }
+    .import-fig-head, .import-fig-row { display: flex; align-items: center; }
+    .import-fig-head { color: var(--app-text); font-weight: 700; border-bottom: 1px solid var(--app-border); }
+    .import-fig-row { border-bottom: 1px solid var(--app-border); }
+    .import-fig-cell {
+      flex: 1 1 0;
+      min-width: 0;
+      padding: 4px 8px;
+      color: var(--app-text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .import-fig-cell.is-name { flex: 1.6 1 0; color: var(--app-text); }
+    /* The value chip Figma draws for a bound variable — a shape, not a
+       number, because what a preview is showing is the STRUCTURE. */
+    .import-fig-chip {
+      display: block;
+      height: 9px;
+      border-radius: 3px;
+      background: var(--app-border);
+      opacity: 0.9;
+    }
+    .import-fig-group {
+      display: block;
+      padding: 5px 8px 3px;
+      color: var(--app-text-muted);
+      opacity: 0.8;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .import-fig-more { padding: 5px 8px; color: var(--app-text-muted); opacity: 0.6; }
     /* Monospace and scrollable: this is something to copy, not to read
        through — a manifest for a real system runs to dozens of lines. */
     .import-manifest-code {
@@ -1965,7 +2076,7 @@
            overridden. It appears only when there is something to confirm. -->
       <div class="import-card" id="import-levels" data-level="4" hidden>
         <p class="import-card-title">How should this be read?</p>
-        <p class="import-card-note">Each of these can be read three ways. As a <b>group</b> it stays in every variable&rsquo;s name. As <b>modes</b> it folds into one collection&rsquo;s axis. As <b>collections</b> each value becomes a collection of its own.</p>
+        <p class="import-card-note">Each depth can be read three ways: as a <b>group</b> it stays in every variable&rsquo;s name, as <b>modes</b> it becomes a collection&rsquo;s columns, as <b>collections</b> each value becomes its own entry in the rail.</p>
         <span id="import-levels-mount"></span>
       </div>
 
@@ -3099,7 +3210,9 @@
          whether it is in force — so the list does not shrink as it is used and
          an alternative stays visible next to the choice that displaced it. */
       var shown = plan.levelCandidates || [];
-      window.PomImportLevels.set(shown, importState.levels);
+      /* The resulting collections go in too — the preview draws what the
+         current reading actually produces, not a description of it. */
+      window.PomImportLevels.set(shown, importState.levels, plan.collections || []);
       el.hidden = !shown.length;
     }
 

@@ -185,7 +185,12 @@ function applyLevels(ir, levels) {
     /* Whatever was promoted LEAVES the name. Otherwise it appears twice: once
        as the structure and once again inside every variable underneath it. */
     const rest = segs.filter((_, i) => !drop.has(i));
-    return Object.assign({}, r, { group, variant, path: rest.join('.') || segs[segs.length - 1] });
+    /* Tagged, because a row that has been given an explicit reading must not
+       then be re-addressed by a declaration — see address(). Without this the
+       $themes set map silently won, and choosing "modes" or "collections"
+       produced the same document: only the NAME change survived. */
+    return Object.assign({}, r, { group, variant, leveled: true,
+                                  path: rest.join('.') || segs[segs.length - 1] });
   });
   return Object.assign({}, ir, { rows });
 }
@@ -415,6 +420,29 @@ function derive(ir, opts) {
 
   /* ── 2. address every row to (collection, mode) ────────────────────────── */
   const address = (r) => {
+    /*
+      AN EXPLICIT READING OUTRANKS EVERY DECLARATION.
+
+      A declaration is what the file says when nobody has said otherwise.
+      Somebody just did — they chose a reading for this depth — and a file
+      cannot overrule the person importing it. Ranked above both
+      $figmaStructure and $themes for exactly the groups a level map names,
+      and below them everywhere else.
+    */
+    if (r.leveled) {
+      /* The reading decides the SHAPE; $figmaStructure may still supply the
+         NAMES. Those are orthogonal — one says "this depth is an axis", the
+         other says "the collection it belongs to is called .mode" — and a
+         level map the FILE declared arrives alongside exactly such a binding.
+         Only the $themes set map is genuinely displaced, since that addresses
+         a row outright. */
+      const named = naming.get(r.group);
+      if (named && named.verdict === 'modes') {
+        return { col: named.collection, mode: (named.modeName && named.modeName[r.variant]) || r.variant };
+      }
+      return { col: r.group, mode: r.variant };
+    }
+
     /* A set the themes claim is addressed by DECLARATION, and nothing derived
        from its name applies — that is the whole point of the declaration.
        $figmaStructure still outranks it, since that one is exact. */
@@ -555,8 +583,17 @@ function derive(ir, opts) {
     const g = groupOfCol.get(name);
     const ev = evidence.get(g) || {};
     const count = varsPerCol.get(name) || 0;
+    /* A few real variable names, so a preview can show ROWS rather than a
+       count. Cheap, and a count alone cannot show what a reading does to the
+       names — which is most of the difference between the three. */
+    const sample = [];
+    for (const spec of vars.values()) {
+      if (sample.length >= 3) break;
+      if (spec.col === name && spec.ft !== null) sample.push(spec.path.split('.').join('/'));
+    }
+
     const entry = {
-      name, modes: modes.slice(), variables: count, fromGroup: g,
+      name, modes: modes.slice(), variables: count, fromGroup: g, sample,
       verdict: verdict.get(g),
       overlap: ev.overlap === undefined ? null : +(ev.overlap * 100).toFixed(1),
       evidence: ev.note,

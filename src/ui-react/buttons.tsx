@@ -391,7 +391,7 @@ declare global {
   interface Window {
     PomImportApplyBtn: any;
     PomImportLevels: {
-      set: (candidates: any[], applied: Record<string, Record<string, string>>) => void;
+      set: (candidates: any[], applied: Record<string, Record<string, string>>, collections?: any[]) => void;
       onToggle: ((group: string, depth: number, role: string) => void) | null;
     };
     PomImportQuestions: {
@@ -1139,65 +1139,159 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
 */
 (function mountImportLevels() {
   const container = document.getElementById('import-levels-mount');
-  let set: (c: any[], a: any) => void = () => {};
+  let set: (c: any[], a: any, cols: any[]) => void = () => {};
 
-  /* What each reading DOES, said as a consequence rather than a category. */
-  function consequence(c: any, role: string) {
-    const n = c.variablesIfPromoted.toLocaleString();
-    if (role === 'mode') return c.distinct + ' modes of one collection · ' + n + ' variables each';
-    if (role === 'collection') return c.distinct + ' separate collections · about ' + n + ' variables each';
-    return 'stays in every variable\u2019s name underneath';
+  const ROLE_LABEL: Record<string, string> = {
+    name: 'group', mode: 'modes', collection: 'collections',
+  };
+
+  /*
+    A MINIATURE OF FIGMA'S OWN VARIABLES TABLE.
+
+    "modes" and "collections" are the same word-count apart and completely
+    different outcomes: one gives a collection extra COLUMNS, the other gives
+    you extra TABLES. Describing that in a sentence asks someone to picture it;
+    drawing it does not. So each resulting collection is rendered the way the
+    panel will show it — its name, a column per mode, and real variable names
+    down the side.
+  */
+  /*
+    FIGMA'S OWN VARIABLES PANEL, IN MINIATURE.
+
+    "modes" and "collections" are one word apart and completely different
+    outcomes — one gives a collection extra COLUMNS, the other gives you extra
+    ROWS IN THE RAIL — and no sentence makes that as plain as the shape does.
+    So this is drawn the way the panel is: the collections list on the left
+    with its variable counts, the selected one's table on the right with a
+    column per mode.
+
+    Names are shown as Figma groups them — the last segment in the Name column,
+    the path above it as a heading — because a reading left as `group` is
+    exactly one that pushes another segment into that path.
+  */
+  function Preview({ collections }: { collections: any[] }) {
+    const [picked, setPicked] = useState(0);
+    if (!collections.length) return null;
+    const c = collections[Math.min(picked, collections.length - 1)];
+    const rows = (c.sample || []).slice(0, 4).map((full: string) => {
+      const i = full.lastIndexOf('/');
+      return { group: i === -1 ? '' : full.slice(0, i), leaf: i === -1 ? full : full.slice(i + 1) };
+    });
+    return (
+      <span className="import-fig">
+        <span className="import-fig-rail">
+          <span className="import-fig-rail-head">Collections</span>
+          {collections.map((x, i) => (
+            <button
+              key={x.name}
+              type="button"
+              className={'import-fig-rail-item' + (x === c ? ' is-on' : '')}
+              onClick={() => setPicked(i)}
+            >
+              <span className="import-fig-rail-name" title={x.name}>{x.name}</span>
+              <span className="import-fig-rail-count">{x.variables.toLocaleString()}</span>
+            </button>
+          ))}
+        </span>
+        <span className="import-fig-table">
+          <span className="import-fig-title">{c.name}</span>
+          <span className="import-fig-head">
+            <span className="import-fig-cell is-name">Name</span>
+            {c.modes.slice(0, 3).map((m: string) => (
+              <span key={m} className="import-fig-cell" title={m}>{m}</span>
+            ))}
+            {c.modes.length > 3 && <span className="import-fig-cell">+{c.modes.length - 3}</span>}
+          </span>
+          {rows.map((r: any, i: number) => (
+            <span key={i}>
+              {(i === 0 || rows[i - 1].group !== r.group) && r.group && (
+                <span className="import-fig-group" title={r.group}>{r.group}</span>
+              )}
+              <span className="import-fig-row">
+                <span className="import-fig-cell is-name">{r.leaf}</span>
+                {c.modes.slice(0, 3).map((m: string) => (
+                  <span key={m} className="import-fig-cell"><i className="import-fig-chip" /></span>
+                ))}
+                {c.modes.length > 3 && <span className="import-fig-cell" />}
+              </span>
+            </span>
+          ))}
+          {c.variables > rows.length && (
+            <span className="import-fig-more">+{(c.variables - rows.length).toLocaleString()} more</span>
+          )}
+        </span>
+      </span>
+    );
   }
 
   function View() {
     const [candidates, setCandidates] = useState<any[]>([]);
-    set = (c) => setCandidates(c || []);
+    const [collections, setCollections] = useState<any[]>([]);
+    set = (c, _a, cols) => { setCandidates(c || []); setCollections(cols || []); };
     if (!candidates.length) return null;
+
+    /*
+      GROUPED BY THE GROUP, because that is the thing being described. A flat
+      list repeats "restrictions" once per depth and buries the fact that the
+      depths belong to one tree — the first of them is the outer level and the
+      rest sit inside it.
+    */
+    const byGroup: Record<string, any[]> = {};
+    candidates.forEach((c) => { (byGroup[c.group] = byGroup[c.group] || []).push(c); });
 
     return (
       <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-5)' }}>
-        {candidates.map((c) => {
-          const role = c.role || 'name';
-          const shown = c.values.slice(0, 5).join(', ') + (c.values.length > 5 ? ', \u2026' : '');
-          /* A mode elsewhere in this group rules out a mode HERE, and nothing
-             else — reading it as collections stays available either way. */
-          const modeTaken = !!c.modeTakenBySibling;
-          const options = [
-            { value: 'name', label: 'group' },
-            { value: 'mode', label: 'modes', disabled: modeTaken },
-            { value: 'collection', label: 'collections' },
-          ];
-          return (
-            <span key={c.group + ':' + c.depth} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text)' }}>
-                {c.group} · {shown}
-              </span>
-              <SegmentedControl
-                /* aria only — the line above is the visible name. */
-                label={'How to read ' + c.group + ' depth ' + c.depth}
-                size="small"
-                block
-                value={role}
-                options={options}
-                onChange={(v: string) => window.PomImportLevels.onToggle?.(c.group, c.depth, v)}
-              />
-              <span style={{ fontSize: 11, color: 'var(--app-text-muted)', lineHeight: 1.45 }}>
-                {consequence(c, role)}
-                {modeTaken && role !== 'mode'
-                  ? ' \u00b7 modes unavailable: a collection has one axis and this group already uses it'
-                  : ''}
-                {c.suggests && role === 'name'
-                  ? ' \u00b7 measured as ' + (c.suggests === 'mode' ? 'an axis' : 'separate namespaces')
-                  : ''}
-              </span>
+        {Object.keys(byGroup).map((group) => (
+          <span key={group} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--app-text)' }}>{group}</span>
+            {byGroup[group].map((c) => {
+              const role = c.role || 'name';
+              const modeTaken = !!c.modeTakenBySibling;
+              return (
+                <span key={c.depth} className="import-level-row">
+                  <span className="import-level-values" title={c.values.join(', ')}>
+                    {c.values.slice(0, 4).join(', ')}
+                    {c.values.length > 4 ? ', \u2026 (' + c.values.length + ')' : ''}
+                  </span>
+                  <span className="import-level-control">
+                    <DropDownSelect
+                      /* DropDownSelect RENDERS its label — there is no
+                         labelHidden, and hiding it in CSS would leave the
+                         control unnamed, since the component drops aria-label
+                         when a visible <label> owns the name. So it gets a
+                         real one, kept to two words because it repeats down
+                         the column and the values to its left are the row's
+                         actual identity. */
+                      label="read as"
+                      size="small"
+                      block
+                      value={role}
+                      options={[
+                        { value: 'name', label: ROLE_LABEL.name },
+                        { value: 'mode', label: ROLE_LABEL.mode + (modeTaken ? ' \u2014 axis taken' : ''), disabled: modeTaken },
+                        { value: 'collection', label: ROLE_LABEL.collection },
+                      ]}
+                      onChange={(v: string) => window.PomImportLevels.onToggle?.(c.group, c.depth, v)}
+                    />
+                  </span>
+                </span>
+              );
+            })}
+          </span>
+        ))}
+        {collections.length > 0 && (
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--app-text)' }}>
+              How this lands in Figma
             </span>
-          );
-        })}
+            <Preview collections={collections} />
+          </span>
+        )}
       </span>
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
-  window.PomImportLevels = { set: (c, a) => set(c, a), onToggle: null };
+  window.PomImportLevels = { set: (c, a, cols) => set(c, a, cols || []), onToggle: null };
 })();
 
 /* ── the questions an import cannot answer for itself ───────────────────────

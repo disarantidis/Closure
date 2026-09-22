@@ -1084,6 +1084,73 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
   ok('themes: and one whose themes enable nothing', bindThemes({ themes: [{ name: 'x', selectedTokenSets: {} }] }) === null);
 }
 
+/* ── an explicit reading outranks every declaration ──────────────────────── */
+{
+  /*
+    A declaration is what the file says when nobody has said otherwise.
+    Somebody just did. A file cannot overrule the person importing it.
+
+    This was wrong and silently so: $themes addresses a row by its SET, which
+    the level map never touches, so an explicit choice was discarded and only
+    the NAME change survived. "modes" and "collections" produced the identical
+    document — two different answers, one outcome, and no error.
+  */
+  const doc = {
+    $metadata: { tokenSetOrder: ['r/a', 'r/b'] },
+    'r/a': { normal: { x: tok('#111111') }, subtle: { x: tok('#222222') } },
+    'r/b': { normal: { x: tok('#333333') }, subtle: { x: tok('#444444') } },
+    $themes: [
+      { id: '1', name: 'a', group: '.r', selectedTokenSets: { 'r/a': 'enabled' } },
+      { id: '2', name: 'b', group: '.r', selectedTokenSets: { 'r/b': 'enabled' } },
+    ],
+  };
+  const ir = toIR(doc);
+
+  const declared = derive(ir, {});
+  ok('precedence: with no reading chosen, the declaration stands',
+     declared.collections.length === 1 && declared.collections[0].name === '.r' &&
+     declared.collections[0].modes.join(',') === 'a,b',
+     JSON.stringify(declared.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+
+  const asModes = derive(ir, { levels: { r: { 0: 'mode' } } });
+  const asCollections = derive(ir, { levels: { r: { 0: 'collection' } } });
+  ok('precedence: a chosen reading displaces the declaration',
+     asModes.collections[0].modes.join(',') === 'normal,subtle',
+     JSON.stringify(asModes.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+  ok('precedence: and the two readings differ, which is the whole point',
+     asCollections.collections.length === 2 &&
+     asCollections.collections.map((c) => c.name).sort().join(',') === 'normal,subtle',
+     JSON.stringify(asCollections.collections.map((c) => c.name)));
+}
+{
+  /* But NAMES and SHAPE are orthogonal. $figmaStructure says what a collection
+     is called; a level map says which depth is an axis. A level map the FILE
+     declared arrives beside exactly such a binding, so the two compose. */
+  const dt = (v) => ({ $value: v, $type: 'color' });
+  const doc = {
+    mode: { light: { bg: dt('#111111') }, dark: { bg: dt('#222222') } },
+    $figmaStructure: {
+      version: 1,
+      collections: [{ figmaName: '.mode', modes: ['light', 'dark'] }],
+      levels: { mode: { '1': { role: 'mode', axis: '.mode' } } },
+    },
+  };
+  const plan = derive(toIR(doc), {});
+  ok('precedence: a declared reading still takes its declared NAME',
+     plan.collections.length === 1 && plan.collections[0].name === '.mode' &&
+     plan.collections[0].modes.join(',') === 'light,dark',
+     JSON.stringify(plan.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+}
+{
+  /* The preview needs rows, not just a count — a count cannot show what a
+     reading does to the NAMES, which is most of what separates the three. */
+  const doc = { $metadata: { tokenSetOrder: ['c'] }, c: { a: { b: tok('#111111') } } };
+  const plan = derive(toIR(doc), {});
+  ok('preview: collections carry sample variable names',
+     Array.isArray(plan.collections[0].sample) && plan.collections[0].sample[0] === 'a/b',
+     JSON.stringify(plan.collections[0].sample));
+}
+
 /* ── the EXPORT declares its own nesting ─────────────────────────────────── */
 {
   /*
