@@ -35,6 +35,7 @@ import { Alert } from '../vendor/pomegranate/panel/node/Alert';
 import { Skeleton } from '../vendor/pomegranate/panel/node/Skeleton';
 import { Tag } from '../vendor/pomegranate/panel/node/Tag';
 import { SelectableCard } from '../vendor/pomegranate/panel/node/SelectableCard';
+import { FileUploadItem } from '../vendor/pomegranate/panel/node/FileUploadItem';
 import { fieldLevel, useLevel, LevelContext, type Level } from '../vendor/pomegranate/panel/node/LevelContext';
 
 /* The plugin GROUND is level 2 — bumped from 1 (the ladder's actual
@@ -408,6 +409,13 @@ declare global {
     PomImportQuestions: {
       set: (questions: any[]) => void;
       onAnswer: ((id: string, value: string) => void) | null;
+    };
+    PomImportFile: {
+      /* null clears the row; bytes is optional because the size is only known
+         when a real File was picked, and FileUploadItem draws no subtitle
+         rather than making a caller invent a number. */
+      set: (name: string | null, bytes?: number) => void;
+      onRemove: (() => void) | null;
     };
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
     PomAddGitlabBtn: LiveToggleIconHandle;
@@ -1336,6 +1344,50 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
 
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomImportLevels = { set: (c, a, cols) => set(c, a, cols || []), onToggle: null };
+})();
+
+/* ── the file that was chosen ───────────────────────────────────────────────
+
+  THE KIT ALREADY HAD THIS. FileUploadItem is the uploaded-file row: the name,
+  the size, a glyph chosen from the type, and a ✕ that appears only when it is
+  given something to do. Writing a third file header by hand — the import page
+  already had one, the Json download card has another — would have been a
+  fourth spelling of a row this design system has settled.
+
+  ONE FILE, so this is a single row rather than a FileUploadList. An import
+  reads exactly one document; a list would imply otherwise before anyone had
+  tried it, and the remove here is what makes "one" workable rather than a
+  dead end.
+
+  The ✕ is the ONLY way back to the drop zone, which is why it is wired to a
+  real reset in ui.template.html rather than just hiding the row: a card that
+  disappears while the parsed document is still in importState would leave the
+  Apply button acting on a file nobody can see.
+*/
+(function mountImportFile() {
+  const container = document.getElementById('import-file-item-mount');
+  let set: (f: { name: string; bytes?: number } | null) => void = () => {};
+
+  function View() {
+    const [file, setFile] = useState<{ name: string; bytes?: number } | null>(null);
+    set = setFile;
+    if (!file) return null;
+    return (
+      <FileUploadItem
+        name={file.name}
+        bytes={file.bytes}
+        type="application/json"
+        size="medium"
+        /* Handing it a remover is what gives it a ✕ — see the prop's own note.
+           The row names the button after the file, so it announces as
+           "Remove sarantidis-foundations.json" rather than a bare dismiss. */
+        onRemove={() => window.PomImportFile.onRemove?.()}
+      />
+    );
+  }
+
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomImportFile = { set: (name, bytes) => set(name ? { name, bytes } : null), onRemove: null };
 })();
 
 /* ── the questions an import cannot answer for itself ───────────────────────

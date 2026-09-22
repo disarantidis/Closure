@@ -2087,14 +2087,12 @@
 
       <!-- Step 2. What arrived. -->
       <div class="import-card" id="import-summary" data-level="4" hidden>
-        <div class="json-download-header">
-          <div class="json-download-title-group">
-            <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>
-            </svg>
-            <p class="json-download-title" id="import-summary-name">file.json</p>
-          </div>
-        </div>
+        <!-- FileUploadItem, from the kit (buttons.tsx, mountImportFile): the
+             file's name, its size, and a ✕ that removes it. This used to be a
+             hand-written header with its own file glyph — a third spelling of
+             a row the design system has already settled, and one with no way
+             to undo the choice. The ✕ is that way back. -->
+        <span id="import-file-item-mount"></span>
         <div class="import-facts" id="import-facts"></div>
       </div>
 
@@ -3078,6 +3076,33 @@
     var importFileInput = document.getElementById('import-file');
     var importDrop = document.getElementById('import-drop');
 
+    /*
+      THE ✕ ON THE FILE ROW. Hiding the row alone would be a lie: the parsed
+      document, the answered questions and the level map all live on
+      importState, and Apply reads them from there — so a card that vanished
+      while they stayed would leave the button ready to write a file nobody
+      can see any more.
+
+      Everything derived goes with it, and the input's value is cleared
+      because a file input does not fire `change` when the same file is picked
+      twice, which would make re-choosing the file you just removed do nothing.
+    */
+    function clearImportFile() {
+      importState.doc = null; importState.fileName = null; importState.fileBytes = undefined;
+      importState.ir = null; importState.plan = null; importState.compiled = null;
+      importState.changes = null; importState.manifest = null;
+      importState.decisions = {}; importState.levels = {};
+      ['import-summary', 'import-levels', 'import-questions',
+       'import-changes', 'import-manifest', 'import-problem'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.hidden = true;
+      });
+      window.PomImportFile.set(null);
+      importFileInput.value = '';
+      importDrop.hidden = false;
+    }
+    window.PomImportFile.onRemove = clearImportFile;
+
     document.getElementById('import-choose-btn').addEventListener('click', function() {
       importFileInput.click();
     });
@@ -3112,6 +3137,10 @@
 
     function readImportFile(file) {
       importState.fileName = file.name;
+      /* Only known when a real File was picked — re-running after a decision
+         goes through runImport(), which never sees one. Kept on the state so
+         the row keeps its subtitle across those re-runs. */
+      importState.fileBytes = file.size;
       var fr = new FileReader();
       fr.onerror = function() { importProblem('Could not read that file', 'The browser could not open ' + file.name + '.'); };
       fr.onload = function() {
@@ -3134,6 +3163,15 @@
     function runImport(doc, fileName) {
       document.getElementById('import-problem').hidden = true;
       importState.doc = doc;
+      /*
+        AN IMPORT READS EXACTLY ONE DOCUMENT, so once there is one the drop
+        zone is not an invitation any more — it is a second control for a slot
+        that is full, and dropping on it would silently replace everything
+        below without saying so. The file's own row carries the ✕ that empties
+        the slot, which is the only way back here.
+      */
+      importDrop.hidden = true;
+      window.PomImportFile.set(fileName, importState.fileBytes);
 
       var ir, plan, compiled;
       try {
@@ -3181,7 +3219,8 @@
     var esc = function(x) { return String(x).replace(/[&<>]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); };
 
     function renderImportSummary(fileName, ir, plan, compiled) {
-      document.getElementById('import-summary-name').textContent = fileName;
+      /* The file's name is the FileUploadItem's job now (runImport sets it);
+         there is no 'import-summary-name' element to write to any more. */
       var format = ir.source === 'legacy' ? 'Tokens Studio / Legacy'
                  : ir.source === 'dtcg' ? 'W3C DTCG' : 'plain token tree';
       var html = '';
