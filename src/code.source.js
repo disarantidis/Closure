@@ -3242,6 +3242,60 @@ figma.ui.onmessage = function(msg) {
     return;
   }
 
+  /*
+    DELETE EVERY LOCAL VARIABLE COLLECTION IN THIS FILE.
+
+    The most destructive thing this plugin can do, and the only handler that
+    removes rather than adds. Three things make it survivable:
+
+      IT ONLY EVER SEES LOCAL COLLECTIONS. getLocalVariableCollectionsAsync
+      returns what this file owns; a collection consumed from a library is not
+      in the list and has no remove() to call, so a shared design system cannot
+      be deleted from a file that merely uses it.
+
+      IT COUNTS BEFORE IT CUTS. variableIds is read while the collection still
+      exists — after remove() the object is gone and the number with it, so a
+      report gathered afterwards would be a report of nothing.
+
+      IT DOES NOT STOP ON ONE FAILURE. A collection that refuses is recorded
+      and the rest still go; the alternative is a half-cleared file whose
+      remaining contents depend on iteration order, which is the state hardest
+      to reason about afterwards.
+
+    NOT UNDONE BY THIS PLUGIN. Figma keeps plugin edits on its own undo stack,
+    so Cmd-Z may bring them back, but that is Figma's behaviour and not a
+    promise this code can make — which is why the confirmation in the UI says
+    what will go rather than offering to reverse it.
+  */
+  if (msg.type === 'clearVariables') {
+    (async function() {
+      try {
+        var cols = await figma.variables.getLocalVariableCollectionsAsync();
+        var removed = [], failed = [], variables = 0;
+        cols.forEach(function(c) {
+          var n = (c.variableIds || []).length;   // read BEFORE remove()
+          var name = c.name;
+          try {
+            c.remove();
+            removed.push({ name: name, variables: n });
+            variables += n;
+          } catch (e) {
+            failed.push({ name: name, error: (e && e.message) || String(e) });
+          }
+        });
+        console.log('[Closure] cleared ' + removed.length + ' collection(s), ' +
+          variables + ' variable(s)' + (failed.length ? '; ' + failed.length + ' refused' : ''));
+        figma.ui.postMessage({ type: 'variablesCleared',
+          removed: removed, failed: failed, variables: variables });
+      } catch (e) {
+        console.error('[Closure] clear failed:', e);
+        figma.ui.postMessage({ type: 'variablesCleared',
+          removed: [], failed: [{ name: null, error: (e && e.message) || String(e) }], variables: 0 });
+      }
+    })();
+    return;
+  }
+
   if (msg.type === 'transform') {
     var nativeResult = transformToFinalFormat(msg.raw, {
       includeDescriptions: !!msg.includeDescriptions

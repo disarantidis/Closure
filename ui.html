@@ -1496,6 +1496,15 @@
        InteractiveCard's hit target is a separate, empty,
        absolutely-stretched sibling (its own "hit layer" pattern), so this
        is free to just be its natural content width. */
+    /* Right-aligned and given room above, so it reads as an afterword to the
+       list rather than another row of it. */
+    .clear-variables-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 4px;
+      padding: 0 4px;
+    }
+
     .collections-header {
       display: flex;
       min-width: 0;
@@ -21737,6 +21746,15 @@ html[data-theme=dark] {
       </div>
     </div>
     <div class="collections-list" id="collections-list" style="display: none;"></div>
+
+    <!-- Sits under the list of the very collections it deletes, because that
+         list is the only honest preview of what "all" means here. Hidden
+         whenever there is nothing to delete — an empty file already shows the
+         empty state, and a destructive control with no target is just a trap
+         to misclick. -->
+    <div class="clear-variables-row" id="clear-variables-row" hidden>
+      <span id="clear-variables-btn-mount"></span>
+    </div>
     <div class="empty-state" id="empty-state" style="display: none;">
       <!-- The Closure variable mark (Pomegranate Identity, node 16:31) — a
            hexagon with a centred dot, the same glyph the brand uses for "a
@@ -21758,6 +21776,7 @@ html[data-theme=dark] {
   </div>
   
   <div id="closure-warning-mount"></div>
+  <div id="clear-variables-dialog-mount"></div>
 
     <!-- Between the file-variables card above and push settings below: the
          one JSON file name, editable here directly (see primary-filename's
@@ -48357,6 +48376,7 @@ html[data-theme=dark] {
   mountIconButton("import-back-btn-mount", { id: "import-back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
   mountButton("import-copy-btn-mount", { id: "import-copy-btn", variant: "outline", size: "small", label: "Copy", block: true }, CARD_LEVEL);
   mountButton("import-choose-btn-mount", { id: "import-choose-btn", variant: "filled", size: "large", label: "Choose a JSON file" });
+  mountButton("clear-variables-btn-mount", { id: "clear-variables-btn", variant: "ghost", destructive: true, size: "small", label: "Delete all variables", leftIcon: true, buttonLeftIcon: IconTrash(16) });
   mountButton("import-empty-btn-mount", { id: "import-empty-btn", variant: "tonal", size: "medium", label: "Import from JSON", leftIcon: true, buttonLeftIcon: IconImport(16) });
   (function mountThemeToggle() {
     const container = document.getElementById("theme-toggle-btn-mount");
@@ -49004,6 +49024,60 @@ html[data-theme=dark] {
     window.PomClearTokenDialog = {
       open: (provider) => {
         (0, import_react_dom.flushSync)(() => setProvider(provider));
+        setOpen(true);
+      },
+      onConfirm: null
+    };
+  })();
+  (function mountClearVariablesDialog() {
+    const container = document.getElementById("clear-variables-dialog-mount");
+    let setOpen = () => {
+    };
+    let setSummary = () => {
+    };
+    function View() {
+      const [open, setO] = (0, import_react16.useState)(false);
+      const [s, setS] = (0, import_react16.useState)(
+        { collections: 0, variables: 0, names: [], fileName: "" }
+      );
+      setOpen = setO;
+      setSummary = setS;
+      const n = (x) => x.toLocaleString();
+      const plural = (x, word) => x + " " + word + (x === 1 ? "" : "s");
+      const names = s.names.length <= 8 ? s.names.join(", ") : s.names.slice(0, 8).join(", ") + " and " + (s.names.length - 8) + " more";
+      return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
+        Dialog,
+        {
+          open,
+          onClose: () => setO(false),
+          size: "small",
+          title: "Delete all variables in " + (s.fileName || "this file") + "?",
+          description: "This removes " + plural(s.collections, "collection") + " and " + n(s.variables) + " variable" + (s.variables === 1 ? "" : "s") + " from the Figma file \u2014 " + names + ". Any layer, style or component using one of them loses that binding and keeps the raw value it was showing. Nothing is exported or saved first.",
+          actions: /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: { display: "flex", flexDirection: "row", gap: 12, width: "100%" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(Button, { variant: "tonal", size: "large", style: { flex: 1 }, onClick: () => setO(false), children: "Cancel" }),
+            /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
+              Button,
+              {
+                variant: "primary",
+                size: "large",
+                style: { flex: 1 },
+                "data-scheme": "error",
+                onClick: () => {
+                  setO(false);
+                  window.PomClearVariablesDialog.onConfirm?.();
+                },
+                children: "Delete " + n(s.variables)
+              }
+            )
+          ] }),
+          children: null
+        }
+      );
+    }
+    if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(View, {}) }));
+    window.PomClearVariablesDialog = {
+      open: (summary) => {
+        (0, import_react_dom.flushSync)(() => setSummary(summary));
         setOpen(true);
       },
       onConfirm: null
@@ -52120,7 +52194,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'd3fb095 15:49:04';
+    var CLOSURE_BUILD = '7bab272 16:06:48';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -54204,6 +54278,30 @@ function format(report, limit) {
 
     downloadBtn.addEventListener('click', doDownloadSingle);
 
+    /*
+      DELETE ALL VARIABLES.
+
+      The counts come from rawData — the extract already on screen — rather
+      than from a fresh read, so the number in the dialog is the number in the
+      list above it. Asking the plugin again could disagree with what is
+      displayed, and a confirmation that does not match what you are looking
+      at is worse than no number at all.
+    */
+    document.getElementById('clear-variables-btn').addEventListener('click', function() {
+      if (!rawData || !rawData.collections || !rawData.collections.length) return;
+      var variables = rawData.collections.reduce(function(n, c) { return n + (c.variables || []).length; }, 0);
+      window.PomClearVariablesDialog.open({
+        collections: rawData.collections.length,
+        variables: variables,
+        names: rawData.collections.map(function(c) { return c.name; }),
+        fileName: lastFigmaFileName || 'this file',
+      });
+    });
+    window.PomClearVariablesDialog.onConfirm = function() {
+      setActionsLoading(true);
+      parent.postMessage({ pluginMessage: { type: 'clearVariables' } }, '*');
+    };
+
     window.onmessage = function(event) {
       var msg = event.data.pluginMessage;
       if (!msg) return;
@@ -54239,6 +54337,7 @@ function format(report, limit) {
           // the class comes off below and they are already correct rather
           // than revealing as stale skeletons.
           document.querySelector('.flow-wrap').classList.add('is-empty');
+          document.getElementById('clear-variables-row').hidden = true;
           setActionsLoading(false);   // nothing to transform — reveal now
           return;
         }
@@ -54246,6 +54345,7 @@ function format(report, limit) {
         // A previous extract may have emptied the screen (file switched, or
         // variables added since) — put the pipeline back.
         document.querySelector('.flow-wrap').classList.remove('is-empty');
+        document.getElementById('clear-variables-row').hidden = false;
         
         collectionsList.style.display = 'flex';
         // Collections card + modal (buttons.tsx): one row per collection in
@@ -54400,6 +54500,38 @@ function format(report, limit) {
           parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
           closeImport();
         }
+      }
+
+      if (msg.type === 'variablesCleared') {
+        /*
+          RE-EXTRACT RATHER THAN EDIT THE SCREEN. Everything visible here —
+          the collections list, the token count, the file size, the empty
+          state — is derived from one extract, and hand-clearing each of them
+          would be a second, parallel description of an empty file that has to
+          be kept in step with the first. Asking again costs one round trip
+          and cannot drift.
+        */
+        var gone = (msg.removed || []).length;
+        if (msg.failed && msg.failed.length) {
+          /* Partial is the state worth naming: some collections went and some
+             did not, so neither "done" nor "failed" is true on its own. The
+             reason Figma gave is in the console; the count is what belongs in
+             a toast someone reads in passing. */
+          console.warn('[Closure] refused: ' + msg.failed.map(function(f) {
+            return (f.name || 'a collection') + ' — ' + f.error;
+          }).join('; '));
+          window.PomToast.show(
+            gone
+              ? 'Deleted ' + gone + ', but ' + msg.failed.length + ' could not be — see the console'
+              : 'Nothing could be deleted — see the console',
+            true
+          );
+        } else {
+          window.PomToast.show('Deleted ' + gone + ' collection' + (gone === 1 ? '' : 's') +
+            ' and ' + (msg.variables || 0).toLocaleString() + ' variable' + (msg.variables === 1 ? '' : 's'));
+        }
+        parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+        return;
       }
 
       if (msg.type === 'error') {

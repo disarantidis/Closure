@@ -1496,6 +1496,15 @@
        InteractiveCard's hit target is a separate, empty,
        absolutely-stretched sibling (its own "hit layer" pattern), so this
        is free to just be its natural content width. */
+    /* Right-aligned and given room above, so it reads as an afterword to the
+       list rather than another row of it. */
+    .clear-variables-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 4px;
+      padding: 0 4px;
+    }
+
     .collections-header {
       display: flex;
       min-width: 0;
@@ -1855,6 +1864,15 @@
       </div>
     </div>
     <div class="collections-list" id="collections-list" style="display: none;"></div>
+
+    <!-- Sits under the list of the very collections it deletes, because that
+         list is the only honest preview of what "all" means here. Hidden
+         whenever there is nothing to delete — an empty file already shows the
+         empty state, and a destructive control with no target is just a trap
+         to misclick. -->
+    <div class="clear-variables-row" id="clear-variables-row" hidden>
+      <span id="clear-variables-btn-mount"></span>
+    </div>
     <div class="empty-state" id="empty-state" style="display: none;">
       <!-- The Closure variable mark (Pomegranate Identity, node 16:31) — a
            hexagon with a centred dot, the same glyph the brand uses for "a
@@ -1876,6 +1894,7 @@
   </div>
   
   <div id="closure-warning-mount"></div>
+  <div id="clear-variables-dialog-mount"></div>
 
     <!-- Between the file-variables card above and push settings below: the
          one JSON file name, editable here directly (see primary-filename's
@@ -4519,6 +4538,30 @@
 
     downloadBtn.addEventListener('click', doDownloadSingle);
 
+    /*
+      DELETE ALL VARIABLES.
+
+      The counts come from rawData — the extract already on screen — rather
+      than from a fresh read, so the number in the dialog is the number in the
+      list above it. Asking the plugin again could disagree with what is
+      displayed, and a confirmation that does not match what you are looking
+      at is worse than no number at all.
+    */
+    document.getElementById('clear-variables-btn').addEventListener('click', function() {
+      if (!rawData || !rawData.collections || !rawData.collections.length) return;
+      var variables = rawData.collections.reduce(function(n, c) { return n + (c.variables || []).length; }, 0);
+      window.PomClearVariablesDialog.open({
+        collections: rawData.collections.length,
+        variables: variables,
+        names: rawData.collections.map(function(c) { return c.name; }),
+        fileName: lastFigmaFileName || 'this file',
+      });
+    });
+    window.PomClearVariablesDialog.onConfirm = function() {
+      setActionsLoading(true);
+      parent.postMessage({ pluginMessage: { type: 'clearVariables' } }, '*');
+    };
+
     window.onmessage = function(event) {
       var msg = event.data.pluginMessage;
       if (!msg) return;
@@ -4554,6 +4597,7 @@
           // the class comes off below and they are already correct rather
           // than revealing as stale skeletons.
           document.querySelector('.flow-wrap').classList.add('is-empty');
+          document.getElementById('clear-variables-row').hidden = true;
           setActionsLoading(false);   // nothing to transform — reveal now
           return;
         }
@@ -4561,6 +4605,7 @@
         // A previous extract may have emptied the screen (file switched, or
         // variables added since) — put the pipeline back.
         document.querySelector('.flow-wrap').classList.remove('is-empty');
+        document.getElementById('clear-variables-row').hidden = false;
         
         collectionsList.style.display = 'flex';
         // Collections card + modal (buttons.tsx): one row per collection in
@@ -4715,6 +4760,38 @@
           parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
           closeImport();
         }
+      }
+
+      if (msg.type === 'variablesCleared') {
+        /*
+          RE-EXTRACT RATHER THAN EDIT THE SCREEN. Everything visible here —
+          the collections list, the token count, the file size, the empty
+          state — is derived from one extract, and hand-clearing each of them
+          would be a second, parallel description of an empty file that has to
+          be kept in step with the first. Asking again costs one round trip
+          and cannot drift.
+        */
+        var gone = (msg.removed || []).length;
+        if (msg.failed && msg.failed.length) {
+          /* Partial is the state worth naming: some collections went and some
+             did not, so neither "done" nor "failed" is true on its own. The
+             reason Figma gave is in the console; the count is what belongs in
+             a toast someone reads in passing. */
+          console.warn('[Closure] refused: ' + msg.failed.map(function(f) {
+            return (f.name || 'a collection') + ' — ' + f.error;
+          }).join('; '));
+          window.PomToast.show(
+            gone
+              ? 'Deleted ' + gone + ', but ' + msg.failed.length + ' could not be — see the console'
+              : 'Nothing could be deleted — see the console',
+            true
+          );
+        } else {
+          window.PomToast.show('Deleted ' + gone + ' collection' + (gone === 1 ? '' : 's') +
+            ' and ' + (msg.variables || 0).toLocaleString() + ' variable' + (msg.variables === 1 ? '' : 's'));
+        }
+        parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+        return;
       }
 
       if (msg.type === 'error') {

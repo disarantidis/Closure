@@ -441,6 +441,10 @@ declare global {
     PomRemoveGithubDialog: { open: () => void; onConfirm: (() => void) | null };
     PomRemoveGitlabDialog: { open: () => void; onConfirm: (() => void) | null };
     PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
+    PomClearVariablesDialog: {
+      open: (summary: { collections: number; variables: number; names: string[]; fileName: string }) => void;
+      onConfirm: (() => void) | null;
+    };
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomOutputFormat: { onChange: ((shape: string) => void) | null; setValue: (shape: string) => void; setHint: (hint: string) => void; setResolvedHint: (hint: string) => void };
@@ -553,6 +557,11 @@ mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'fill
   header's icon-only twin instead of the one obvious action on an empty screen.
   The labelled form puts the icon in the leading slot and keeps the text.
 */
+/* Ghost + destructive: present where the collections it deletes are listed,
+   and quiet enough that it is never the thing the eye lands on first. The
+   dialog above is what actually guards it. */
+mountButton('clear-variables-btn-mount', { id: 'clear-variables-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Delete all variables', leftIcon: true, buttonLeftIcon: IconTrash(16) });
+
 mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', leftIcon: true, buttonLeftIcon: IconImport(16) });
 
 /* ── Settings header: light/dark theme toggle ────────────────────────────── */
@@ -1542,6 +1551,75 @@ confirmDialog('remove-gitlab-dialog-mount',
   if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
   window.PomClearTokenDialog = {
     open: (provider) => { flushSync(() => setProvider(provider)); setOpen(true); },
+    onConfirm: null,
+  };
+})();
+
+/*
+  CLEAR EVERY VARIABLE IN THE FILE — the confirmation.
+
+  Its own dialog rather than confirmDialog() because the only thing that makes
+  this safe to offer is the COUNTS, and those are different every time it
+  opens. A fixed sentence would have to say "all your variables", which is the
+  wording someone clicks past; "11 collections and 2,765 variables" is the
+  wording that stops them.
+
+  IT NAMES THE FILE. This plugin runs in whatever document is open, and the
+  one mistake worth designing against is not misreading the button — it is
+  being in the wrong file. So the file's name is in the dialog, in the
+  sentence, where it has to be read to get to the confirm.
+
+  IT SAYS WHAT ELSE BREAKS. A variable is not only a row in a panel: every
+  node bound to one loses that binding when it goes. Someone picturing only
+  the panel is agreeing to something smaller than what happens.
+
+  NO PROMISE OF UNDO. Figma keeps plugin edits on its own undo stack and
+  Cmd-Z often does bring them back, but that is Figma's behaviour, not
+  something this code controls — so the dialog does not offer it.
+*/
+(function mountClearVariablesDialog() {
+  const container = document.getElementById('clear-variables-dialog-mount');
+  let setOpen: (v: boolean) => void = () => {};
+  let setSummary: (s: any) => void = () => {};
+  function View() {
+    const [open, setO] = useState(false);
+    const [s, setS] = useState<{ collections: number; variables: number; names: string[]; fileName: string }>(
+      { collections: 0, variables: 0, names: [], fileName: '' });
+    setOpen = setO; setSummary = setS;
+    const n = (x: number) => x.toLocaleString();
+    const plural = (x: number, word: string) => x + ' ' + word + (x === 1 ? '' : 's');
+    /* Every name while they fit, then a count — a list that scrolls is not
+       read, and the number is the part that has to land. */
+    const names = s.names.length <= 8
+      ? s.names.join(', ')
+      : s.names.slice(0, 8).join(', ') + ' and ' + (s.names.length - 8) + ' more';
+    return (
+      <Dialog
+        open={open}
+        onClose={() => setO(false)}
+        size="small"
+        title={'Delete all variables in ' + (s.fileName || 'this file') + '?'}
+        description={
+          'This removes ' + plural(s.collections, 'collection') + ' and ' + n(s.variables) +
+          ' variable' + (s.variables === 1 ? '' : 's') + ' from the Figma file — ' + names + '. ' +
+          'Any layer, style or component using one of them loses that binding and keeps ' +
+          'the raw value it was showing. Nothing is exported or saved first.'
+        }
+        actions={
+          <div style={{ display: 'flex', flexDirection: 'row', gap: 12, width: '100%' }}>
+            <Button variant="tonal" size="large" style={{ flex: 1 }} onClick={() => setO(false)}>Cancel</Button>
+            <Button variant="primary" size="large" style={{ flex: 1 }} data-scheme="error"
+                    onClick={() => { setO(false); window.PomClearVariablesDialog.onConfirm?.(); }}>
+              {'Delete ' + n(s.variables)}
+            </Button>
+          </div>
+        }
+      >{null}</Dialog>
+    );
+  }
+  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
+  window.PomClearVariablesDialog = {
+    open: (summary) => { flushSync(() => setSummary(summary)); setOpen(true); },
     onConfirm: null,
   };
 })();
