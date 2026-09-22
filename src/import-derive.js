@@ -144,6 +144,12 @@ const vkey = (col, path) => col + SEP + path;
   direction the dependency runs. So promoting a second depth is refused rather
   than approximated.
 */
+/* A level entry is a bare role, or { role, axis } when whoever wrote it knew
+   which Figma axis the depth came from. */
+function roleOf(entry) {
+  return (entry && typeof entry === 'object') ? entry.role : entry;
+}
+
 function applyLevels(ir, levels) {
   if (!levels || !Object.keys(levels).length) return ir;
   const rows = ir.rows.map((r) => {
@@ -159,8 +165,13 @@ function applyLevels(ir, levels) {
     for (const key of Object.keys(spec)) {
       const i = Number(key);
       if (!(i >= 0 && i < segs.length)) continue;
-      if (spec[key] === 'collection') { group = segs[i]; drop.add(i); movedCollection = true; }
-      else if (spec[key] === 'mode') { variant = segs[i]; drop.add(i); movedMode = true; }
+      /* Either a bare role or { role, axis } — the EXPORTER writes the second,
+         because it knows which Figma axis it put at this depth and that is
+         worth recording even though applyLevels only needs the role. */
+      const entry = spec[key];
+      const role = (entry && typeof entry === 'object') ? entry.role : entry;
+      if (role === 'collection') { group = segs[i]; drop.add(i); movedCollection = true; }
+      else if (role === 'mode') { variant = segs[i]; drop.add(i); movedMode = true; }
     }
     if (!drop.size) return r;
 
@@ -557,14 +568,17 @@ function derive(ir, opts) {
      rather than additions — which is a thing to show, not to hide. */
   plan.levelCandidates = candidates.map((c) => {
     const spec = levels[c.group] || {};
-    const role = spec[String(c.depth)] || 'name';
+    const role = roleOf(spec[String(c.depth)]) || 'name';
     return Object.assign({}, c, {
       role,
       applied: role !== 'name',
       /* Only a MODE elsewhere in this group rules out a mode here. Reading
          this depth as collections stays available either way. */
       modeTakenBySibling: Object.keys(spec)
-        .some((d) => spec[d] === 'mode' && String(c.depth) !== d),
+        .some((d) => roleOf(spec[d]) === 'mode' && String(c.depth) !== d),
+      /* Present only when a DECLARATION named the Figma axis this depth came
+         from — the measurement can never know that, only the exporter can. */
+      axis: (spec[String(c.depth)] && spec[String(c.depth)].axis) || null,
     });
   });
 
@@ -600,7 +614,7 @@ function derive(ir, opts) {
   return plan;
 }
 
-  var api = { derive, applyLevels, levelCandidates, figmaType, isComposite, isDtcgScalar, vkey,
+  var api = { derive, applyLevels, levelCandidates, roleOf, figmaType, isComposite, isDtcgScalar, vkey,
                    MODES_MIN, SEPARATE_MAX, FIGMA_TYPES, VARIABLE_CEILING,
                    FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
 

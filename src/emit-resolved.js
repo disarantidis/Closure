@@ -684,6 +684,8 @@
         if (!lastHouse.collisions.length) {
           return {
             document: lastHouse.document, shape: 'house', roles: roles,
+            /* The layout it just chose, said out loud — see shapeHouse. */
+            levels: lastHouse.levels,
             autoPinned: Object.keys(pinned).length ? pinned : null,
             total: countResolvedTokens(lastHouse.document), emit: current
           };
@@ -733,18 +735,22 @@
         roles = detectLayoutRoles(current) || roles;
       }
 
+      var derivedDoc = shapeDerived(res);
       return {
-        document: shapeDerived(res),
+        document: derivedDoc,
         shape: 'derived',
         roles: options.axes,
         total: derivedTotal,
         layoutCollisions: lastHouse ? lastHouse.collisions.length : 0,
         unplacedAxes: lastHouse ? lastHouse.culprits : [],
+        levels: shapeDerived.levels,
         emit: res
       };
     }
 
-    return { document: shapeDerived(res), shape: 'derived', roles: null, total: derivedTotal, emit: res };
+    var plainDoc = shapeDerived(res);
+    return { document: plainDoc, shape: 'derived', roles: null, total: derivedTotal,
+             levels: shapeDerived.levels, emit: res };
   }
 
   /*
@@ -867,6 +873,11 @@
   */
   function shapeDerived(res) {
     var out = {};
+    /* Same idea as shapeHouse's: this function chooses the nesting, so it can
+       say what it chose. A section named "mode-scheme" puts its first axis at
+       depth 1; only that one can be a Figma mode, since a collection has a
+       single axis, and the rest stay in the names. */
+    var levels = out.__levels = {};
     Object.keys(res.primitives).forEach(function (name) {
       out[name.replace(/^[._]+/, '')] = res.primitives[name];
     });
@@ -876,12 +887,19 @@
         ? g.axes.map(function (a) { return a.replace(/^[._]+/, ''); }).join('-')
         : 'static';
       var node = out[section] = out[section] || {};
+      if (g.axes.length && !levels[section]) {
+        levels[section] = { '1': { role: 'mode', axis: g.axes[0] } };
+      }
       g.branches.forEach(function (b) {
         var here = node;
         b.path.forEach(function (seg) { here = here[seg] = here[seg] || {}; });
         mergeResolvedInto(here, b.tokens);
       });
     });
+    /* Carried out of band — it is metadata about the document, not part of
+       it, and the caller lifts it into $figmaStructure. */
+    delete out.__levels;
+    shapeDerived.levels = levels;
     return out;
   }
 
@@ -960,7 +978,30 @@
         });
       });
     });
-    return { document: out, collisions: collisions, culprits: Object.keys(culprits) };
+    /*
+      WHERE EACH AXIS WENT, so a reader does not have to work it out again.
+
+      This function has just DECIDED the nesting: breakpoint's values sit one
+      level under `breakpoint`, and the mode axis one level under `mode`. That
+      is precisely the level map an import otherwise has to ask a human for —
+      and here it is not a guess at all, because we put them there.
+
+      Depth 1, not 0: a DTCG path keeps its top-level group, so
+      `mode.light.neutral...` has `mode` at 0 and the axis at 1.
+
+      Only the axes this layout gave a level of their own are declared. The
+      scheme axis ends up naming the leaf and is NOT a level, so it is left
+      for the import to ask about — saying nothing is better than declaring a
+      reading that was never made.
+    */
+    var levels = {};
+    if (Object.keys(out.breakpoint).length && roles.breakpoint) {
+      levels.breakpoint = { '1': { role: 'mode', axis: roles.breakpoint } };
+    }
+    if (Object.keys(out.mode).length && roles.mode) {
+      levels.mode = { '1': { role: 'mode', axis: roles.mode } };
+    }
+    return { document: out, collisions: collisions, culprits: Object.keys(culprits), levels: levels };
   }
 
   var api = {

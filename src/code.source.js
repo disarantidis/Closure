@@ -2994,6 +2994,41 @@ figma.ui.onmessage = function(msg) {
         unplacedAxes: built.unplacedAxes || [],
         autoPinned: built.autoPinned || null
       };
+
+      /*
+        HOW TO READ THIS BACK, written by the thing that wrote it.
+
+        The resolved shape denormalises axes into nesting — light/dark and the
+        schemes stop being collections and become path depths — and until now
+        an importer had to work out which depths those were by measuring, or
+        ask a person. It never had to: the layout above just DECIDED where each
+        axis went, so it can say so. `built.levels` is that decision.
+
+        This is the gap the export side was missing. $figmaStructure already
+        recorded the collections a file came out of, which survives a
+        non-resolved export unchanged; a resolved one flattens them, and the
+        flattening is exactly what needed declaring.
+
+        Only the axes given a level of their own are here. The scheme axis ends
+        up naming a leaf rather than a level, so nothing is claimed about it and
+        the import still asks — saying nothing beats declaring a reading that
+        was never made.
+      */
+      if (built.levels && Object.keys(built.levels).length) {
+        /* finalTokens, not `out` — that one is a local of toTokenFormat and
+           belongs to the legacy tree. This is the resolved document. */
+        finalTokens['$figmaStructure'] = {
+          version: 1,
+          collections: (msg.raw.collections || []).map(function (c) {
+            return {
+              figmaName: c.name,
+              modes: (c.modes || []).map(function (m) { return m.name; }),
+              variables: (c.variables || []).length
+            };
+          }),
+          levels: built.levels
+        };
+      }
       if (built.autoPinned) {
         console.warn('[Resolved] held at their default mode so the layout fits: ' +
           Object.keys(built.autoPinned).map(function (k) {

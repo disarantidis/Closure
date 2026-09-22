@@ -996,6 +996,64 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
      !!bindManifest(toIR(doc), imported));
 }
 
+/* ── the EXPORT declares its own nesting ─────────────────────────────────── */
+{
+  /*
+    The resolved shape denormalises axes into nesting: light/dark stop being a
+    collection's modes and become a path depth. Until now an importer had to
+    measure that back or ask a person — and it never had to, because the
+    exporter DECIDED where each axis went. It can simply say so.
+
+    A level entry is therefore either a bare role or { role, axis }: the
+    exporter writes the second, since it knows which Figma axis it put at that
+    depth. applyLevels only needs the role; the axis is provenance, and the
+    measurement can never recover it.
+  */
+  /* DTCG, deliberately — that is what a resolved export is, and it keeps its
+     top-level group in the path, so the axis sits at depth 1. The same tree in
+     Tokens Studio form would put it at depth 0. */
+  const dt = (v) => ({ $value: v, $type: 'color' });
+  const doc = {
+    core: { red: dt('#ff0000') },
+    mode: { light: { bg: dt('{core.red}') }, dark: { bg: dt('#330000') } },
+    $figmaStructure: {
+      version: 1,
+      collections: [
+        { figmaName: '.core', modes: ['.core'] },
+        { figmaName: '.mode', modes: ['light', 'dark'] },
+      ],
+      levels: { mode: { '1': { role: 'mode', axis: '.mode' } } },
+    },
+  };
+  const plan = derive(toIR(doc), {});
+  ok('declared: a { role, axis } entry is applied like a bare role',
+     plan.levelsDeclared === true &&
+     plan.collections.some((c) => c.modes.join(',') === 'light,dark'),
+     JSON.stringify(plan.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+
+  /* Both halves of $figmaStructure together: the levels restore the AXES and
+     the collections restore the NAMES. Neither does both on its own. */
+  ok('declared: the original Figma names come back with the axes',
+     plan.collections.map((c) => c.name).sort().join(',') === '.core,.mode',
+     JSON.stringify(plan.collections.map((c) => c.name)));
+
+  ok('declared: the axis it came from is reported',
+     plan.levelCandidates.some((c) => c.group === 'mode' && c.axis === '.mode'),
+     JSON.stringify(plan.levelCandidates.map((c) => c.group + ':' + c.depth + '<-' + c.axis)));
+
+  ok('declared: and nothing is left to ask',
+     compile(toIR(doc), plan, {}).ok === true);
+
+  /* The same document without the declaration is where this started. */
+  const bare = JSON.parse(JSON.stringify(doc));
+  delete bare.$figmaStructure;
+  const guessed = derive(toIR(bare), {});
+  ok('declared: without it the axis is just part of every name',
+     guessed.levelsDeclared === false &&
+     guessed.collections.every((c) => c.modes.length === 1),
+     JSON.stringify(guessed.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+}
+
 /* ── Figma caps a collection at 5,000 variables ──────────────────────────── */
 {
   /* Found by a real import: 6,195 operations went through and then stopped on
