@@ -515,6 +515,7 @@ mountIconButton('settings-btn-mount', { id: 'settings-btn', variant: 'ghost', si
    neither is the screen's own action. */
 mountIconButton('import-btn-mount', { id: 'import-btn', variant: 'ghost', size: 'large', title: 'Import tokens from JSON', 'aria-label': 'Import tokens from JSON', icon: IconImport(24) });
 mountIconButton('import-back-btn-mount', { id: 'import-back-btn', variant: 'tonal', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
+mountButton('import-copy-btn-mount', { id: 'import-copy-btn', variant: 'outline', size: 'small', label: 'Copy', block: true }, CARD_LEVEL);
 mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'filled', size: 'large', label: 'Choose a JSON file' });
 /* The empty state is where an import is most obviously the right thing to do,
    so it gets its own way in rather than making someone find the header. */

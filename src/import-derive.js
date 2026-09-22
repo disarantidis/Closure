@@ -243,8 +243,22 @@ function levelCandidates(ir, opts) {
 
 function derive(ir, opts) {
   opts = opts || {};
-  /* FIRST, before anything else looks at the rows — see applyLevels. */
-  const levels = opts.levels || {};
+  /*
+    FIRST, before anything else looks at the rows — see applyLevels.
+
+    A map the DOCUMENT carries is the default, and a caller's overrides it.
+    That ordering is what makes the answer durable: the level map is the one
+    part of the projection no measurement can settle on its own — light/dark
+    genuinely could be modes, collections, or names, and only whoever owns the
+    system knows which. Asking once and writing it into $figmaStructure means
+    the next import of the same file does not ask again.
+
+    It is format-specific, which is exactly why it belongs in the file rather
+    than in a shared config: depth 1 of a Tokens Studio path and depth 1 of a
+    DTCG path are not the same depth (see applyLevels).
+  */
+  const declaredLevels = (ir.manifest && ir.manifest.levels) || {};
+  const levels = Object.keys(opts.levels || {}).length ? opts.levels : declaredLevels;
   /* Measured on the ORIGINAL rows, not the rewritten ones. What a document
      could be read as does not change because of what it is currently being
      read as — and the depth indices would shift under the transform anyway,
@@ -277,6 +291,10 @@ function derive(ir, opts) {
        caller can offer them; never applied on their own. */
     levelCandidates: [],
     levelsApplied: levels,
+    /* Whether this reading came from the file or from the caller — worth
+       reporting, because "the document says so" and "you just chose it" are
+       different kinds of confidence. */
+    levelsDeclared: levels === declaredLevels && Object.keys(levels).length > 0,
     totals: {},
     ok: false,
   };

@@ -438,16 +438,39 @@ function evaluate(expr, plan, mode) {
   carries its own structure can never be mis-projected.
 */
 function toManifest(plan) {
-  return {
+  const m = {
     version: 1,
+    /*
+      `figmaName`, NOT `name` — this is the same field src/import-manifest.js
+      writes on the export side and reads in bindManifest(), and it has to be
+      the one key because there is only one $figmaStructure.
+
+      These two were written months apart in the same afternoon and never met:
+      buildManifest() emitted figmaName, toManifest() emitted name, and nothing
+      had yet round-tripped an import's own manifest back through an import.
+      The first thing that did got a collection called "undefined".
+    */
     collections: plan.collections.map((c) => ({
-      name: c.name,
+      figmaName: c.name,
       modes: c.modes,
       fromGroup: c.fromGroup,
       verdict: c.verdict,
     })),
     decisions: plan.decisionsApplied,
   };
+  /*
+    THE LEVEL MAP TRAVELS WITH THE DOCUMENT, and it is the part that most needs
+    to. Everything else in this manifest can be re-derived from the file if it
+    is lost — the collections, the verdicts, all of it comes back from
+    measuring. A level map cannot: whether light/dark are modes, collections,
+    or names is a fact about the SYSTEM, not about the bytes, and no amount of
+    looking at the file settles it.
+
+    Only written when there is one. An empty object would claim the question
+    was answered when it was never asked.
+  */
+  if (plan.levelsApplied && Object.keys(plan.levelsApplied).length) m.levels = plan.levelsApplied;
+  return m;
 }
 
   var api = { compile, toManifest, toColor, coerce, evaluate };

@@ -1225,6 +1225,23 @@
     /* Separated from the counts above it — it is a commitment, not another
        line of the report. */
     .import-apply { margin-top: 8px; }
+    /* Monospace and scrollable: this is something to copy, not to read
+       through — a manifest for a real system runs to dozens of lines. */
+    .import-manifest-code {
+      margin: 0;
+      padding: 10px 12px;
+      max-height: 140px;
+      overflow: auto;
+      border-radius: 12px;
+      background: var(--app-surface);
+      border: 1px solid var(--app-border);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      line-height: 1.5;
+      color: var(--app-text-muted);
+      white-space: pre;
+    }
+    .import-card-note code { font-size: 10px; color: var(--app-text); }
 
     .empty-state .hint {
       font-size: 11px;
@@ -1967,6 +1984,16 @@
         <!-- Deliberately at the FOOT of this card and nowhere else: the only
              route to writing runs past the report of what writing would do. -->
         <div id="import-apply-btn-mount" class="import-apply"></div>
+      </div>
+
+      <!-- The reading, as something that can leave this session. Everything
+           else on this page can be worked out again from the file; how to
+           read its depths cannot, so it is offered back rather than kept. -->
+      <div class="import-card" id="import-manifest" data-level="4" hidden>
+        <p class="import-card-title">Save this reading into the file</p>
+        <p class="import-card-note">Paste this next to your tokens as <code>$figmaStructure</code> and the next import will not ask again.</p>
+        <pre class="import-manifest-code" id="import-manifest-code"></pre>
+        <div id="import-copy-btn-mount"></div>
       </div>
 
       <div class="import-card is-problem" id="import-problem" data-level="4" hidden>
@@ -2886,7 +2913,7 @@
       than four modes and every variable in it moves.
     */
     var importState = { doc: null, fileName: null, ir: null, plan: null,
-                        compiled: null, changes: null, decisions: {}, levels: {} };
+                        compiled: null, changes: null, decisions: {}, levels: {}, manifest: null };
 
     function openImport() {
       document.getElementById('main-page').classList.add('hidden');
@@ -2984,6 +3011,8 @@
       renderImportSummary(fileName, ir, plan, compiled);
       renderImportLevels(plan);
       renderImportQuestions(plan, compiled);
+
+      renderImportManifest(compiled);
 
       if (compiled.ok) {
         /* rawData is whatever the main screen already extracted — so the diff
@@ -3128,6 +3157,39 @@
       importState.decisions[id] = value;
       if (importState.doc) runImport(importState.doc, importState.fileName);
     };
+
+    /*
+      Shown only once a READING has been chosen. With nothing assigned the
+      manifest says nothing worth carrying — and offering an empty one would
+      suggest the question had been settled when it was never asked.
+    */
+    function renderImportManifest(compiled) {
+      var el = document.getElementById('import-manifest');
+      var m = compiled && compiled.ok && compiled.manifest;
+      if (!m || !m.levels) { el.hidden = true; return; }
+      importState.manifest = m;
+      document.getElementById('import-manifest-code').textContent =
+        '"$figmaStructure": ' + JSON.stringify(m, null, 2);
+      el.hidden = false;
+    }
+
+    document.getElementById('import-copy-btn').addEventListener('click', function() {
+      if (!importState.manifest) return;
+      var text = '"$figmaStructure": ' + JSON.stringify(importState.manifest, null, 2);
+      /* navigator.clipboard needs a secure context and a permission the plugin
+         iframe does not reliably have, so the old selection route is the one
+         that actually works here. */
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      showToast(ok ? 'Copied — paste it beside your tokens' : 'Could not copy; select the text above');
+    });
 
     function renderImportChanges(d) {
       var s = d.summary, html = '';

@@ -1225,6 +1225,23 @@
     /* Separated from the counts above it — it is a commitment, not another
        line of the report. */
     .import-apply { margin-top: 8px; }
+    /* Monospace and scrollable: this is something to copy, not to read
+       through — a manifest for a real system runs to dozens of lines. */
+    .import-manifest-code {
+      margin: 0;
+      padding: 10px 12px;
+      max-height: 140px;
+      overflow: auto;
+      border-radius: 12px;
+      background: var(--app-surface);
+      border: 1px solid var(--app-border);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      line-height: 1.5;
+      color: var(--app-text-muted);
+      white-space: pre;
+    }
+    .import-card-note code { font-size: 10px; color: var(--app-text); }
 
     .empty-state .hint {
       font-size: 11px;
@@ -21849,6 +21866,16 @@ html[data-theme=dark] {
         <!-- Deliberately at the FOOT of this card and nowhere else: the only
              route to writing runs past the report of what writing would do. -->
         <div id="import-apply-btn-mount" class="import-apply"></div>
+      </div>
+
+      <!-- The reading, as something that can leave this session. Everything
+           else on this page can be worked out again from the file; how to
+           read its depths cannot, so it is offered back rather than kept. -->
+      <div class="import-card" id="import-manifest" data-level="4" hidden>
+        <p class="import-card-title">Save this reading into the file</p>
+        <p class="import-card-note">Paste this next to your tokens as <code>$figmaStructure</code> and the next import will not ask again.</p>
+        <pre class="import-manifest-code" id="import-manifest-code"></pre>
+        <div id="import-copy-btn-mount"></div>
       </div>
 
       <div class="import-card is-problem" id="import-problem" data-level="4" hidden>
@@ -48036,6 +48063,7 @@ html[data-theme=dark] {
   mountIconButton("settings-btn-mount", { id: "settings-btn", variant: "ghost", size: "large", title: "Git settings", "aria-label": "Git settings", icon: IconSettings(24) });
   mountIconButton("import-btn-mount", { id: "import-btn", variant: "ghost", size: "large", title: "Import tokens from JSON", "aria-label": "Import tokens from JSON", icon: IconImport(24) });
   mountIconButton("import-back-btn-mount", { id: "import-back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
+  mountButton("import-copy-btn-mount", { id: "import-copy-btn", variant: "outline", size: "small", label: "Copy", block: true }, CARD_LEVEL);
   mountButton("import-choose-btn-mount", { id: "import-choose-btn", variant: "filled", size: "large", label: "Choose a JSON file" });
   mountButton("import-empty-btn-mount", { id: "import-empty-btn", variant: "tonal", size: "medium", label: "Import from JSON", icon: IconImport(16) });
   (function mountThemeToggle() {
@@ -50188,8 +50216,22 @@ function levelCandidates(ir, opts) {
 
 function derive(ir, opts) {
   opts = opts || {};
-  /* FIRST, before anything else looks at the rows — see applyLevels. */
-  const levels = opts.levels || {};
+  /*
+    FIRST, before anything else looks at the rows — see applyLevels.
+
+    A map the DOCUMENT carries is the default, and a caller's overrides it.
+    That ordering is what makes the answer durable: the level map is the one
+    part of the projection no measurement can settle on its own — light/dark
+    genuinely could be modes, collections, or names, and only whoever owns the
+    system knows which. Asking once and writing it into $figmaStructure means
+    the next import of the same file does not ask again.
+
+    It is format-specific, which is exactly why it belongs in the file rather
+    than in a shared config: depth 1 of a Tokens Studio path and depth 1 of a
+    DTCG path are not the same depth (see applyLevels).
+  */
+  const declaredLevels = (ir.manifest && ir.manifest.levels) || {};
+  const levels = Object.keys(opts.levels || {}).length ? opts.levels : declaredLevels;
   /* Measured on the ORIGINAL rows, not the rewritten ones. What a document
      could be read as does not change because of what it is currently being
      read as — and the depth indices would shift under the transform anyway,
@@ -50222,6 +50264,10 @@ function derive(ir, opts) {
        caller can offer them; never applied on their own. */
     levelCandidates: [],
     levelsApplied: levels,
+    /* Whether this reading came from the file or from the caller — worth
+       reporting, because "the document says so" and "you just chose it" are
+       different kinds of confidence. */
+    levelsDeclared: levels === declaredLevels && Object.keys(levels).length > 0,
     totals: {},
     ok: false,
   };
@@ -50976,16 +51022,39 @@ function evaluate(expr, plan, mode) {
   carries its own structure can never be mis-projected.
 */
 function toManifest(plan) {
-  return {
+  const m = {
     version: 1,
+    /*
+      `figmaName`, NOT `name` — this is the same field src/import-manifest.js
+      writes on the export side and reads in bindManifest(), and it has to be
+      the one key because there is only one $figmaStructure.
+
+      These two were written months apart in the same afternoon and never met:
+      buildManifest() emitted figmaName, toManifest() emitted name, and nothing
+      had yet round-tripped an import's own manifest back through an import.
+      The first thing that did got a collection called "undefined".
+    */
     collections: plan.collections.map((c) => ({
-      name: c.name,
+      figmaName: c.name,
       modes: c.modes,
       fromGroup: c.fromGroup,
       verdict: c.verdict,
     })),
     decisions: plan.decisionsApplied,
   };
+  /*
+    THE LEVEL MAP TRAVELS WITH THE DOCUMENT, and it is the part that most needs
+    to. Everything else in this manifest can be re-derived from the file if it
+    is lost — the collections, the verdicts, all of it comes back from
+    measuring. A level map cannot: whether light/dark are modes, collections,
+    or names is a fact about the SYSTEM, not about the bytes, and no amount of
+    looking at the file settles it.
+
+    Only written when there is one. An empty object would claim the question
+    was answered when it was never asked.
+  */
+  if (plan.levelsApplied && Object.keys(plan.levelsApplied).length) m.levels = plan.levelsApplied;
+  return m;
 }
 
   var api = { compile, toManifest, toColor, coerce, evaluate };
@@ -51422,7 +51491,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '260049e 20:38:23';
+    var CLOSURE_BUILD = '6f3abbc 10:04:27';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -52062,7 +52131,7 @@ function format(report, limit) {
       than four modes and every variable in it moves.
     */
     var importState = { doc: null, fileName: null, ir: null, plan: null,
-                        compiled: null, changes: null, decisions: {}, levels: {} };
+                        compiled: null, changes: null, decisions: {}, levels: {}, manifest: null };
 
     function openImport() {
       document.getElementById('main-page').classList.add('hidden');
@@ -52160,6 +52229,8 @@ function format(report, limit) {
       renderImportSummary(fileName, ir, plan, compiled);
       renderImportLevels(plan);
       renderImportQuestions(plan, compiled);
+
+      renderImportManifest(compiled);
 
       if (compiled.ok) {
         /* rawData is whatever the main screen already extracted — so the diff
@@ -52304,6 +52375,39 @@ function format(report, limit) {
       importState.decisions[id] = value;
       if (importState.doc) runImport(importState.doc, importState.fileName);
     };
+
+    /*
+      Shown only once a READING has been chosen. With nothing assigned the
+      manifest says nothing worth carrying — and offering an empty one would
+      suggest the question had been settled when it was never asked.
+    */
+    function renderImportManifest(compiled) {
+      var el = document.getElementById('import-manifest');
+      var m = compiled && compiled.ok && compiled.manifest;
+      if (!m || !m.levels) { el.hidden = true; return; }
+      importState.manifest = m;
+      document.getElementById('import-manifest-code').textContent =
+        '"$figmaStructure": ' + JSON.stringify(m, null, 2);
+      el.hidden = false;
+    }
+
+    document.getElementById('import-copy-btn').addEventListener('click', function() {
+      if (!importState.manifest) return;
+      var text = '"$figmaStructure": ' + JSON.stringify(importState.manifest, null, 2);
+      /* navigator.clipboard needs a secure context and a permission the plugin
+         iframe does not reliably have, so the old selection route is the one
+         that actually works here. */
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      showToast(ok ? 'Copied — paste it beside your tokens' : 'Could not copy; select the text above');
+    });
 
     function renderImportChanges(d) {
       var s = d.summary, html = '';

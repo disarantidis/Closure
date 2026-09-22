@@ -937,6 +937,65 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
      c.stats.variables + ' + ' + c.stats.skippedComposite + ' vs ' + ir.rows.length);
 }
 
+/* ── the level map travels with the document ─────────────────────────────── */
+{
+  /*
+    The level map is the ONE part of the projection no measurement can settle.
+    Whether light/dark are modes, collections or names is a fact about the
+    system, not about the bytes — everything else in the manifest can be
+    re-derived if lost. So it is asked once and written into $figmaStructure.
+  */
+  const base = { t: { light: { a: tok('#111111'), b: tok('#222222') },
+                      dark: { a: tok('#333333'), b: tok('#444444') } } };
+
+  const answered = derive(toIR(base), { levels: { t: { 0: 'mode' } } });
+  const first = compile(toIR(base), answered, {});
+  ok('manifest: it carries the level map',
+     first.manifest.levels && first.manifest.levels.t['0'] === 'mode',
+     JSON.stringify(first.manifest.levels));
+  ok('manifest: and not an empty one when nothing was assigned',
+     compile(toIR(base), derive(toIR(base), {}), {}).manifest.levels === undefined);
+
+  /* Written back into the file, a cold import needs no answer. */
+  const withManifest = Object.assign({}, base, { $figmaStructure: first.manifest });
+  const cold = derive(toIR(withManifest), {});
+  ok('manifest: a cold re-import reads the map from the file',
+     cold.levelsDeclared === true &&
+     cold.collections.length === 1 && cold.collections[0].modes.join(',') === 'light,dark',
+     JSON.stringify(cold.collections.map((c) => c.name + '[' + c.modes.join(',') + ']')));
+
+  /* The point of all of it: the same program, without being asked twice. */
+  const second = compile(toIR(withManifest), cold, {});
+  ok('manifest: and produces the identical program',
+     fingerprint(materialise(first.program)) === fingerprint(materialise(second.program)),
+     fingerprint(materialise(first.program)) + ' vs ' + fingerprint(materialise(second.program)));
+
+  /* A caller still outranks the file — the map is a default, not a lock. */
+  const overridden = derive(toIR(withManifest), { levels: { t: { 0: 'collection' } } });
+  ok('manifest: a caller still overrides what the file says',
+     overridden.levelsDeclared === false && overridden.collections.length === 2,
+     JSON.stringify(overridden.collections.map((c) => c.name)));
+}
+{
+  /* ONE KEY, ONE SHAPE. buildManifest() on the export side and toManifest()
+     on the import side both write $figmaStructure and bindManifest() reads
+     it, so all three must agree on the field. They did not: one wrote
+     `figmaName` and the other `name`, and nothing had round-tripped an
+     import's own manifest back through an import until the level map made
+     that the whole point. The first thing that did got a collection called
+     "undefined". */
+  const { buildManifest, bindManifest } = require('../src/import-manifest.js');
+  const exported = buildManifest([{ name: '.core', modes: [{ name: '.core' }], variables: [1] }]);
+  const doc = { $metadata: { tokenSetOrder: ['core'] }, core: { red: tok('#ff0000') } };
+  const plan = derive(toIR(doc), {});
+  const imported = compile(toIR(doc), plan, {}).manifest;
+  ok('manifest: both sides name the collection the same way',
+     'figmaName' in exported.collections[0] && 'figmaName' in imported.collections[0],
+     Object.keys(imported.collections[0]).join(','));
+  ok('manifest: and what an import writes, an import can read back',
+     !!bindManifest(toIR(doc), imported));
+}
+
 /* ── Figma caps a collection at 5,000 variables ──────────────────────────── */
 {
   /* Found by a real import: 6,195 operations went through and then stopped on
