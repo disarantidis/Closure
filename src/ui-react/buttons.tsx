@@ -36,6 +36,8 @@ import { Skeleton } from '../vendor/pomegranate/panel/node/Skeleton';
 import { Tag } from '../vendor/pomegranate/panel/node/Tag';
 import { SelectableCard } from '../vendor/pomegranate/panel/node/SelectableCard';
 import { FileUploadItem } from '../vendor/pomegranate/panel/node/FileUploadItem';
+import { Spinner } from '../vendor/pomegranate/panel/node/Spinner';
+import { ConfirmIcon } from '../vendor/pomegranate/panel/node/Icon';
 import { fieldLevel, useLevel, LevelContext, type Level } from '../vendor/pomegranate/panel/node/LevelContext';
 
 /* The plugin GROUND is level 2 — bumped from 1 (the ladder's actual
@@ -399,6 +401,7 @@ type FolderSelectBridge = { setItems: (items: any[], selectedValue: string) => v
 // still can: the onboarding dialog's "skip both" choice — Download alone is
 // a complete, supported workflow, not an unfinished state to route past.
 type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
+type ImportFileState = { name: string; bytes?: number; busy?: boolean; error?: string };
 declare global {
   interface Window {
     PomImportApplyBtn: any;
@@ -414,7 +417,7 @@ declare global {
       /* null clears the row; bytes is optional because the size is only known
          when a real File was picked, and FileUploadItem draws no subtitle
          rather than making a caller invent a number. */
-      set: (name: string | null, bytes?: number) => void;
+      set: (name: string | null, bytes?: number, opts?: { busy?: boolean; error?: string }) => void;
       onRemove: (() => void) | null;
     };
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
@@ -1366,28 +1369,68 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
 */
 (function mountImportFile() {
   const container = document.getElementById('import-file-item-mount');
-  let set: (f: { name: string; bytes?: number } | null) => void = () => {};
+  let set: (f: ImportFileState | null) => void = () => {};
 
   function View() {
-    const [file, setFile] = useState<{ name: string; bytes?: number } | null>(null);
+    const [file, setFile] = useState<ImportFileState | null>(null);
     set = setFile;
     if (!file) return null;
+    /*
+      THE GLYPH CARRIES THE STATE, because it is the only part of the row that
+      is not already text. The name and the size are written out; a second
+      written "done" beside them would be noise, and an animation where the
+      file type used to be is read without being read.
+
+        reading  Spinner  — the kit's own suggestion for this slot, in its own
+                            words: "a Spinner while the row is still
+                            resolving". label='' because the row above it is
+                            already named, and two announcements of one thing
+                            is worse than none.
+        done     ConfirmIcon
+        failed   the file glyph, with `error` taking the subtitle's place —
+                 the component displaces the size with the reason, which is
+                 the one place a failure belongs on this row.
+
+      A DETERMINATE RING around the glyph is what was actually asked for and
+      the kit has no such component: Spinner is circular but indeterminate,
+      ProgressBar is determinate but a bar. Raised as disarantidis/pomegranate#93
+      rather than hand-drawn here — an arc with its own dash keyframes would be
+      a second, unowned spinner living in this file, with none of Spinner's
+      pathLength normalisation and none of its reasoning about --accent. So
+      the swap below is a cut rather than a motion, on purpose, until the kit
+      has the mark.
+    */
+    const leading = file.error ? undefined
+      : file.busy ? <Spinner size={18} strokeWidth={2.5} label="" />
+      : <ConfirmIcon />;
     return (
       <FileUploadItem
         name={file.name}
         bytes={file.bytes}
         type="application/json"
         size="medium"
+        error={file.error}
+        leading={leading}
         /* Handing it a remover is what gives it a ✕ — see the prop's own note.
            The row names the button after the file, so it announces as
-           "Remove sarantidis-foundations.json" rather than a bare dismiss. */
+           "Remove sarantidis-foundations.json" rather than a bare dismiss.
+
+           Its variant is ghost and cannot be anything else: FileUploadItem
+           writes variant="ghost" into its own render and exposes no prop that
+           reaches it. Right for a row in a list on the page background, loud
+           enough to be wrong for a row alone on a raised card — which is what
+           this is. Raised as disarantidis/pomegranate#92; overriding it from
+           here would mean selecting into Button's internals. */
         onRemove={() => window.PomImportFile.onRemove?.()}
       />
     );
   }
 
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
-  window.PomImportFile = { set: (name, bytes) => set(name ? { name, bytes } : null), onRemove: null };
+  window.PomImportFile = {
+    set: (name, bytes, opts) => set(name ? { name, bytes, busy: !!(opts && opts.busy), error: opts && opts.error } : null),
+    onRemove: null,
+  };
 })();
 
 /* ── the questions an import cannot answer for itself ───────────────────────

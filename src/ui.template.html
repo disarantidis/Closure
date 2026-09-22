@@ -2100,13 +2100,23 @@
       </div>
 
       <!-- Step 2. What arrived. -->
-      <div class="import-card" id="import-summary" data-level="4" hidden>
-        <!-- FileUploadItem, from the kit (buttons.tsx, mountImportFile): the
-             file's name, its size, and a ✕ that removes it. This used to be a
-             hand-written header with its own file glyph — a third spelling of
-             a row the design system has already settled, and one with no way
-             to undo the choice. The ✕ is that way back. -->
+      <!-- Step 2a. WHICH FILE — its own card, and separate from the facts
+           below on purpose. The two answer different questions and arrive at
+           different times: this one appears the moment a file is picked, with
+           its spinner still turning, while the facts cannot exist until the
+           document has been read and measured. Sharing a card would mean
+           either showing an empty half or making the file wait for numbers it
+           does not depend on.
+
+           FileUploadItem, from the kit (buttons.tsx, mountImportFile): the
+           file's name, its size, a glyph that carries the state, and a ✕ that
+           removes it. -->
+      <div class="import-card" id="import-file-card" data-level="4" hidden>
         <span id="import-file-item-mount"></span>
+      </div>
+
+      <!-- Step 2b. What was in it. -->
+      <div class="import-card" id="import-summary" data-level="4" hidden>
         <div class="import-facts" id="import-facts"></div>
       </div>
 
@@ -3090,6 +3100,15 @@
     var importFileInput = document.getElementById('import-file');
     var importDrop = document.getElementById('import-drop');
 
+    /* One writer for the row AND the card that holds it. Two call sites set
+       this (readImportFile while reading, runImport once it is read) and a
+       card visible with an empty row — or a row with no card — is the defect
+       that follows from letting each do its own half. */
+    function showImportFile(opts) {
+      document.getElementById('import-file-card').hidden = false;
+      window.PomImportFile.set(importState.fileName, importState.fileBytes, opts || {});
+    }
+
     /*
       THE ✕ ON THE FILE ROW. Hiding the row alone would be a lie: the parsed
       document, the answered questions and the level map all live on
@@ -3106,7 +3125,7 @@
       importState.ir = null; importState.plan = null; importState.compiled = null;
       importState.changes = null; importState.manifest = null;
       importState.decisions = {}; importState.levels = {};
-      ['import-summary', 'import-levels', 'import-questions',
+      ['import-file-card', 'import-summary', 'import-levels', 'import-questions',
        'import-changes', 'import-manifest', 'import-problem'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.hidden = true;
@@ -3141,9 +3160,26 @@
     });
 
     function importProblem(title, body) {
+      /*
+        THE ROW FAILS TOO. Every way an import can go wrong funnels through
+        here, so this is the one place that can guarantee the file's own row
+        agrees with the problem card below it.
+
+        It did not, and the mismatch was worse than a missing signal: a file
+        that parsed as JSON but held no tokens had already been settled to
+        "done", so the row showed a completion tick directly above a card
+        explaining that it had failed. The title is the short form of the same
+        sentence, which is what FileUploadItem's `error` wants — it displaces
+        the file size, because someone reading a failed row is not reading its
+        bytes.
+      */
+      if (importState.fileName) showImportFile({ error: title });
       document.getElementById('import-problem-title').textContent = title;
       document.getElementById('import-problem-body').textContent = body;
       document.getElementById('import-problem').hidden = false;
+      /* import-file-card is deliberately NOT in this list: the ✕ on that row
+         is the only way to get rid of a file that failed, so hiding it would
+         strand someone on the error with the drop zone gone too. */
       ['import-summary', 'import-questions', 'import-changes'].forEach(function(id) {
         document.getElementById(id).hidden = true;
       });
@@ -3155,21 +3191,44 @@
          goes through runImport(), which never sees one. Kept on the state so
          the row keeps its subtitle across those re-runs. */
       importState.fileBytes = file.size;
+
+      /* The row appears NOW, before anything is read, so the spinner covers
+         the wait rather than arriving after it. */
+      showImportFile({ busy: true });
+
       var fr = new FileReader();
-      fr.onerror = function() { importProblem('Could not read that file', 'The browser could not open ' + file.name + '.'); };
+      fr.onerror = function() {
+        importProblem('Could not be read', 'The browser could not open ' + file.name + '.');
+      };
       fr.onload = function() {
-        var doc;
-        try { doc = JSON.parse(fr.result); }
-        catch (err) {
-          /* Worth being specific: "not valid JSON" and "valid JSON that is
-             not tokens" are different problems with different fixes. */
-          importProblem('That file is not valid JSON', String(err.message || err));
-          return;
-        }
-          /* A new file answers nothing the last one was asked. */
-        importState.decisions = {};
-        importState.levels = {};
-        runImport(doc, file.name);
+        /*
+          YIELD BEFORE THE HEAVY WORK, or the spinner never turns.
+
+          Everything after this point — JSON.parse of a file that can be most
+          of a megabyte, then toIR, derive and compile — is synchronous, and
+          the browser cannot paint while it runs. Calling it straight from
+          onload means the row is mounted and then frozen in whatever state it
+          was in, so a spinner would be a still picture of a spinner for the
+          whole two seconds it is supposed to be covering.
+
+          rAF then setTimeout(0): the frame lets the spinner's first paint
+          land, the timeout gets off that frame's callback so the work does
+          not stretch it.
+        */
+        requestAnimationFrame(function () { setTimeout(function () {
+          var doc;
+          try { doc = JSON.parse(fr.result); }
+          catch (err) {
+            /* Worth being specific: "not valid JSON" and "valid JSON that is
+               not tokens" are different problems with different fixes. */
+            importProblem('Not valid JSON', String(err.message || err));
+            return;
+          }
+            /* A new file answers nothing the last one was asked. */
+          importState.decisions = {};
+          importState.levels = {};
+          runImport(doc, file.name);
+        }, 0); });
       };
       fr.readAsText(file);
     }
@@ -3185,7 +3244,11 @@
         the slot, which is the only way back here.
       */
       importDrop.hidden = true;
-      window.PomImportFile.set(fileName, importState.fileBytes);
+      /* Settled, not created — readImportFile put the row up busy. A re-run
+         after a decision has no File behind it and lands here directly, which
+         is why this is also the path that shows the row at all. */
+      importState.fileName = fileName;
+      showImportFile({ busy: false });
 
       var ir, plan, compiled;
       try {
