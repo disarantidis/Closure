@@ -1656,6 +1656,42 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
            ctx.validateReferenceClosure(bp).ok === true,
            JSON.stringify(ctx.validateReferenceClosure(bp).missingRoots));
 
+        /* A DOT COLLECTION NO NAMED RULE CLAIMS. normalizeVariableName takes
+           the collection's own name off the token path for a ".foo"
+           collection, and buildAliasPath takes it off and PUTS IT BACK — so
+           every reference says "restrictions.normal.bg" while the token, if
+           nothing re-roots it, sits at "normal.bg".
+
+           The named rules re-root ({ section: … }, { card: … }); the generic
+           pass-through did not, so a dot collection it handled came out one
+           level too shallow and every reference into it dangled. 4,884 of
+           them in a real re-export. */
+        const dotted = exportOf([
+          { name: '.restrictions', modes: ['unrestricted'],
+            vars: [{ name: 'restrictions/normal/bg', value: colour(1, 0, 0) }] },
+          { name: '.card', modes: ['not-a-card'],
+            vars: [{ name: 'card/normal/bg', value: colour(1, 0, 0), aliasTo: 'C0V0' }] },
+        ]);
+        ok('exporter: a dot collection keeps its name as the token root',
+           !!(dotted['restrictions/unrestricted'] && dotted['restrictions/unrestricted'].restrictions),
+           JSON.stringify(Object.keys(dotted['restrictions/unrestricted'] || {})));
+        const dottedClosure = ctx.validateReferenceClosure(dotted);
+        ok('exporter: and references into it resolve',
+           dottedClosure.ok === true,
+           JSON.stringify(dottedClosure.missingRoots) + ' ' + JSON.stringify(dottedClosure.sampleBroken));
+
+        /* An UNDOTTED collection keeps its name in the path already, so
+           wrapping it again would double the root — the mirror of the bug
+           above, and the one the breakpoint rule hit. */
+        const undotted = exportOf([
+          { name: 'palette', modes: ['light'],
+            vars: [{ name: 'palette/brand/primary', value: colour(0, 1, 0) }] },
+        ]);
+        ok('exporter: an undotted collection is not re-rooted twice',
+           !!(undotted['palette/light'] && undotted['palette/light'].palette &&
+              !undotted['palette/light'].palette.palette),
+           JSON.stringify(Object.keys((undotted['palette/light'] || {}).palette || {})));
+
         /* "core." IS NOT ALWAYS NOISE. fixAliasPaths strips that prefix off
            every reference, which is right when ".core" is a dot-collection
            whose variables are named "dimension/0" — the token is published at

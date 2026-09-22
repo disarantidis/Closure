@@ -2617,6 +2617,84 @@ function toTokenFormat(native, rawData) {
   if (!out['core']) out['core'] = {};
   out['core']['Elevation'] = buildCoreElevationReference();
 
+  /*
+    EVERYTHING THE RULES ABOVE DID NOT TAKE.
+
+    Every rule above is keyed to a collection this exporter was written
+    against — ".core", ".mode", ".scheme", "_restricted" and the rest. Against
+    a file built by anyone else, almost none of them fire: one real import had
+    the collections "core mode fill base level foundation breakpoint scheme
+    interaction tense master", which overlaps that list on "foundation" alone.
+    33 sets collapsed to 2 and 246 references dangled, while the export
+    reported success.
+
+    So what is left over is emitted on its own terms: one set per mode, named
+    "collection/mode", with the leading "." or "_" that marks a Figma helper
+    collection stripped. No interpretation, no renaming — a set the exporter
+    does not understand is still a set, and a token nobody claimed is better
+    passed through verbatim than dropped.
+  */
+  var passedThrough = [];
+  Object.keys(native).forEach(function (colName) {
+    if (claimed[colName]) return;
+    var byMode = native[colName];
+    if (!byMode || typeof byMode !== 'object') return;
+    var modes = Object.keys(byMode).filter(function (m) {
+      return byMode[m] && typeof byMode[m] === 'object';
+    });
+    if (!modes.length) return;
+
+    var base = colName.replace(/^[._]+/, '') || colName;
+    /*
+      A DOT COLLECTION HAS ITS NAME TAKEN OFF THE TOKEN PATH, SO PUT IT BACK.
+
+      normalizeVariableName strips the collection's own name from a variable
+      in a ".foo" collection — ".restrictions" holding
+      "restrictions/normal/white/basic/background" becomes the token
+      "normal.white.basic.background". buildAliasPath performs the SAME strip
+      and then re-adds the base name, so every reference to it says
+      "restrictions.normal.white.basic.background".
+
+      The named rules re-add it too: the section rule emits { section: … },
+      the card rule { card: … }. This one did not, so a dot collection no
+      named rule claimed came out one level too shallow and every reference
+      into it dangled — 4,884 of them in a real import, all of them pointing
+      at a "restrictions" root that had been stripped away and never replaced.
+
+      Gated on the dot, exactly as normalizeVariableName is: an undotted
+      collection keeps its name in the path and must not be wrapped again.
+    */
+    var dotted = colName.charAt(0) === '.';
+    /* A single mode named after its own collection is Figma's way of saying
+       "this collection has no axis" — one set, not "base/base". */
+    var single = modes.length === 1 && modes[0].replace(/^[._]+/, '') === base;
+    modes.forEach(function (m) {
+      var setName = single ? base : base + '/' + m.replace(/^[._]+/, '');
+      var incoming = byMode[m];
+      if (dotted) { var wrapped = {}; wrapped[base] = incoming; incoming = wrapped; }
+      if (out[setName]) {
+        /* Merged, not skipped. out['core'] and out['foundation'] are created
+           unconditionally above and FILLED with primitives this exporter
+           synthesises, so the set is neither absent nor empty — it holds
+           invented tokens and none of the file's own. Skipping on "it exists"
+           lost 2,156 references while reporting 33 sets exported. */
+        var target = out[setName];
+        Object.keys(incoming).forEach(function (k) {
+          if (target[k] === undefined) target[k] = incoming[k];
+          else deepMerge(target[k], incoming[k]);
+        });
+      } else {
+        out[setName] = incoming;
+      }
+      passedThrough.push(setName);
+    });
+  });
+  if (passedThrough.length) {
+    console.log('[Closure] ' + passedThrough.length + ' set(s) passed through from ' +
+      'collections this export has no specific rule for: ' + passedThrough.slice(0, 8).join(', ') +
+      (passedThrough.length > 8 ? ' …' : ''));
+  }
+
   // Reorder value/type keys globally
   out = fixKeyOrder(out);
 
@@ -2625,10 +2703,12 @@ function toTokenFormat(native, rawData) {
     Given the paths that exist, so the strip can tell a prefix that is noise
     from one that is part of the address — see fixAliasPaths.
   */
+  /* The pass-through above has already run, which is what makes this index
+     complete: a collection the named rules did not claim gets its tokens
+     there, and until it has, every reference INTO one looks unresolvable —
+     so the strip would leave it alone and it would dangle under its
+     unstripped name. */
   out = fixAliasPaths(out, tokenPathIndex(out));
-  /* Deferred until the generic pass-through has run, because that is where a
-     collection the named rules did not claim gets its tokens — until then the
-     index cannot see them and every reference into one looks unresolvable. */
   walkAndFinalizeNatoTypographyComposites(out['core'], out);
 
   // Canonical breakpoint typography quirks — run LAST on the final tree so no
@@ -2662,62 +2742,6 @@ function toTokenFormat(native, rawData) {
     never carries it — which is the same normalisation buildAliasPath already
     applies to the references that point at them.
   */
-  /*
-    EVERYTHING THE RULES ABOVE DID NOT TAKE.
-
-    Every rule above is keyed to a collection this exporter was written
-    against — ".core", ".mode", ".scheme", "_restricted" and the rest. Against
-    a file built by anyone else, almost none of them fire: one real import had
-    the collections "core mode fill base level foundation breakpoint scheme
-    interaction tense master", which overlaps that list on "foundation" alone.
-    33 sets collapsed to 2 and 246 references dangled, while the export
-    reported success.
-
-    So what is left over is emitted on its own terms: one set per mode, named
-    "collection/mode", with the leading "." or "_" that marks a Figma helper
-    collection stripped. No interpretation, no renaming — a set the exporter
-    does not understand is still a set, and a token nobody claimed is better
-    passed through verbatim than dropped.
-  */
-  var passedThrough = [];
-  Object.keys(native).forEach(function (colName) {
-    if (claimed[colName]) return;
-    var byMode = native[colName];
-    if (!byMode || typeof byMode !== 'object') return;
-    var modes = Object.keys(byMode).filter(function (m) {
-      return byMode[m] && typeof byMode[m] === 'object';
-    });
-    if (!modes.length) return;
-
-    var base = colName.replace(/^[._]+/, '') || colName;
-    /* A single mode named after its own collection is Figma's way of saying
-       "this collection has no axis" — one set, not "base/base". */
-    var single = modes.length === 1 && modes[0].replace(/^[._]+/, '') === base;
-    modes.forEach(function (m) {
-      var setName = single ? base : base + '/' + m.replace(/^[._]+/, '');
-      var incoming = byMode[m];
-      if (out[setName]) {
-        /* Merged, not skipped. out['core'] and out['foundation'] are created
-           unconditionally above and FILLED with primitives this exporter
-           synthesises, so the set is neither absent nor empty — it holds
-           invented tokens and none of the file's own. Skipping on "it exists"
-           lost 2,156 references while reporting 33 sets exported. */
-        var target = out[setName];
-        Object.keys(incoming).forEach(function (k) {
-          if (target[k] === undefined) target[k] = incoming[k];
-          else deepMerge(target[k], incoming[k]);
-        });
-      } else {
-        out[setName] = incoming;
-      }
-      passedThrough.push(setName);
-    });
-  });
-  if (passedThrough.length) {
-    console.log('[Closure] ' + passedThrough.length + ' set(s) passed through from ' +
-      'collections this export has no specific rule for: ' + passedThrough.slice(0, 8).join(', ') +
-      (passedThrough.length > 8 ? ' …' : ''));
-  }
 
   /* Last, so it sees every set: see pruneSynthesisedFoundationRefs. */
   var prunedRefs = pruneSynthesisedFoundationRefs(out);
