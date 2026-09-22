@@ -1656,6 +1656,62 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
            ctx.validateReferenceClosure(bp).ok === true,
            JSON.stringify(ctx.validateReferenceClosure(bp).missingRoots));
 
+        /* THE EXPORT MUST NOT DEPEND ON THE ORDER OF THE RAIL.
+
+           findParentCollection used to return the first collection Figma
+           handed back, and every ".mode" alias path is built from its answer —
+           so the export was correct only because ".core" happened to sit first
+           in the file it was written against. Creating collections in
+           dependency order put "foundation" there instead and rewrote 2,008
+           references to a root that does not hold them.
+
+           Panel order is something a person can change by dragging. Nothing
+           about what the file MEANS may depend on it. */
+        /* Named the way the real file names them — a ".core" variable is
+           "dimension/0", not "core/dimension/0". A fixture that invents its own
+           convention tests the fixture. */
+        const shuffleCols = [
+          { name: '.core', modes: ['.core'],
+            vars: [{ name: 'dimension/0', value: 4, type: 'FLOAT' },
+                   /* NOT one of the names buildAliasPath special-cases
+                      ("dimension/", "core-colours/", …) — those return before
+                      findParentCollection is ever consulted, so a fixture built
+                      only from them cannot see the order-dependence at all. */
+                   { name: 'fontSize/0', value: 16, type: 'FLOAT' }] },
+          { name: 'foundation', modes: ['foundation'],
+            vars: [{ name: 'foundation/spacing/x', value: 4, type: 'FLOAT', aliasTo: 'C0V0' }] },
+          { name: '.mode', modes: ['light', 'dark'],
+            vars: [{ name: 'mode/neutral/basic/size', value: 16, type: 'FLOAT', aliasTo: 'C0V1' }] },
+        ];
+        const forwards = exportOf(shuffleCols);
+        /* The fixture's ids are positional, so a reversed list must re-point
+           its aliases at the same variable under its new index — otherwise the
+           two runs describe two different documents and prove nothing. */
+        const reversed = shuffleCols.slice().reverse();
+        const coreAt = reversed.findIndex((c) => c.name === '.core');
+        const backwards = exportOf(reversed.map((c) => ({
+          ...c,
+          vars: c.vars.map((v) => (v.aliasTo
+            ? { ...v, aliasTo: 'C' + coreAt + 'V' + v.aliasTo.slice(v.aliasTo.indexOf('V') + 1) }
+            : v)),
+        })));
+
+        /* EVERY TOKEN SET, not the whole document: $figmaStructure records the
+           collections and $themes' id is a hash over them, so both legitimately
+           follow the rail. What must not move is a single token or reference. */
+        const namedSets = (o) => Object.keys(o).filter((k) => k.charAt(0) !== '$').sort();
+        const sameSets = namedSets(forwards).join(',') === namedSets(backwards).join(',');
+        const sameContent = sameSets && namedSets(forwards)
+          .every((k) => JSON.stringify(forwards[k]) === JSON.stringify(backwards[k]));
+        ok('exporter: the same document exports the same whatever the rail order',
+           sameContent,
+           namedSets(forwards).join(',') + '  vs  ' + namedSets(backwards).join(',') + '  | ' +
+           (namedSets(forwards).find((k) => JSON.stringify(forwards[k]) !== JSON.stringify(backwards[k])) || ''));
+        ok('exporter: and closes in both orders',
+           ctx.validateReferenceClosure(forwards).ok === true &&
+           ctx.validateReferenceClosure(backwards).ok === true,
+           JSON.stringify(ctx.validateReferenceClosure(backwards).missingRoots));
+
         /* A DOT COLLECTION NO NAMED RULE CLAIMS. normalizeVariableName takes
            the collection's own name off the token path for a ".foo"
            collection, and buildAliasPath takes it off and PUTS IT BACK — so

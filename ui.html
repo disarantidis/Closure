@@ -51848,8 +51848,61 @@ function compile(ir, plan, opts) {
   const nonEmpty = new Set();
   for (const spec of vars.values()) if (alive.has(vkey(spec.col, spec.path))) nonEmpty.add(spec.col);
 
+  /*
+    ── the order collections are CREATED in, which is the only order Figma
+       offers ──────────────────────────────────────────────────────────────
+
+    The Plugin API has no way to reorder variable collections: a collection
+    exposes its name, its modes and its variables, and nothing that says where
+    it sits in the panel. The rail lists them in the order they were made. So
+    the one moment this can be decided is here, and only for collections an
+    import CREATES — one already in the file keeps its place, because apply()
+    reuses it rather than making it again.
+
+    LAST HOP FIRST. A token file is a chain: primitives at the bottom, then
+    each layer aliasing the one beneath it, up to the semantic layer a designer
+    actually picks from. Reading order and dependency order are opposites —
+    nobody opens the panel looking for "core.dimension.4", they open it looking
+    for "foundation.colours.basic.text" — so the deepest CONSUMER is created
+    first and the primitives last.
+
+    Depth is the longest path down the alias graph, computed from the same
+    refTarget map phase 4 uses, so it describes the references that will
+    actually be written rather than the ones the file mentions. Cycles cannot
+    lengthen a path: a name already on the current descent contributes zero.
+    Ties keep the document's own order, so the result is stable.
+  */
+  const dependsOn = new Map();
+  for (const spec of vars.values()) {
+    if (!keep.has(spec.col) || !nonEmpty.has(spec.col)) continue;
+    if (!dependsOn.has(spec.col)) dependsOn.set(spec.col, new Set());
+    for (const [, v] of spec.values) {
+      if (v.ref === undefined) continue;
+      const t = refTarget.get(v.ref);
+      if (t && t.col !== spec.col) dependsOn.get(spec.col).add(t.col);
+    }
+  }
+  const depthMemo = new Map();
+  const depthOf = (name, onPath) => {
+    if (depthMemo.has(name)) return depthMemo.get(name);
+    if (onPath.has(name)) return 0;                 // a cycle adds no length
+    onPath.add(name);
+    let d = 0;
+    for (const t of (dependsOn.get(name) || [])) d = Math.max(d, 1 + depthOf(t, new Set(onPath)));
+    onPath.delete(name);
+    depthMemo.set(name, d);
+    return d;
+  };
+  const creationOrder = [...modesOf.keys()];
+  const documentOrder = new Map(creationOrder.map((n, i) => [n, i]));
+  creationOrder.sort((a, b) => {
+    const d = depthOf(b, new Set()) - depthOf(a, new Set());
+    return d !== 0 ? d : documentOrder.get(a) - documentOrder.get(b);
+  });
+
   /* ── phase 1: collections and modes ────────────────────────────────────── */
-  for (const [name, modes] of modesOf) {
+  for (const name of creationOrder) {
+    const modes = modesOf.get(name);
     if (!keep.has(name)) continue;
     /* A collection with nothing left alive in it would be created empty, which
        is the same junk one level up — `foundation` in a real slice, whose every
@@ -52505,7 +52558,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '565007a 17:41:33';
+    var CLOSURE_BUILD = '55454e6 18:07:27';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
