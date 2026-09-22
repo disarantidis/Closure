@@ -21996,13 +21996,26 @@ html[data-theme=dark] {
                  deliberately NOT the gear the header's Settings button
                  uses, which means "open the Settings page" everywhere else
                  in this UI. -->
-            <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <!-- Three marks, one shown at a time — see nameRepoCard(). The
+                 generic branch glyph is only correct while no provider has
+                 been added; once one has, this card is about a named service
+                 and says which, in its own logo. The two provider paths are
+                 the SAME ones .target-row-title uses a few lines below, so
+                 the card and the row inside it cannot end up wearing
+                 different marks for the same thing. -->
+            <svg id="repo-card-icon-generic" class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M6 3v12"/>
               <circle cx="18" cy="6" r="3"/>
               <circle cx="6" cy="18" r="3"/>
               <path d="M18 9a9 9 0 0 1-9 9"/>
             </svg>
-            <p class="json-download-title">Repo settings</p>
+            <svg id="repo-card-icon-gitlab" class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none">
+              <path d="M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024"/>
+            </svg>
+            <svg id="repo-card-icon-github" class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            <p class="json-download-title" id="repo-card-title">Repo settings</p>
           </div>
         </div>
         <!-- Only meaningful once BOTH providers are actually added (see
@@ -52616,7 +52629,7 @@ function format(report, limit) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '32d9559 18:22:25';
+    var CLOSURE_BUILD = '8173dcf 18:40:49';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -54355,8 +54368,52 @@ function format(report, limit) {
     // switcher uses (updateProviderSectionVisibility's showTabs).
     // Single-provider mode falls straight through to the one added
     // provider, with nothing to switch.
+    /*
+      THE CARD NAMES THE SERVICE IT IS ABOUT.
+
+      "Repo settings" is the right title for exactly one state: nothing added
+      yet, where the card is an invitation rather than a description. Once a
+      provider IS added the card is about GitHub, or GitLab, and saying so in
+      that service's own mark is both quicker to read and harder to get wrong
+      than a generic branch glyph over a generic word.
+
+      With BOTH added the card follows the provider tab already sitting inside
+      it, so the title and the block underneath always agree — a header naming
+      one service over a body showing the other would be worse than the
+      generic word it replaced.
+    */
+    function nameRepoCard() {
+      var which = null;
+      /* Normalised, not trusted: the tab is binary, so anything that is not
+         'github' is GitLab. Passing the raw value through let an unexpected
+         one produce a state that cannot be read — no logo at all beside the
+         generic word, because it matched neither icon while still counting as
+         "a provider is chosen". */
+      if (gitlabAdded && githubAdded) which = mainProviderTab === 'github' ? 'github' : 'gitlab';
+      else if (gitlabAdded) which = 'gitlab';
+      else if (githubAdded) which = 'github';
+      var title = which === 'gitlab' ? 'GitLab' : which === 'github' ? 'GitHub' : 'Repo settings';
+      document.getElementById('repo-card-title').textContent = title;
+      /*
+        style.display, NOT .hidden — these are <svg> elements.
+
+        `hidden` is a property of HTMLElement, and an SVG element is not one.
+        Assigning to it does not fail and does not warn: it quietly creates an
+        ordinary JS property, sets no attribute, and matches no CSS. Reading it
+        back gives what was just written, so it looks like it worked from every
+        angle except the screen — the generic branch glyph stayed up beside the
+        word "GitHub", and the GitHub mark, which carried `hidden` in the markup
+        and so could never be un-hidden this way, never appeared at all.
+      */
+      var show = function (id, on) { document.getElementById(id).style.display = on ? '' : 'none'; };
+      show('repo-card-icon-generic', !which);
+      show('repo-card-icon-gitlab', which === 'gitlab');
+      show('repo-card-icon-github', which === 'github');
+    }
+
     function updatePushTargetUI() {
       var r = computePushReadiness();
+      nameRepoCard();
       var tabMode = gitlabAdded && githubAdded;
       document.getElementById('main-provider-tabs-row').hidden = !tabMode;
       if (tabMode) {
