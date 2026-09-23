@@ -2222,7 +2222,8 @@ const COMPARE_SAMPLE = 40;
             <div className="compare-section-head">
               <span className="compare-section-title">Architecture</span>
               <span className="compare-section-note">
-                {(r.onlyInFigma.length + r.onlyInRepo.length + (r.repointed || []).length).toLocaleString()}
+                {(r.onlyInFigma.length + r.onlyInRepo.length +
+                  (r.repointed || []).length + (r.aliased || []).length).toLocaleString()}
                 {' in total'}
               </span>
             </div>
@@ -2235,9 +2236,13 @@ const COMPARE_SAMPLE = 40;
                 <div className="compare-stat-n">{r.onlyInRepo.length.toLocaleString()}</div>
                 <div className="compare-stat-label">only in the repo</div>
               </div>
-              <div className="compare-stat is-wide">
+              <div className="compare-stat">
                 <div className="compare-stat-n">{(r.repointed || []).length.toLocaleString()}</div>
                 <div className="compare-stat-label">pointing somewhere new</div>
+              </div>
+              <div className="compare-stat">
+                <div className="compare-stat-n">{(r.aliased || []).length.toLocaleString()}</div>
+                <div className="compare-stat-label">aliased one side, inlined the other</div>
               </div>
             </div>
           </div>
@@ -2279,6 +2284,9 @@ const COMPARE_SAMPLE = 40;
                   <span className={'compare-count' + (g.repointed ? '' : ' is-zero')} title="reference repointed">
                     {'\u2192' + (g.repointed || 0)}
                   </span>
+                  <span className={'compare-count' + (g.aliased ? '' : ' is-zero')} title="same value, aliased one side">
+                    {'=' + (g.aliased || 0)}
+                  </span>
                 </span>
               </div>
             ))}
@@ -2305,6 +2313,10 @@ const COMPARE_SAMPLE = 40;
             almost always the least interesting, because a re-rooting moves
             thousands of references without anyone having decided anything. */}
         {leaves('Architecture \u2014 pointing somewhere new', r.repointed || [], true)}
+        {/* The value is the SAME on both sides — one file points at it, the
+            other spells it out. Worth seeing (it says the two exports were
+            made differently) and emphatically not a value change. */}
+        {leaves('Architecture \u2014 same value, aliased one side', r.aliased || [], true)}
         {leaves('Architecture \u2014 only here', r.onlyInFigma, false)}
         {leaves('Architecture \u2014 only in the repo', r.onlyInRepo, false)}
 

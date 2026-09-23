@@ -178,6 +178,17 @@ function rootOf(path) {
   return i === -1 ? path : path.slice(0, i);
 }
 
+/* The RAW value at a path — the resolver needs the reference as written,
+   not renderValue's rendering of it. */
+function rawOf(doc, path) {
+  var node = doc;
+  var segs = path.split('.');
+  /* A dot-prefixed root is one segment, not an empty one plus a name. */
+  if (path.charAt(0) === '.') { segs = path.slice(1).split('.'); segs[0] = '.' + segs[0]; }
+  for (var i = 0; i < segs.length && node; i++) node = node[segs[i]];
+  return node && isToken(node) ? tokenValue(node) : null;
+}
+
 /* How many tokens a document holds. The same walk, so the number on the card
    and the number in the report can never disagree. */
 function countTokens(doc) { return flatten(doc).size; }
@@ -241,6 +252,41 @@ var FORMAT_LABEL = { legacy: 'Legacy JSON', dtcg: 'W3C DTCG', resolved: 'Resolve
 function formatLabel(f) { return FORMAT_LABEL[f] || FORMAT_LABEL.unknown; }
 
 /*
+  WHAT A REFERENCE ACTUALLY POINTS AT.
+
+  Needed for one question only: when one side aliases and the other holds a
+  literal, are they saying the same thing? On two real exports of one system
+  that was 252 of 1,060 "value changes" — Spar.json keeping
+  {font-family.teleneo-var} where tokens_.json had inlined "TeleNeo Var",
+  while both files define that alias as exactly "TeleNeo Var". Nobody changed
+  anything; one export resolved its references and the other did not.
+
+  RESOLVED WITHIN ITS OWN TOP-LEVEL DOCUMENT, because that is the scope these
+  references have: a themes-shaped export is several self-contained documents
+  in one file, and {core.blue} inside one of them means that document's core,
+  not another's.
+
+  Depth-capped, because a reference can point at a reference and a file can be
+  wrong: a cycle would otherwise be an infinite loop rather than an unresolved
+  value, and an unresolved value is a perfectly good answer here — it just
+  means the two sides are not known to agree.
+*/
+function resolveRef(doc, root, ref, seen) {
+  var m = /^\{([^}]+)\}$/.exec(String(ref));
+  if (!m) return ref;
+  if (!seen) seen = {};
+  if (seen[ref] || Object.keys(seen).length > 8) return null;
+  seen[ref] = 1;
+  var node = doc[root];
+  var segs = m[1].split('.');
+  for (var i = 0; i < segs.length && node; i++) node = node[segs[i]];
+  if (!node || typeof node !== 'object') return null;
+  var v = isToken(node) ? tokenValue(node) : null;
+  if (v === null) return null;
+  return isReference(v) ? resolveRef(doc, root, v, seen) : v;
+}
+
+/*
   compare(figmaDoc, repoDoc) -> report
 
   `figmaDoc` is what this file exports right now — the exact bytes Download
@@ -264,6 +310,10 @@ function compare(figmaDoc, repoDoc) {
     comparable: true,
     problem: null,
     onlyInFigma: [], onlyInRepo: [], changed: [], repointed: [],
+    /* One side aliases what the other inlines, and they resolve to the same
+       thing — a difference in how the file was written, not in what it says.
+       Architecture, not a value: nobody decided anything. */
+    aliased: [],
     /* [{ type, count }] for the value changes, commonest first — a colour
        decision and a font-family decision are different acts and the page
        separates them. */
@@ -398,7 +448,7 @@ function compare(figmaDoc, repoDoc) {
   var groups = new Map();
   var bump = function (path, field) {
     var g = groupOf(path);
-    if (!groups.has(g)) groups.set(g, { name: g, onlyInFigma: 0, onlyInRepo: 0, changed: 0, repointed: 0, same: 0 });
+    if (!groups.has(g)) groups.set(g, { name: g, onlyInFigma: 0, onlyInRepo: 0, changed: 0, repointed: 0, aliased: 0, same: 0 });
     groups.get(g)[field]++;
   };
 
@@ -421,7 +471,57 @@ function compare(figmaDoc, repoDoc) {
       holds a literal — or started pointing when it did not before — has had
       its value changed in the way that matters, so it stays in `changed`.
     */
-    var bucket = (leaf.ref && other.ref) ? 'repointed' : 'changed';
+    var bucket;
+    if (leaf.ref && other.ref) {
+      bucket = 'repointed';
+    } else if (leaf.ref !== other.ref) {
+      /*
+        ONE SIDE POINTS AND THE OTHER HOLDS. Resolve the pointing one and ask
+        whether they agree: if they do, the token's VALUE did not change and
+        calling it a value change buries the ones that did. If they do not —
+        or the reference does not resolve — it stays a value change, because
+        then the two files genuinely say different things.
+      */
+      var root = rootOf(path);
+      var resolved = leaf.ref
+        ? resolveRef(figmaDoc, root, rawOf(figmaDoc, path))
+        : resolveRef(repoDoc, root, rawOf(repoDoc, path));
+      bucket = (resolved !== null && renderValue(resolved) === (leaf.ref ? other.value : leaf.value))
+        ? 'aliased' : 'changed';
+    } else {
+      /*
+        THE SAME QUESTION ONE LEVEL DOWN. A typography token is a bag of five
+        sub-values, and on these files exactly one of them differs: fontFamily,
+        aliased on one side and inlined on the other — the same non-change as
+        above, wearing a composite. Whole-value comparison cannot see it,
+        because the bag as a whole does differ.
+
+        So when both sides are bags, the differing entries are resolved
+        individually and the token counts as aliased only if EVERY one of them
+        agrees. One genuine difference anywhere in the bag makes it a value
+        change, which is the safe direction: a real change must never be
+        filed as a non-change.
+      */
+      bucket = 'changed';
+      var fRaw = rawOf(figmaDoc, path), rRaw = rawOf(repoDoc, path);
+      if (fRaw && rRaw && typeof fRaw === 'object' && typeof rRaw === 'object' &&
+          !Array.isArray(fRaw) && !Array.isArray(rRaw)) {
+        var rt = rootOf(path);
+        var keys = Object.keys(fRaw).concat(Object.keys(rRaw));
+        var allAgree = true, sawOne = false;
+        for (var ki = 0; ki < keys.length && allAgree; ki++) {
+          var k = keys[ki];
+          if (k.charAt(0) === '$') continue;
+          var fv = fRaw[k], rv = rRaw[k];
+          if (renderValue(fv) === renderValue(rv)) continue;
+          sawOne = true;
+          var fr = isReference(fv) ? resolveRef(figmaDoc, rt, fv) : fv;
+          var rr = isReference(rv) ? resolveRef(repoDoc, rt, rv) : rv;
+          if (fr === null || rr === null || renderValue(fr) !== renderValue(rr)) allAgree = false;
+        }
+        if (sawOne && allAgree) bucket = 'aliased';
+      }
+    }
     /* The type comes from THIS side. Where the two disagree the token's kind
        itself changed, which is a change worth seeing under the new kind
        rather than the old one. */
@@ -437,8 +537,8 @@ function compare(figmaDoc, repoDoc) {
   /* Sorted by how much there is to look at, so the group that changed most is
      the one at the top rather than whichever happened to be named first. */
   report.groups = Array.from(groups.values()).sort(function (a, b) {
-    var da = a.onlyInFigma + a.onlyInRepo + a.changed + a.repointed;
-    var db = b.onlyInFigma + b.onlyInRepo + b.changed + b.repointed;
+    var da = a.onlyInFigma + a.onlyInRepo + a.changed + a.repointed + a.aliased;
+    var db = b.onlyInFigma + b.onlyInRepo + b.changed + b.repointed + b.aliased;
     if (da !== db) return db - da;
     return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
   });
@@ -454,7 +554,8 @@ function compare(figmaDoc, repoDoc) {
   report.identical = report.onlyInFigma.length === 0 &&
                      report.onlyInRepo.length === 0 &&
                      report.changed.length === 0 &&
-                     report.repointed.length === 0;
+                     report.repointed.length === 0 &&
+                     report.aliased.length === 0;
   return report;
 }
 
@@ -519,6 +620,8 @@ function format(report, opts) {
   list('  only in the repo — no longer in this file', report.onlyInRepo, side);
   list('  pointing somewhere new — the same token, a different target',
        report.repointed, bothSides);
+  list('  same value, aliased one side — one file points at it, the other spells it out',
+       report.aliased, bothSides);
 
   out.push(report.sameCount.toLocaleString() + ' identical');
   return out.join('\n');

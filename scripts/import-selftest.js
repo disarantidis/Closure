@@ -2147,8 +2147,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
 
       ok('compare: the group roll-up counts what is under each top-level name',
          JSON.stringify(r.groups) ===
-         JSON.stringify([{ name: 'core', onlyInFigma: 0, onlyInRepo: 1, changed: 1, repointed: 0, same: 2 },
-                         { name: 'extra', onlyInFigma: 1, onlyInRepo: 0, changed: 0, repointed: 0, same: 0 }]),
+         JSON.stringify([{ name: 'core', onlyInFigma: 0, onlyInRepo: 1, changed: 1, repointed: 0, aliased: 0, same: 2 },
+                         { name: 'extra', onlyInFigma: 1, onlyInRepo: 0, changed: 0, repointed: 0, aliased: 0, same: 0 }]),
          JSON.stringify(r.groups));
 
       /*
@@ -2350,6 +2350,47 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       const nameless = JD.compare({ a: { x: { value: 'hello' } } }, { a: { x: { value: 'world' } } });
       ok('types: and an unrecognisable value answers "unknown" rather than guessing',
          nameless.changed[0].type === 'unknown', nameless.changed[0].type);
+
+      /*
+        AN ALIAS AND ITS OWN INLINED VALUE ARE NOT A VALUE CHANGE.
+
+        One side points, the other holds, and they resolve to the same thing:
+        nobody decided anything — one export resolved its references and the
+        other did not. Filed as architecture, because that is what it is, and
+        counting it as a value buries the ones that are. On two real exports of
+        one system it was 292 of 1,060 so-called value changes.
+      */
+      /* The top-level key is a DOCUMENT and a reference is relative to it —
+         a themes-shaped export is several self-contained documents in one
+         file, and {g.base} inside one of them means that document's g. The
+         first draft of this fixture put the group at the top level, so the
+         resolver walked g.base starting from g and found nothing. */
+      const aliasDoc = { d: { g: { base: tok('#ff0000'), use: tok('{g.base}') } } };
+      const inlineDoc = { d: { g: { base: tok('#ff0000'), use: tok('#ff0000') } } };
+      const alias = JD.compare(inlineDoc, aliasDoc);
+      ok('alias: one side pointing at what the other inlines is not a value change',
+         alias.changed.length === 0 && alias.aliased.length === 1 &&
+         alias.aliased[0].path === 'd.g.use',
+         JSON.stringify({ changed: alias.changed, aliased: alias.aliased }));
+      /* The safe direction: a real difference must never be filed as a
+         non-change, so a reference that resolves to something ELSE is still a
+         value change. */
+      const realAlias = JD.compare(
+        { d: { g: { base: tok('#00ff00'), use: tok('#ff0000') } } },
+        { d: { g: { base: tok('#00ff00'), use: tok('{g.base}') } } });
+      ok('alias: a reference resolving to something else is still a value change',
+         realAlias.changed.length === 1 && realAlias.aliased.length === 0,
+         JSON.stringify(realAlias.changed));
+      /* And an alias that cannot be resolved at all is not claimed to agree. */
+      const dangling = JD.compare(
+        { d: { g: { use: tok('#ff0000') } } }, { d: { g: { use: tok('{nowhere.at.all}') } } });
+      ok('alias: an unresolvable reference stays a value change',
+         dangling.changed.length === 1 && dangling.aliased.length === 0);
+      /* A cycle is a file being wrong, not a reason to hang. */
+      const cyclic = JD.compare(
+        { d: { g: { a: tok('#ff0000') } } }, { d: { g: { a: tok('{g.a}') } } });
+      ok('alias: a self-referencing token resolves to nothing rather than looping',
+         cyclic.changed.length + cyclic.aliased.length === 1);
 
       /* The clipboard copy is the only place the full list exists — the page
          caps every list it draws. */
