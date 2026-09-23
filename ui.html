@@ -50365,7 +50365,15 @@ html[data-theme=dark] {
   mountIconButton("folder-create-mount", { id: "folder-create-btn", variant: "outline", size: "medium", title: "Use this folder path \u2014 created on the first push", "aria-label": "Use this folder path", icon: IconAdd(16) }, SUBCARD_LEVEL);
   window.PomFolderSelect = { ...mountFolderCombo("folder-select-mount", "PomFolderSelect", "choose a folder", SUBCARD_LEVEL), onChange: null };
   window.PomGithubFolderSelect = { ...mountFolderCombo("github-folder-select-mount", "PomGithubFolderSelect", "choose a folder", SUBCARD_LEVEL), onChange: null };
-  window.PomImportFolderSelect = { ...mountFolderCombo("import-folder-select-mount", "PomImportFolderSelect", "choose a folder"), onChange: null };
+  window.PomImportFolderSelect = {
+    ...mountLiveDropdown(
+      "import-folder-select-mount",
+      { label: "Folder path", icon: IconFolder(16) },
+      (v) => window.PomImportFolderSelect?.onChange?.(v),
+      CARD_LEVEL
+    ),
+    onChange: null
+  };
   window.PomFolderNew = { ...mountFolderCombo("folder-new-mount", "PomFolderNew", "find or type a folder"), onChange: null };
   window.PomGithubFolderNew = { ...mountFolderCombo("github-folder-new-mount", "PomGithubFolderNew", "find or type a folder"), onChange: null };
   function mountFolderList(mountId, bridgeKey, idPrefix, level = GROUND) {
@@ -56133,7 +56141,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'ee74882 18:05:29';
+    var CLOSURE_BUILD = 'a0b253c 18:10:24';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

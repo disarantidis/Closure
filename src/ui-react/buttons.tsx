@@ -659,7 +659,12 @@ declare global {
     PomToast: { show: (message: string, isError?: boolean) => void };
     PomFolderSelect: FolderComboBridge;
     PomGithubFolderSelect: FolderComboBridge;
-    PomImportFolderSelect: FolderComboBridge;
+    /* A dropdown, not a combobox — the import page reads, so there is nothing
+       to type. Only the two members that page actually uses. */
+    PomImportFolderSelect: {
+      setItems: (items: any[], selectedValue: string) => void;
+      onChange: ((value: string) => void) | null;
+    };
     PomFolderNew: FolderComboBridge;
     PomGithubFolderNew: FolderComboBridge;
     PomFolderList: FolderListBridge;
@@ -1893,10 +1898,28 @@ mountIconButton('folder-create-mount', { id: 'folder-create-btn', variant: 'outl
 */
 window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', 'choose a folder', SUBCARD_LEVEL), onChange: null };
 window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', 'choose a folder', SUBCARD_LEVEL), onChange: null };
-/* The import page's own pair. One combo rather than one per provider, like the
-   file picker beside it: the page shows whichever provider the repo card is on,
-   and a second hidden copy for the other one would be state that can disagree. */
-window.PomImportFolderSelect = { ...mountFolderCombo('import-folder-select-mount', 'PomImportFolderSelect', 'choose a folder'), onChange: null };
+/*
+  THE IMPORT PAGE'S FOLDER IS A LIST TOO, for the reason the file beside it is.
+
+  Everywhere else a folder picker is a Combobox because a folder you are about
+  to push into may not exist yet — you type it, press +, and the push creates
+  it. Importing writes nothing. A folder that is not in the repository holds no
+  file to read, so typing one could only ever produce an empty file list, and
+  the clear × next to it offered to unset an address that has to be set.
+
+  One control rather than one per provider, like the file picker beside it: the
+  page shows whichever provider the repo card is on, and a second hidden copy
+  for the other would be state that can disagree.
+*/
+window.PomImportFolderSelect = {
+  ...mountLiveDropdown(
+    'import-folder-select-mount',
+    { label: 'Folder path', icon: IconFolder(16) },
+    (v: string) => window.PomImportFolderSelect?.onChange?.(v),
+    CARD_LEVEL,
+  ),
+  onChange: null,
+};
 /* The Settings pair — fed the repo's real directories, and read by the Add
    button beside each. `get()` rather than a DOM lookup, same reason as the
    file name field: a Combobox owns its own input id. */
