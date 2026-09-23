@@ -6872,33 +6872,42 @@
            already up there, which is exactly what this listing just settled. */
         updateActionUI();
         /*
-          WHAT TO SELECT, when nothing has been chosen by hand.
+          IT NO LONGER CHOOSES FOR ANYBODY, AND THAT WAS A BUG.
 
-          The file this plugin pushes to, if the repo has it — comparing
-          against what you last wrote is the thing people come here for, and
-          it makes the two cards line up by default. Failing that, the first
-          JSON in the folder, because one named file is a better starting
-          point than an empty field next to a repo that demonstrably has
-          something in it.
+          This picked a file when the current one was not in the listing: the
+          pushed name if the repo had it, else the first JSON there. That was
+          right when "the file in the repo" was a separate picker of its own,
+          which started empty and needed a sensible default.
+
+          It is the export's own NAME now, and choosing for somebody means
+          overwriting what they are typing. The sequence was exact: type a new
+          name, which re-checks the address, which lists the folder, which does
+          not contain the half-typed name — so this reached in and set the name
+          back to a file that IS up there. The visible text kept what was being
+          typed (a set while the field has focus deliberately leaves the text
+          alone) and the VALUE went back to the old file, so the name field and
+          the repo card disagreed and the push would have gone to neither what
+          was on screen nor what was wanted.
+
+          A name that is not in the repo is not a mistake. It is a new file,
+          which is most of what this plugin does. The listing's job is to fill
+          the dropdown and to tell Push whether it is replacing something; it
+          has no business deciding what the file is called.
         */
-        if (names.indexOf(repoSelectedFile()) === -1) {
-          var mine = pushFilePath(which).split('/').pop();
-          chooseRepoFile(names.indexOf(mine) !== -1 ? mine : (names[0] || ''));
-          wanted = repoSelectedFile() || wanted;
-          /* Choosing for them moved the address, so the key this check is
-             answering under has to move with it — otherwise the fetch below
-             lands as "a reply about a file nobody is looking at" and is
-             dropped by its own staleness guard. */
-          key = repoAddressKey(which);
-          repoCheckedFor = key;
-        }
         /* The listing usually lands while somebody is looking at one of the
            two screens it feeds; this is the other one. */
         refreshImportRepoFile();
         if (names.indexOf(repoSelectedFile()) === -1) {
-          repoReadStatus(names.length
+          /*
+            A NAME THE REPO DOES NOT HAVE MEANS DIFFERENT THINGS IN THE TWO
+            MODES. Pushing one is the ordinary case — it is a new file, which
+            is most of what this plugin does, and the button already says "Push
+            to GitHub" rather than "Push and Replace". Comparing against one is
+            the whole problem, because there is nothing to read.
+          */
+          repoReadStatus(repoMode !== 'compare' ? '' : (names.length
             ? 'No ' + wanted + ' — the repo holds ' + names.join(', ')
-            : 'Nothing pushed to ' + branch + ' yet');
+            : 'Nothing pushed to ' + branch + ' yet'));
           return null;
         }
         /*
