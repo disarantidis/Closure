@@ -1825,7 +1825,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
                        'renderImportFolderSelect', 'listRepoFolders',
                        'refreshFolderImportOffer', 'addFolderPath', 'normFolder',
-                       'foldersMissingFromRepo'];
+                       'foldersMissingFromRepo', 'githubCommitTree'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -2042,6 +2042,72 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              JSON.stringify(ctx.foldersMissingFromRepo('github')));
           ctx.ghFolders = [];
           ctx.__lastDiscovered().github = null;
+
+          /*
+            DELETING A FOLDER OUT OF A REPOSITORY, AND MOVING WHAT WAS IN IT.
+
+            The obvious implementation of a move — read the file, write it at
+            the new path, delete the old — is exactly wrong for this content: a
+            token export is tens of megabytes and it is the same round trip
+            GitHub refuses above one. A tree references the EXISTING blob by
+            its sha, so a file moves without its bytes ever leaving the server.
+            These pin that the tree says what it should, since it is the one
+            request here that destroys something.
+          */
+          {
+            const seen = {};
+            const tree = (rows) => {
+              ctx.fetch = (url, opts) => {
+                if (/ref\/heads/.test(url)) return Promise.resolve(res(200, {}, { object: { sha: 'HEAD' } }));
+                if (/commits\/HEAD/.test(url)) return Promise.resolve(res(200, {}, { tree: { sha: 'T0' } }));
+                if (/trees\/T0/.test(url)) return Promise.resolve(res(200, {}, { tree: rows }));
+                if (/\/trees$/.test(url)) { seen.tree = JSON.parse(opts.body).tree; return Promise.resolve(res(201, {}, { sha: 'T1' })); }
+                if (/\/commits$/.test(url)) { seen.commit = JSON.parse(opts.body); return Promise.resolve(res(201, {}, { sha: 'C1' })); }
+                return Promise.resolve(res(200, {}, {}));
+              };
+            };
+            const blobs = [
+              { type: 'blob', path: 'Spar/a.json', sha: 'B1', mode: '100644' },
+              { type: 'blob', path: 'Spar/nested/b.json', sha: 'B2', mode: '100644' },
+              { type: 'blob', path: 'other/keep.json', sha: 'B3', mode: '100644' },
+            ];
+            tree(blobs);
+            await ctx.githubCommitTree('github', 'Spar', 'delete', 'msg');
+            ok('remove folder: a delete names every blob under it, however deep, and nothing else',
+               seen.tree.map((e) => e.path).join(',') === 'Spar/a.json,Spar/nested/b.json' &&
+               seen.tree.every((e) => e.sha === null),
+               JSON.stringify(seen.tree));
+            ok('remove folder: and it builds on the branch, so the rest of the repo survives',
+               seen.commit.parents.join(',') === 'HEAD', JSON.stringify(seen.commit.parents));
+
+            tree(blobs);
+            await ctx.githubCommitTree('github', 'Spar', 'move', 'msg');
+            /* The folder is dropped, the shape under it is not. Flattening
+               loses the structure somebody built AND collides two files that
+               were only ever distinct because of the directories they sat in. */
+            ok('remove folder: a move keeps what was under the folder, minus the folder',
+               seen.tree.map((e) => (e.sha === null ? '-' : '+') + e.path).join(' ') ===
+                 '-Spar/a.json +a.json -Spar/nested/b.json +nested/b.json',
+               JSON.stringify(seen.tree));
+            ok('remove folder: and the moved file is the SAME blob, so no content is transferred',
+               seen.tree.filter((e) => e.sha).map((e) => e.sha).join(',') === 'B1,B2',
+               JSON.stringify(seen.tree.filter((e) => e.sha)));
+
+            /* The tree API takes the last writer silently, so a destination
+               that is already occupied would be overwritten — data loss, in the
+               middle of the option chosen because it KEEPS the files. */
+            tree([{ type: 'blob', path: 'Spar/a.json', sha: 'B1', mode: '100644' },
+                  { type: 'blob', path: 'a.json', sha: 'X', mode: '100644' }]);
+            const clash = await rejects(ctx.githubCommitTree('github', 'Spar', 'move', 'msg'));
+            ok('remove folder: a move that would overwrite something refuses instead',
+               !!clash && /would overwrite a\.json/.test(clash.message), JSON.stringify(clash));
+
+            tree([{ type: 'blob', path: 'elsewhere/x.json', sha: 'B9', mode: '100644' }]);
+            const empty = await rejects(ctx.githubCommitTree('github', 'Spar', 'delete', 'msg'));
+            ok('remove folder: a folder with nothing in it commits nothing',
+               !!empty && /nothing in that folder/.test(empty.message), JSON.stringify(empty));
+            ctx.fetch = (url, opts) => { calls.push({ url, opts }); return Promise.resolve(ctx.__res); };
+          }
 
           /*
             THE + BESIDE A FIELD WITH SOMETHING IN IT MUST ACT ON IT.

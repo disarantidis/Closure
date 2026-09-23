@@ -695,6 +695,40 @@
     }
     .folder-discovery-where svg { flex: none; opacity: 0.8; }
 
+    .folder-remove-path {
+      display: flex; align-items: center; gap: 8px;
+      margin: 0 0 12px; padding: 10px 12px;
+      border-radius: 12px; background: var(--nd-field-fill, rgba(255,255,255,0.04));
+      font-size: 12px; overflow-wrap: anywhere;
+    }
+    .folder-remove-path svg { flex: none; opacity: 0.7; }
+    .folder-remove-files { margin: 0 0 12px; font-size: 11px; }
+    .folder-remove-files-title { margin: 0 0 6px; opacity: 0.75; }
+    .folder-remove-files ul {
+      margin: 0; padding: 0 0 0 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+    }
+    .folder-remove-files li { margin: 2px 0; }
+    .folder-remove-more { margin: 4px 0 0; opacity: 0.6; }
+    .folder-remove-choices { display: flex; flex-direction: column; gap: 8px; }
+    /* The whole row is the target, not the 13px dot in the corner of it. */
+    .folder-remove-choice {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px; border-radius: 12px; cursor: pointer;
+      border: 1px solid var(--app-border);
+    }
+    .folder-remove-choice.is-on { border-color: var(--app-text); }
+    .folder-remove-choice input { margin-top: 2px; flex: none; }
+    .folder-remove-choice b { display: block; font-size: 12px; font-weight: 600; }
+    .folder-remove-choice em {
+      display: block; margin-top: 2px;
+      font-size: 11px; font-style: normal; opacity: 0.7; line-height: 1.45;
+    }
+    .folder-remove-error {
+      margin: 12px 0 0; font-size: 11px; color: var(--app-danger); line-height: 1.5;
+    }
+
     .folder-discovery-list { display: flex; flex-direction: column; gap: 8px; }
     .folder-discovery-row {
       display: flex; align-items: center; gap: 8px;
@@ -2905,9 +2939,11 @@
               identical to one Sync found. This says which, and offers to make
               it real.
             -->
+            <!-- The note only. Creating is per row now — the ⤒ beside each
+                 path that is not in the repository yet — so a second button
+                 doing all of them at once is the same act with a worse name. -->
             <div class="folder-missing-row" id="folder-missing-row" hidden>
               <p class="folder-missing-note" id="folder-missing-note"></p>
-              <span id="folder-missing-mount"></span>
             </div>
             <div class="folder-add" id="folder-add">
               <span id="folder-new-mount"></span>
@@ -2964,9 +3000,11 @@
               identical to one Sync found. This says which, and offers to make
               it real.
             -->
+            <!-- The note only. Creating is per row now — the ⤒ beside each
+                 path that is not in the repository yet — so a second button
+                 doing all of them at once is the same act with a worse name. -->
             <div class="folder-missing-row" id="github-folder-missing-row" hidden>
               <p class="folder-missing-note" id="github-folder-missing-note"></p>
-              <span id="github-folder-missing-mount"></span>
             </div>
             <div class="folder-add" id="github-folder-add">
               <span id="github-folder-new-mount"></span>
@@ -2985,6 +3023,7 @@
        dialog's own setOpenExternal closure never got reassigned off its
        default no-op) until this round added the GitLab one and caught it. -->
   <div id="folder-discovery-dialog-mount"></div>
+  <div id="folder-remove-dialog-mount"></div>
   <div id="remove-github-dialog-mount"></div>
   <div id="remove-gitlab-dialog-mount"></div>
   <!-- First-run nudge — opened from the GIT_SETTINGS_LOADED handler
@@ -3423,13 +3462,15 @@
       if (glActiveFolder && glFolders.indexOf(glActiveFolder) === -1) glActiveFolder = glFolders[0] || '';
       var subcard = document.getElementById('gitlab-folder-subcard');
       if (subcard) subcard.classList.toggle('is-flat', glFolders.length === 0);
+      var glMissing = foldersMissingFromRepo('gitlab');
       var rows = glFolders.map(function(path) {
         // Every row — standard (baked-in) or user-added — can be modified or
         // deleted. See gitSettings.setState(): a saved
         // `folders` list is now trusted as the complete, authoritative set,
         // so removing a standard path here actually stays removed across a
         // reload instead of being silently re-seeded.
-        return { path: path, canEdit: true };
+        return { path: path, canEdit: true,
+                 inRepo: glMissing ? glMissing.indexOf(path) === -1 : undefined };
       });
       window.PomFolderList.render(rows);
       renderFolderSelect();
@@ -3455,11 +3496,112 @@
       setFieldValue('folder-row-input-' + idx, norm);
       renderFolderSelect();
     };
-    window.PomFolderList.onRemove = function(idx) {
-      var removed = glFolders[idx];
-      glFolders.splice(idx, 1);
-      if (glActiveFolder === removed) glActiveFolder = glFolders[0] || '';
-      renderFolderList();
+    window.PomFolderList.onRemove = function(idx) { removeFolderPath('gitlab', idx); };
+    window.PomFolderList.onCreate = function(idx) { createOneFolder('gitlab', idx); };
+
+    /*
+      CREATING ONE FOLDER, from its own row.
+
+      This was a single button that created all of them at once. Per row is both
+      narrower and clearer: the row it sits on says which path it means, which a
+      button under the list can only do by repeating the names in its own label.
+      One button per thing it acts on.
+    */
+    function createOneFolder(which, idx) {
+      var list = which === 'github' ? ghFolders : glFolders;
+      var folder = list[idx];
+      if (!folder) return;
+      var prefix = which === 'gitlab' ? 'folder' : 'github-folder';
+      var note = document.getElementById(prefix + '-missing-note');
+      if (note) { note.className = 'folder-missing-note'; note.textContent = 'Creating ' + folder + '…'; }
+      createRepoFolder(which, folder).then(function () {
+        lastDiscovered[which] = (lastDiscovered[which] || []).concat([normFolder(folder)]);
+        repoFolderCache = null;
+        if (note) { note.className = 'folder-missing-note is-done';
+                    note.textContent = '"' + folder + '" now exists in the repository.'; }
+        if (which === 'github') renderGithubFolderList(); else renderFolderList();
+      }, function (err) {
+        if (note) { note.className = 'folder-missing-note is-error';
+                    note.textContent = 'Could not create ' + folder + ' — ' +
+                                       ((err && err.message) || 'the request failed'); }
+      });
+    }
+
+    /*
+      REMOVING ONE — and the two very different things that can mean.
+
+      Taking a path off this list is local bookkeeping. Deleting the folder out
+      of the repository is not, and it takes whatever is inside with it. They
+      were the same click, and the only reason that was ever safe is that the
+      second half did not exist yet.
+
+      A path the repository does not have is still the harmless case, so it
+      stays instant: there is nothing to confirm about forgetting a path that
+      only this plugin ever knew.
+    */
+    var folderRemoveFor = null;      // { which, path }
+    function removeFolderPath(which, idx) {
+      var list = which === 'github' ? ghFolders : glFolders;
+      var folder = list[idx];
+      var missing = foldersMissingFromRepo(which);
+      var known = missing !== null;
+      var notThere = !normFolder(folder) || (known && missing.indexOf(folder) !== -1);
+      if (notThere || !known) { dropFolderPath(which, folder); return; }
+
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      folderRemoveFor = { which: which, path: folder };
+      /* Read what is in there BEFORE asking. A dialog that offers to delete a
+         folder without saying what is in it is asking for consent to something
+         it has not described. */
+      listRepoFolderContents(which, folder).then(function (res) {
+        window.PomFolderRemove.open({
+          provider: which,
+          where: (which === 'gitlab' ? c.project : c.repo) + ' · ' + c.branch,
+          path: folder, files: res.files, subfolders: res.subfolders,
+        });
+      }, function () {
+        /* Could not look. Offer the local removal only — it is the one thing
+           that is certainly safe when the repository will not answer. */
+        window.PomFolderRemove.open({
+          provider: which, where: (which === 'gitlab' ? c.project : c.repo) + ' · ' + c.branch,
+          path: folder, files: [], subfolders: 0,
+        });
+      });
+    }
+
+    function dropFolderPath(which, folder) {
+      var list = which === 'github' ? ghFolders : glFolders;
+      var i = list.indexOf(folder);
+      if (i !== -1) list.splice(i, 1);
+      if (which === 'github') {
+        if (ghActiveFolder === folder) ghActiveFolder = ghFolders[0] || '';
+        renderGithubFolderList();
+      } else {
+        if (glActiveFolder === folder) glActiveFolder = glFolders[0] || '';
+        renderFolderList();
+      }
+      persistSettings();
+    }
+
+    window.PomFolderRemove.onConfirm = function (mode) {
+      if (!folderRemoveFor) return;
+      var which = folderRemoveFor.which, folder = folderRemoveFor.path;
+      if (mode === 'list') {
+        dropFolderPath(which, folder);
+        window.PomFolderRemove.close();
+        return;
+      }
+      commitFolderChange(which, folder, mode).then(function () {
+        /* The repository changed, so every reading of it is stale. */
+        repoFolderCache = null;
+        lastDiscovered[which] = (lastDiscovered[which] || []).filter(function (p) {
+          return p !== normFolder(folder);
+        });
+        dropFolderPath(which, folder);
+        window.PomFolderRemove.close();
+      }, function (err) {
+        window.PomFolderRemove.fail((err && err.message) || 'the request failed');
+      });
     };
 
     // Main screen: populate the folder dropdown (left of the file name).
@@ -3517,8 +3659,13 @@
       if (ghActiveFolder && ghFolders.indexOf(ghActiveFolder) === -1) ghActiveFolder = ghFolders[0] || '';
       var subcard = document.getElementById('github-folder-subcard');
       if (subcard) subcard.classList.toggle('is-flat', ghFolders.length === 0);
+      /* undefined, not false, while nothing has been synced: the row asks
+         "is it in the repo", and before a sync the only honest answer is that
+         nobody has looked — which shows no button rather than a wrong one. */
+      var ghMissing = foldersMissingFromRepo('github');
       var rows = ghFolders.map(function(path) {
-        return { path: path, canEdit: true };
+        return { path: path, canEdit: true,
+                 inRepo: ghMissing ? ghMissing.indexOf(path) === -1 : undefined };
       });
       window.PomGithubFolderList.render(rows);
       renderGithubFolderSelect();
@@ -3539,12 +3686,8 @@
       setFieldValue('github-folder-row-input-' + idx, norm);
       renderGithubFolderSelect();
     };
-    window.PomGithubFolderList.onRemove = function(idx) {
-      var removed = ghFolders[idx];
-      ghFolders.splice(idx, 1);
-      if (ghActiveFolder === removed) ghActiveFolder = ghFolders[0] || '';
-      renderGithubFolderList();
-    };
+    window.PomGithubFolderList.onRemove = function(idx) { removeFolderPath('github', idx); };
+    window.PomGithubFolderList.onCreate = function(idx) { createOneFolder('github', idx); };
 
     // Main screen: GitHub's own folder dropdown, shown only when relevant
     // to the current mainProviderTab (see updatePushTargetUI()).
@@ -4811,53 +4954,199 @@
            one; the name is the same length and answers it. */
         note.className = 'folder-missing-note';
         note.textContent = (missing.length === 1
-          ? '"' + missing[0] + '" is saved here but is not in the repository yet.'
-          : missing.length + ' saved paths are not in the repository yet: ' + missing.join(', ') + '.');
+          ? '"' + missing[0] + '" is saved here but is not in the repository yet — use ⤒ on its row to create it.'
+          : missing.length + ' saved paths are not in the repository yet (' + missing.join(', ') +
+            ') — use ⤒ on a row to create it.');
+      });
+    }
+
+/*
+      WHAT IS ACTUALLY IN A FOLDER, before offering to delete it.
+
+      The whole tree is already read by listRepoFolders and cached; this reads
+      the one folder, because the tree listing keeps directories only and the
+      question here is about files. Returns the files directly inside it and a
+      count of the subfolders under it — a folder with children is a different
+      proposition from a flat one, and the dialog says so.
+    */
+    function listRepoFolderContents(which, folder) {
+      var dir = normFolder(folder);
+      if (which === 'gitlab') {
+        var g = gitlabConfig();
+        var url = g.host.replace(/\/+$/, '') + '/api/v4/projects/' + encodeURIComponent(g.project) +
+                  '/repository/tree?per_page=100&ref=' + encodeURIComponent(g.branch) +
+                  '&path=' + encodeURIComponent(dir);
+        return fetch(url, { headers: { 'PRIVATE-TOKEN': g.token } }).then(function (r) {
+          if (r.status === 404) return [];
+          if (!r.ok) throw { status: r.status, message: 'the repo answered ' + r.status };
+          return r.json();
+        }).then(function (rows) {
+          return {
+            files: (rows || []).filter(function (e) { return e.type === 'blob'; })
+                               .map(function (e) { return e.name; }),
+            subfolders: (rows || []).filter(function (e) { return e.type === 'tree'; }).length,
+          };
+        });
+      }
+      var c = githubConfig();
+      var parts = (c.repo || '').split('/');
+      if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
+      var gh = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
+               encodeURIComponent(parts[1]) + '/contents/' +
+               dir.split('/').map(encodeURIComponent).join('/') +
+               '?ref=' + encodeURIComponent(c.branch);
+      return fetch(gh, { headers: { 'Authorization': 'token ' + c.token,
+                                    'Accept': 'application/vnd.github+json' } }).then(function (r) {
+        if (r.status === 404) return [];
+        if (!r.ok) throw { status: r.status, message: 'the repo answered ' + r.status };
+        return r.json();
+      }).then(function (rows) {
+        if (!Array.isArray(rows)) return { files: [], subfolders: 0 };
+        return {
+          files: rows.filter(function (e) { return e.type === 'file'; }).map(function (e) { return e.name; }),
+          subfolders: rows.filter(function (e) { return e.type === 'dir'; }).length,
+        };
       });
     }
 
     /*
-      MAKE THEM REAL — one empty .gitkeep per folder, which is how git has
-      always been told to keep a directory that has nothing in it yet.
+      DELETE OR MOVE, IN ONE COMMIT, WITHOUT MOVING ANY BYTES.
 
-      A separate act from Push on purpose. Push writes the token document, and
-      it writes it to ONE folder; this is about the others, and it should not
-      require exporting anything to happen. It is also the smallest possible
-      write: an empty file, at a path nothing else uses.
+      The obvious implementation of a move — read the file, write it at the new
+      path, delete the old one — is exactly wrong for this repository's
+      contents: a token export is tens of megabytes, and it is the same
+      round trip that GitHub's own endpoints refuse above a megabyte.
+
+      Both hosts can do better. GitHub takes a tree that REFERENCES the existing
+      blob by its sha, so a file moves without its content ever leaving the
+      server. GitLab's commits endpoint takes a list of actions, move among
+      them, and applies them together. Either way it is one commit, so a failure
+      halfway cannot leave the folder half-deleted.
     */
-    function pushMissingFolders(which) {
-      var missing = foldersMissingFromRepo(which) || [];
-      if (!missing.length) return;
-      var btn = which === 'gitlab' ? window.PomFolderPushMissing : window.PomGithubFolderPushMissing;
-      var prefix = which === 'gitlab' ? 'folder' : 'github-folder';
-      var note = document.getElementById(prefix + '-missing-note');
-      btn.setLoading(true);
-      note.className = 'folder-missing-note';
-      note.textContent = 'Creating ' + missing.join(', ') + '…';
-      /* One after another rather than all at once: each is a commit on the same
-         branch, and several in flight race each other for the branch tip. */
-      var done = [];
-      missing.reduce(function (chain, folder) {
-        return chain.then(function () {
-          return createRepoFolder(which, folder).then(function () { done.push(folder); });
+    function commitFolderChange(which, folder, mode) {
+      var dir = normFolder(folder);
+      var msg = (mode === 'move' ? 'Move ' + dir + '/ contents to the root and remove the folder'
+                                 : 'Remove ' + dir + '/');
+      if (which === 'gitlab') return gitlabCommitActions(which, dir, mode, msg);
+      return githubCommitTree(which, dir, mode, msg);
+    }
+
+    function gitlabCommitActions(which, dir, mode, msg) {
+      var g = gitlabConfig();
+      var base = g.host.replace(/\/+$/, '') + '/api/v4/projects/' + encodeURIComponent(g.project);
+      var headers = { 'PRIVATE-TOKEN': g.token, 'Content-Type': 'application/json' };
+      return fetch(base + '/repository/tree?recursive=true&per_page=100&ref=' +
+                   encodeURIComponent(g.branch) + '&path=' + encodeURIComponent(dir),
+                   { headers: headers }).then(function (r) {
+        if (!r.ok) throw { status: r.status, message: 'the repo answered ' + r.status };
+        return r.json();
+      }).then(function (rows) {
+        /* The folder's own shape is kept and only the folder is dropped — see
+           the note beside githubCommitTree's dest(). */
+        var actions = (rows || []).filter(function (e) { return e.type === 'blob'; })
+          .map(function (e) {
+            if (mode !== 'move') return { action: 'delete', file_path: e.path };
+            return { action: 'move', previous_path: e.path,
+                     file_path: e.path.slice(dir.length + 1) };
+          });
+        if (!actions.length) throw { message: 'there is nothing in that folder to change' };
+        return fetch(base + '/repository/commits', {
+          method: 'POST', headers: headers,
+          body: JSON.stringify({ branch: g.branch, commit_message: msg, actions: actions }),
         });
-      }, Promise.resolve()).then(function () {
-        btn.setLoading(false);
-        note.className = 'folder-missing-note is-done';
-        note.textContent = done.length === 1
-          ? '"' + done[0] + '" now exists in the repository.'
-          : done.length + ' folder paths now exist in the repository.';
-        /* The repo has changed, so what the last sync saw is stale. */
-        lastDiscovered[which] = (lastDiscovered[which] || []).concat(done);
-        repoFolderCache = null;
-        refreshFolderImportOffer();
-        document.getElementById(prefix + '-missing-row').hidden = true;
-      }, function (err) {
-        btn.setLoading(false);
-        note.className = 'folder-missing-note is-error';
-        note.textContent = 'Could not create ' +
-          (done.length ? 'the rest — ' : missing[0] + ' — ') +
-          ((err && err.message) || 'the request failed');
+      }).then(function (r) {
+        if (r.ok) return null;
+        return r.json().then(function (e) {
+          throw { status: r.status, message: (e && (e.message || e.error)) || 'the request failed' };
+        }, function () { throw { status: r.status, message: 'the repo answered ' + r.status }; });
+      });
+    }
+
+    function githubCommitTree(which, dir, mode, msg) {
+      var c = githubConfig();
+      var parts = (c.repo || '').split('/');
+      if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
+      var api = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
+                encodeURIComponent(parts[1]) + '/git/';
+      var headers = { 'Authorization': 'token ' + c.token, 'Accept': 'application/vnd.github+json',
+                      'Content-Type': 'application/json' };
+      var branchRef = c.branch.split('/').map(encodeURIComponent).join('/');
+      var head = null, baseTree = null;
+      return fetch(api + 'ref/heads/' + branchRef, { headers: headers }).then(function (r) {
+        if (!r.ok) throw { status: r.status, message: 'branch ' + c.branch + ' was not found' };
+        return r.json();
+      }).then(function (ref) {
+        head = ref.object.sha;
+        return fetch(api + 'commits/' + head, { headers: headers }).then(function (r) { return r.json(); });
+      }).then(function (commit) {
+        baseTree = commit.tree.sha;
+        /* The whole tree, because a folder's contents are however deep they go
+           and a delete has to name every blob under it. */
+        return fetch(api + 'trees/' + baseTree + '?recursive=1', { headers: headers })
+          .then(function (r) { return r.json(); });
+      }).then(function (tree) {
+        var all = tree.tree || [];
+        var inside = all.filter(function (e) {
+          return e.type === 'blob' && e.path.indexOf(dir + '/') === 0;
+        });
+        if (!inside.length) throw { message: 'there is nothing in that folder to change' };
+        /*
+          A MOVE KEEPS THE SHAPE UNDER THE FOLDER, and only drops the folder
+          itself: "Spar/nested/b.json" becomes "nested/b.json", not "b.json".
+          Flattening was the first version and it is wrong twice — it loses the
+          structure somebody built, and it collides two files that were only
+          ever distinct because of the directories they sat in.
+        */
+        var dest = function (path) { return path.slice(dir.length + 1); };
+        if (mode === 'move') {
+          /*
+            AND IT NEVER LANDS ON SOMETHING. The tree API takes the last writer,
+            silently, so a file already at the destination would be replaced by
+            one being moved out — data loss nobody asked for, in the middle of an
+            operation chosen because it KEEPS the files.
+          */
+          var occupied = {};
+          all.forEach(function (e) {
+            if (e.type === 'blob' && e.path.indexOf(dir + '/') !== 0) occupied[e.path] = 1;
+          });
+          var clash = inside.map(function (e) { return dest(e.path); })
+                            .filter(function (p) { return occupied[p]; });
+          if (clash.length) {
+            throw { message: 'moving these out would overwrite ' + clash.slice(0, 3).join(', ') +
+                             (clash.length > 3 ? ' and ' + (clash.length - 3) + ' more' : '') +
+                             ' — move or rename ' + (clash.length === 1 ? 'it' : 'them') + ' first' };
+          }
+        }
+        var changes = [];
+        inside.forEach(function (e) {
+          /* A null sha at a path is how the Trees API spells "delete this". */
+          changes.push({ path: e.path, mode: e.mode || '100644', type: 'blob', sha: null });
+          if (mode === 'move') {
+            /* The same blob, by reference — no content moves. */
+            changes.push({ path: dest(e.path), mode: e.mode || '100644', type: 'blob', sha: e.sha });
+          }
+        });
+        return fetch(api + 'trees', {
+          method: 'POST', headers: headers,
+          body: JSON.stringify({ base_tree: baseTree, tree: changes }),
+        }).then(function (r) {
+          if (!r.ok) throw { status: r.status, message: 'the tree was refused (' + r.status + ')' };
+          return r.json();
+        });
+      }).then(function (tree) {
+        return fetch(api + 'commits', {
+          method: 'POST', headers: headers,
+          body: JSON.stringify({ message: msg, tree: tree.sha, parents: [head] }),
+        }).then(function (r) { return r.json(); });
+      }).then(function (commit) {
+        return fetch(api + 'refs/heads/' + branchRef, {
+          method: 'PATCH', headers: headers, body: JSON.stringify({ sha: commit.sha }),
+        }).then(function (r) {
+          if (r.ok) return null;
+          return r.json().then(function (e) {
+            throw { status: r.status, message: (e && e.message) || 'the branch could not be moved' };
+          }, function () { throw { status: r.status, message: 'the branch could not be moved' }; });
+        });
       });
     }
 
@@ -4904,8 +5193,6 @@
 
     document.getElementById('gh-sync-btn').addEventListener('click', function () { syncRepo('github'); });
     document.getElementById('gl-sync-btn').addEventListener('click', function () { syncRepo('gitlab'); });
-    document.getElementById('folder-missing-btn').addEventListener('click', function () { pushMissingFolders('gitlab'); });
-    document.getElementById('github-folder-missing-btn').addEventListener('click', function () { pushMissingFolders('github'); });
     document.getElementById('folder-import-btn').addEventListener('click', function () { openFolderDiscovery('gitlab'); });
     document.getElementById('github-folder-import-btn').addEventListener('click', function () { openFolderDiscovery('github'); });
 

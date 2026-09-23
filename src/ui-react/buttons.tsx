@@ -574,10 +574,11 @@ function mountLiveDropdown(mountId: string, base: any, onSelect: (v: string) => 
 
 /* ── window.Pom* bridge shapes (types stripped by esbuild; kept for clarity) ─ */
 type FolderListBridge = {
-  render: (rows: { path: string; canEdit: boolean }[]) => void;
+  render: (rows: { path: string; canEdit: boolean; inRepo?: boolean }[]) => void;
   onInput: ((idx: number, value: string) => void) | null;
   onBlur: ((idx: number, value: string) => void) | null;
   onRemove: ((idx: number) => void) | null;
+  onCreate: ((idx: number) => void) | null;
 };
 type FolderSelectBridge = { setItems: (items: any[], selectedValue: string) => void; onChange: ((value: string) => void) | null };
 // Only ever reaches window.PomOnboardingDialog.onConfirm now — this used to
@@ -614,8 +615,6 @@ declare global {
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
     PomRepoReadBtn: LiveTitleHandle;
     PomGithubSyncBtn: LiveBusyHandle;
-    PomFolderPushMissing: LiveBusyHandle;
-    PomGithubFolderPushMissing: LiveBusyHandle;
     PomGitlabSyncBtn: LiveBusyHandle;
     PomAddGitlabBtn: LiveToggleIconHandle;
     PomAddGithubBtn: LiveToggleIconHandle;
@@ -691,6 +690,13 @@ declare global {
       open: (provider: string, where: string, paths: string[], added: string[]) => void;
       onAdd: ((path: string) => void) | null;
     };
+    PomFolderRemove: {
+      open: (info: { provider: string; where: string; path: string;
+                     files: string[]; subfolders: number }) => void;
+      close: () => void;
+      fail: (message: string) => void;
+      onConfirm: ((mode: string) => void) | null;
+    };
     PomRemoveGithubDialog: { open: () => void; onConfirm: (() => void) | null };
     PomRemoveGitlabDialog: { open: () => void; onConfirm: (() => void) | null };
     PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
@@ -754,17 +760,6 @@ function mountIconButton(mountId: string, props: any, level?: Level) { mountOnce
    answer the same question and should not have two different doors. */
 mountButton('folder-import-mount', { id: 'folder-import-btn', variant: 'tonal', size: 'small', block: true, label: 'Add existing folder paths from repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
 mountButton('github-folder-import-mount', { id: 'github-folder-import-btn', variant: 'tonal', size: 'small', block: true, label: 'Add existing folder paths from repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
-
-/* Creates the folders that exist only here — see pushMissingFolders(). A live
-   handle because it is a write to somebody's repository and the round trip is
-   a real one; a button that looks idle through it reads as one that missed the
-   click, and the temptation then is to click it again. */
-window.PomFolderPushMissing = mountLiveBusyButton('folder-missing-mount',
-  { id: 'folder-missing-btn', variant: 'outline', size: 'small', block: true, label: 'Create in the repo', leftIcon: true, buttonLeftIcon: IconUpload(16) },
-  'Commit an empty .gitkeep so the folder exists in Git', CARD_LEVEL);
-window.PomGithubFolderPushMissing = mountLiveBusyButton('github-folder-missing-mount',
-  { id: 'github-folder-missing-btn', variant: 'outline', size: 'small', block: true, label: 'Create in the repo', leftIcon: true, buttonLeftIcon: IconUpload(16) },
-  'Commit an empty .gitkeep so the folder exists in Git', CARD_LEVEL);
 
 mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
@@ -1590,7 +1585,10 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
   const container = document.getElementById(mountId);
   const root = container ? createRoot(container) : null;
   let generation = 0;
-  function render(rows: { path: string; canEdit: boolean }[]) {
+  /* `inRepo` decides whether the row offers to create the folder or not: a
+     path that is already there has nothing to create, and a button that does
+     nothing beside one that deletes is a bad neighbour to have. */
+  function render(rows: { path: string; canEdit: boolean; inRepo?: boolean }[]) {
     if (!root) return;
     generation += 1;
     const gen = generation;
@@ -1607,6 +1605,19 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
               onInput={(v: string) => (window as any)[bridgeKey].onInput?.(idx, v)}
               onBlur={(v: string) => (window as any)[bridgeKey].onBlur?.(idx, v)}
             />
+            {/* Per row, because the answer is per row: one path can be in the
+                repository while the one under it is not, and a single button
+                for all of them cannot say which it is about. Shown only where
+                there is something to create. */}
+            {row.canEdit && row.inRepo === false && (
+              <PomButton
+                variant="outline" size="medium"
+                title="Create this folder in the repository"
+                aria-label="Create this folder in the repository"
+                icon={IconUpload(16)}
+                onClick={() => (window as any)[bridgeKey].onCreate?.(idx)}
+              />
+            )}
             {row.canEdit && (
               // medium, not small: beside a field (band 50), same reasoning
               // as folder-add-btn-mount / gl-clear-token-btn-mount above.
@@ -1622,7 +1633,7 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
       </></LevelContext.Provider>,
     );
   }
-  (window as any)[bridgeKey] = { render, onInput: null, onBlur: null, onRemove: null };
+  (window as any)[bridgeKey] = { render, onInput: null, onBlur: null, onRemove: null, onCreate: null };
 }
 mountFolderList('folder-list', 'PomFolderList', 'folder-row-input', CARD_LEVEL);
 mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-input', CARD_LEVEL);
@@ -3127,6 +3138,119 @@ function mountFolderDiscovery() {
   };
 }
 mountFolderDiscovery();
+
+/*
+  REMOVING A FOLDER PATH — and what that means for the repository.
+
+  The trash on a saved row used to remove it from this plugin's list, which is
+  a local bookkeeping change and instant. It can now also delete the folder from
+  the repository, and those two are so far apart in consequence that they cannot
+  share one unannounced click.
+
+  So: the choice is the dialog, and the harmless one is the default. What it
+  offers depends on what is actually in the folder, which is read before this
+  opens rather than assumed — a folder holding a 20 MB token file and an empty
+  one deserve different sentences, and only one of them can be written in
+  advance.
+
+  THE FILES ARE LISTED BY NAME. "3 files" asks somebody to authorise deleting
+  things they cannot see; the names are what make consent mean anything.
+*/
+function mountFolderRemove() {
+  const container = document.getElementById('folder-remove-dialog-mount');
+  type S = {
+    open: boolean; provider: string; where: string; path: string;
+    files: string[]; subfolders: number; busy: boolean; error: string; mode: string;
+  };
+  const FRESH: S = { open: false, provider: 'github', where: '', path: '', files: [],
+                     subfolders: 0, busy: false, error: '', mode: 'list' };
+  let state: S = FRESH;
+  let apply: ((s: S) => void) | null = null;
+  const put = (next: Partial<S>) => { state = { ...state, ...next }; apply?.(state); };
+  function View() {
+    const [s, setS] = useState<S>(state);
+    apply = setS;
+    const n = s.files.length;
+    /*
+      'list' is first and pre-selected. The other two write to somebody's
+      repository, and a dialog that opens with a destructive option already
+      chosen is a dialog that deletes on a reflex Enter.
+    */
+    const options: { value: string; label: string; note: string }[] = [
+      { value: 'list', label: 'Remove from this list only',
+        note: 'The folder and everything in it stay in the repository.' },
+    ];
+    if (n) {
+      options.push({ value: 'move', label: 'Move the files to the repository root, then delete the folder',
+        note: n + ' file' + (n === 1 ? '' : 's') + ' kept, at the top level instead of inside ' + s.path + '.' });
+      options.push({ value: 'delete', label: 'Delete the folder and everything in it',
+        note: n + ' file' + (n === 1 ? '' : 's') + ' removed from the repository. Recoverable only from git history.' });
+    } else {
+      options.push({ value: 'delete', label: 'Delete the folder from the repository',
+        note: 'It holds no files, so nothing is lost with it.' });
+    }
+    return (
+      <Dialog
+        open={s.open}
+        onClose={() => put({ open: false })}
+        title="Remove folder path"
+        size="large"
+        actions={
+          <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+            <PomButton id="folder-remove-cancel" variant="ghost" size="medium" block
+              label="Cancel" disabled={s.busy} onClick={() => put({ open: false })} />
+            <PomButton id="folder-remove-confirm" variant="primary" size="medium" block
+              destructive={s.mode !== 'list'}
+              loading={s.busy}
+              label={s.mode === 'list' ? 'Remove from the list'
+                   : s.mode === 'move' ? 'Move and delete'
+                   : 'Delete from the repository'}
+              onClick={() => { put({ busy: true, error: '' });
+                               window.PomFolderRemove.onConfirm?.(s.mode); }} />
+          </div>
+        }
+      >
+        <p className="folder-discovery-where">
+          {s.provider === 'gitlab' ? IconGitlab(14) : IconGithub(14)}
+          <span>{s.where}</span>
+        </p>
+        <p className="folder-remove-path">{IconFolder(14)}<span>{s.path}</span></p>
+        {n > 0 && (
+          <div className="folder-remove-files">
+            <p className="folder-remove-files-title">
+              This folder holds {n} file{n === 1 ? '' : 's'}
+              {s.subfolders ? ' and ' + s.subfolders + ' subfolder' + (s.subfolders === 1 ? '' : 's') : ''}:
+            </p>
+            <ul>{s.files.slice(0, 12).map((f) => <li key={f}>{f}</li>)}</ul>
+            {n > 12 && <p className="folder-remove-more">…and {n - 12} more</p>}
+          </div>
+        )}
+        <div className="folder-remove-choices">
+          {options.map((o) => (
+            <label className={'folder-remove-choice' + (s.mode === o.value ? ' is-on' : '')} key={o.value}>
+              <input type="radio" name="folder-remove-mode" value={o.value}
+                checked={s.mode === o.value} disabled={s.busy}
+                onChange={() => put({ mode: o.value })} />
+              <span>
+                <b>{o.label}</b>
+                <em>{o.note}</em>
+              </span>
+            </label>
+          ))}
+        </div>
+        {s.error ? <p className="folder-remove-error">{s.error}</p> : null}
+      </Dialog>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  window.PomFolderRemove = {
+    open: (info) => put({ ...FRESH, ...info, open: true }),
+    close: () => put({ open: false, busy: false }),
+    fail: (message) => put({ busy: false, error: message }),
+    onConfirm: null,
+  };
+}
+mountFolderRemove();
 
 window.PomRemoveGithubDialog = { open: () => {}, onConfirm: null };
 confirmDialog('remove-github-dialog-mount',
