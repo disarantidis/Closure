@@ -205,11 +205,11 @@
       padding: var(--spacing-component-2) var(--spacing-component-5) var(--spacing-component-5);
     }
     /* Same treatment, same reasoning, for the "scanned collections" modal
-       (buttons.tsx's mountCollectionsAccordion, mounted at #collections-list)
+       (buttons.tsx's mountCollectionsAccordion, at #collections-dialog-mount)
        — node.css's .nd-dialog-content default (10px/16px) read tight around
        the per-collection rows on left/right/bottom; top is left at its
        default so the title-to-list gap doesn't move, same fix as above. */
-    #collections-list .nd-dialog-content {
+    #collections-dialog-mount .nd-dialog-content {
       padding: var(--spacing-component-2) var(--spacing-component-5) var(--spacing-component-5);
     }
 
@@ -1962,7 +1962,7 @@
       max- is overridden too: the kit's min(92vw, …) would otherwise clamp two
       pixels narrower and the edges would not line up.
     */
-    #collections-list .nd-dialog {
+    #collections-dialog-mount .nd-dialog {
       inline-size: calc(100vw - 32px);
       max-inline-size: calc(100vw - 32px);
     }
@@ -2234,7 +2234,29 @@
     /* The collections card inside it is an InteractiveCard and paints its own
        surface; at the subcard rung it reads as part of this one rather than as
        a card sitting on a card. */
-    .figma-card > .collections-list { margin: 0; }
+    /*
+      THE --app-* ALIASES HAVE TO BE RE-DERIVED HERE, and this is the one place
+      in the plugin where that matters.
+
+      THEMING.md's arrangement is that :root maps --app-text onto --text and
+      everything in this file's own CSS reads the alias. Custom properties
+      resolve where they are DEFINED, so --app-text is computed once at :root
+      and inherits as a fixed colour — it cannot follow --text when the
+      inverted pole redefines it further down (tokens.css's
+      [data-tense='inverted'] block). The kit's own components were fine, since
+      they read --text directly; this card's plain-CSS titles rendered white on
+      white and were legible only by selecting them.
+
+      So the aliases are computed again at this scope, and every --app-*
+      consumer inside the card follows the pole.
+    */
+    [data-tense="inverted"] {
+      --app-text: var(--text);
+      --app-text-muted: var(--text-recessive);
+      --app-border: var(--stroke);
+      --app-surface: var(--background);
+    }
+
     /* Sits in by the subcards' own inset, so the title lines up with the names
        under it rather than with the frame around them. */
     .figma-card-header { padding: 4px var(--spacing-component-4) 0; }
@@ -2495,21 +2517,31 @@
       They are siblings under one surface instead, which is what the provider
       card does too: its heading is not a box either.
     -->
-    <div class="figma-card" id="figma-card" data-level="4">
-      <!-- The card's own title row, the same shape the Json file subcard below
-           uses: a mark and a name on the left, the one number that describes
-           the whole card on the right. The token count moved here from the
-           collections card, because it counts what this CARD is about — the
-           Figma file — and the card under it is now just the file's name and
-           the way into its collections. -->
+    <!--
+      data-tense="inverted" on the CARD, not on a wrapper inside it. The
+      collections card carried it and was the one light surface in the column;
+      the card is the Figma file now, so the whole card is.
+    -->
+    <div class="figma-card" id="figma-card" data-level="4" data-tense="inverted" style="display: none;">
+      <!--
+        THE FILE'S OWN NAME, not the word "Figma". A card titled with the name
+        of the tool it came from says nothing the mark beside it has not
+        already said; the file is what this card is about and what the one
+        below it was repeating.
+
+        And a BUTTON, not a tag. The count was already the way into the
+        collections dialog — the whole card used to be clickable — so it may as
+        well look like the control it is. It also retires the nested-interactive
+        problem: a card that is a button cannot hold the Json file card, and a
+        button inside a plain card can.
+      -->
       <div class="json-download-header figma-card-header">
         <div class="json-download-title-group">
           <span class="json-download-title-icon" id="figma-card-icon-mount"></span>
-          <p class="json-download-title">Figma</p>
+          <span id="figma-card-title-mount"></span>
         </div>
         <span id="figma-card-tag-mount"></span>
       </div>
-    <div class="collections-list" id="collections-list" style="display: none;"></div>
     <!-- Skeleton twin, shown until the same moment #skeleton-list hides
          (the 'extracted' handler, or 'error') — this card's own content
          (a static filename field + Download) never actually needed to
@@ -3211,6 +3243,10 @@
        silently a no-op — document.getElementById returned null, so the
        dialog's own setOpenExternal closure never got reassigned off its
        default no-op) until this round added the GitLab one and caught it. -->
+  <!-- The collections dialog, out here rather than inside the card that opens
+       it: the card is hidden until an extract lands (display:none), and a
+       dialog inside a hidden ancestor is a dialog that cannot open. -->
+  <div id="collections-dialog-mount"></div>
   <div id="folder-discovery-dialog-mount"></div>
   <div id="folder-remove-dialog-mount"></div>
   <div id="remove-github-dialog-mount"></div>
@@ -5905,7 +5941,9 @@
     var pushBtn = document.getElementById('push-btn');
     var downloadBtn = document.getElementById('download-btn');
     var exportMode = 'legacy';
-    var collectionsList = document.getElementById('collections-list');
+    /* The Figma card as a whole now — it used to be the collections card
+       inside it, which is no longer a separate thing. */
+    var collectionsList = document.getElementById('figma-card');
     var loadingState = document.getElementById('loading-state');
     var skeletonList = document.getElementById('skeleton-list');
     var emptyState = document.getElementById('empty-state');

@@ -644,11 +644,13 @@ declare global {
     PomGithubFolderNew: FolderComboBridge;
     PomFolderList: FolderListBridge;
     PomGithubFolderList: FolderListBridge;
-    PomFigmaCardTag: { set: (value: string) => void };
+    PomFigmaCardTag: { set: (value: string) => void; setTitle: (value: string) => void };
     PomCollectionsAccordion: {
       setTitle: (title: string) => void;
       setCollections: (collections: { name: string; count: number }[]) => void;
       setSummary: (tokensLabel: string) => void;
+      /* Opened from the Figma card's header button, which is its own root. */
+      open: () => void;
       /* The Delete-all control lives in this dialog now; the page owns what it
          does, the same way the level rows own their own toggles. */
       onClearVariables: (() => void) | null;
@@ -1854,6 +1856,25 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
 (function mountFigmaCardTag() {
   const icon = document.getElementById('figma-card-icon-mount');
   if (icon) flushSync(() => createRoot(icon).render(<>{IconFigma(16)}</>));
+
+  /* The file's name, which is what this card is about. */
+  const titleEl = document.getElementById('figma-card-title-mount');
+  let applyTitle: ((v: string) => void) | null = null;
+  let title = '';
+  function Title() {
+    const [v, setV] = useState(title);
+    applyTitle = setV;
+    return <p className="json-download-title">{v || 'This Figma file'}</p>;
+  }
+  if (titleEl) flushSync(() => createRoot(titleEl).render(<Title />));
+
+  /*
+    A BUTTON, BECAUSE IT WAS ALWAYS A CONTROL. The count opened the collections
+    dialog back when the whole card was clickable, so it was already the way in
+    — it just looked like a label. Saying so costs nothing and buys the card
+    back: a card that IS a button cannot contain the Json file card, and a
+    button inside a plain card can.
+  */
   const container = document.getElementById('figma-card-tag-mount');
   let apply: ((v: string) => void) | null = null;
   let value = '';
@@ -1861,66 +1882,48 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     const [v, setV] = useState(value);
     apply = setV;
     if (!v) return null;
-    return <Tag variant="tonal" size="small" leading={IconVariables(11)}>{v}</Tag>;
+    return (
+      <PomButton
+        id="collections-open-btn"
+        variant="tonal"
+        size="small"
+        label={v}
+        leftIcon
+        buttonLeftIcon={IconVariables(14)}
+        title="View the collections this file holds"
+        onClick={() => window.PomCollectionsAccordion.open?.()}
+      />
+    );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
-  window.PomFigmaCardTag = { set: (next: string) => { value = next; apply?.(next); } };
+  window.PomFigmaCardTag = {
+    set: (next: string) => { value = next; apply?.(next); },
+    setTitle: (next: string) => { title = next; applyTitle?.(next); },
+  };
 })();
 
 (function mountCollectionsAccordion() {
-  const container = document.getElementById('collections-list');
+  const container = document.getElementById('collections-dialog-mount');
   let set: (u: (s: any) => any) => void = () => {};
+  /* Reached from the header button, which lives in its own React root. */
+  let openDialog: (v: boolean) => void = () => {};
   function View() {
     const [state, setState] = useState<any>({ title: 'Scanned collections', collections: [], summary: { tokens: '' } });
     const [open, setOpen] = useState(false);
     set = setState;
+    openDialog = setOpen;
     return (
       <>
-        {/* data-tense="inverted", not InteractiveCard's own `tense` prop —
-            that prop is typed 'tonal' | 'strong' only (Card.tsx and
-            InteractiveCard.tsx both), so the kit's cards never expose
-            "inverted" through their public API — it's wired for chip-like
-            elements instead (Tag, Button, SegmentedControl's chosen
-            segment, node.css's [data-tense='inverted'] block), not full
-            card surfaces. The underlying CSS still supports it generically
-            via [data-tense='inverted'] [data-level] though (tokens.css's
-            "pole axis"), and InteractiveCard's own root sets data-level on
-            itself regardless of who's asking for it — so a plain wrapper
-            reaches the exact same cascade without fighting the type
-            system or editing the vendored component. */}
-        <div data-tense="inverted">
-        <InteractiveCard label={`${state.title} — view scanned collections`} level={2} size="large" onClick={() => setOpen(true)}>
-          <div className="collections-header">
-            {/* One row now, not title-then-tags stacked: icon leads the
-                title, the tags sit at the row's own end. .collections-
-                summary keeps flex:1 (below), which is what pushes the
-                tags there — no separate alignment rule needed for them. */}
-            <div className="collections-header-top">
-              <span className="collections-header-icon" aria-hidden="true">{IconFigma(18)}</span>
-              <span className="collections-summary">{state.title}</span>
-              <div className="collections-summary-tags">
-                {/* tonal, not ghost — same fix as the per-row counts below
-                    (.collections-readonly-list): ghost paints no fill
-                    (node.css's .nd-tag.v-ghost, background: none), so these
-                    rendered as plain muted text with no visible pill —
-                    reported from the real plugin as the tags being
-                    "missing" even though the text itself was there.
-                    The file-size tag that used to sit beside this one moved
-                    to the "Json file" card's own title row instead (see
-                    mountJsonFileCard below) — size describes the JSON file,
-                    which now has a title of its own to sit under. */}
-                {/* The variables glyph rides the COUNT now, not the title —
-                    it is the one thing on this row that is actually about
-                    variables. `leading`, the slot Tag keeps for exactly this. */}
-                {/* The token count moved out to the parent card's title row
-                    (mountFigmaCardTag): it counts what the whole card is
-                    about, and this card is the file's NAME and the way into
-                    its collections. */}
-              </div>
-            </div>
-          </div>
-        </InteractiveCard>
-        </div>
+        {/*
+          NO CARD HERE ANY MORE — only the dialog.
+
+          This rendered an InteractiveCard: the whole collections card was one
+          big button that opened this dialog. The card is the FIGMA card now,
+          the name is its title and the count is a real button in its header,
+          and a card that is a button could never have held the Json file card
+          inside it anyway. What survives is the thing that was always the
+          point: the list of what was scanned.
+        */}
         {/* large, not small — a real file's collection list (long names —
             ".magenta-light", "_restricted" — and four-digit counts) read
             cramped at 380px (--surface-width-small, tokens.css), reported
@@ -1977,7 +1980,10 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   window.PomCollectionsAccordion = {
-    setTitle: (title) => set((s) => ({ ...s, title })),
+    setTitle: (title) => {
+      window.PomFigmaCardTag?.setTitle(title);
+      set((s) => ({ ...s, title }));
+    },
     setCollections: (collections) => set((s) => ({ ...s, collections })),
     /* Kept on this card's own state as well as pushed to the parent's title
        row, so the one caller in ui.template.html does not have to know the
@@ -1986,6 +1992,8 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
       window.PomFigmaCardTag?.set(tokens);
       set((s) => ({ ...s, summary: { tokens } }));
     },
+    /* The header button opens it; the dialog owns whether it is open. */
+    open: () => openDialog(true),
     onClearVariables: null,
   };
 })();
