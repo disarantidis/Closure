@@ -1238,6 +1238,16 @@
     */
     .compare-table { font-size: 11px; }
     .compare-table table { width: 100%; table-layout: fixed; }
+    /* The glyph sits before the name and does not move with it: the path
+       wraps over several lines and an icon that wrapped with it would end up
+       beside the middle of a token. align-items: start pins it to the first. */
+    .compare-token { display: flex; align-items: flex-start; gap: 5px; min-width: 0; }
+    .compare-token-icon {
+      display: flex;
+      flex-shrink: 0;
+      opacity: 0.55;
+      margin-top: 1px;
+    }
     .compare-cell-path {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       opacity: 0.9;

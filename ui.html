@@ -1238,6 +1238,16 @@
     */
     .compare-table { font-size: 11px; }
     .compare-table table { width: 100%; table-layout: fixed; }
+    /* The glyph sits before the name and does not move with it: the path
+       wraps over several lines and an icon that wrapped with it would end up
+       beside the middle of a token. align-items: start pins it to the first. */
+    .compare-token { display: flex; align-items: flex-start; gap: 5px; min-width: 0; }
+    .compare-token-icon {
+      display: flex;
+      flex-shrink: 0;
+      opacity: 0.55;
+      margin-top: 1px;
+    }
     .compare-cell-path {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       opacity: 0.9;
@@ -48883,6 +48893,44 @@ html[data-theme=dark] {
   );
   var IconGithub = svg("M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z", { fill: true });
   var IconGitlab = svg("M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024", { fill: true });
+  var IconTypeColor = svg("M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25M7.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M11.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M15.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0");
+  var IconTypeNumber = svg("M5 9l14 0M5 15l14 0M11 4l-4 16M17 4l-4 16");
+  var IconTypeString = svg("M6 4l12 0M12 4l0 16");
+  var IconTypeBoolean = svg("M6 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M2 12a6 6 0 0 1 6 -6h8a6 6 0 0 1 6 6a6 6 0 0 1 -6 6h-8a6 6 0 0 1 -6 -6");
+  var IconTypeTiming = svg("M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0M12 7v5l3 3");
+  var IconTypeEasing = svg("M17 4a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -2M3 18a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -2M17 5c-6.627 0 -12 5.373 -12 12");
+  var IconTypeTypography = svg("M4 20l3 0M14 20l7 0M6.9 15l6.9 0M10.2 6.3l5.8 13.7M5 20l6 -16l2 0l7 16");
+  var IconTypeShadow = svg("M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M13 12h5M13 15h4M13 18h1M13 9h4M13 6h1");
+  var TYPE_ICON = {
+    color: IconTypeColor,
+    number: IconTypeNumber,
+    dimension: IconTypeNumber,
+    spacing: IconTypeNumber,
+    sizing: IconTypeNumber,
+    borderRadius: IconTypeNumber,
+    borderWidth: IconTypeNumber,
+    opacity: IconTypeNumber,
+    fontSize: IconTypeNumber,
+    lineHeight: IconTypeNumber,
+    letterSpacing: IconTypeNumber,
+    paragraphSpacing: IconTypeNumber,
+    paragraphIndent: IconTypeNumber,
+    fontWeight: IconTypeNumber,
+    string: IconTypeString,
+    text: IconTypeString,
+    fontFamily: IconTypeString,
+    fontFamilies: IconTypeString,
+    textCase: IconTypeString,
+    textDecoration: IconTypeString,
+    boolean: IconTypeBoolean,
+    duration: IconTypeTiming,
+    timing: IconTypeTiming,
+    cubicBezier: IconTypeEasing,
+    easing: IconTypeEasing,
+    typography: IconTypeTypography,
+    shadow: IconTypeShadow,
+    boxShadow: IconTypeShadow
+  };
   function btnVariant(v) {
     if (v === "filled") return "primary";
     if (v === "ghost") return "ghost";
@@ -49859,7 +49907,7 @@ html[data-theme=dark] {
         const m = /hex:(#[0-9a-f]{3,8})/i.exec(v) || /^(#[0-9a-f]{3,8})$/i.exec(v);
         return m ? m[1] : null;
       };
-      const pathCell = (path) => {
+      const pathCell = (path, type) => {
         const parts = path.split(".");
         const nodes = [];
         parts.forEach((seg, i) => {
@@ -49869,7 +49917,11 @@ html[data-theme=dark] {
           }
           nodes.push(seg);
         });
-        return /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "compare-cell-path", title: path, children: nodes });
+        const icon2 = type ? TYPE_ICON[type] : void 0;
+        return /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { className: "compare-token", title: type ? path + "  (" + type + ")" : path, children: [
+          icon2 && /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "compare-token-icon", "aria-hidden": "true", children: icon2(13) }),
+          /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "compare-cell-path", children: nodes })
+        ] });
       };
       const headWith = (icon2, label) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { className: "compare-col-head", children: [
         icon2 && /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "compare-col-icon", "aria-hidden": "true", children: icon2 }),
@@ -49908,6 +49960,9 @@ html[data-theme=dark] {
       const valueCell = (v, other) => {
         const sw = swatchOf(v);
         const short = sw || v;
+        if (sw && short.length <= TAGGABLE) {
+          return /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { title: v, children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(Tag, { variant: "tonal", size: "small", leading: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "compare-swatch", style: { background: sw } }), children: short }) });
+        }
         if (other !== void 0) {
           const mine = compositePairs(v), theirs = compositePairs(other);
           if (mine && theirs) {
@@ -49940,7 +49995,7 @@ html[data-theme=dark] {
           {
             key: "path",
             header: "Token",
-            cell: (x) => pathCell(x.path)
+            cell: (x) => pathCell(x.path, x.type)
           }
         ];
         if (twoSided) {
@@ -54265,7 +54320,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'c567a7d 10:45:24';
+    var CLOSURE_BUILD = '2ceb79e 10:52:27';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

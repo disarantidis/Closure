@@ -211,6 +211,59 @@ const IconFigma = svg(
 const IconGithub = svg('M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z', { fill: true });
 const IconGitlab = svg('M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024', { fill: true });
 
+/*
+  WHAT KIND OF TOKEN A ROW IS, AS A GLYPH.
+
+  WHY THESE ARE DRAWN HERE AND NOT TAKEN FROM THE KIT. Pomegranate binds 32
+  icons in icons.generated.ts, and not one of the six variable types has a
+  proper entry: the nearest are `colour` (a brush) and `coreRamp` (a swatch
+  stack) for colour, and `text` (a document) for string — pictures of adjacent
+  ideas, not of these. The right drawings DO exist in icons.inventory.ts, the
+  full 5,130-glyph upstream set, but that file says in its own header that
+  nothing in the kit may import it: the supported route is to bind a name
+  through `npm run icons`, which regenerates the kit's own set. That is a
+  change to src/vendor/pomegranate, which is not ours to make.
+
+  So the paths are lifted verbatim from the inventory's own entries — same
+  Tabler 24/outline drawings, same stroke weight the kit is drawn at — and
+  rendered through this file's own svg(). Each one names the upstream glyph it
+  is, so binding them properly later is a rename rather than a redraw.
+
+  THE SIX ARE FIGMA'S OWN VARIABLE TYPES, plus the two composites these files
+  actually contain (typography, shadow), because a token whose type has no
+  glyph gets no column and the reader has to go and work out why.
+*/
+const IconTypeColor = svg('M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25M7.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M11.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M15.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0');        /* tabler: palette */
+const IconTypeNumber = svg('M5 9l14 0M5 15l14 0M11 4l-4 16M17 4l-4 16');          /* tabler: hash */
+const IconTypeString = svg('M6 4l12 0M12 4l0 16');      /* tabler: letter-t */
+const IconTypeBoolean = svg('M6 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M2 12a6 6 0 0 1 6 -6h8a6 6 0 0 1 6 6a6 6 0 0 1 -6 6h-8a6 6 0 0 1 -6 -6');  /* tabler: toggle-left */
+const IconTypeTiming = svg('M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0M12 7v5l3 3');         /* tabler: clock */
+const IconTypeEasing = svg('M17 4a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -2M3 18a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -2M17 5c-6.627 0 -12 5.373 -12 12'); /* tabler: vector-spline */
+const IconTypeTypography = svg('M4 20l3 0M14 20l7 0M6.9 15l6.9 0M10.2 6.3l5.8 13.7M5 20l6 -16l2 0l7 16');/* tabler: typography */
+const IconTypeShadow = svg('M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M13 12h5M13 15h4M13 18h1M13 9h4M13 6h1');        /* tabler: shadow */
+
+/*
+  TYPE NAME -> GLYPH. Both vocabularies, because both arrive: DTCG's own
+  ($type: color, dimension, fontFamily, duration, cubicBezier) and Tokens
+  Studio's legacy one (type: spacing, sizing, borderRadius, text, boxShadow).
+  A name with no entry draws nothing rather than a wrong picture.
+*/
+const TYPE_ICON: Record<string, (size: number) => ReactNode> = {
+  color: IconTypeColor,
+  number: IconTypeNumber,
+  dimension: IconTypeNumber, spacing: IconTypeNumber, sizing: IconTypeNumber,
+  borderRadius: IconTypeNumber, borderWidth: IconTypeNumber, opacity: IconTypeNumber,
+  fontSize: IconTypeNumber, lineHeight: IconTypeNumber, letterSpacing: IconTypeNumber,
+  paragraphSpacing: IconTypeNumber, paragraphIndent: IconTypeNumber, fontWeight: IconTypeNumber,
+  string: IconTypeString, text: IconTypeString, fontFamily: IconTypeString,
+  fontFamilies: IconTypeString, textCase: IconTypeString, textDecoration: IconTypeString,
+  boolean: IconTypeBoolean,
+  duration: IconTypeTiming, timing: IconTypeTiming,
+  cubicBezier: IconTypeEasing, easing: IconTypeEasing,
+  typography: IconTypeTypography,
+  shadow: IconTypeShadow, boxShadow: IconTypeShadow,
+};
+
 /* ── size / variant maps (mount prop shape → Pomegranate) ───────────────────── */
 function btnVariant(v?: string): 'primary' | 'tonal' | 'ghost' {
   if (v === 'filled') return 'primary';
@@ -1885,14 +1938,22 @@ const COMPARE_SAMPLE = 40;
       line is a piece of the name. The anywhere fallback stays in CSS for the
       one segment long enough to need it.
     */
-    const pathCell = (path: string) => {
+    const pathCell = (path: string, type?: string) => {
       const parts = path.split('.');
       const nodes: ReactNode[] = [];
       parts.forEach((seg, i) => {
         if (i) { nodes.push(<wbr key={'w' + i} />); nodes.push('.'); }
         nodes.push(seg);
       });
-      return <span className="compare-cell-path" title={path}>{nodes}</span>;
+      const icon = type ? TYPE_ICON[type] : undefined;
+      return (
+        <span className="compare-token" title={type ? path + '  (' + type + ')' : path}>
+          {/* Decorative: the type is already the table's own heading, so a
+              screen reader that announced it per row would say it 40 times. */}
+          {icon && <span className="compare-token-icon" aria-hidden="true">{icon(13)}</span>}
+          <span className="compare-cell-path">{nodes}</span>
+        </span>
+      );
     };
 
     /* A column header that carries a mark. The icon is decorative — the word
@@ -1953,6 +2014,25 @@ const COMPARE_SAMPLE = 40;
     const valueCell = (v: string, other?: string) => {
       const sw = swatchOf(v);
       const short = sw || v;
+      /*
+        A COLOUR IS A COMPOSITE TOO, AND MUST NOT BE TREATED AS ONE.
+
+        A DTCG colour is {alpha, colorSpace, components, hex} — structurally
+        the same bag as a typography token, so the sub-value diff below
+        matched it and drew "COMPONENTS [0.05,0.6,0.25] / HEX #0d9b41 / +2
+        unchanged" where a swatch and a hex had been. Correct, and three lines
+        of arithmetic for a thing the eye reads instantly. The hex wins: if a
+        value names a colour, it is shown as one.
+      */
+      if (sw && short.length <= TAGGABLE) {
+        return (
+          <span title={v}>
+            <Tag variant="tonal" size="small" leading={<span className="compare-swatch" style={{ background: sw }} />}>
+              {short}
+            </Tag>
+          </span>
+        );
+      }
       /* Both sides composite: show only the sub-values that moved, and say how
          many did not, so "the rest is the same" is stated rather than implied
          by absence. */
@@ -2011,7 +2091,7 @@ const COMPARE_SAMPLE = 40;
         {
           key: 'path',
           header: 'Token',
-          cell: (x: any) => pathCell(x.path),
+          cell: (x: any) => pathCell(x.path, x.type),
         },
       ];
       /*
