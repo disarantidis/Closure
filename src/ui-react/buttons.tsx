@@ -534,7 +534,6 @@ declare global {
       onClearVariables: (() => void) | null;
     };
     PomJsonFileCard: { setSize: (sizeLabel: string) => void };
-    PomRepoTokenTag: { set: (label: string) => void };
     /* The file name field, which is a plain TextField until the repo turns
        out to hold JSON files to choose from and a Combobox after that.
        `get` is synchronous and exact — it reads the value this bridge owns,
@@ -1586,24 +1585,6 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomJsonFileCard = { setSize: (size) => set(size) };
-})();
-
-/* The repo card's token-count tag — the same tonal pill as the size tag above
-   and the collections card's own count, because it is the same kind of fact:
-   one number describing the thing the card is about. Empty renders nothing at
-   all rather than an empty pill, so the header closes up while the read is
-   still in flight. */
-(function mountRepoTokenTag() {
-  const container = document.getElementById('repo-token-tag-mount');
-  let set: (v: string) => void = () => {};
-  function View() {
-    const [label, setLabel] = useState('');
-    set = setLabel;
-    if (!label) return null;
-    return <Tag variant="tonal" size="small">{label}</Tag>;
-  }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
-  window.PomRepoTokenTag = { set: (label) => set(label) };
 })();
 
 /* ── reference-closure warning (inline alert) ────────────────────────────────

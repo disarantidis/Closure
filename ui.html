@@ -1911,8 +1911,6 @@
       margin: 12px 0 0;
     }
     .repo-file-half { flex: 1 1 0; min-width: 0; }
-    /* Right-aligned, under the file picker's half of the row above. */
-    .repo-token-row { display: flex; justify-content: flex-end; margin: 8px 0 0; }
     /*
       A control ON the wire, between two cards. The wire is painted behind
       everything (z-index: -1 on .flow-wire), so an in-flow button here sits on
@@ -22119,18 +22117,13 @@ html[data-theme=dark] {
           -->
         </div>
         <!--
-          WHAT A TAG CANNOT SAY.
+          WHEN THERE IS SOMETHING TO SAY.
 
-          The answer itself is the tag above — a token count, which is a
-          value. This line is for the states that are sentences: still
-          reading, no such file (and what the repo holds instead), or a read
-          that failed. Those cannot be a pill, and squeezing them into one
-          would be how "Could not read GitHub — the token was refused" ends
-          up truncated to "Could not".
-
-          Exactly one of the two is ever showing — see repoReadStatus() and
-          repoTokenTag(), which is why they are set through a pair of
-          functions rather than written to directly.
+          Empty on success, which is most of the time: the file picker below
+          already shows which file, and a card that reports a normal state is
+          a card reporting noise. It fills for the three states that are
+          genuinely sentences — still reading, no such file (naming what the
+          repo holds instead), and a read that failed.
         -->
         <p class="repo-read-status" id="repo-read-status" hidden></p>
 
@@ -22171,16 +22164,6 @@ html[data-theme=dark] {
           <span id="repo-file-mount" class="repo-file-half"></span>
         </div>
 
-        <!--
-          HOW MANY TOKENS THE REPO'S FILE HOLDS — under the field that names
-          that file, because that is what it is about. It was in the card's
-          header, where it read as a property of the repository rather than of
-          one file in it, and where nothing connected it to the name it counts.
-          Aligned right, under the file picker's own half of the row.
-        -->
-        <div class="repo-token-row">
-          <span id="repo-token-tag-mount"></span>
-        </div>
         <!-- Only meaningful once BOTH providers are actually added (see
              updatePushTargetUI()'s tabMode — same gitlabAdded && githubAdded
              gate the Settings page's own GitLab/GitHub tab switcher uses).
@@ -49529,19 +49512,6 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime24.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(View, {}) })));
     window.PomJsonFileCard = { setSize: (size) => set(size) };
   })();
-  (function mountRepoTokenTag() {
-    const container = document.getElementById("repo-token-tag-mount");
-    let set = () => {
-    };
-    function View() {
-      const [label, setLabel] = (0, import_react18.useState)("");
-      set = setLabel;
-      if (!label) return null;
-      return /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Tag, { variant: "tonal", size: "small", children: label });
-    }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime24.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(View, {}) })));
-    window.PomRepoTokenTag = { set: (label) => set(label) };
-  })();
   function useClipboard() {
     const [copied, setCopied] = (0, import_react18.useState)("");
     const taRef = (0, import_react18.useRef)(null);
@@ -53907,7 +53877,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'e89c361 10:10:44';
+    var CLOSURE_BUILD = '93e731e 10:14:27';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -56176,27 +56146,19 @@ function format(report, opts) {
     }
 
     /*
-      THE TAG AND THE LINE ARE ONE CONTROL WITH TWO FACES, and they are set
-      together so they cannot both be on screen saying different things — a
-      stale "5k tokens" pill beside "Could not read GitHub" is worse than
-      either alone, and is what two independent writers produce.
+      THE ONE LINE THIS CARD SAYS ANYTHING ON.
 
-      A count is a value and goes in the tag; anything that needs a sentence
-      goes in the line.
+      It briefly had a companion — a tag holding the repo file's token count —
+      and the pair were written together so they could not disagree. The tag is
+      gone, so what is left is the simple thing: a line that is empty when
+      there is nothing to report, and holds a sentence when there is.
     */
     function repoReadStatus(text, tone) {
       var el = document.getElementById('repo-read-status');
-      if (el) {
-        el.hidden = !text;
-        el.textContent = text || '';
-        if (tone) el.setAttribute('data-tone', tone); else el.removeAttribute('data-tone');
-      }
-      if (window.PomRepoTokenTag) window.PomRepoTokenTag.set('');
-    }
-    function repoTokenTag(label) {
-      if (window.PomRepoTokenTag) window.PomRepoTokenTag.set(label || '');
-      var el = document.getElementById('repo-read-status');
-      if (el) { el.hidden = true; el.textContent = ''; el.removeAttribute('data-tone'); }
+      if (!el) return;
+      el.hidden = !text;
+      el.textContent = text || '';
+      if (tone) el.setAttribute('data-tone', tone); else el.removeAttribute('data-tone');
     }
 
     /*
@@ -56489,15 +56451,22 @@ function format(report, opts) {
             : 'Nothing pushed to ' + branch + ' yet');
           return null;
         }
-        return fetchRepoDoc(which, key).then(function (got) {
-          if (!current()) return;
-          /* THE COUNT, NOT THE NAME. The card above already names this file;
-             repeating it here told nobody anything they could not see. How
-             many tokens the repo's copy holds is the one number that answers
-             "is the repo behind" at a glance — and it is the same walk the
-             Compare page counts with, so the two can never disagree. */
-          repoTokenTag(tokensLabel(window.PomJsonDiff.countTokens(got.doc)));
-        });
+        /*
+          AND THAT IS THE WHOLE CHECK NOW.
+
+          It used to go on and fetch the file itself, to count the tokens in
+          it for a tag on this card. The tag is gone, and with it the only
+          reason to pull a document that is routinely megabytes — on every
+          open, for a number nothing displays. The listing is what this check
+          is for: it fills the file picker and it says when the named file is
+          not up there. Silence means it is.
+
+          Compare still reads the file, and still keeps it (fetchRepoDoc's
+          cache is unchanged) — it is just paid for by the person who asked
+          for a comparison rather than by everybody who opened the plugin.
+        */
+        repoReadStatus('');
+        return null;
       }).then(null, function (err) {
         if (!current()) return;
         repoReadStatus('Could not read ' + label + ' — ' + ((err && err.message) || 'the request failed'),
