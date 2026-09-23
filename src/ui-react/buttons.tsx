@@ -639,8 +639,15 @@ declare global {
       set: (value: string) => void;
       onChange: ((value: string) => void) | null;
     };
-    /* The file in the repo the comparison READS. */
+    /* The file in the repo the comparison READS — and, on the import page under
+       the same name, the file the import PULLS. Two mounts, one selection. */
     PomRepoFile: {
+      get: () => string;
+      set: (value: string) => void;
+      setOptions: (names: string[]) => void;
+      onChange: ((value: string) => void) | null;
+    };
+    PomImportRepoFile: {
       get: () => string;
       set: (value: string) => void;
       setOptions: (names: string[]) => void;
@@ -950,8 +957,15 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
   were one value until they were separated here, which is why the card could
   say "Compare" while pointing at a file the repo did not have.
 */
-(function mountRepoFile() {
-  const container = document.getElementById('repo-file-mount');
+/*
+  MOUNTED TWICE, DRIVING ONE SELECTION. The repo card picks the file to compare
+  against; the import page picks the file to import — and it is the same file in
+  the same folder, so choosing on either screen has to move both. They are kept
+  in step by chooseRepoFile() in ui.template.html rather than by sharing state
+  here, because one React root cannot span two places in the document.
+*/
+function mountRepoFileCombo(mountId: string, bridgeKey: 'PomRepoFile' | 'PomImportRepoFile') {
+  const container = document.getElementById(mountId);
   /*
     THE TYPED TEXT AND THE CHOSEN FILE ARE TWO DIFFERENT THINGS.
 
@@ -971,7 +985,7 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
   const put = (next: Partial<S>, tell?: boolean) => {
     state = { ...state, ...next };
     apply?.(state);
-    if (tell) window.PomRepoFile.onChange?.(state.selected);
+    if (tell) window[bridgeKey].onChange?.(state.selected);
   };
   const commit = (name: string) => put({ selected: name, query: name }, true);
   function View() {
@@ -1012,7 +1026,7 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
-  window.PomRepoFile = {
+  window[bridgeKey] = {
     get: () => state.selected,
     /* A set from outside is the app choosing, not the user — it moves both,
        silently, because the caller is already acting on the new value. The
@@ -1026,7 +1040,9 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
     setOptions: (names: string[]) => put({ all: names || [] }),
     onChange: null,
   };
-})();
+}
+mountRepoFileCombo('repo-file-mount', 'PomRepoFile');
+mountRepoFileCombo('import-repo-file-mount', 'PomImportRepoFile');
 
 window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false, CARD_LEVEL);
 

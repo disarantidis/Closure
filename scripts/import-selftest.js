@@ -1820,7 +1820,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
         };
         const names = ['repoFilePath', 'pushFilePath', 'repoSelectedFile', 'listRepoJsonFiles',
                        'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
-                       'pushOverwriteNote', 'withRootOption', 'folderDisplay'];
+                       'pushOverwriteNote', 'withRootOption', 'folderDisplay',
+                       'setRepoFileOptions', 'chooseRepoFile', 'repoIdentityRow'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1845,6 +1846,22 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              second copy of it to drift. Stubbed here the same way. */
           let picked = '';
           ctx.PomRepoFile = { get: () => picked, set: (v) => { picked = v; }, setOptions: () => {}, onChange: null };
+          /* The import page's picker is a SECOND mount of the same combo over
+             the same selection. Stubbed as its own object on purpose: if the
+             two ever stop being written together, these see it. */
+          let importPicked = '', importOptions = null;
+          ctx.PomImportRepoFile = {
+            get: () => importPicked, set: (v) => { importPicked = v; },
+            setOptions: (n) => { importOptions = n; }, onChange: null,
+          };
+          /* Enough DOM for repoIdentityRow: it builds a row out of three
+             elements and clones the card's mark, which is absent here. */
+          const el = (tag) => ({
+            tagName: tag, className: '', textContent: '', children: [],
+            appendChild(c) { this.children.push(c); return c; },
+            get text() { return this.children.map((c) => c.textContent).join(' '); },
+          });
+          ctx.document = { createElement: el, getElementById: () => null };
           ctx.repoFileNames = [];
           ctx.repoFileName = undefined;
           /* withRootOption reads it; it lives beside it in the template. */
@@ -1860,6 +1877,40 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             text: () => Promise.resolve(JSON.stringify(body)),
           });
           const rejects = async (p) => { try { await p; return null; } catch (e) { return e; } };
+
+          /*
+            ONE SELECTION BEHIND TWO PICKERS. The repo card and the import page
+            ask the same question — which file in the repo — and the bug this
+            pins is them answering it differently, which would send Compare at
+            one document and Import at another.
+          */
+          ctx.chooseRepoFile('themes.json');
+          ok('repo file: choosing moves the repo card and the import page together',
+             picked === 'themes.json' && importPicked === 'themes.json',
+             picked + ' / ' + importPicked);
+          ctx.setRepoFileOptions(['a.json', 'b.json']);
+          ok('repo file: one listing fills both pickers',
+             importOptions && importOptions.join(',') === 'a.json,b.json',
+             JSON.stringify(importOptions));
+          ok('repo file: the read address follows whatever was chosen',
+             ctx.repoFilePath('github') === 'themes.json', ctx.repoFilePath('github'));
+
+          /*
+            NAMING THE REPOSITORY, not just the path inside it. GitLab is
+            self-hostable so the host is part of the answer; GitHub is not.
+            The scheme is dropped from both — nobody checks whether it says
+            https, and it only makes the line longer.
+          */
+          let row = ctx.repoIdentityRow('gitlab');
+          ok('import repo: GitLab is named host/project, without the scheme',
+             row.text === 'gitlab.com/me/my repo main · tokens/out', row.text);
+          row = ctx.repoIdentityRow('github');
+          ok('import repo: GitHub is named owner/repo, and the root folder shows as /',
+             row.text === 'acme/tokens main · /', row.text);
+          /* Put the picker back where it was found: everything below reads the
+             address, and an address still pointing at themes.json makes the
+             next test's filename change look like it did nothing. */
+          ctx.chooseRepoFile('');
 
           /* The listing, and what it is allowed to conclude from each
              answer. A wrong URL fails exactly like an empty repo, which is
