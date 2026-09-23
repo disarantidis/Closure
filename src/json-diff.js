@@ -405,6 +405,42 @@ function normaliseName(name) {
   return n.replace(/s$/, '');
 }
 
+/*
+  TWO REFERENCES TO WHAT IS ARGUABLY ONE NAME.
+
+  Both sides have to be references, they have to be the same depth, and every
+  segment has to normalise to the same word with at least one of them actually
+  spelled differently — so {a.b} against {a.c} is not a match and
+  {letter-spacing.0} against {letterSpacing.0} is.
+
+  normaliseName is the same one the duplicate check uses, which matters: a
+  pair flagged here is a pair that check would cluster, so the two findings
+  agree by construction rather than by two sets of rules that drift.
+*/
+function sameWordDifferentSpelling(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a === b) return false;
+  var m = /^\{(.+)\}$/.exec(a.trim()), n = /^\{(.+)\}$/.exec(b.trim());
+  if (!m || !n) return false;
+  var x = m[1].split('.'), y = n[1].split('.');
+  if (x.length !== y.length) return false;
+  for (var i = 0; i < x.length; i++) {
+    var nx = normaliseName(x[i]), ny = normaliseName(y[i]);
+    /*
+      A SEGMENT WITH NO LETTERS IN IT IS COMPARED AS IT IS WRITTEN.
+
+      normaliseName keeps letters and nothing else, so every numeric step in a
+      scale — `0`, `100`, `950` — normalises to the empty string and would
+      match every other one. That is how the first version of this missed the
+      very pair it was written for: {letter-spacing.0} and {letterSpacing.0}
+      agree on the word and the step, and the step normalised to nothing.
+    */
+    if (!nx || !ny) { if (x[i] !== y[i]) return false; continue; }
+    if (nx !== ny) return false;
+  }
+  return true;
+}
+
 function findDuplicateNames(doc, side) {
   var out = [];
   if (!doc || typeof doc !== 'object') return out;
@@ -415,7 +451,7 @@ function findDuplicateNames(doc, side) {
     /* Leaf groups only — a group whose children are all tokens. Anything
        deeper is structure, and structure sharing a shape is not a duplicate
        name, it is a system with a shape. */
-    var byContent = new Map();
+    var sigOf = new Map();
     Object.keys(root).forEach(function (groupName) {
       if (groupName.charAt(0) === '$') return;
       var group = root[groupName];
@@ -429,26 +465,48 @@ function findDuplicateNames(doc, side) {
         parts.push(keys[i] + '=' + renderValue(tokenValue(child)));
       }
       if (!parts.length) return;
-      var sig = parts.sort().join('|');
-      if (!byContent.has(sig)) byContent.set(sig, []);
-      byContent.get(sig).push(groupName);
+      sigOf.set(groupName, parts.sort().join('|'));
     });
-    byContent.forEach(function (names, sig) {
+    /*
+      CLUSTERED BY THE NAME, AND ONLY THEN ASKED ABOUT THE CONTENT.
+
+      It used to be the other way round: group by identical content first, and
+      report the clusters whose names were one word spelled several ways. That
+      only ever found the harmless case — an exporter writing the same group
+      twice — and walked straight past the one that does damage.
+
+      Measured on a real pair of 35,000-token exports: `letter-spacing` holds
+      a plain `0` and `letterSpacing` holds `-5%`, in the same document, in the
+      same root. Different contents, so the old check said nothing; and because
+      they are different, every token pointing at one reads as changed against
+      every token pointing at the other. It produced 100 rows of a comparison
+      that had exactly one cause.
+
+      So the content is no longer what forms the cluster — it is what the
+      cluster is then asked about, and the answer goes out with the finding.
+      `sameValues: false` is the serious one: not a name written twice, but one
+      idea split in two.
+    */
+    var byWord = new Map();
+    sigOf.forEach(function (sig, name) {
+      var w = normaliseName(name);
+      /* A name with no letters in it normalises to nothing, and two of those
+         are not two spellings of one word — they are two names this check has
+         no opinion about. */
+      if (!w) return;
+      if (!byWord.has(w)) byWord.set(w, []);
+      byWord.get(w).push(name);
+    });
+    byWord.forEach(function (names) {
       if (names.length < 2) return;
-      /* Group the same-content names by what they NORMALISE to, and report
-         only the clusters that are one word written more than one way. */
-      var byWord = new Map();
-      names.forEach(function (n) {
-        var w = normaliseName(n);
-        if (!byWord.has(w)) byWord.set(w, []);
-        byWord.get(w).push(n);
+      var sigs = names.map(function (n) { return sigOf.get(n); });
+      var same = sigs.every(function (x) { return x === sigs[0]; });
+      var counts = sigs.map(function (x) { return x.split('|').length; });
+      out.push({
+        side: side, root: rootName, names: names.slice().sort(),
+        tokens: Math.max.apply(null, counts),
+        sameValues: same,
       });
-      byWord.forEach(function (spellings) {
-        if (spellings.length < 2) return;
-        out.push({ side: side, root: rootName, names: spellings.slice().sort(),
-                   tokens: sig.split('|').length });
-      });
-      void sig;
     });
   });
   return out;
@@ -613,6 +671,8 @@ function compare(figmaDoc, repoDoc) {
     comparable: true,
     problem: null,
     onlyInFigma: [], onlyInRepo: [], changed: [], repointed: [],
+    /* The changed rows collapsed by the change they share — see below. */
+    changedPatterns: [],
     /* One side aliases what the other inlines, and they resolve to the same
        thing — a difference in how the file was written, not in what it says.
        Architecture, not a value: nobody decided anything. */
@@ -946,7 +1006,8 @@ function compare(figmaDoc, repoDoc) {
   var dupBy = new Map();
   dupRaw.forEach(function (d) {
     var k = d.side + '\u241f' + d.names.join('/');
-    if (!dupBy.has(k)) dupBy.set(k, { side: d.side, names: d.names, tokens: d.tokens, documents: 0 });
+    if (!dupBy.has(k)) dupBy.set(k, { side: d.side, names: d.names, tokens: d.tokens,
+                                      sameValues: d.sameValues, documents: 0 });
     dupBy.get(k).documents++;
   });
   report.duplicateNames = Array.from(dupBy.values());
@@ -972,6 +1033,39 @@ function compare(figmaDoc, repoDoc) {
     var others = spellingOf.get(group);
     if (others && others.length) { row.alsoSpelled = others; row.bindableGroup = group; }
   });
+
+  /*
+    ONE CHANGE, HOWEVER MANY TOKENS FOLLOW IT.
+
+    A hundred tokens pointing at the same variable do not become a hundred
+    findings when that variable is swapped for another — they are one edit,
+    reported a hundred times. On a real pair of exports 500 changed rows came
+    from 99 distinct (from, to) pairs, and 447 of those rows sat in a pair that
+    repeated: 100 for one letter-spacing group, 100 for one font family.
+
+    No inference here at all — two rows are the same change when both sides of
+    them are identical strings. What the reader gets is the count, which is the
+    part they were working out by scrolling.
+
+    `sameNameDifferentSpelling` is the one guess, and it is a cheap one: both
+    ends are references, and the names they point at normalise to the same
+    word. That is the pair above — {letter-spacing.0} against {letterSpacing.0}
+    — and on those 99 pairs it fired once, on that one, and nowhere else.
+  */
+  var patternBy = new Map();
+  report.changed.forEach(function (c) {
+    var k = String(c.figma) + '\u241f' + String(c.repo);
+    if (!patternBy.has(k)) {
+      patternBy.set(k, { figma: c.figma, repo: c.repo, type: c.type, count: 0, paths: [],
+                         sameNameDifferentSpelling: sameWordDifferentSpelling(c.figma, c.repo) });
+    }
+    var p = patternBy.get(k);
+    p.count++;
+    if (p.paths.length < 3) p.paths.push(c.path);
+  });
+  report.changedPatterns = Array.from(patternBy.values())
+    .filter(function (p) { return p.count > 1; })
+    .sort(function (a, b) { return b.count - a.count; });
 
   var typeCount = new Map();
   report.changed.forEach(function (c) {
@@ -1060,7 +1154,11 @@ function format(report, opts) {
   return out.join('\n');
 }
 
-  var api = { compare, flatten, countTokens, detectFormat, formatLabel, renderValue, isToken, format };
+  /* findDuplicateNames is exported because it does not need a comparison: it
+     is a reading of ONE document, and the export and import paths both have a
+     document and nothing to compare it against. */
+  var api = { compare, flatten, countTokens, detectFormat, formatLabel, renderValue, isToken, format,
+              findDuplicateNames };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.PomJsonDiff = api;

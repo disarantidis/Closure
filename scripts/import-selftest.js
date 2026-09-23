@@ -2859,6 +2859,69 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
         and the file name field now lists every .json in the repo, so a
         package.json is one click away.
       */
+      /*
+        ONE EDIT, HOWEVER MANY TOKENS FOLLOW IT — and the cause of it, when the
+        cause is a name written two ways.
+
+        This is the shape that produced a hundred rows of a real comparison
+        with one cause: a group called `letter-spacing` and a group called
+        `letterSpacing` in one document, holding different values, with half
+        the tokens pointing at each. Pinned at both ends — the collapse, which
+        is arithmetic, and the spelling flag, which is the one inference and
+        must not fire on an ordinary swap.
+      */
+      {
+        const mk = (ref) => ({ value: '{' + ref + '}', type: 'number' });
+        const L = { core: { 'letter-spacing': { 0: { value: 0, type: 'number' } },
+                            'letterSpacing': { 0: { value: '-5%', type: 'letterSpacing' } },
+                            'font-family': { a: { value: 'Alpha', type: 'fontFamily' } } },
+                    type: { a: mk('letter-spacing.0'), b: mk('letter-spacing.0'),
+                            c: mk('letter-spacing.0'), d: mk('font-family.a') } };
+        const R = { core: { 'letterSpacing': { 0: { value: '0%', type: 'letterSpacing' } },
+                            'font-family': { a: { value: 'Beta', type: 'fontFamily' } } },
+                    type: { a: mk('letterSpacing.0'), b: mk('letterSpacing.0'),
+                            c: mk('letterSpacing.0'), d: mk('font-family.a') } };
+        const rep = JD.compare(L, R);
+        const pats = rep.changedPatterns || [];
+        const big = pats.find((p) => p.count === 3);
+        ok('compare: rows sharing one (from, to) collapse to a single pattern',
+           !!big && big.figma === '{letter-spacing.0}' && big.repo === '{letterSpacing.0}',
+           JSON.stringify(pats));
+        ok('compare: and the pattern says the two names are one word, spelled twice',
+           !!big && big.sameNameDifferentSpelling === true);
+        /* The guard that matters: a font genuinely swapped for another font is
+           the same SHAPE of change and must not be blamed on spelling. */
+        ok('compare: an ordinary swap is not blamed on spelling',
+           pats.every((p) => p.sameNameDifferentSpelling !== true || p === big),
+           JSON.stringify(pats.map((p) => [p.figma, p.repo, p.sameNameDifferentSpelling])));
+        /* Only pairs that repeat are patterns — one row is not a pattern, it
+           is a row, and it is already in the table below. */
+        ok('compare: a change of one token is not reported as a pattern',
+           pats.every((p) => p.count > 1));
+
+        /*
+          THE SAME FINDING WITHOUT A SECOND DOCUMENT. This is the check that
+          could have said so before anybody compared anything — and the pair it
+          has to catch is the one whose two halves DISAGREE, which is exactly
+          what the old content-first version walked past.
+        */
+        const dups = JD.findDuplicateNames(L, 'figma');
+        const ls = dups.find((d) => d.names.join('/') === 'letter-spacing/letterSpacing');
+        ok('names: two spellings of one name are found in a single document',
+           !!ls && ls.root === 'core', JSON.stringify(dups));
+        ok('names: and it says whether the two halves agree',
+           !!ls && ls.sameValues === false);
+        ok('names: a document with one spelling of each has nothing to report',
+           JD.findDuplicateNames(R, 'repo').length === 0,
+           JSON.stringify(JD.findDuplicateNames(R, 'repo')));
+        /* A scale step is not a spelling: `0` and `100` normalise to nothing
+           at all, and matching them would make every ramp a duplicate. */
+        const ramp = { core: { grey: { 0: { value: '#000', type: 'color' },
+                                       100: { value: '#111', type: 'color' } } } };
+        ok('names: numeric steps are not mistaken for one another',
+           JD.findDuplicateNames(ramp, 'figma').length === 0);
+      }
+
       const empty = JD.compare({ $extensions: { 'com.closure': { format: 'legacy' } } }, B);
       ok('compare: an export holding nothing is a failed export, not a mass deletion',
          empty.comparable === false && empty.problem.kind === 'empty-figma',

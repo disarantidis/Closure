@@ -1645,6 +1645,20 @@
       border-radius: 18px;
       padding: var(--spacing-component-4);
     }
+    /* The collapsed-change table: the count leads, because it is the number
+       the reader was working out by scrolling. */
+    .compare-pattern-count {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--app-text);
+    }
+    .compare-pattern-to { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .compare-pattern-why {
+      font-size: 10px;
+      line-height: 1.4;
+      color: var(--app-warning);
+    }
+
     .import-repo-loaded[hidden] { display: none; }
     /*
       THE ROW'S REMOVER, SQUARED UP AND GIVEN THE RIGHT GLYPH.
@@ -2203,8 +2217,8 @@
       width: 100%;
     }
 
-    #closure-warning-mount { margin: 0 16px 16px; }
-    #closure-warning-mount:empty { margin: 0; }
+    #closure-warning-mount, #name-warning-mount { margin: 0 16px 16px; }
+    #closure-warning-mount:empty, #name-warning-mount:empty { margin: 0; }
 
     /* Plain sentence naming what the list below actually is — the list
        itself is just token paths with no label of its own otherwise. */
@@ -2824,6 +2838,10 @@
   </div>
   
   <div id="closure-warning-mount"></div>
+  <!-- Two groups in one document whose names differ only in spelling. Beside
+       the closure warning because both are readings of what this file would
+       export, not of any comparison. -->
+  <div id="name-warning-mount"></div>
   <div id="clear-variables-dialog-mount"></div>
 
     <!-- Between the file-variables card above and push settings below: the
@@ -5213,6 +5231,27 @@
       if (plan.refDuplicates && plan.refDuplicates.length) {
         html += fact(plan.refDuplicates.length,
                      'paths defined identically in several collections — read as one');
+      }
+      /*
+        AND THE SAME READING THE EXPORT SIDE DOES, ON THE FILE JUST READ.
+
+        Two groups whose names differ only in spelling survive an import
+        perfectly — they arrive as two groups, which is what they were. It is
+        worth saying HERE because this is the moment somebody is looking at
+        what the file contains, and because importing it is how the split gets
+        carried into Figma and back out into the next export.
+      */
+      var nameDups = window.PomJsonDiff.findDuplicateNames(importState.doc, 'repo');
+      if (nameDups.length) {
+        html += '<div class="import-fact is-warn"><b>' + nameDups.length + '</b><span>' +
+                (nameDups.length === 1 ? 'name is' : 'names are') +
+                ' spelled two ways in this file</span></div>';
+        html += '<div class="import-warn-note">' + nameDups.map(function (d) {
+          return d.names.join(' \u00b7 ') + ' in ' + d.root +
+                 (d.sameValues ? '' : ' — and they hold different values');
+        }).join('<br>') +
+        '<br>Each pair is one idea written as two groups: half the tokens point at one, ' +
+        'half at the other, and a later comparison reads every one of them as changed.</div>';
       }
       document.getElementById('import-facts').innerHTML = html;
       document.getElementById('import-summary').hidden = false;
@@ -8213,6 +8252,25 @@
         } else {
           window.PomClosureWarning.hide();
           justImported = false;
+        }
+
+        /*
+          AND THE OTHER READING OF THE SAME DOCUMENT.
+
+          Nothing here is broken — this is a shape, not a failure: two groups
+          whose names differ only in spelling are two groups, so half the
+          tokens point at one and half at the other. It costs nothing until
+          somebody compares two exports that split differently, and then it
+          costs a hundred rows with one cause. Cheaper to say now.
+        */
+        /* The document this export WOULD write — getTokensToExport(), the same
+           thing Push and Download and Compare all use — not the sandbox's raw
+           tree, which is keyed by collection rather than by set. */
+        var nameDups = window.PomJsonDiff.findDuplicateNames(getTokensToExport(), 'figma');
+        if (nameDups.length) {
+          window.PomNameWarning.show('In the file this export would write.', nameDups);
+        } else {
+          window.PomNameWarning.hide();
         }
 
         parent.postMessage({

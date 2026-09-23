@@ -723,6 +723,12 @@ declare global {
       setOptions: (names: string[]) => void;
       onChange: ((value: string) => void) | null;
     };
+    /* Two groups in one document whose names differ only in spelling — see
+       mountNameWarning. A reading of one file, not a comparison. */
+    PomNameWarning: {
+      show: (where: string, items: { root: string; names: string[]; tokens: number; sameValues: boolean }[]) => void;
+      hide: () => void;
+    };
     PomClosureWarning: {
       show: (title: string, groups: { ref: string; froms: string[] }[], more?: number, note?: string,
              copyText?: string) => void;
@@ -2316,6 +2322,70 @@ function useClipboard() {
   };
 })();
 
+/* ── one name, spelled two ways ──────────────────────────────────────────────
+
+  A READING OF ONE DOCUMENT, WHICH IS WHY IT IS NOT ON THE COMPARE PAGE.
+
+  Two groups whose names differ only in spelling — `letter-spacing` and
+  `letterSpacing` in the same root — are two groups as far as everything
+  downstream is concerned. Nothing breaks. It simply means half the tokens
+  point at one and half at the other, and the day anybody compares two exports
+  that split differently, every one of those tokens reads as changed. That is
+  what produced a hundred rows of a comparison with one cause.
+
+  So it is reported where the document is, not where two documents are: after
+  an export, and after reading a file to import. Both have a document in hand
+  and nothing to compare it against, and both are earlier than the moment the
+  damage shows.
+
+  `warning`, not `error`. Nothing has failed and nothing will; this is a shape
+  worth straightening before it costs anybody an afternoon.
+*/
+(function mountNameWarning() {
+  const container = document.getElementById('name-warning-mount');
+  let set: (u: any) => void = () => {};
+  type Dup = { root: string; names: string[]; tokens: number; sameValues: boolean };
+  function View() {
+    const [s, setS] = useState<{ open: boolean; where: string; items: Dup[] }>(
+      { open: false, where: '', items: [] });
+    set = setS;
+    if (!s.open || !s.items.length) return null;
+    const n = s.items.length;
+    return (
+      <Alert
+        tone="warning"
+        title={n === 1 ? 'One name is spelled two ways' : n + ' names are spelled two ways'}
+      >
+        <p className="closure-warning-subtitle">
+          {s.where} Each pair below is one idea written as two groups, so half
+          the tokens point at one and half at the other.
+        </p>
+        <ul className="closure-warning-list">
+          {s.items.map((d) => (
+            <li key={d.root + '/' + d.names.join('/')}>
+              <div className="closure-warning-missing">{d.names.join('  ·  ')}</div>
+              <div className="closure-warning-froms">
+                in {d.root}
+                {/* The pair that holds DIFFERENT values is the one that costs
+                    something: the same token name resolves to two answers
+                    depending on which spelling it went through. */}
+                {d.sameValues
+                  ? ' — same values in both, so only the name is split'
+                  : ' — and they hold different values'}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Alert>
+    );
+  }
+  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
+  window.PomNameWarning = {
+    show: (where, items) => set(() => ({ open: true, where, items })),
+    hide: () => set((s: any) => ({ ...s, open: false })),
+  };
+})();
+
 /* ── the Compare page ──────────────────────────────────────────────────────── */
 /*
   WHAT DIFFERS BETWEEN THIS FILE'S EXPORT AND THE REPO'S JSON.
@@ -2692,6 +2762,71 @@ const COMPARE_SAMPLE = 40;
       );
     };
 
+    /*
+      ONE EDIT, AND HOW MANY TOKENS FOLLOWED IT.
+
+      Every table below this is keyed by token, which is right for reading what
+      happened to a token and wrong for reading what happened. A variable
+      swapped for another one puts a row in those tables for every token that
+      pointed at it: measured on a real pair of exports, 500 changed rows came
+      from 99 distinct (from, to) pairs, and a hundred of the rows were one
+      letter-spacing group.
+
+      So the same rows are offered here first, collapsed by the change itself,
+      biggest first. Nothing is inferred to build it — two rows are the same
+      change when both of their sides are identical strings.
+    */
+    const patterns = (rows: any[]) => {
+      if (!rows.length) return null;
+      const title = 'What changed \u2014 by the change, not the token';
+      return (
+        <div className="json-download-card" data-level={4} key={title}>
+          <div className="json-download-header">
+            <div className="json-download-title-group">
+              <p className="json-download-title">{title}</p>
+            </div>
+            <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
+          </div>
+          <div className="compare-table">
+            <Table
+              caption={title}
+              captionHidden
+              size="small"
+              rules
+              columns={[
+                { key: 'count', header: 'Tokens',
+                  cell: (x: any) => <span className="compare-pattern-count">{x.count.toLocaleString()}</span> },
+                { key: 'figma', header: headWith(IconFigma(12), 'Was'),
+                  cell: (x: any) => pathCell(String(x.figma), x.type) },
+                { key: 'repo',
+                  header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
+                                 : s.sides.provider === 'github' ? IconGithub(12) : null, 'Now'),
+                  cell: (x: any) => (
+                    <span className="compare-pattern-to">
+                      {pathCell(String(x.repo), x.type)}
+                      {/*
+                        THE CAUSE, ON THE LINE THAT SHOWS IT. Both ends point at
+                        names that are one word spelled two ways, which is not a
+                        decision anybody made — it is two groups that were meant
+                        to be one. See sameWordDifferentSpelling.
+                      */}
+                      {x.sameNameDifferentSpelling && (
+                        <span className="compare-pattern-why">one name, spelled two ways</span>
+                      )}
+                    </span>
+                  ) },
+              ]}
+              rows={rows.slice(0, COMPARE_SAMPLE)}
+              rowKey={(x: any) => String(x.figma) + '\u241f' + String(x.repo)}
+            />
+          </div>
+          {rows.length > COMPARE_SAMPLE && (
+            <p className="compare-more">+{(rows.length - COMPARE_SAMPLE).toLocaleString()} more</p>
+          )}
+        </div>
+      );
+    };
+
     const leaves = (title: string, rows: any[], twoSided: boolean,
                     flagOf?: (row: any) => ReactNode) => {
       if (!rows.length) return null;
@@ -2932,6 +3067,9 @@ const COMPARE_SAMPLE = 40;
           (color)" reads as a filter applied to something, when it is simply
           everything there is.
         */}
+        {/* Before the per-token tables, because it is the shorter answer to
+            the same question and usually the whole of it. */}
+        {patterns(r.changedPatterns || [])}
         {(r.changedByType || []).length > 1
           ? r.changedByType.map((t: any) =>
               leaves('Values \u2014 ' + t.type, r.changed.filter((c: any) => c.type === t.type), true))
