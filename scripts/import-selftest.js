@@ -2062,6 +2062,11 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              offer([], null) === true);
           ok('folder offer: shown once a listing exists, with nothing saved yet',
              offer([], ['Spar', 'tokens']) === false);
+          /* A listing that found nothing is not a listing worth a button. The
+             dialog behind it would open holding the sentence "there is nothing
+             here", which the sync line already says without a modal. */
+          ok('folder offer: absent when the sync found no folders at all',
+             offer([], []) === true);
           ok('folder offer: and still shown when some are saved and more remain',
              offer(['Spar'], ['Spar', 'tokens']) === false);
           /* It does not vanish at the moment everything is added — the dialog

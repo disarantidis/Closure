@@ -5255,13 +5255,29 @@
           The line stays for the failures, which is the half that cannot be
           inferred from anywhere else.
         */
+        /*
+          AN EMPTY REPOSITORY IS THE ONE SUCCESS WORTH A SENTENCE.
+
+          Everything else this sync learns is either on screen already or is on
+          the button. "There are no folders in it" is neither, and it is the
+          answer somebody pressed Sync to get — so it goes on the line rather
+          than into a dialog that opens holding nothing.
+        */
         lastSyncedAt[which] = Date.now();
         syncStatus(which, res.truncated
           ? 'This repo holds more folders than one listing can hold — type a path if one is missing'
-          : '', res.truncated ? 'ok' : null);
+          : !res.folders.length
+            ? 'No folders in ' + where + ' — a push with none chosen goes to the root'
+            : '', res.truncated || !res.folders.length ? 'ok' : null);
         refreshSyncLabels();
         refreshFolderImportOffer();
-        if (!saved.length) openFolderDiscovery(which);
+        /*
+          ONLY WHEN THERE IS SOMETHING IN IT. The dialog exists to hand over the
+          paths a sync found, and a repository with no folders has none to hand
+          over — it opened to report that it was empty, which is a modal in the
+          way of an answer the line above gives for free.
+        */
+        if (!saved.length && res.folders.length) openFolderDiscovery(which);
       }, function (err) {
         btn.setLoading(false);
         /* Name the thing that was refused. "Could not connect" sends somebody
@@ -5335,14 +5351,19 @@
       field for typing a path by hand. A control that comes and goes as paths
       are added and removed is one nobody can learn the position of.
 
-      Still absent before any sync. There is nothing to choose from, and a
-      dialog that opens on an empty list answers a question by not answering it.
+      Still absent before any sync, and absent when the sync found nothing.
+      There is nothing to choose from in either case, and a button whose whole
+      offer is a dialog reading "there is nothing here" is a route to a dead
+      end. The permanence argument above is about a repository that HAS folders
+      — where the route is worth learning the position of; there is no route to
+      be permanent about when the other end is empty.
     */
     function refreshFolderImportOffer() {
       [['gitlab', 'folder-import-row'], ['github', 'github-folder-import-row']]
         .forEach(function (row) {
           var el = document.getElementById(row[1]);
-          if (el) el.hidden = !lastDiscovered[row[0]];
+          var found = lastDiscovered[row[0]];
+          if (el) el.hidden = !(found && found.length);
         });
       refreshFolderMissingOffer();
     }
