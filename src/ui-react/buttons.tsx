@@ -3042,75 +3042,93 @@ const COMPARE_SAMPLE = 40;
             </div>
           </div>
 
-          {/*
-            EVERY SYMBOL NAMED, AND ONLY ONCE.
+          {(() => {
+            /*
+              ONLY THE COLLECTIONS THAT MOVED, AND A COUNT OF THE REST.
 
-            The key said "~ values + - → architecture" — four of the six marks,
-            two of them labelled by the group they belong to rather than by what
-            they count, and `=` and `↳` not mentioned at all. Someone reading a
-            row had to infer three of the six from position.
+              The list is every collection either side holds — on a real file
+              forty-five of them, twelve of which differ. The other thirty-three
+              were a row each saying "identical", with a name to read past
+              first: not a list of what happened, but the table of contents of
+              the document with the answer hidden inside it.
 
-            Tags, because the key is a legend and not a row of numbers: it
-            should not line up under the counts as if it were one more
-            collection with six figures of its own.
-          */}
-          <div className="compare-group-name compare-key-title">per collection</div>
-          <div className="compare-key">
-            {COUNT_KEYS.map((k) => (
-              /* `label` as well as children: Tag takes the accessible name
-                 separately once the visible content is markup, and the mark is
-                 drawn in a face a screen reader should not try to pronounce. */
-              <Tag key={k.sym} variant="tonal" size="small" label={k.sym + ' means ' + k.label}>
-                <span className="compare-key-sym" aria-hidden>{k.sym}</span>{k.label}
-              </Tag>
-            ))}
-          </div>
-          <div className="compare-groups">
-            {r.groups.map((g: any) => {
-              /*
-                ONLY WHAT HAPPENED. Six figures per row, four of them zero, is
-                four numbers to read past to find the one that is not — and on a
-                file with thirty collections that is a hundred and twenty zeroes
-                on screen. A row now carries the marks that have a count, so the
-                shape of a collection is legible across the column: a row with
-                one `~` did one thing, a row with `~` and `→` did two.
-              */
-              const shown = COUNT_KEYS.filter((k) => (g[k.field] || 0) > 0);
-              return (
-                <div className="compare-group" key={g.name}>
-                  <span className="compare-group-name">{g.name}</span>
-                  <span className="compare-group-counts">
+              Collections that did nothing are worth one sentence — that they
+              exist and that they are fine — so they get one. The names go,
+              because nobody scans a list of unchanged things for a name: the
+              question a specific collection raises is whether it moved, and
+              its absence from a list of what moved answers that.
+            */
+            const rows = r.groups
+              .map((g: any) => ({ g, shown: COUNT_KEYS.filter((k) => (g[k.field] || 0) > 0) }))
+              .filter((x: any) => x.shown.length);
+            const quiet = r.groups.length - rows.length;
+            return (
+              <>
+                {rows.length > 0 && (
+                  <>
                     {/*
-                      TAGS, THE SAME SHAPE AS THE KEY ABOVE THEM. Bare figures
-                      in a row read as one number broken into parts — `~40 +15
-                      −25` looked like an equation. A tag each makes them
-                      countable at a glance, and it is the legend's own shape,
-                      so the eye matches a row to the key by form as well as by
-                      symbol.
+                      EVERY SYMBOL NAMED, AND ONLY ONCE. The key read "~ values
+                      + - → architecture": four of the six marks, two of them
+                      labelled by the group they belong to rather than by what
+                      they count, and `=` and `↳` never mentioned.
 
-                      `primary` for the values mark, tonal for the rest: it is
-                      the only one of the six that is a decision somebody made.
+                      Tags, because a legend is not a row of numbers and should
+                      not line up under the counts as though it were one more
+                      collection with six figures of its own.
                     */}
-                    {shown.length
-                      ? shown.map((k) => (
-                          <Tag key={k.sym}
-                               variant={k.field === 'changed' ? 'primary' : 'tonal'}
-                               size="small"
-                               label={(g[k.field] || 0) + ' ' + k.label}>
-                            <span className="compare-key-sym" aria-hidden>{k.sym}</span>
-                            {(g[k.field] || 0).toLocaleString()}
-                          </Tag>
-                        ))
-                      /* A collection can be in this list and have nothing in
-                         it — the list is every collection either side holds,
-                         not every collection that differs. Saying so beats a
-                         row of blanks that reads as a rendering fault. */
-                      : <span className="compare-count is-zero" title="nothing differs here">identical</span>}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                    <div className="compare-group-name compare-key-title">per collection</div>
+                    <div className="compare-key">
+                      {COUNT_KEYS.map((k) => (
+                        /* `label` as well as children: Tag takes the accessible
+                           name separately once the visible content is markup,
+                           and the mark is drawn in a face a screen reader
+                           should not try to pronounce. */
+                        <Tag key={k.sym} variant="tonal" size="small" label={k.sym + ' means ' + k.label}>
+                          <span className="compare-key-sym" aria-hidden>{k.sym}</span>{k.label}
+                        </Tag>
+                      ))}
+                    </div>
+                    <div className="compare-groups">
+                      {rows.map(({ g, shown }: any) => (
+                        <div className="compare-group" key={g.name}>
+                          <span className="compare-group-name">{g.name}</span>
+                          <span className="compare-group-counts">
+                            {/*
+                              TAGS, THE SAME SHAPE AS THE KEY ABOVE. Bare
+                              figures in a row read as one number broken into
+                              parts — `~40 +15 −25` looked like an equation. A
+                              tag each makes them countable at a glance.
+
+                              `primary` for the values mark, tonal for the rest:
+                              it is the only one of the six that is a decision
+                              somebody made.
+                            */}
+                            {shown.map((k: any) => (
+                              <Tag key={k.sym}
+                                   variant={k.field === 'changed' ? 'primary' : 'tonal'}
+                                   size="small"
+                                   label={(g[k.field] || 0) + ' ' + k.label}>
+                                <span className="compare-key-sym" aria-hidden>{k.sym}</span>
+                                {(g[k.field] || 0).toLocaleString()}
+                              </Tag>
+                            ))}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {quiet > 0 && (
+                  <p className="compare-groups-rest">
+                    {rows.length === 0
+                      ? 'All ' + quiet.toLocaleString() + ' collections are identical.'
+                      : 'The other ' + quiet.toLocaleString() + ' collection' +
+                        (quiet === 1 ? ' is' : 's are') + ' identical.'}
+                  </p>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         {/*

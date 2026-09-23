@@ -1380,6 +1380,16 @@
     /* The mark in front of a side's name, at the size of the text beside it. */
     .compare-side-name { display: flex; align-items: center; gap: 6px; }
     .compare-side-mark { display: flex; flex-shrink: 0; opacity: 0.85; }
+    /* The collections that did nothing, in one line at the foot of the ones
+       that did. Quiet, because it is the absence of news. */
+    .compare-groups-rest {
+      margin: 10px 0 0;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--app-text-muted);
+      opacity: 0.75;
+    }
+
     .compare-key-sym {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-weight: 700;

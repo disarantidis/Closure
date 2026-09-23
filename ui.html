@@ -1380,6 +1380,16 @@
     /* The mark in front of a side's name, at the size of the text beside it. */
     .compare-side-name { display: flex; align-items: center; gap: 6px; }
     .compare-side-mark { display: flex; flex-shrink: 0; opacity: 0.85; }
+    /* The collections that did nothing, in one line at the foot of the ones
+       that did. Quiet, because it is the absence of news. */
+    .compare-groups-rest {
+      margin: 10px 0 0;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--app-text-muted);
+      opacity: 0.75;
+    }
+
     .compare-key-sym {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-weight: 700;
@@ -51235,35 +51245,42 @@ html[data-theme=dark] {
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: r.sameCount.toLocaleString() }),
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "identical" })
           ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-group-name compare-key-title", children: "per collection" }),
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-key", children: COUNT_KEYS.map((k) => (
-            /* `label` as well as children: Tag takes the accessible name
-               separately once the visible content is markup, and the mark is
-               drawn in a face a screen reader should not try to pronounce. */
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(Tag, { variant: "tonal", size: "small", label: k.sym + " means " + k.label, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-key-sym", "aria-hidden": true, children: k.sym }),
-              k.label
-            ] }, k.sym)
-          )) }),
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-groups", children: r.groups.map((g) => {
-            const shown = COUNT_KEYS.filter((k) => (g[k.field] || 0) > 0);
-            return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-group", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-group-name", children: g.name }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-group-counts", children: shown.length ? shown.map((k) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
-                Tag,
-                {
-                  variant: k.field === "changed" ? "primary" : "tonal",
-                  size: "small",
-                  label: (g[k.field] || 0) + " " + k.label,
-                  children: [
+          (() => {
+            const rows = r.groups.map((g) => ({ g, shown: COUNT_KEYS.filter((k) => (g[k.field] || 0) > 0) })).filter((x) => x.shown.length);
+            const quiet = r.groups.length - rows.length;
+            return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
+              rows.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-group-name compare-key-title", children: "per collection" }),
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-key", children: COUNT_KEYS.map((k) => (
+                  /* `label` as well as children: Tag takes the accessible
+                     name separately once the visible content is markup,
+                     and the mark is drawn in a face a screen reader
+                     should not try to pronounce. */
+                  /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(Tag, { variant: "tonal", size: "small", label: k.sym + " means " + k.label, children: [
                     /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-key-sym", "aria-hidden": true, children: k.sym }),
-                    (g[k.field] || 0).toLocaleString()
-                  ]
-                },
-                k.sym
-              )) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count is-zero", title: "nothing differs here", children: "identical" }) })
-            ] }, g.name);
-          }) })
+                    k.label
+                  ] }, k.sym)
+                )) }),
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-groups", children: rows.map(({ g, shown }) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-group", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-group-name", children: g.name }),
+                  /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-group-counts", children: shown.map((k) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
+                    Tag,
+                    {
+                      variant: k.field === "changed" ? "primary" : "tonal",
+                      size: "small",
+                      label: (g[k.field] || 0) + " " + k.label,
+                      children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-key-sym", "aria-hidden": true, children: k.sym }),
+                        (g[k.field] || 0).toLocaleString()
+                      ]
+                    },
+                    k.sym
+                  )) })
+                ] }, g.name)) })
+              ] }),
+              quiet > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "compare-groups-rest", children: rows.length === 0 ? "All " + quiet.toLocaleString() + " collections are identical." : "The other " + quiet.toLocaleString() + " collection" + (quiet === 1 ? " is" : "s are") + " identical." })
+            ] });
+          })()
         ] }),
         patterns(r.changedPatterns || []),
         spellings(r.duplicateNames || []),
@@ -56680,7 +56697,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '2b29ae0 19:31:42';
+    var CLOSURE_BUILD = '776ea6f 19:35:19';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
