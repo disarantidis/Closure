@@ -2292,9 +2292,16 @@
       color: var(--app-text);
     }
     .json-download-title-icon { flex-shrink: 0; }
-    /* The header's trailing pair — the size tag and Download. justify-content:
-       space-between already holds the title at one end and these at the other;
-       this is only the gap between the two of them. */
+    /*
+      THE SIZE READS WITH THE TITLE, NOT AT THE OTHER END OF THE ROW.
+
+      It is a property of the thing the title names — this file is 9.89 MB —
+      and space-between had it floating in the middle, equidistant from the
+      words it belongs to and the button it has nothing to do with. An auto
+      margin at its trailing edge takes the row's slack instead, so the tag
+      sits with the title and Download keeps the far right on its own.
+    */
+    #json-download-card .json-download-header #json-file-size-mount { margin-inline-end: auto; }
     #json-download-card .json-download-header #download-btn-mount { display: flex; }
     /* The header's trailing group. Two things now — the token-count tag and
        the Compare button — and .json-download-header's space-between would
@@ -2318,7 +2325,6 @@
     .folder-push-cell { display: flex; align-items: center; gap: 8px; flex: 1 1 0; min-width: 0; }
     .folder-push-cell[hidden] { display: none; }
     #compare-folder-mount[hidden] { display: none; }
-    #download-btn-mount[hidden] { display: none; }
     .repo-file-half { flex: 1 1 0; min-width: 0; }
     /*
       A control ON the wire, between two cards. The wire is painted behind
@@ -49744,10 +49750,9 @@ html[data-theme=dark] {
         in a header beside a small Tag now, and the rule is to match the band of
         the row you are actually in.
     
-        It is also a PUSH-ONLY control. There is nothing to download while the card
-        is comparing — the file being read is already in the repository — so
-        applyRepoMode takes it off the header rather than leaving a button that
-        would produce the wrong file.
+        It is in BOTH modes. Hiding it while comparing read the button as belonging
+        to the repository; it does not — it saves the JSON just made out of the
+        Figma file, which is one of the two things a comparison is about.
       */
     download: mountLiveIconButton(
       "download-btn-mount",
@@ -56137,7 +56142,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'e26a051 17:39:18';
+    var CLOSURE_BUILD = '7943e77 17:43:29';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -59209,9 +59214,13 @@ function format(report, opts) {
       if (el('compare-folder-mount')) el('compare-folder-mount').hidden = !comparing;
       if (el('primary-filename-mount')) el('primary-filename-mount').hidden = comparing;
       if (el('compare-pick-mount')) el('compare-pick-mount').hidden = !comparing;
-      /* And there is nothing to download while comparing: the file on the
-         other side is already in the repository. */
-      if (el('download-btn-mount')) el('download-btn-mount').hidden = comparing;
+      /*
+        DOWNLOAD STAYS IN BOTH, and taking it out of Compare was reading the
+        button as belonging to the repository. It does not: it saves the JSON
+        this plugin just made out of the Figma file, which is one of the two
+        things a comparison is ABOUT. Wanting it is at its most likely exactly
+        here — a diff you disagree with is a file you want a copy of.
+      */
       showCompareSides();
     }
 

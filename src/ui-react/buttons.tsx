@@ -783,10 +783,9 @@ window.PomButtons = {
     in a header beside a small Tag now, and the rule is to match the band of
     the row you are actually in.
 
-    It is also a PUSH-ONLY control. There is nothing to download while the card
-    is comparing — the file being read is already in the repository — so
-    applyRepoMode takes it off the header rather than leaving a button that
-    would produce the wrong file.
+    It is in BOTH modes. Hiding it while comparing read the button as belonging
+    to the repository; it does not — it saves the JSON just made out of the
+    Figma file, which is one of the two things a comparison is about.
   */
   download: mountLiveIconButton(
     'download-btn-mount',
