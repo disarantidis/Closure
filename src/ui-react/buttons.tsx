@@ -156,15 +156,48 @@ const IconMoon = svg('M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z');
 // two rows down, not a lookalike.
 const IconGitLab = svg('M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024', { fill: true });
 const IconGitHub = svg('M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z', { fill: true });
-// Leads the collections card's own title. Was a generic hexagon/nut outline
-// approximating Figma's own Variables mark; now the Closure brand's own
-// variables glyph (Pomegranate Identity, Figma node 16:31) — a hexagon ring
-// with a centred dot. Same artwork as the main screen's empty state
-// (.empty-state-icon in ui.template.html), so the mark that says "variables"
-// when there are none is the same one that labels them when there are.
+// The Closure brand's own variables glyph (Pomegranate Identity, Figma node
+// 16:31) — a hexagon ring with a centred dot. Same artwork as the main
+// screen's empty state (.empty-state-icon in ui.template.html), so the mark
+// that says "variables" when there are none is the same one that labels them
+// when there are.
+//
+// It led the collections card's TITLE until that title turned out to be the
+// Figma file's name, which is not a set of variables; it rides the token
+// count on the same row now, which is. IconFigma below took the title.
+//
 // A filled path, not a stroked Lucide glyph, and not square — hence the
 // viewBox option on svg() above.
 const IconVariables = svg('M224.291 0C228.861 3.11883 238.191 8.06017 243.27 10.9668L281.556 32.8584L392.028 95.9863L428.185 116.635C434.503 120.242 441.916 124.242 448.033 128.062C448.483 148.142 448.103 169.751 448.101 189.924L448.105 306.543L448.103 360.293L448.098 374.702C448.098 377.135 448.205 381.697 447.82 383.935C443.788 386.807 433.849 392.125 429.188 394.787L392.193 415.928L272.538 484.298L239.216 503.332L229.285 509.01C228.22 509.625 225.181 511.308 224.288 512H223.83C222.29 510.83 217.99 508.542 216.113 507.475L201.5 499.152L151.188 470.4L52.6142 414.065C35.5567 404.318 17.3488 393.465 0.17279 384.202C-0.146659 380.552 0.074087 372.922 0.0770869 369.082L0.0966182 339.25V245.088L0.0917353 165.016L0.07904 140.786C0.07729 137.155 -0.113577 130.988 0.271423 127.627C2.4837 126.682 7.26641 123.797 9.47064 122.538L26.4013 112.864L82.288 80.9268L176.742 26.9512L207.661 9.27637C212.712 6.38948 218.963 3.05347 223.806 0H224.291ZM121.38 132.478L84.4013 153.616C78.0818 157.23 70.2297 161.424 64.2382 165.293C63.7863 169.694 64.0934 181.281 64.0966 186.091L64.0986 227.669L64.0976 306.69C64.0973 319.825 63.8929 333.585 64.1054 346.67C72.8009 352.04 82.9489 357.555 91.8798 362.66L142.331 391.513L195.479 421.912C198.771 423.795 222.196 437.655 224.516 438.027C228.588 435.367 234.108 432.405 238.408 429.947L262.876 415.965L342.681 370.327L368.863 355.367C373.798 352.547 379.263 349.577 384.023 346.582C384.308 334.062 384.093 320.717 384.093 308.125L384.098 237.584V190.074C384.098 182.797 384.408 172.467 384.013 165.405C379.773 162.667 374.738 159.937 370.296 157.402L348.313 144.837L279.016 105.205L241.575 83.8037C238.682 82.1443 225.577 74.3711 223.738 73.959L121.38 132.478ZM220.128 192.146C255.353 189.98 285.681 216.747 287.908 251.97C290.136 287.192 263.42 317.565 228.2 319.853C192.897 322.145 162.434 295.35 160.202 260.043C157.97 224.736 184.816 194.318 220.128 192.146Z', { fill: true, viewBox: '0 0 448.253 512' });
+
+/*
+  THE FIGMA MARK, outline weight — drawn from the node this was taken from
+  (file 0ZdPQU4nErWe4ow95W1mKT, node 22:6).
+
+  It leads the collections card, whose title is the FIGMA FILE'S NAME. The
+  variables glyph that used to sit there was naming the wrong thing: the words
+  beside it are "Untitled", or "Sarantidis Foundations" — a file, not a set of
+  variables. The variables mark moved to the token count tag on the same row,
+  where what it labels really is the variables.
+
+  GEOMETRY, NOT TRACING. The mark is five shapes on a 2x3 grid of squares: two
+  half-pills making the top row, a half-pill and a circle making the middle,
+  and a flat-topped circle at the bottom left. Every corner radius is half a
+  cell, so with a cell of 7 the whole mark is 14 by 21 — the 2:3 the logo has
+  — centred in a 16x24 box with one unit of margin for the stroke.
+
+  Each piece is CLOSED (Z) on purpose. The closing edge is the vertical stem
+  down the middle, and without it the top row has no divider — which is the
+  one line that makes the mark read as an F rather than as a stack of pills.
+*/
+const IconFigma = svg(
+  'M8 1.5 H4.5 A3.5 3.5 0 0 0 4.5 8.5 H8 Z' +
+  'M8 1.5 H11.5 A3.5 3.5 0 0 1 11.5 8.5 H8 Z' +
+  'M8 8.5 H4.5 A3.5 3.5 0 0 0 4.5 15.5 H8 Z' +
+  'M15 12 A3.5 3.5 0 1 1 8 12 A3.5 3.5 0 1 1 15 12 Z' +
+  'M8 15.5 H4.5 A3.5 3.5 0 1 0 8 19 Z',
+  { viewBox: '0 0 16 24' },
+);
 
 /* ── size / variant maps (mount prop shape → Pomegranate) ───────────────────── */
 function btnVariant(v?: string): 'primary' | 'tonal' | 'ghost' {
@@ -1445,7 +1478,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
                 summary keeps flex:1 (below), which is what pushes the
                 tags there — no separate alignment rule needed for them. */}
             <div className="collections-header-top">
-              <span className="collections-header-icon" aria-hidden="true">{IconVariables(18)}</span>
+              <span className="collections-header-icon" aria-hidden="true">{IconFigma(18)}</span>
               <span className="collections-summary">{state.title}</span>
               <div className="collections-summary-tags">
                 {/* tonal, not ghost — same fix as the per-row counts below
@@ -1458,7 +1491,12 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
                     to the "Json file" card's own title row instead (see
                     mountJsonFileCard below) — size describes the JSON file,
                     which now has a title of its own to sit under. */}
-                {state.summary.tokens ? <Tag variant="tonal" size="small">{state.summary.tokens}</Tag> : null}
+                {/* The variables glyph rides the COUNT now, not the title —
+                    it is the one thing on this row that is actually about
+                    variables. `leading`, the slot Tag keeps for exactly this. */}
+                {state.summary.tokens
+                  ? <Tag variant="tonal" size="small" leading={IconVariables(11)}>{state.summary.tokens}</Tag>
+                  : null}
               </div>
             </div>
           </div>
