@@ -1383,6 +1383,8 @@
        name the plugin happens to push to. Same picker as the repo card, same
        selection behind it. */
     .import-repo-file { margin: 0 0 12px; text-align: left; }
+    .import-repo-pickers { display: flex; gap: 8px; }
+    .import-repo-pickers > .repo-file-half { flex: 1 1 0; min-width: 0; }
     .import-repo-file-label {
       display: block; margin: 0 0 4px;
       font-size: 11px; opacity: 0.7; text-align: center;
@@ -22430,9 +22432,19 @@ html[data-theme=dark] {
       <div class="import-repo" id="import-repo" hidden>
         <p class="import-repo-title">…or import from the repo</p>
         <div class="import-repo-where" id="import-repo-where"></div>
+        <!--
+          THE PATH, AS TWO CONTROLS RATHER THAN A SENTENCE. The folder used to
+          be a word in the line above, which says where the file is without
+          letting you go anywhere else; the same repo usually holds more than
+          one folder worth reading. Folder first, then file, in the order the
+          path itself reads and in the same order as the repo card.
+        -->
         <div class="import-repo-file" id="import-repo-file" hidden>
           <span class="import-repo-file-label" id="import-repo-file-label"></span>
-          <span id="import-repo-file-mount"></span>
+          <div class="import-repo-pickers">
+            <span id="import-folder-select-mount" class="repo-file-half"></span>
+            <span id="import-repo-file-mount" class="repo-file-half"></span>
+          </div>
         </div>
         <div class="import-repo-actions">
           <span id="import-pull-gitlab-mount"></span>
@@ -49705,6 +49717,7 @@ html[data-theme=dark] {
   mountIconButton("folder-create-mount", { id: "folder-create-btn", variant: "outline", size: "medium", title: "Use this folder path \u2014 created on the first push", "aria-label": "Use this folder path", icon: IconAdd(16) }, CARD_LEVEL);
   window.PomFolderSelect = { ...mountFolderCombo("folder-select-mount", "PomFolderSelect", "choose a folder"), onChange: null };
   window.PomGithubFolderSelect = { ...mountFolderCombo("github-folder-select-mount", "PomGithubFolderSelect", "choose a folder"), onChange: null };
+  window.PomImportFolderSelect = { ...mountFolderCombo("import-folder-select-mount", "PomImportFolderSelect", "choose a folder"), onChange: null };
   window.PomFolderNew = { ...mountFolderCombo("folder-new-mount", "PomFolderNew", "find or type a folder"), onChange: null };
   window.PomGithubFolderNew = { ...mountFolderCombo("github-folder-new-mount", "PomGithubFolderNew", "find or type a folder"), onChange: null };
   function mountFolderList(mountId, bridgeKey, idPrefix, level = GROUND) {
@@ -55123,7 +55136,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '29a7950 12:35:07';
+    var CLOSURE_BUILD = 'd2c8d32 12:46:56';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -55903,6 +55916,7 @@ function format(report, opts) {
       where.textContent = '';
       if (gl) where.appendChild(repoIdentityRow('gitlab'));
       if (gh) where.appendChild(repoIdentityRow('github'));
+      renderImportFolderSelect();
       /* The listing is what fills the file picker, and it is the repo card's
          listing — the same folder, the same branch, cached under the same key,
          so arriving here does not re-ask for something already known. */
@@ -55941,7 +55955,9 @@ function format(report, opts) {
       row.appendChild(name);
       var path = document.createElement('span');
       path.className = 'import-repo-path';
-      path.textContent = c.branch + ' · ' + folderDisplay(c.folder);
+      /* The branch only. The folder is a control below, and naming it twice
+         means one of the two is wrong the moment the control is used. */
+      path.textContent = c.branch;
       row.appendChild(path);
       return row;
     }
@@ -55954,14 +55970,33 @@ function format(report, opts) {
       be changed; with nothing listed yet it says that instead, because an
       empty box next to an Import button reads as a fault.
     */
+    /*
+      THE SAME FOLDERS THE REPO CARD OFFERS, on the page that reads from them.
+      One combo for whichever provider is active, fed the same way its card is —
+      the discovered paths plus the repo root, which shows as "/" so that a
+      chosen root reads as chosen rather than as an empty box.
+    */
+    function renderImportFolderSelect() {
+      if (!window.PomImportFolderSelect) return;
+      var which = activeRepoProvider();
+      var folders = which === 'gitlab' ? glFolders : ghFolders;
+      var active = which === 'gitlab' ? glActiveFolder : ghActiveFolder;
+      window.PomImportFolderSelect.setItems(withRootOption(folders), folderDisplay(active));
+    }
+
     function refreshImportRepoFile() {
       var box = document.getElementById('import-repo-file');
       if (!box) return;
       var label = document.getElementById('import-repo-file-label');
       var mount = document.getElementById('import-repo-file-mount');
       var names = repoFileNames;
-      box.hidden = !repoListed;
-      if (!repoListed) return;
+      renderImportFolderSelect();
+      /* The FOLDER picker stays up whatever the listing says — an empty folder
+         is the one case where you most need to go and choose another. Only the
+         file picker comes and goes with the files. */
+      box.hidden = !activeRepoProvider();
+      if (box.hidden) return;
+      if (!repoListed) { mount.hidden = true; label.textContent = 'Looking…'; return; }
       /* A folder with nothing in it gets the sentence and no box: there is
          nothing to choose between, and an empty picker would only invite a
          click that cannot go anywhere. */
@@ -56809,6 +56844,7 @@ function format(report, opts) {
       if (val && list.indexOf(val) === -1) list.push(val);
       if (which === 'github') ghActiveFolder = val; else glActiveFolder = val;
       if (which === 'github') renderGithubFolderList(); else renderFolderList();
+      renderImportFolderSelect();   // the import page shows the same folder
       persistSettings();    // remember both the pick and any new path
       refreshRepoReadRow(); // a different folder is a different file to compare
     }
@@ -56873,6 +56909,18 @@ function format(report, opts) {
     // Main-screen GitHub folder dropdown (shown only when relevant to the
     // current mainProviderTab) → same behavior as GitLab's own dropdown above.
     window.PomGithubFolderSelect.onChange = function(value) { chooseFolder('github', value); };
+    /*
+      Picking a folder on the import page is the same act as picking one on the
+      repo card — same setting, same saved list, same re-listing of what is in
+      there. It goes through chooseFolder for whichever provider the page is
+      showing, so neither screen can end up reading a folder the other is not.
+    */
+    window.PomImportFolderSelect.onChange = function(value) {
+      var which = activeRepoProvider();
+      if (!which) return;
+      chooseFolder(which, value);
+      refreshImportRepoFile();
+    };
 
     // ── GitHub connection: optional, add/remove ────────────────────────────
     // Data-only init, factored out so the onboarding dialog (see

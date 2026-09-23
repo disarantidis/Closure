@@ -597,6 +597,7 @@ declare global {
     PomToast: { show: (message: string, isError?: boolean) => void };
     PomFolderSelect: FolderComboBridge;
     PomGithubFolderSelect: FolderComboBridge;
+    PomImportFolderSelect: FolderComboBridge;
     PomFolderNew: FolderComboBridge;
     PomGithubFolderNew: FolderComboBridge;
     PomFolderList: FolderListBridge;
@@ -1497,6 +1498,10 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
 mountIconButton('folder-create-mount', { id: 'folder-create-btn', variant: 'outline', size: 'medium', title: 'Use this folder path — created on the first push', 'aria-label': 'Use this folder path', icon: IconAdd(16) }, CARD_LEVEL);
 window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', 'choose a folder'), onChange: null };
 window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', 'choose a folder'), onChange: null };
+/* The import page's own pair. One combo rather than one per provider, like the
+   file picker beside it: the page shows whichever provider the repo card is on,
+   and a second hidden copy for the other one would be state that can disagree. */
+window.PomImportFolderSelect = { ...mountFolderCombo('import-folder-select-mount', 'PomImportFolderSelect', 'choose a folder'), onChange: null };
 /* The Settings pair — fed the repo's real directories, and read by the Add
    button beside each. `get()` rather than a DOM lookup, same reason as the
    file name field: a Combobox owns its own input id. */

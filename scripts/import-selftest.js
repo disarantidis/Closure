@@ -1822,7 +1822,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
                        'pushOverwriteNote', 'withRootOption', 'folderDisplay',
                        'setRepoFileOptions', 'chooseRepoFile', 'repoIdentityRow',
-                       'pushGitHubLarge', 'blobPayload', 'byteLength'];
+                       'pushGitHubLarge', 'blobPayload', 'byteLength',
+                       'renderImportFolderSelect'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1869,6 +1870,14 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ctx.ROOT_FOLDER_VALUE = '/';
           ctx.CONTENTS_API_MAX = 1024 * 1024;
           ctx.BLOB_API_MAX = 40 * 1000 * 1000;
+          ctx.glFolders = []; ctx.ghFolders = [];
+          ctx.glActiveFolder = ''; ctx.ghActiveFolder = '';
+          let folderFeed = null;
+          ctx.PomImportFolderSelect = {
+            setItems: (items, selected) => { folderFeed = { items, selected }; },
+            get: () => (folderFeed && folderFeed.selected) || '', onChange: null,
+          };
+          ctx.__folderFeed = () => folderFeed;
           ctx.TextEncoder = TextEncoder;
           ctx.window = ctx;
           vmx.createContext(ctx);
@@ -1907,14 +1916,46 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           */
           let row = ctx.repoIdentityRow('gitlab');
           ok('import repo: GitLab is named host/project, without the scheme',
-             row.text === 'gitlab.com/me/my repo main · tokens/out', row.text);
+             row.text === 'gitlab.com/me/my repo main', row.text);
           row = ctx.repoIdentityRow('github');
-          ok('import repo: GitHub is named owner/repo, and the root folder shows as /',
-             row.text === 'acme/tokens main · /', row.text);
+          ok('import repo: GitHub is named owner/repo and the branch',
+             row.text === 'acme/tokens main', row.text);
+          /* The folder is NOT here — it is the dropdown below, and a path named
+             in two places is a path one of them gets wrong the moment it moves.
+             GitLab's config puts it at tokens/out, so if the row still carried
+             it, it would say so. */
+          ok('import repo: and the folder is left to the picker that owns it',
+             ctx.repoIdentityRow('gitlab').text.indexOf('tokens/out') === -1,
+             ctx.repoIdentityRow('gitlab').text);
           /* Put the picker back where it was found: everything below reads the
              address, and an address still pointing at themes.json makes the
              next test's filename change look like it did nothing. */
           ctx.chooseRepoFile('');
+
+          /*
+            THE FOLDER, AS A CONTROL ON THE IMPORT PAGE TOO.
+
+            It used to be a word in the line naming the repository, which says
+            where the file is without letting you go anywhere else — and a repo
+            that holds one folder worth reading usually holds others. Same list
+            as the repo card, same root-shown-as-"/" so a chosen root reads as
+            chosen rather than as an empty box.
+          */
+          ctx.gitlabAdded = false; ctx.githubAdded = true; ctx.__gh = true;
+          ctx.ghFolders = ['Spar', 'tokens/design', 'exports'];
+          ctx.ghActiveFolder = 'Spar';
+          ctx.renderImportFolderSelect();
+          ok('import folder: the repo root comes first, then the discovered paths',
+             ctx.__folderFeed().items.map((i) => i.value).join(',') ===
+               '/,Spar,tokens/design,exports',
+             JSON.stringify(ctx.__folderFeed().items.map((i) => i.value)));
+          ok('import folder: the active folder is the one shown',
+             ctx.__folderFeed().selected === 'Spar', ctx.__folderFeed().selected);
+          ctx.ghActiveFolder = '';
+          ctx.renderImportFolderSelect();
+          ok('import folder: the root shows as / rather than as an empty field',
+             ctx.__folderFeed().selected === '/', ctx.__folderFeed().selected);
+          ctx.ghActiveFolder = 'Spar'; ctx.gitlabAdded = false; ctx.githubAdded = false;
 
           /*
             A FILE TOO BIG FOR THE CONTENTS ENDPOINT.
