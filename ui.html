@@ -2223,10 +2223,16 @@
       /* A frame round two cards, so it is thin: the cards inside carry their
          own padding and the content should not pay twice for being grouped. */
       padding: var(--spacing-component-3);
-      /* NO horizontal margin — .collections-wrap already insets this column by
-         16px, and adding it here put this one card 16px in from every card
-         that is not inside that wrapper. */
-      margin: 0 0 16px;
+      /*
+        NO MARGIN AT ALL — .collections-wrap supplies both.
+
+        It insets this column by 16px horizontally, which is why there is none
+        here; it also carries 16px BELOW itself, which this card's own
+        margin-bottom was adding to. So the gap above the compare card measured
+        32 while the gap below it measured 16, and a stack whose spacing changes
+        halfway down reads as a mistake wherever the eye lands on it.
+      */
+      margin: 0;
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -55976,7 +55982,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'cff6b59 15:21:46';
+    var CLOSURE_BUILD = 'eebb70a 15:23:43';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
