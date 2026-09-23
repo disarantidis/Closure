@@ -55123,7 +55123,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '759e498 12:31:11';
+    var CLOSURE_BUILD = '29a7950 12:35:07';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -58213,7 +58213,51 @@ function format(report, opts) {
     */
     var CONTENTS_API_MAX = 1024 * 1024;
 
-    function pushGitHubLarge(parts, c, filePath, json, commitMsg, headers, readErr) {
+    /*
+      AND THE BLOB ENDPOINT HAS A CEILING OF ITS OWN — about 42 MB, answered as
+      422 "Sorry, your input was too large to process. Consider creating the
+      blob in a local clone of the repository and then pushing it to GitHub."
+      A real export cleared the first limit and hit this one: 40.4 MB of
+      document, 44.0 MB of request body once JSON-escaped into it.
+
+      The cheapest megabytes in the file are the ones nobody reads. Indenting a
+      40 MB machine-generated document costs 19.7 MB of spaces and newlines to
+      produce a diff that is unreadable anyway, so a file too big to push gets
+      written compact rather than not written at all. Measured on that export:
+      44.0 MB of body becomes 23.0 MB.
+
+      Base64 is NOT the lever it looks like. The blob endpoint takes either, and
+      base64 of the same document is 53.8 MB against utf-8's 44.0 — JSON is full
+      of quotes, but base64 inflates everything by a third and escapes nothing.
+      utf-8 wins on this content, which is why the blob path sends it.
+
+      MEASURED ON THE REQUEST BODY, NOT ON THE DOCUMENT — and getting that
+      wrong is why the first attempt at this still failed. The export that was
+      refused is 40.4 MB of JSON, comfortably under the ~42 MB the endpoint is
+      reported to take; what crosses the wire is that document escaped into a
+      JSON envelope, which is 44.0 MB, and THAT is what was over. A threshold
+      on the document would have waved it straight through again.
+
+      40 MB, not 42, because the number is what has been observed to fail rather
+      than a documented contract, and the last megabyte of headroom is not worth
+      a failed 40 MB upload.
+    */
+    var BLOB_API_MAX = 40 * 1000 * 1000;
+
+    /* The exact bytes the blob POST will send, built once: it is what decides
+       whether the push can happen and it is what gets sent, so measuring a
+       second copy of it would be both slower and a thing that can disagree. */
+    function blobPayload(json) {
+      return JSON.stringify({ content: json, encoding: 'utf-8' });
+    }
+
+    function byteLength(str) {
+      return typeof TextEncoder === 'function'
+        ? new TextEncoder().encode(str).length
+        : unescape(encodeURIComponent(str)).length;
+    }
+
+    function pushGitHubLarge(parts, c, filePath, json, commitMsg, headers, readErr, blobBody) {
       var api = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
                 encodeURIComponent(parts[1]) + '/git/';
       /* Two spellings of one branch: the URL wants it encoded, the create-a-ref
@@ -58226,7 +58270,9 @@ function format(report, opts) {
           .then(function (r) { return r.ok ? r.json() : readErr(r, what); });
       };
       var blobSha = null, parent = null, baseTree = null;
-      return post('blobs', { content: json, encoding: 'utf-8' })
+      return fetch(api + 'blobs', { method: 'POST', headers: headers,
+                                    body: blobBody || blobPayload(json) })
+        .then(function (r) { return r.ok ? r.json() : readErr(r, 'blobs'); })
         .then(function (blob) {
           blobSha = blob.sha;
           /* An empty repo, or a branch that does not exist yet, has no ref —
@@ -58299,11 +58345,22 @@ function format(report, opts) {
 
       /* Measured in bytes, not characters — the limit is on what crosses the
          wire, and a document full of non-ASCII is longer than it looks. */
-      var bytes = typeof TextEncoder === 'function'
-        ? new TextEncoder().encode(json).length
-        : unescape(encodeURIComponent(json)).length;
+      var bytes = byteLength(json);
       if (bytes > CONTENTS_API_MAX) {
-        return pushGitHubLarge(parts, c, filePath, json, commitMsg, headers, readErr);
+        var blobBody = blobPayload(json);
+        /* Readable beats compact right up until readable cannot be pushed. */
+        if (byteLength(blobBody) > BLOB_API_MAX) {
+          json = JSON.stringify(tokens);
+          blobBody = blobPayload(json);
+          if (byteLength(blobBody) > BLOB_API_MAX) {
+            return Promise.reject({ message:
+              'This document is ' + (byteLength(json) / 1e6).toFixed(0) + ' MB, past what GitHub ' +
+              'accepts over its API even with the formatting stripped. Split it across files — ' +
+              'the folder can hold one JSON per collection — or push it from a local clone.' });
+          }
+          showToast('Too large to push formatted — writing it without indentation');
+        }
+        return pushGitHubLarge(parts, c, filePath, json, commitMsg, headers, readErr, blobBody);
       }
       var content = encodeContent(tokens);
 

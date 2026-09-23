@@ -1822,7 +1822,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
                        'pushOverwriteNote', 'withRootOption', 'folderDisplay',
                        'setRepoFileOptions', 'chooseRepoFile', 'repoIdentityRow',
-                       'pushGitHubLarge'];
+                       'pushGitHubLarge', 'blobPayload', 'byteLength'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1868,6 +1868,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           /* withRootOption reads it; it lives beside it in the template. */
           ctx.ROOT_FOLDER_VALUE = '/';
           ctx.CONTENTS_API_MAX = 1024 * 1024;
+          ctx.BLOB_API_MAX = 40 * 1000 * 1000;
+          ctx.TextEncoder = TextEncoder;
           ctx.window = ctx;
           vmx.createContext(ctx);
           vmx.runInContext(lifted.join('\n'), ctx);
@@ -1984,6 +1986,23 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                seq.filter((x) => /tree base=undefined/.test(x)).length === 1,
                JSON.stringify(seq));
             ctx.fetch = (url, opts) => { calls.push({ url, opts }); return Promise.resolve(ctx.__res); };
+
+            /*
+              THE LIMIT IS ON WHAT CROSSES THE WIRE, NOT ON THE DOCUMENT, and
+              measuring the wrong one is why the first fix still failed. The
+              export that GitHub refused is 40.4 MB of JSON — under the ~42 MB
+              the blob endpoint is reported to take — and 44.0 MB once escaped
+              into the request envelope, which is what was actually over. A
+              threshold on the document waves it straight back through.
+            */
+            const doc = { s: '"'.repeat(1000) };        // all quotes: escaping doubles them
+            const payload = ctx.blobPayload(JSON.stringify(doc));
+            ok('big push: the size that counts is the request body, which escaping inflates',
+               ctx.byteLength(payload) > ctx.byteLength(JSON.stringify(doc)) * 1.8,
+               ctx.byteLength(JSON.stringify(doc)) + ' -> ' + ctx.byteLength(payload));
+            ok('big push: and the body is exactly what is sent, not a second estimate of it',
+               JSON.parse(payload).content === JSON.stringify(doc) &&
+               JSON.parse(payload).encoding === 'utf-8');
           }
 
           /* The listing, and what it is allowed to conclude from each
