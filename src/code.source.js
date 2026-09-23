@@ -3474,20 +3474,29 @@ figma.ui.onmessage = function(msg) {
           });
         });
 
-        return Promise.all(promises);
+        /*
+          REPORTED HERE, WHICH IS WHERE THE COUNTERS EXIST. The first version of
+          this logged from the NEXT .then in the chain — a sibling of the
+          callback that declares them, not a child of it — so reading skipStats
+          threw a ReferenceError and took the whole extract down with it. The
+          plugin showed a cheerful mascot and "Error: 'skipStats' is not
+          defined", which is a fair summary of the mistake.
+        */
+        return Promise.all(promises).then(function (cols) {
+          console.log('[Closure] variables seen ' + skipStats.seen +
+            ' — owned here ' + skipStats.owned +
+            ', inherited and identical (not written) ' + skipStats.pruned +
+            ', inherited but differing (written) ' + skipStats.borrowedButChanged +
+            ', owner unknown ' + skipStats.noOwner);
+          skipStats.examples.forEach(function (e) { console.log('[Closure]     e.g. ' + e); });
+          return cols;
+        });
       });
     }).then(function(result) {
       // How many variables actually carry a Figma description, counted on the RAW
       // extraction — upstream of transformToFinalFormat, the the token format fixups
       // and the DTCG conversion. If this says 0, the descriptions are not in the
       // file; if it says N > 0 but the export has none, the loss is ours.
-      console.log('[Closure] variables seen ' + skipStats.seen +
-        ' — owned here ' + skipStats.owned +
-        ', inherited and identical (not written) ' + skipStats.pruned +
-        ', inherited but differing (written) ' + skipStats.borrowedButChanged +
-        ', owner unknown ' + skipStats.noOwner);
-      skipStats.examples.forEach(function (e) { console.log('[Closure]     e.g. ' + e); });
-
       (function logDescriptionCoverage() {
         var total = 0, described = 0;
         result.forEach(function(col) {

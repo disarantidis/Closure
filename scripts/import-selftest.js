@@ -3007,6 +3007,116 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          plan.unresolved.length + ' left');
     }
 
+    /*
+      THE EXTRACT, ACTUALLY RUN.
+
+      Everything else in this file tests pure functions lifted out of the build.
+      The extract handler is not one — it talks to Figma — so it had no test at
+      all, and it shipped a ReferenceError: a counter declared in one .then and
+      read from the next one along, which is a sibling scope and not a child.
+      The plugin came up, showed its mascot, and said "Error: 'skipStats' is not
+      defined". No amount of syntax checking finds that; running it does, and a
+      stub of the four Figma calls it makes is twenty lines.
+
+      It earns its keep twice, because the same stub exercises the pruning that
+      an extended collection depends on — which is not otherwise reachable from
+      Node at all.
+    */
+    {
+      const fsx = require('fs'), pathx = require('path'), vmx = require('vm');
+      const built = pathx.join(__dirname, '..', 'code.js');
+      if (!fsx.existsSync(built)) {
+        ok('extract: code.js is built (run npm run ui:build)', false);
+      } else {
+        const CORE = 'VariableCollectionId:core', MODE = 'VariableCollectionId:mode';
+        const RED = { r: 1, g: 0, b: 0, a: 1 }, BLUE = { r: 0, g: 0, b: 1, a: 1 };
+        const run = async (overrideBlue) => {
+          const collections = [
+            { id: CORE, name: '.core', defaultModeId: 'm-core',
+              modes: [{ modeId: 'm-core', name: 'Value' }], variableIds: ['V:red'] },
+            /* Extends .core — and Figma lists the variable it INHERITS among its
+               own variableIds, which is the whole reason one primitive can be
+               written out once per collection. */
+            { id: MODE, name: '.mode', defaultModeId: 'm-light', isExtension: true,
+              parentVariableCollectionId: CORE, rootVariableCollectionId: CORE,
+              modes: [{ modeId: 'm-light', name: 'light', parentModeId: 'm-core' },
+                      { modeId: 'm-dark', name: 'dark', parentModeId: 'm-core' }],
+              variableIds: ['V:red', 'V:bg'] },
+          ];
+          const seenFromMode = overrideBlue
+            ? { 'm-light': RED, 'm-dark': BLUE }        // a real override
+            : { 'm-light': RED, 'm-dark': RED };        // pure inheritance
+          const vars = {
+            'V:red': { id: 'V:red', name: 'core-colours/red', resolvedType: 'COLOR',
+                       variableCollectionId: CORE, valuesByMode: { 'm-core': RED },
+                       valuesByModeForCollectionAsync: async (c) =>
+                         (c.id === MODE ? seenFromMode : { 'm-core': RED }),
+                       codeSyntax: {}, scopes: [], description: '' },
+            'V:bg': { id: 'V:bg', name: 'mode/background', resolvedType: 'COLOR',
+                      variableCollectionId: MODE,
+                      valuesByMode: { 'm-light': { type: 'VARIABLE_ALIAS', id: 'V:red' },
+                                      'm-dark': { type: 'VARIABLE_ALIAS', id: 'V:red' } },
+                      valuesByModeForCollectionAsync: async () => ({
+                        'm-light': { type: 'VARIABLE_ALIAS', id: 'V:red' },
+                        'm-dark': { type: 'VARIABLE_ALIAS', id: 'V:red' } }),
+                      codeSyntax: {}, scopes: [], description: '' },
+          };
+          let posted = null;
+          const quiet = () => {};
+          const figma = {
+            showUI: quiet, root: { name: 'Stub' }, currentPage: {},
+            clientStorage: { getAsync: async () => null, setAsync: async () => {} },
+            getLocalTextStyles: () => [], getLocalEffectStyles: () => [],
+            variables: { getLocalVariableCollectionsAsync: async () => collections,
+                         getVariableByIdAsync: async (id) => vars[id] || null },
+            ui: { onmessage: null, postMessage: (m) => {
+              if (m.type === 'extracted' || m.type === 'error') posted = m; } },
+          };
+          const ctx = { figma, __html__: '', Promise, JSON, Object, Array, Map, Set,
+                        String, Number, Math, parseFloat, parseInt, isNaN, isFinite,
+                        RegExp, Date, setTimeout, Error, Boolean,
+                        console: { log: quiet, warn: quiet, error: quiet } };
+          vmx.createContext(ctx);
+          vmx.runInContext(fsx.readFileSync(built, 'utf8'), ctx);
+          await figma.ui.onmessage({ type: 'extract' });
+          for (let i = 0; i < 20 && !posted; i++) await new Promise((r) => setTimeout(r, 10));
+          return posted;
+        };
+
+        let posted = await run(false);
+        /* The one this exists for: a ReferenceError anywhere in the handler
+           lands here as an error message instead of an extraction. */
+        ok('extract: the handler runs to completion and posts an extraction',
+           !!posted && posted.type === 'extracted',
+           posted ? (posted.message || posted.type) : 'nothing posted');
+        if (posted && posted.type === 'extracted') {
+          const of = (n) => (posted.collections.filter((c) => c.name === n)[0] || {}).variables || [];
+          ok('extract: a variable is written in the collection that owns it',
+             of('.core').map((v) => v.name).join(',') === 'core-colours/red',
+             JSON.stringify(of('.core').map((v) => v.name)));
+          ok('extract: and NOT in the collection that only inherits it unchanged',
+             of('.mode').map((v) => v.name).join(',') === 'mode/background',
+             JSON.stringify(of('.mode').map((v) => v.name)));
+          const bg = of('.mode').filter((v) => v.name === 'mode/background')[0];
+          ok('extract: an alias records the collection its target lives in',
+             !!bg && Object.keys(bg.aliasInfo).every((m) =>
+               bg.aliasInfo[m].aliasedVarCollection === '.core'),
+             JSON.stringify(bg && bg.aliasInfo));
+        }
+
+        /* An override is the entire point of an extended collection, and it
+           must survive a change whose whole job is dropping copies. */
+        posted = await run(true);
+        ok('extract: an overridden inherited variable IS written where it is overridden',
+           !!posted && posted.type === 'extracted' &&
+           (posted.collections.filter((c) => c.name === '.mode')[0] || { variables: [] })
+             .variables.map((v) => v.name).sort().join(',') === 'core-colours/red,mode/background',
+           JSON.stringify(((posted && posted.collections &&
+             posted.collections.filter((c) => c.name === '.mode')[0]) || { variables: [] })
+               .variables.map((v) => v.name)));
+      }
+    }
+
     console.log('');
     console.log(pass + '/' + (pass + fail) + ' passed');
     process.exit(fail ? 1 : 0);
