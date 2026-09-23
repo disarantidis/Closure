@@ -2330,7 +2330,11 @@
       align-items: stretch;
       gap: 12px;
     }
-    .compare-card > span { display: block; text-align: center; }
+    /* Left, under the title. Centring was right when the card WAS the pair —
+       a row of tags over a button, with nothing else to line up against. It has
+       a heading now, and content centred under a left-aligned title reads as a
+       caption for the card rather than as the card's own content. */
+    .compare-card > span { display: block; }
     .compare-card[hidden] { display: none; }
     #compare-card-icon-mount { display: flex; }
     /*
@@ -2345,8 +2349,10 @@
       the first decided.
     */
     .compare-card-sides {
-      display: flex; align-items: center; justify-content: center;
+      display: flex; align-items: center; justify-content: flex-start;
       gap: 8px; flex-wrap: wrap;
+      /* No inset of its own: the card's padding is what both this and the
+         header sit inside, so they line up by having nothing between them. */
     }
     /* Between the two, because that is what it is between. The button below
        says the verb; this says the relation, and a reader gets the shape of
