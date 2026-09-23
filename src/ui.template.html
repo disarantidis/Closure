@@ -1641,6 +1641,15 @@
       padding: var(--spacing-component-4);
     }
     .import-repo-loaded[hidden] { display: none; }
+    /* The counts, once they are inside the file's card rather than being one
+       of their own. No surface, no inset, no gap above — the card around them
+       supplies all three, and the row they sit under is what they are about. */
+    .import-card.is-inline {
+      background: none;
+      border-radius: 0;
+      padding: 0;
+      margin-top: 0;
+    }
 
     .import-question { margin-bottom: 12px; font-size: 12px; color: var(--app-text-muted); line-height: 1.5; }
     .import-question:last-child { margin-bottom: 0; }
@@ -3122,9 +3131,6 @@
         <div class="import-repo-actions">
           <span id="import-pull-gitlab-mount"></span>
           <span id="import-pull-github-mount"></span>
-          <!-- Replaces both of the above once there is a file: see
-               applyImportRepoMode. -->
-          <span id="import-remove-mount" hidden></span>
         </div>
       </div>
 
@@ -3142,6 +3148,10 @@
            removes it. -->
       <div class="import-card" id="import-file-card" data-level="4" hidden>
         <span id="import-file-item-mount"></span>
+        <!-- #import-summary is MOVED in here by applyImportRepoMode once the
+             file came from the repository — what a document contains belongs
+             with the document, and the two were separate cards saying "this
+             file" and "what was in this file" a gap apart. -->
       </div>
 
       <!-- Step 2b. What was in it. -->
@@ -4493,8 +4503,8 @@
       var card = document.getElementById('import-file-card');
       if (!row || !slot || !card) return;
       var inRepo = !!(importState.fromRepo && importState.fileName) && !row.hidden;
+      var facts = document.getElementById('import-summary');
       slot.hidden = !inRepo;
-      document.getElementById('import-remove-mount').hidden = !inRepo;
       if (inRepo) {
         document.getElementById('import-pull-gitlab-mount').hidden = true;
         document.getElementById('import-pull-github-mount').hidden = true;
@@ -4505,6 +4515,15 @@
         card.classList.add('is-sub');
         card.setAttribute('data-level', '3');
         if (card.parentElement !== slot) slot.appendChild(card);
+        /* The counts go INSIDE the file's own card, under the row naming the
+           file they count — and they give up their card while they are there,
+           because a card inside a card inside a card is three boxes for one
+           fact. Same node, moved, for the same reason the file card is. */
+        if (facts && facts.parentElement !== card) {
+          facts.classList.add('is-inline');
+          facts.setAttribute('data-level', '3');
+          card.appendChild(facts);
+        }
       } else {
         /* Restored from readiness, not left where the loaded state put them:
            this branch runs on the way back out, and a card that had reported a
@@ -4513,10 +4532,15 @@
         document.getElementById('import-pull-github-mount').hidden = !isGitHubReady();
         card.classList.remove('is-sub');
         card.setAttribute('data-level', '4');
-        var home = document.getElementById('import-summary');
-        if (home && card.parentElement !== home.parentElement) {
-          home.parentElement.insertBefore(card, home);
+        var content = document.querySelector('#import-page .settings-page-content');
+        if (facts && facts.parentElement !== content) {
+          facts.classList.remove('is-inline');
+          facts.setAttribute('data-level', '4');
+          /* Back to its own card, immediately after the file's — the order the
+             page reads in, and where the cards below it expect it. */
+          content.insertBefore(facts, document.getElementById('import-levels'));
         }
+        if (facts && card.parentElement !== content) content.insertBefore(card, facts);
       }
     }
 
@@ -4884,11 +4908,7 @@
        that follows from letting each do its own half. */
     function showImportFile(opts) {
       document.getElementById('import-file-card').hidden = false;
-      var o = opts || {};
-      /* The row drops its own ✕ while it is inside the repo card, because the
-         Remove JSON button under it is the same act — see mountImportFile. */
-      o.inRepo = !!(importState.fromRepo && !document.getElementById('import-repo').hidden);
-      window.PomImportFile.set(importState.fileName, importState.fileBytes, o);
+      window.PomImportFile.set(importState.fileName, importState.fileBytes, opts || {});
       applyImportRepoMode();
     }
 
@@ -4925,10 +4945,6 @@
       importDrop.hidden = false;
     }
     window.PomImportFile.onRemove = clearImportFile;
-    /* The repo card's own remover, which is the same act — the ✕ on the row is
-       withheld while this button is on screen so there is never a pair of
-       them. */
-    document.getElementById('import-remove-btn').addEventListener('click', clearImportFile);
 
     document.getElementById('import-choose-btn').addEventListener('click', function() {
       importFileInput.click();

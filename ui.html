@@ -1641,6 +1641,15 @@
       padding: var(--spacing-component-4);
     }
     .import-repo-loaded[hidden] { display: none; }
+    /* The counts, once they are inside the file's card rather than being one
+       of their own. No surface, no inset, no gap above — the card around them
+       supplies all three, and the row they sit under is what they are about. */
+    .import-card.is-inline {
+      background: none;
+      border-radius: 0;
+      padding: 0;
+      margin-top: 0;
+    }
 
     .import-question { margin-bottom: 12px; font-size: 12px; color: var(--app-text-muted); line-height: 1.5; }
     .import-question:last-child { margin-bottom: 0; }
@@ -23004,9 +23013,6 @@ html[data-theme=dark] {
         <div class="import-repo-actions">
           <span id="import-pull-gitlab-mount"></span>
           <span id="import-pull-github-mount"></span>
-          <!-- Replaces both of the above once there is a file: see
-               applyImportRepoMode. -->
-          <span id="import-remove-mount" hidden></span>
         </div>
       </div>
 
@@ -23024,6 +23030,10 @@ html[data-theme=dark] {
            removes it. -->
       <div class="import-card" id="import-file-card" data-level="4" hidden>
         <span id="import-file-item-mount"></span>
+        <!-- #import-summary is MOVED in here by applyImportRepoMode once the
+             file came from the repository — what a document contains belongs
+             with the document, and the two were separate cards saying "this
+             file" and "what was in this file" a gap apart. -->
       </div>
 
       <!-- Step 2b. What was in it. -->
@@ -50025,7 +50035,6 @@ html[data-theme=dark] {
   );
   mountButton("import-pull-gitlab-mount", { id: "import-pull-gitlab-btn", variant: "filled", size: "large", block: true, label: "Import from GitLab", rightIcon: true, buttonRightIcon: IconGitlab(18) });
   mountButton("import-pull-github-mount", { id: "import-pull-github-btn", variant: "filled", size: "large", block: true, label: "Import from GitHub", rightIcon: true, buttonRightIcon: IconGithub(18) });
-  mountButton("import-remove-mount", { id: "import-remove-btn", variant: "outline", size: "large", block: true, label: "Remove JSON", leftIcon: true, buttonLeftIcon: IconTrash(18) });
   function mountImportRepoWhere() {
     const container = document.getElementById("import-repo-where-mount");
     let set = () => {
@@ -51443,7 +51452,7 @@ html[data-theme=dark] {
       const [file, setFile] = (0, import_react16.useState)(null);
       set = setFile;
       if (!file) return null;
-      const leading = file.error ? void 0 : file.busy ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Spinner, { size: 18, strokeWidth: 2.5, label: "" }) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(ConfirmIcon, {});
+      const leading = file.busy ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Spinner, { size: 18, strokeWidth: 2.5, label: "" }) : void 0;
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
         FileUploadItem,
         {
@@ -51453,13 +51462,13 @@ html[data-theme=dark] {
           size: "medium",
           error: file.error,
           leading,
-          onRemove: file.inRepo ? void 0 : () => window.PomImportFile.onRemove?.()
+          onRemove: () => window.PomImportFile.onRemove?.()
         }
       );
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
     window.PomImportFile = {
-      set: (name, bytes, opts) => set(name ? { name, bytes, busy: !!(opts && opts.busy), error: opts && opts.error, inRepo: !!(opts && opts.inRepo) } : null),
+      set: (name, bytes, opts) => set(name ? { name, bytes, busy: !!(opts && opts.busy), error: opts && opts.error } : null),
       onRemove: null
     };
   })();
@@ -56385,7 +56394,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '6c34a8c 18:41:17';
+    var CLOSURE_BUILD = '299e3da 18:46:22';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -57284,8 +57293,8 @@ function format(report, opts) {
       var card = document.getElementById('import-file-card');
       if (!row || !slot || !card) return;
       var inRepo = !!(importState.fromRepo && importState.fileName) && !row.hidden;
+      var facts = document.getElementById('import-summary');
       slot.hidden = !inRepo;
-      document.getElementById('import-remove-mount').hidden = !inRepo;
       if (inRepo) {
         document.getElementById('import-pull-gitlab-mount').hidden = true;
         document.getElementById('import-pull-github-mount').hidden = true;
@@ -57296,6 +57305,15 @@ function format(report, opts) {
         card.classList.add('is-sub');
         card.setAttribute('data-level', '3');
         if (card.parentElement !== slot) slot.appendChild(card);
+        /* The counts go INSIDE the file's own card, under the row naming the
+           file they count — and they give up their card while they are there,
+           because a card inside a card inside a card is three boxes for one
+           fact. Same node, moved, for the same reason the file card is. */
+        if (facts && facts.parentElement !== card) {
+          facts.classList.add('is-inline');
+          facts.setAttribute('data-level', '3');
+          card.appendChild(facts);
+        }
       } else {
         /* Restored from readiness, not left where the loaded state put them:
            this branch runs on the way back out, and a card that had reported a
@@ -57304,10 +57322,15 @@ function format(report, opts) {
         document.getElementById('import-pull-github-mount').hidden = !isGitHubReady();
         card.classList.remove('is-sub');
         card.setAttribute('data-level', '4');
-        var home = document.getElementById('import-summary');
-        if (home && card.parentElement !== home.parentElement) {
-          home.parentElement.insertBefore(card, home);
+        var content = document.querySelector('#import-page .settings-page-content');
+        if (facts && facts.parentElement !== content) {
+          facts.classList.remove('is-inline');
+          facts.setAttribute('data-level', '4');
+          /* Back to its own card, immediately after the file's — the order the
+             page reads in, and where the cards below it expect it. */
+          content.insertBefore(facts, document.getElementById('import-levels'));
         }
+        if (facts && card.parentElement !== content) content.insertBefore(card, facts);
       }
     }
 
@@ -57675,11 +57698,7 @@ function format(report, opts) {
        that follows from letting each do its own half. */
     function showImportFile(opts) {
       document.getElementById('import-file-card').hidden = false;
-      var o = opts || {};
-      /* The row drops its own ✕ while it is inside the repo card, because the
-         Remove JSON button under it is the same act — see mountImportFile. */
-      o.inRepo = !!(importState.fromRepo && !document.getElementById('import-repo').hidden);
-      window.PomImportFile.set(importState.fileName, importState.fileBytes, o);
+      window.PomImportFile.set(importState.fileName, importState.fileBytes, opts || {});
       applyImportRepoMode();
     }
 
@@ -57716,10 +57735,6 @@ function format(report, opts) {
       importDrop.hidden = false;
     }
     window.PomImportFile.onRemove = clearImportFile;
-    /* The repo card's own remover, which is the same act — the ✕ on the row is
-       withheld while this button is on screen so there is never a pair of
-       them. */
-    document.getElementById('import-remove-btn').addEventListener('click', clearImportFile);
 
     document.getElementById('import-choose-btn').addEventListener('click', function() {
       importFileInput.click();

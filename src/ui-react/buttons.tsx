@@ -39,7 +39,6 @@ import { Table } from '../vendor/pomegranate/panel/node/Table';
 import { SelectableCard } from '../vendor/pomegranate/panel/node/SelectableCard';
 import { FileUploadItem } from '../vendor/pomegranate/panel/node/FileUploadItem';
 import { Spinner } from '../vendor/pomegranate/panel/node/Spinner';
-import { ConfirmIcon } from '../vendor/pomegranate/panel/node/Icon';
 import { fieldLevel, useLevel, LevelContext, type Level } from '../vendor/pomegranate/panel/node/LevelContext';
 
 /* The plugin GROUND is level 2 — bumped from 1 (the ladder's actual
@@ -614,7 +613,7 @@ type FolderSelectBridge = { setItems: (items: any[], selectedValue: string) => v
 // still can: the onboarding dialog's "skip both" choice — Download alone is
 // a complete, supported workflow, not an unfinished state to route past.
 type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
-type ImportFileState = { name: string; bytes?: number; busy?: boolean; error?: string; inRepo?: boolean };
+type ImportFileState = { name: string; bytes?: number; busy?: boolean; error?: string };
 declare global {
   interface Window {
     PomImportApplyBtn: any;
@@ -638,7 +637,7 @@ declare global {
       /* null clears the row; bytes is optional because the size is only known
          when a real File was picked, and FileUploadItem draws no subtitle
          rather than making a caller invent a number. */
-      set: (name: string | null, bytes?: number, opts?: { busy?: boolean; error?: string; inRepo?: boolean }) => void;
+      set: (name: string | null, bytes?: number, opts?: { busy?: boolean; error?: string }) => void;
       onRemove: (() => void) | null;
     };
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
@@ -1137,17 +1136,9 @@ window.PomRepoReadBtn = mountLiveTitleButton(
    is recognised before the label is read. */
 mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'filled', size: 'large', block: true, label: 'Import from GitLab', rightIcon: true, buttonRightIcon: IconGitlab(18) });
 mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'filled', size: 'large', block: true, label: 'Import from GitHub', rightIcon: true, buttonRightIcon: IconGithub(18) });
-/*
-  THE SAME SLOT, ONCE THE FILE IS IN. The repo card's job is over the moment it
-  has handed a document over — there is nothing left to import from it — so the
-  button that did that is replaced by the one thing still worth doing to the
-  file it produced.
-
-  `outline`, not the `filled` it replaces: the page's own primary action by
-  then is "Import into this file" further down, and two filled full-width
-  buttons on one screen is two of them claiming to be the thing to press.
-*/
-mountButton('import-remove-mount', { id: 'import-remove-btn', variant: 'outline', size: 'large', block: true, label: 'Remove JSON', leftIcon: true, buttonLeftIcon: IconTrash(18) });
+/* A full-width "Remove JSON" lived here for a day. It said what the ✕ on the
+   row above it already said, at ten times the size, in the place the file's own
+   contents now occupy — see applyImportRepoMode. */
 
 /*
   WHICH REPOSITORY, AS COMPONENTS RATHER THAN AS MARKUP.
@@ -3470,7 +3461,13 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
                             resolving". label='' because the row above it is
                             already named, and two announcements of one thing
                             is worse than none.
-        done     ConfirmIcon
+        done     THE KIT'S OWN, DERIVED FROM THE TYPE — `leading` left off, so
+                 `application/json` takes FileIcon, the blank sheet. It was a
+                 ConfirmIcon, which answered a question nobody had: the row is
+                 on screen because the file arrived, the size beside it is
+                 proof, and what is underneath it now is a count of everything
+                 that was in it. A tick over all of that is the row agreeing
+                 with itself.
         failed   the file glyph, with `error` taking the subtitle's place —
                  the component displaces the size with the reason, which is
                  the one place a failure belongs on this row.
@@ -3484,9 +3481,7 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
       the swap below is a cut rather than a motion, on purpose, until the kit
       has the mark.
     */
-    const leading = file.error ? undefined
-      : file.busy ? <Spinner size={18} strokeWidth={2.5} label="" />
-      : <ConfirmIcon />;
+    const leading = file.busy ? <Spinner size={18} strokeWidth={2.5} label="" /> : undefined;
     return (
       <FileUploadItem
         name={file.name}
@@ -3496,33 +3491,30 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
         error={file.error}
         leading={leading}
         /*
-          HANDING IT A REMOVER IS WHAT GIVES IT A ✕ — see the prop's own note.
-          The row names the button after the file, so it announces as "Remove
+          HANDING IT A REMOVER IS WHAT GIVES IT A BUTTON — see the prop's own
+          note. The row names it after the file, so it announces as "Remove
           sarantidis-foundations.json" rather than a bare dismiss.
 
-          AND IT ONLY GETS ONE WHEN IT IS THE ONLY WAY OUT. Inside the repo
-          card the row sits directly above a full-width "Remove JSON" button
-          that does exactly this; a ✕ as well would be two controls for one
-          act, in a card six centimetres tall. Standing on its own — a file
-          dropped on the page — it is the only remover there is, so it keeps
-          it. Which one is on screen is the one the reader can use, and never
-          both.
+          ONE REMOVER, AND IT IS THIS ONE. A full-width "Remove JSON" under the
+          row said the same thing at ten times the size, and took the place
+          where what the file CONTAINS now goes. Removing something is a small
+          act on a row that names what is being removed; reading what arrived
+          is the reason the card exists.
 
-          Its variant is ghost and cannot be anything else: FileUploadItem
-          writes variant="ghost" into its own render and exposes no prop that
-          reaches it. Right for a row in a list on the page background, loud
-          enough to be wrong for a row alone on a raised card. Raised as
-          disarantidis/pomegranate#92; overriding it from here would mean
-          selecting into Button's internals.
+          Its glyph is the kit's ✕ and its variant is ghost, and neither can be
+          anything else: FileUploadItem writes both into its own render and
+          exposes no prop that reaches either. A trash would say "remove" more
+          plainly than a dismiss does. Raised as disarantidis/pomegranate#92;
+          overriding from here would mean selecting into Button's internals.
         */
-        onRemove={file.inRepo ? undefined : () => window.PomImportFile.onRemove?.()}
+        onRemove={() => window.PomImportFile.onRemove?.()}
       />
     );
   }
 
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomImportFile = {
-    set: (name, bytes, opts) => set(name ? { name, bytes, busy: !!(opts && opts.busy), error: opts && opts.error, inRepo: !!(opts && opts.inRepo) } : null),
+    set: (name, bytes, opts) => set(name ? { name, bytes, busy: !!(opts && opts.busy), error: opts && opts.error } : null),
     onRemove: null,
   };
 })();
