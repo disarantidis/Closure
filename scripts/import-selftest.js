@@ -1823,7 +1823,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'pushOverwriteNote', 'withRootOption', 'folderDisplay',
                        'setRepoFileOptions', 'chooseRepoFile', 'repoIdentityRow',
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
-                       'renderImportFolderSelect'];
+                       'renderImportFolderSelect', 'listRepoFolders'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1869,6 +1869,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           /* withRootOption reads it; it lives beside it in the template. */
           ctx.ROOT_FOLDER_VALUE = '/';
           ctx.CONTENTS_API_MAX = 1024 * 1024;
+          ctx.repoFolderCache = null;      // listRepoFolders keeps its answer here
           ctx.BLOB_API_MAX = 40 * 1000 * 1000;
           ctx.glFolders = []; ctx.ghFolders = [];
           ctx.glActiveFolder = ''; ctx.ghActiveFolder = '';
@@ -1931,6 +1932,45 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              address, and an address still pointing at themes.json makes the
              next test's filename change look like it did nothing. */
           ctx.chooseRepoFile('');
+
+          /*
+            SYNC ASKS AGAIN, WHICH IS THE ONLY THING IT IS FOR.
+
+            listRepoFolders caches by address, which is right for opening the
+            page — the answer is free and cannot be wrong for the same address.
+            It is exactly wrong for a button somebody presses BECAUSE they have
+            just made a folder in GitHub and want to see it: an instant cached
+            "nothing changed" is the one answer that button must never give.
+          */
+          ctx.__gh_over = { folder: '' };
+          calls.length = 0;
+          ctx.__res = res(200, {}, { tree: [{ type: 'tree', path: 'Spar' },
+                                             { type: 'blob', path: 'a.json' }], truncated: false });
+          let folders = await ctx.listRepoFolders('github');
+          ok('sync: the folder listing reads the recursive tree and keeps only directories',
+             folders.folders.join(',') === 'Spar' && calls.length === 1,
+             JSON.stringify(folders.folders) + ' in ' + calls.length + ' call(s)');
+          await ctx.listRepoFolders('github');
+          ok('sync: asking again for the same address is answered from the cache',
+             calls.length === 1, calls.length + ' call(s)');
+          await ctx.listRepoFolders('github', true);
+          ok('sync: and forcing it goes back to the repo anyway',
+             calls.length === 2, calls.length + ' call(s)');
+          /* An empty repo has no tree. That is an answer — no folders yet —
+             and not a failure to report. */
+          ctx.__res = res(404, {}, {});
+          folders = await ctx.listRepoFolders('github', true);
+          ok('sync: an empty repo lists no folders rather than failing',
+             folders.folders.length === 0, JSON.stringify(folders.folders));
+          ctx.__res = res(401, {}, {});
+          const refused = await rejects(ctx.listRepoFolders('github', true));
+          ok('sync: a refused token says so, so the fix is the field above it',
+             !!refused && /token was refused/.test(refused.message), JSON.stringify(refused));
+          ctx.__gh_over = null;
+          /* Leave the stub as it was found — what follows reads calls[0]. */
+          ctx.repoFolderCache = null;
+          calls.length = 0;
+          ctx.__res = null;
 
           /*
             THE FOLDER, AS A CONTROL ON THE IMPORT PAGE TOO.

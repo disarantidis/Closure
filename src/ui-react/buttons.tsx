@@ -140,6 +140,9 @@ const IconSettings = svg(
 const IconCheck = svg('M20 6L9 17l-5-5');
 const IconFolder = svg('M3 7a2 2 0 012-2h3.5l2 2H19a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z');
 const IconAdd = svg('M12 5v14M5 12h14');
+/* Two arrows chasing each other — "go and ask the repo again". Not the plain
+   circular arrow, which reads as undo as often as it reads as refresh. */
+const IconSync = svg('M21 12a9 9 0 0 1-9 9 9 9 0 0 1-7.5-4 M3 12a9 9 0 0 1 9-9 9 9 0 0 1 7.5 4 M20 4v5h-5 M4 20v-5h5');
 // Every remove/delete action in this file uses this, not the minus or × it
 // used to — a trash bin reads as "remove" on sight; a minus/× also reads as
 // "collapse" / "dismiss", which is what those glyphs mean everywhere else in
@@ -480,6 +483,22 @@ function mountLiveTitleButton(mountId: string, base: any, initialTitle: string, 
   return { setTitle: (t) => set(t) };
 }
 
+/* A compact labelled button that can say it is busy. mountLiveButton also has
+   loading, but it is `block` — full width — which is right for Push at the
+   bottom of a card and wrong for a button sitting in a heading row beside a
+   title. mountLiveTitleButton is the right shape and carries only a title. */
+type LiveBusyHandle = { setLoading: (v: boolean) => void };
+function mountLiveBusyButton(mountId: string, base: any, title: string, level: Level = GROUND): LiveBusyHandle {
+  const container = document.getElementById(mountId);
+  let set: (v: boolean) => void = () => {};
+  function View() {
+    const [loading, setL] = useState(false); set = setL;
+    return <PomButton {...base} loading={loading} title={title} aria-label={title} />;
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
+  return { setLoading: (v) => set(v) };
+}
+
 type LiveToggleIconHandle = { setMode: (mode: 'add' | 'remove') => void };
 function mountLiveToggleIconButton(
   mountId: string,
@@ -591,6 +610,8 @@ declare global {
     };
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
     PomRepoReadBtn: LiveTitleHandle;
+    PomGithubSyncBtn: LiveBusyHandle;
+    PomGitlabSyncBtn: LiveBusyHandle;
     PomAddGitlabBtn: LiveToggleIconHandle;
     PomAddGithubBtn: LiveToggleIconHandle;
     PomExportMode: { onChange: ((index: number) => void) | null };
@@ -815,6 +836,35 @@ mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'fill
   empty state's Import button fell into. The title still carries the full
   sentence, including which file and which branch.
 */
+/*
+  SYNC — go and ask this repository what is actually in it.
+
+  The folder discovery has always run on opening this page, and has always
+  failed silently: the folder field kept accepting anything typed, so a refused
+  token, a misspelt repository and a repo that genuinely has no folders were
+  three states with one appearance, which was none. This asks on purpose, says
+  what came back, and is the only thing here that tells you the token works
+  before a push does.
+
+  A live handle because it is the slowest request the plugin makes — the whole
+  tree of the repository — and a button that looks idle for four seconds reads
+  as a button that did not take the click.
+*/
+window.PomGithubSyncBtn = mountLiveBusyButton(
+  'gh-sync-btn-mount',
+  { id: 'gh-sync-btn', variant: 'tonal', size: 'small',
+    label: 'Sync', leftIcon: true, buttonLeftIcon: IconSync(16) },
+  'Check the connection and find the folders in this repository',
+  CARD_LEVEL,
+);
+window.PomGitlabSyncBtn = mountLiveBusyButton(
+  'gl-sync-btn-mount',
+  { id: 'gl-sync-btn', variant: 'tonal', size: 'small',
+    label: 'Sync', leftIcon: true, buttonLeftIcon: IconSync(16) },
+  'Check the connection and find the folders in this repository',
+  CARD_LEVEL,
+);
+
 window.PomRepoReadBtn = mountLiveTitleButton(
   'repo-read-btn-mount',
   { id: 'repo-read-btn', variant: 'tonal', size: 'small',

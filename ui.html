@@ -654,6 +654,24 @@
       justify-content: space-between;
       margin-bottom: 16px;
     }
+    /* Sync and Remove sit together at the end of the heading row. */
+    .provider-heading-actions { display: flex; align-items: center; gap: 8px; }
+    /*
+      WHAT THE LAST SYNC FOUND. The discovery has always run on opening this
+      page and always failed silently — the folder field still accepted
+      anything typed, so a refused token and a repo with no folders in it
+      looked exactly alike, and both looked like nothing happening.
+    */
+    .provider-sync-status {
+      margin: -8px 0 16px;
+      font-size: 11px;
+      line-height: 1.5;
+      opacity: 0.75;
+      overflow-wrap: anywhere;
+    }
+    .provider-sync-status:empty { display: none; }
+    .provider-sync-status.is-error { color: var(--app-danger); opacity: 1; }
+    .provider-sync-status.is-ok { color: var(--app-text); }
     /* The provider name + its logo badge, side by side (was plain text). */
     .provider-section-heading .folder-paths-title {
       display: flex;
@@ -22677,8 +22695,12 @@ html[data-theme=dark] {
               </span>
               GitLab
             </p>
-            <span id="remove-gitlab-btn-mount" hidden></span>
+            <div class="provider-heading-actions">
+              <span id="gl-sync-btn-mount"></span>
+              <span id="remove-gitlab-btn-mount" hidden></span>
+            </div>
           </div>
+          <p class="provider-sync-status" id="gl-sync-status"></p>
           <div id="gitlab-fields">
             <!-- Token + its Clear button share a row, the same
                  [field][icon button] shape as the folder-add rows below. -->
@@ -22722,8 +22744,12 @@ html[data-theme=dark] {
               </span>
               GitHub
             </p>
-            <span id="remove-github-btn-mount" hidden></span>
+            <div class="provider-heading-actions">
+              <span id="gh-sync-btn-mount"></span>
+              <span id="remove-github-btn-mount" hidden></span>
+            </div>
           </div>
+          <p class="provider-sync-status" id="gh-sync-status"></p>
           <div id="github-connection-fields">
             <div class="token-row">
               <span id="gh-token-mount"></span>
@@ -48945,6 +48971,7 @@ html[data-theme=dark] {
   var IconCheck = svg("M20 6L9 17l-5-5");
   var IconFolder = svg("M3 7a2 2 0 012-2h3.5l2 2H19a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z");
   var IconAdd = svg("M12 5v14M5 12h14");
+  var IconSync = svg("M21 12a9 9 0 0 1-9 9 9 9 0 0 1-7.5-4 M3 12a9 9 0 0 1 9-9 9 9 0 0 1 7.5 4 M20 4v5h-5 M4 20v-5h5");
   var IconTrash = svg("M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M10 11v6 M14 11v6");
   var IconSun = svg("M12 2v2 M12 20v2 M4.93 4.93 6.34 6.34 M19.07 19.07 17.66 17.66 M2 12h2 M20 12h2 M4.93 19.07 6.34 17.66 M19.07 4.93 17.66 6.34 M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0");
   var IconMoon = svg("M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z");
@@ -49192,6 +49219,18 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime25.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(View, {}) })));
     return { setTitle: (t) => set(t) };
   }
+  function mountLiveBusyButton(mountId, base, title, level = GROUND) {
+    const container = document.getElementById(mountId);
+    let set = () => {
+    };
+    function View() {
+      const [loading, setL] = (0, import_react18.useState)(false);
+      set = setL;
+      return /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(PomButton, { ...base, loading, title, "aria-label": title });
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime25.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(View, {}) })));
+    return { setLoading: (v) => set(v) };
+  }
   function mountLiveToggleIconButton(mountId, base, addIcon, removeIcon, addTitle, removeTitle, initial, level = GROUND) {
     const container = document.getElementById(mountId);
     let set = () => {
@@ -49295,6 +49334,32 @@ html[data-theme=dark] {
   mountIconButton("import-back-btn-mount", { id: "import-back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
   mountButton("import-copy-btn-mount", { id: "import-copy-btn", variant: "outline", size: "small", label: "Copy", block: true }, CARD_LEVEL);
   mountButton("import-choose-btn-mount", { id: "import-choose-btn", variant: "filled", size: "large", label: "Choose a JSON file" });
+  window.PomGithubSyncBtn = mountLiveBusyButton(
+    "gh-sync-btn-mount",
+    {
+      id: "gh-sync-btn",
+      variant: "tonal",
+      size: "small",
+      label: "Sync",
+      leftIcon: true,
+      buttonLeftIcon: IconSync(16)
+    },
+    "Check the connection and find the folders in this repository",
+    CARD_LEVEL
+  );
+  window.PomGitlabSyncBtn = mountLiveBusyButton(
+    "gl-sync-btn-mount",
+    {
+      id: "gl-sync-btn",
+      variant: "tonal",
+      size: "small",
+      label: "Sync",
+      leftIcon: true,
+      buttonLeftIcon: IconSync(16)
+    },
+    "Check the connection and find the folders in this repository",
+    CARD_LEVEL
+  );
   window.PomRepoReadBtn = mountLiveTitleButton(
     "repo-read-btn-mount",
     {
@@ -55136,7 +55201,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '267dbae 12:59:41';
+    var CLOSURE_BUILD = '1ca4215 13:07:05';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -56699,6 +56764,67 @@ function format(report, opts) {
       });
     }
 
+    /*
+      SYNC — the button in each provider's heading.
+
+      Says three things loadRepoFolders() never could: whether the credentials
+      are accepted at all, how many folder paths the repository actually has,
+      and when it has none. A silent failure left all three looking identical,
+      and the only way to discover a wrong token was to try a push.
+
+      The status stays on screen rather than passing through a toast: it is the
+      answer to a question that was just asked on purpose, and it should still
+      be there while the fields above it are being corrected.
+    */
+    function syncStatus(which, text, kind) {
+      var el = document.getElementById(which === 'gitlab' ? 'gl-sync-status' : 'gh-sync-status');
+      if (!el) return;
+      el.textContent = text || '';
+      el.className = 'provider-sync-status' + (kind ? ' is-' + kind : '');
+    }
+
+    function syncRepo(which) {
+      var btn = which === 'gitlab' ? window.PomGitlabSyncBtn : window.PomGithubSyncBtn;
+      var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
+      var ready = which === 'gitlab' ? isGitLabReady() : isGitHubReady();
+      if (!ready) {
+        syncStatus(which, which === 'gitlab'
+          ? 'Add a token and a project before syncing'
+          : 'Add a token and a repository before syncing', 'error');
+        return;
+      }
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      var where = which === 'gitlab' ? c.project : c.repo;
+      btn.setLoading(true);
+      syncStatus(which, 'Asking ' + label + ' about ' + where + ' on ' + c.branch + '…');
+      listRepoFolders(which, true).then(function (res) {
+        btn.setLoading(false);
+        var combo = which === 'gitlab' ? window.PomFolderNew : window.PomGithubFolderNew;
+        combo.setOptions(res.folders);
+        var n = res.folders.length;
+        /*
+          NO FOLDERS IS AN ANSWER, NOT A FAILURE. A repo whose JSON sits at the
+          root has none, and so does one nothing has been pushed to yet — both
+          are ordinary, and both used to look like the button had done nothing.
+        */
+        syncStatus(which, n
+          ? where + ' on ' + c.branch + ' — ' + n.toLocaleString() + ' folder path' +
+            (n === 1 ? '' : 's') + ' found' +
+            (res.truncated ? ', and more than this list can hold — type a path if it is missing' : '')
+          : where + ' on ' + c.branch + ' — connected, and the root is the only path in it',
+          'ok');
+      }, function (err) {
+        btn.setLoading(false);
+        /* Name the thing that was refused. "Could not connect" sends somebody
+           to their network; "the token was refused" sends them to the field
+           immediately above, which is where the problem is. */
+        syncStatus(which, 'Could not read ' + where + ' — ' +
+          ((err && err.message) || 'the request failed'), 'error');
+      });
+    }
+    document.getElementById('gh-sync-btn').addEventListener('click', function () { syncRepo('github'); });
+    document.getElementById('gl-sync-btn').addEventListener('click', function () { syncRepo('gitlab'); });
+
     document.getElementById('settings-btn').addEventListener('click', function() {
       document.getElementById('main-page').classList.add('hidden');
       document.getElementById('settings-page').classList.add('visible');
@@ -57666,11 +57792,15 @@ function format(report, opts) {
       for the missing one in the wrong place.
     */
     var repoFolderCache = null;    // { key, folders, truncated }
-    function listRepoFolders(which) {
+    function listRepoFolders(which, force) {
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
       var where = which === 'gitlab' ? c.host + '#' + c.project : c.repo;
       var key = which + '|' + where + '|' + c.branch + '|' + c.token;
-      if (repoFolderCache && repoFolderCache.key === key) return Promise.resolve(repoFolderCache);
+      /* Sync means ASK AGAIN. The cache is keyed by the address, so it answers
+         instantly and correctly for the same address — which is right for
+         opening the page and wrong for a button pressed because somebody has
+         just made a folder over in GitHub and wants to see it. */
+      if (!force && repoFolderCache && repoFolderCache.key === key) return Promise.resolve(repoFolderCache);
 
       var url, headers;
       if (which === 'gitlab') {
