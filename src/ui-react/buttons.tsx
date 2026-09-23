@@ -644,6 +644,7 @@ declare global {
     PomGithubFolderNew: FolderComboBridge;
     PomFolderList: FolderListBridge;
     PomGithubFolderList: FolderListBridge;
+    PomFigmaCardTag: { set: (value: string) => void };
     PomCollectionsAccordion: {
       setTitle: (title: string) => void;
       setCollections: (collections: { name: string; count: number }[]) => void;
@@ -1841,6 +1842,31 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
 // the vanilla script's 'extracted'/'transformed' handlers call
 // setTitle/setCollections/setSummary and don't know or care how this
 // renders internally.
+/*
+  THE PARENT CARD'S TITLE ROW — a mark, the word Figma, and the one number that
+  describes everything under it.
+
+  It is the same shape the Json file subcard beneath it already had, which is
+  the point: two cards side by side in a stack, each saying what it is and how
+  big it is. The count used to ride the collections card, where it read as a
+  fact about that card rather than about the file.
+*/
+(function mountFigmaCardTag() {
+  const icon = document.getElementById('figma-card-icon-mount');
+  if (icon) flushSync(() => createRoot(icon).render(<>{IconFigma(16)}</>));
+  const container = document.getElementById('figma-card-tag-mount');
+  let apply: ((v: string) => void) | null = null;
+  let value = '';
+  function View() {
+    const [v, setV] = useState(value);
+    apply = setV;
+    if (!v) return null;
+    return <Tag variant="tonal" size="small" leading={IconVariables(11)}>{v}</Tag>;
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomFigmaCardTag = { set: (next: string) => { value = next; apply?.(next); } };
+})();
+
 (function mountCollectionsAccordion() {
   const container = document.getElementById('collections-list');
   let set: (u: (s: any) => any) => void = () => {};
@@ -1886,9 +1912,10 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
                 {/* The variables glyph rides the COUNT now, not the title —
                     it is the one thing on this row that is actually about
                     variables. `leading`, the slot Tag keeps for exactly this. */}
-                {state.summary.tokens
-                  ? <Tag variant="tonal" size="small" leading={IconVariables(11)}>{state.summary.tokens}</Tag>
-                  : null}
+                {/* The token count moved out to the parent card's title row
+                    (mountFigmaCardTag): it counts what the whole card is
+                    about, and this card is the file's NAME and the way into
+                    its collections. */}
               </div>
             </div>
           </div>
@@ -1952,7 +1979,13 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
   window.PomCollectionsAccordion = {
     setTitle: (title) => set((s) => ({ ...s, title })),
     setCollections: (collections) => set((s) => ({ ...s, collections })),
-    setSummary: (tokens) => set((s) => ({ ...s, summary: { tokens } })),
+    /* Kept on this card's own state as well as pushed to the parent's title
+       row, so the one caller in ui.template.html does not have to know the
+       count is drawn somewhere else now. */
+    setSummary: (tokens) => {
+      window.PomFigmaCardTag?.set(tokens);
+      set((s) => ({ ...s, summary: { tokens } }));
+    },
     onClearVariables: null,
   };
 })();

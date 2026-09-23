@@ -2195,6 +2195,50 @@
       padding: var(--spacing-component-6);
       margin: 0 16px 16px;
     }
+    /*
+      THE SAME CARD, ONE RUNG IN. Nested inside .figma-card it keeps its shape
+      and gives up its gutter — the outer card's padding is the inset now, and
+      a margin here would inset it twice. A slightly tighter radius so the two
+      corners are concentric rather than parallel.
+    */
+    .json-download-card.is-sub {
+      margin: 0;
+      border-radius: 18px;
+      /* Tighter than a top-level card's, because it is paying for two insets
+         now — its own and the one around it. At the card's full padding the
+         file-name field lost 44px and truncated "odstokens.json" to "odstok",
+         which is a nested layout charging the content for the nesting. */
+      padding: var(--spacing-component-4);
+    }
+
+    /*
+      THE FIGMA FILE, AND WHAT IT PRODUCES. One surface holding the collections
+      card and the Json file card, the way .provider-card holds its
+      .provider-subcard. Padding on the outer, so the subcard sits in from
+      every edge by the same amount.
+    */
+    .figma-card {
+      background: var(--background);
+      border-radius: 24px;
+      /* A frame round two cards, so it is thin: the cards inside carry their
+         own padding and the content should not pay twice for being grouped. */
+      padding: var(--spacing-component-3);
+      /* NO horizontal margin — .collections-wrap already insets this column by
+         16px, and adding it here put this one card 16px in from every card
+         that is not inside that wrapper. */
+      margin: 0 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    /* The collections card inside it is an InteractiveCard and paints its own
+       surface; at the subcard rung it reads as part of this one rather than as
+       a card sitting on a card. */
+    .figma-card > .collections-list { margin: 0; }
+    /* Sits in by the subcards' own inset, so the title lines up with the names
+       under it rather than with the frame around them. */
+    .figma-card-header { padding: 4px var(--spacing-component-4) 0; }
+    #figma-card-icon-mount { display: flex; }
     /* Title left, trailing affordance flush right — the file-size tag on
        the Json file card, the read button on the repo card. */
     .json-download-header {
@@ -22317,7 +22361,92 @@ html[data-theme=dark] {
         <p class="loader-text">Gathering your tokens…</p>
       </div>
     </div>
+    <!--
+      THE JSON IS WHAT THIS FIGMA FILE MAKES, so it is drawn inside it.
+
+      They were two cards in a row, which said they were two peers. They are
+      not: one is the source and the other is what the source produces, and
+      naming the file at the top of a card whose body is the file it exports
+      says that without a word of explanation. Same shape as Settings' provider
+      card holding its Selected Folder Paths.
+
+      The collections card stays an InteractiveCard — it opens the collections
+      dialog — so the JSON card cannot literally live INSIDE it: interactive
+      content nested in interactive content is one tab stop firing two things
+      (SelectableCard.tsx makes the same point about a control inside a card).
+      They are siblings under one surface instead, which is what the provider
+      card does too: its heading is not a box either.
+    -->
+    <div class="figma-card" id="figma-card" data-level="4">
+      <!-- The card's own title row, the same shape the Json file subcard below
+           uses: a mark and a name on the left, the one number that describes
+           the whole card on the right. The token count moved here from the
+           collections card, because it counts what this CARD is about — the
+           Figma file — and the card under it is now just the file's name and
+           the way into its collections. -->
+      <div class="json-download-header figma-card-header">
+        <div class="json-download-title-group">
+          <span class="json-download-title-icon" id="figma-card-icon-mount"></span>
+          <p class="json-download-title">Figma</p>
+        </div>
+        <span id="figma-card-tag-mount"></span>
+      </div>
     <div class="collections-list" id="collections-list" style="display: none;"></div>
+    <!-- Skeleton twin, shown until the same moment #skeleton-list hides
+         (the 'extracted' handler, or 'error') — this card's own content
+         (a static filename field + Download) never actually needed to
+         wait on extraction, but showing it fully rendered while the
+         file-variables card AND the push-settings card both still read as
+         skeletons was reported as inconsistent: one of three stacked
+         cards looking "already done" while its neighbours load reads as
+         broken, not as a deliberately-instant card. Synced to the same
+         reveal moment as #skeleton-list now, purely for that consistency
+         — see the 'extracted'/'error' handlers, which toggle this pair
+         together. -->
+    <div class="json-download-card is-sub" id="json-download-skeleton" data-level="3">
+      <div class="json-download-header">
+        <div class="json-download-title-group">
+          <span id="json-download-icon-skeleton-mount"></span>
+          <span id="json-download-title-skeleton-mount"></span>
+        </div>
+        <span id="json-download-tag-skeleton-mount"></span>
+      </div>
+      <div class="json-download-fields">
+        <span id="json-download-field-skeleton-mount"></span>
+        <span id="json-download-btn-skeleton-mount"></span>
+      </div>
+    </div>
+    <div class="json-download-card is-sub" id="json-download-card" data-level="3" hidden>
+      <div class="json-download-header">
+        <div class="json-download-title-group">
+          <!-- Plain inline SVG, not React-mounted — same reasoning as the
+               GitLab/GitHub marks on the repo card below: this card's
+               title row is static markup, not a React root. Lucide's
+               "file-text" glyph — a document, reading as "this is the
+               file" the way the collections card's braces icon reads as
+               "these are the variables". -->
+          <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <path d="M14 2v6h6"/>
+            <path d="M16 13H8"/>
+            <path d="M16 17H8"/>
+            <path d="M10 9H8"/>
+          </svg>
+          <p class="json-download-title">Json file</p>
+        </div>
+        <!-- The file-size tag that used to sit on the collections card
+             (beside its token count) — it describes this JSON file, so it
+             reads better here, at the right of this card's own title. -->
+        <span id="json-file-size-mount"></span>
+      </div>
+      <div class="json-download-fields">
+        <span id="primary-filename-mount"></span>
+        <div id="download-btn-mount"></div>
+      </div>
+    </div>
+
+    </div>
+
 
     <div class="empty-state" id="empty-state" style="display: none;">
       <!-- The Closure variable mark (Pomegranate Identity, node 16:31) — a
@@ -22358,59 +22487,6 @@ html[data-theme=dark] {
          white against the grayer page) is the ladder's own highest/most
          elevated rung, giving the strongest contrast tokens.css offers
          without inventing a one-off colour. -->
-    <!-- Skeleton twin, shown until the same moment #skeleton-list hides
-         (the 'extracted' handler, or 'error') — this card's own content
-         (a static filename field + Download) never actually needed to
-         wait on extraction, but showing it fully rendered while the
-         file-variables card AND the push-settings card both still read as
-         skeletons was reported as inconsistent: one of three stacked
-         cards looking "already done" while its neighbours load reads as
-         broken, not as a deliberately-instant card. Synced to the same
-         reveal moment as #skeleton-list now, purely for that consistency
-         — see the 'extracted'/'error' handlers, which toggle this pair
-         together. -->
-    <div class="json-download-card" id="json-download-skeleton" data-level="4">
-      <div class="json-download-header">
-        <div class="json-download-title-group">
-          <span id="json-download-icon-skeleton-mount"></span>
-          <span id="json-download-title-skeleton-mount"></span>
-        </div>
-        <span id="json-download-tag-skeleton-mount"></span>
-      </div>
-      <div class="json-download-fields">
-        <span id="json-download-field-skeleton-mount"></span>
-        <span id="json-download-btn-skeleton-mount"></span>
-      </div>
-    </div>
-    <div class="json-download-card" id="json-download-card" data-level="4" hidden>
-      <div class="json-download-header">
-        <div class="json-download-title-group">
-          <!-- Plain inline SVG, not React-mounted — same reasoning as the
-               GitLab/GitHub marks on the repo card below: this card's
-               title row is static markup, not a React root. Lucide's
-               "file-text" glyph — a document, reading as "this is the
-               file" the way the collections card's braces icon reads as
-               "these are the variables". -->
-          <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <path d="M14 2v6h6"/>
-            <path d="M16 13H8"/>
-            <path d="M16 17H8"/>
-            <path d="M10 9H8"/>
-          </svg>
-          <p class="json-download-title">Json file</p>
-        </div>
-        <!-- The file-size tag that used to sit on the collections card
-             (beside its token count) — it describes this JSON file, so it
-             reads better here, at the right of this card's own title. -->
-        <span id="json-file-size-mount"></span>
-      </div>
-      <div class="json-download-fields">
-        <span id="primary-filename-mount"></span>
-        <div id="download-btn-mount"></div>
-      </div>
-    </div>
-
     <!--
       COMPARE SITS BETWEEN THE TWO THINGS IT COMPARES.
 
@@ -50180,6 +50256,24 @@ html[data-theme=dark] {
   }
   mountFolderList("folder-list", "PomFolderList", "folder-row-input", CARD_LEVEL);
   mountFolderList("github-folder-list", "PomGithubFolderList", "github-folder-row-input", CARD_LEVEL);
+  (function mountFigmaCardTag() {
+    const icon2 = document.getElementById("figma-card-icon-mount");
+    if (icon2) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(icon2).render(/* @__PURE__ */ (0, import_jsx_runtime25.jsx)(import_jsx_runtime25.Fragment, { children: IconFigma(16) })));
+    const container = document.getElementById("figma-card-tag-mount");
+    let apply = null;
+    let value = "";
+    function View() {
+      const [v, setV] = (0, import_react18.useState)(value);
+      apply = setV;
+      if (!v) return null;
+      return /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(Tag, { variant: "tonal", size: "small", leading: IconVariables(11), children: v });
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime25.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(View, {}) })));
+    window.PomFigmaCardTag = { set: (next) => {
+      value = next;
+      apply?.(next);
+    } };
+  })();
   (function mountCollectionsAccordion() {
     const container = document.getElementById("collections-list");
     let set = () => {
@@ -50192,7 +50286,7 @@ html[data-theme=dark] {
         /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { "data-tense": "inverted", children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(InteractiveCard, { label: `${state.title} \u2014 view scanned collections`, level: 2, size: "large", onClick: () => setOpen(true), children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "collections-header", children: /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "collections-header-top", children: [
           /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "collections-header-icon", "aria-hidden": "true", children: IconFigma(18) }),
           /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "collections-summary", children: state.title }),
-          /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "collections-summary-tags", children: state.summary.tokens ? /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(Tag, { variant: "tonal", size: "small", leading: IconVariables(11), children: state.summary.tokens }) : null })
+          /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "collections-summary-tags" })
         ] }) }) }) }),
         /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
           Dialog,
@@ -50227,7 +50321,13 @@ html[data-theme=dark] {
     window.PomCollectionsAccordion = {
       setTitle: (title) => set((s) => ({ ...s, title })),
       setCollections: (collections) => set((s) => ({ ...s, collections })),
-      setSummary: (tokens) => set((s) => ({ ...s, summary: { tokens } })),
+      /* Kept on this card's own state as well as pushed to the parent's title
+         row, so the one caller in ui.template.html does not have to know the
+         count is drawn somewhere else now. */
+      setSummary: (tokens) => {
+        window.PomFigmaCardTag?.set(tokens);
+        set((s) => ({ ...s, summary: { tokens } }));
+      },
       onClearVariables: null
     };
   })();
@@ -55836,7 +55936,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '4e0acd5 14:51:06';
+    var CLOSURE_BUILD = 'ba07f5f 14:55:34';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
