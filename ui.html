@@ -1621,26 +1621,30 @@
       table. Reading down the page, every preview looked like it belonged to
       the section BELOW it.
 
-      A rule down the left side and the indent it creates is enough: it starts
-      at the heading and stops after the preview, so the extent of a section is
-      drawn rather than implied. Cheaper than a card, and this is already
-      inside one.
+      A rule down the left side was the first answer — cheaper than a card, and
+      this is already inside one. It drew the extent, but only as a line beside
+      the content rather than around it, and with the preview table's own border
+      a few pixels to its right the section ended up bounded on one side by a
+      rule and on the other by nothing.
+
+      A subcard says it properly: one surface per collection, at the rung below
+      the card holding them, which is the same relationship the Json file card
+      has to the repo card on the main screen.
     */
     .import-level-section {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      padding: 2px 0 10px 10px;
-      border-left: 2px solid var(--app-border);
+      background: var(--background);
+      /* Concentric with the .import-card around it rather than parallel —
+         24 outside, 18 in, the same pair .json-download-card.is-sub uses. */
+      border-radius: 18px;
+      padding: var(--spacing-component-4);
     }
     .import-level-section > .import-level-title {
       font-size: 12px;
       font-weight: 700;
       color: var(--app-text);
-      /* Pulled back over the rule so the name starts the line the rule draws,
-         instead of sitting indented from its own section. */
-      margin-left: -10px;
-      padding-left: 10px;
     }
 
     /*
@@ -1748,6 +1752,14 @@
        the left, the selected collection's table on the right with a column
        per mode. Small, but the SHAPE is the message — modes add columns,
        collections add rail entries. */
+    /*
+      data-level is set on this in the markup, one rung ABOVE the section it
+      sits in. --background is a level's own colour, so inside a level-3
+      subcard the table body and the selected rail item would have painted the
+      exact shade of the card behind them and the rail's selection would have
+      disappeared. It is raised off that surface, which is also what it looks
+      like.
+    */
     .import-fig {
       display: grid;
       grid-template-columns: 104px 1fr;
@@ -51054,7 +51066,7 @@ html[data-theme=dark] {
         const i = full.lastIndexOf("/");
         return { group: i === -1 ? "" : full.slice(0, i), leaf: i === -1 ? full : full.slice(i + 1) };
       });
-      return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-fig", children: [
+      return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-fig", "data-level": TOP_CARD_LEVEL, children: [
         /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-fig-rail", children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-fig-rail-head", children: "Collections" }),
           collections.map((x, i) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
@@ -51125,96 +51137,101 @@ html[data-theme=dark] {
           groupsInOrder.push(g);
         }
       });
-      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-6)" }, children: groupsInOrder.map((group) => {
-        const mine = collections.filter((x) => x.fromGroup === group);
-        return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-level-section", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-level-title", children: group }),
-          gcOf[group] && (() => {
-            const gc = gcOf[group];
-            const shown = gc.variants.slice(0, 5);
-            return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-level-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-level-path is-sets", "aria-hidden": "true", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "seg is-axis", children: [
-                  gc.variants.length,
-                  " sets"
+      return (
+        /* The card edges do the separating now, so the gap between them is the
+           .import-card's own rhythm rather than the 22px that was standing in
+           for a boundary that was not drawn. */
+        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: 10 }, children: groupsInOrder.map((group) => {
+          const mine = collections.filter((x) => x.fromGroup === group);
+          return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-level-section", "data-level": SUBCARD_LEVEL, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-level-title", children: group }),
+            gcOf[group] && (() => {
+              const gc = gcOf[group];
+              const shown = gc.variants.slice(0, 5);
+              return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-level-row", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-level-path is-sets", "aria-hidden": "true", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "seg is-axis", children: [
+                    gc.variants.length,
+                    " sets"
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "sep", children: "/" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "seg is-leaf", children: gc.measured ? "read from the file" : "not certain from the file" })
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "sep", children: "/" }),
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "seg is-leaf", children: gc.measured ? "read from the file" : "not certain from the file" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("ul", { className: "import-level-values", children: [
-                shown.map((v) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("li", { title: v, children: v }, v)),
-                gc.variants.length > shown.length && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("li", { className: "is-more", children: [
-                  "+",
-                  gc.variants.length - shown.length,
-                  " more"
-                ] })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-level-control", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
-                DropDownSelect,
-                {
-                  label: "read as",
-                  size: "small",
-                  block: true,
-                  value: gc.verdict,
-                  options: [
-                    { value: "modes", label: "modes" },
-                    { value: "separate", label: "collections" }
-                  ],
-                  onChange: (v) => window.PomImportLevels.onGroupToggle?.(group, v)
-                }
-              ) })
-            ] });
-          })(),
-          (byGroup[group] || []).map((c) => {
-            const role = c.role || "name";
-            const modeTaken = !!c.modeTakenBySibling;
-            const shown = c.values.slice(0, 5);
-            const segs = c.segments || [];
-            return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-level-row", children: [
-              segs.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-level-path", "aria-hidden": "true", children: segs.map((seg, i) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { style: { display: "contents" }, children: [
-                i > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "sep", children: "/" }),
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
-                  "span",
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("ul", { className: "import-level-values", children: [
+                  shown.map((v) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("li", { title: v, children: v }, v)),
+                  gc.variants.length > shown.length && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("li", { className: "is-more", children: [
+                    "+",
+                    gc.variants.length - shown.length,
+                    " more"
+                  ] })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-level-control", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+                  DropDownSelect,
                   {
-                    className: "seg" + (i === c.depth ? " is-axis" : "") + (i === segs.length - 1 && i !== c.depth ? " is-leaf" : ""),
-                    title: seg,
-                    children: seg
+                    label: "read as",
+                    size: "small",
+                    block: true,
+                    value: gc.verdict,
+                    options: [
+                      { value: "modes", label: "modes" },
+                      { value: "separate", label: "collections" }
+                    ],
+                    onChange: (v) => window.PomImportLevels.onGroupToggle?.(group, v)
                   }
-                )
-              ] }, i)) }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("ul", { className: "import-level-values", children: [
-                shown.map((v) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("li", { title: v, children: v }, v)),
-                c.values.length > shown.length && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("li", { className: "is-more", children: [
-                  "+",
-                  c.values.length - shown.length,
-                  " more"
-                ] })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-level-control", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
-                DropDownSelect,
-                {
-                  label: "read as",
-                  size: "small",
-                  block: true,
-                  value: role,
-                  options: [
-                    { value: "name", label: ROLE_LABEL.name },
-                    { value: "mode", label: ROLE_LABEL.mode + (modeTaken ? " \u2014 axis taken" : ""), disabled: modeTaken },
-                    { value: "collection", label: ROLE_LABEL.collection }
-                  ],
-                  onChange: (v) => window.PomImportLevels.onToggle?.(c.group, c.depth, v)
-                }
-              ) })
-            ] }, c.depth);
-          }),
-          mine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 5 }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-fig-label", children: "How this lands in Figma" }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Preview, { collections: mine })
-          ] })
-        ] }, group);
-      }) });
+                ) })
+              ] });
+            })(),
+            (byGroup[group] || []).map((c) => {
+              const role = c.role || "name";
+              const modeTaken = !!c.modeTakenBySibling;
+              const shown = c.values.slice(0, 5);
+              const segs = c.segments || [];
+              return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-level-row", children: [
+                segs.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-level-path", "aria-hidden": "true", children: segs.map((seg, i) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { style: { display: "contents" }, children: [
+                  i > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "sep", children: "/" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+                    "span",
+                    {
+                      className: "seg" + (i === c.depth ? " is-axis" : "") + (i === segs.length - 1 && i !== c.depth ? " is-leaf" : ""),
+                      title: seg,
+                      children: seg
+                    }
+                  )
+                ] }, i)) }),
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("ul", { className: "import-level-values", children: [
+                  shown.map((v) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("li", { title: v, children: v }, v)),
+                  c.values.length > shown.length && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("li", { className: "is-more", children: [
+                    "+",
+                    c.values.length - shown.length,
+                    " more"
+                  ] })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-level-control", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+                  DropDownSelect,
+                  {
+                    label: "read as",
+                    size: "small",
+                    block: true,
+                    value: role,
+                    options: [
+                      { value: "name", label: ROLE_LABEL.name },
+                      { value: "mode", label: ROLE_LABEL.mode + (modeTaken ? " \u2014 axis taken" : ""), disabled: modeTaken },
+                      { value: "collection", label: ROLE_LABEL.collection }
+                    ],
+                    onChange: (v) => window.PomImportLevels.onToggle?.(c.group, c.depth, v)
+                  }
+                ) })
+              ] }, c.depth);
+            }),
+            mine.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 5 }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-fig-label", children: "How this lands in Figma" }),
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Preview, { collections: mine })
+            ] })
+          ] }, group);
+        }) })
+      );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: SUBCARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
     window.PomImportLevels = {
       set: (c, a, cols, gc, ord) => set(c, a, cols || [], gc || [], ord || []),
       onToggle: null,
@@ -56141,7 +56158,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'a0b253c 18:10:24';
+    var CLOSURE_BUILD = '59627e2 18:14:36';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

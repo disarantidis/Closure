@@ -3071,7 +3071,7 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
       return { group: i === -1 ? '' : full.slice(0, i), leaf: i === -1 ? full : full.slice(i + 1) };
     });
     return (
-      <span className="import-fig">
+      <span className="import-fig" data-level={TOP_CARD_LEVEL}>
         <span className="import-fig-rail">
           <span className="import-fig-rail-head">Collections</span>
           {collections.map((x, i) => (
@@ -3154,14 +3154,17 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
     Object.keys(byGroup).forEach((g) => { if (!seen.has(g)) { seen.add(g); groupsInOrder.push(g); } });
 
     return (
-      <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-6)' }}>
+      /* The card edges do the separating now, so the gap between them is the
+         .import-card's own rhythm rather than the 22px that was standing in
+         for a boundary that was not drawn. */
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {groupsInOrder.map((group) => {
           /* Only the collections THIS group produced. The preview belongs
              beside the choice that determines it, not in one pile at the
              bottom where it answers for everything at once. */
           const mine = collections.filter((x) => x.fromGroup === group);
           return (
-            <span key={group} className="import-level-section">
+            <span key={group} className="import-level-section" data-level={SUBCARD_LEVEL}>
               <span className="import-level-title">{group}</span>
 
               {gcOf[group] && (() => {
@@ -3270,7 +3273,11 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
     );
   }
 
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  /* SUBCARD_LEVEL: every "read as" dropdown stands on .import-level-section,
+     which is rung 3 now. At CARD_LEVEL they would compute rung 3 as well and
+     paint the colour of the card behind them — the same disappearance Compare's
+     file picker was measured doing on the main screen. */
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={SUBCARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomImportLevels = {
     set: (c, a, cols, gc, ord) => set(c, a, cols || [], gc || [], ord || []),
     onToggle: null,
