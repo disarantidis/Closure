@@ -1836,10 +1836,10 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             fetch: (url, opts) => { calls.push({ url, opts }); return Promise.resolve(ctx.__res); },
             composeFilePath: (folder, file) => (folder ? folder.replace(/\/+$/, '') + '/' : '') + file,
             gitlabConfig: () => Object.assign({ host: 'https://gitlab.com/', project: 'me/my repo',
-                                   folder: 'tokens/out', filename: 'tokens_dtcg.json',
+                                   folder: 'tokens/out', filename: ctx.primaryFilename(),
                                    branch: 'main', token: 'GLT' }, ctx.__gl_over),
             githubConfig: () => Object.assign({ repo: 'acme/tokens', folder: '',
-                                   filename: 'tokens_dtcg.json', branch: 'main', token: 'GHT' },
+                                   filename: ctx.primaryFilename(), branch: 'main', token: 'GHT' },
                                    ctx.__gh_over),
             isGitLabReady: () => ctx.__gl, isGitHubReady: () => ctx.__gh,
             gitlabAdded: false, githubAdded: false, mainProviderTab: 'gitlab',
@@ -1849,7 +1849,12 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           /* The combo box on the repo card OWNS the picked file — there is no
              second copy of it to drift. Stubbed here the same way. */
           let picked = '';
-          ctx.PomRepoFile = { get: () => picked, set: (v) => { picked = v; }, setOptions: () => {}, onChange: null };
+          /* The name field IS the repo-file picker now — one control for the
+             name written and the name read back. */
+          ctx.PomPrimaryFilename = {
+            get: () => picked, set: (v) => { picked = v; }, setOptions: () => {}, onChange: null,
+          };
+          ctx.primaryFilename = () => picked;
           /* The import page's picker is a SECOND mount of the same combo over
              the same selection. Stubbed as its own object on purpose: if the
              two ever stop being written together, these see it. */
@@ -1903,11 +1908,11 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             one document and Import at another.
           */
           ctx.chooseRepoFile('themes.json');
-          ok('repo file: choosing moves the repo card and the import page together',
+          ok('repo file: choosing moves the name field and the import page together',
              picked === 'themes.json' && importPicked === 'themes.json',
              picked + ' / ' + importPicked);
           ctx.setRepoFileOptions(['a.json', 'b.json']);
-          ok('repo file: one listing fills both pickers',
+          ok('repo file: one listing fills the name field and the import picker',
              importOptions && importOptions.join(',') === 'a.json,b.json',
              JSON.stringify(importOptions));
           ok('repo file: the read address follows whatever was chosen',
@@ -2384,7 +2389,14 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             ok('repo probe: the address key moves when ' + why, k !== base, k);
           };
           moves({ folder: 'tokens/out' }, 'the folder changes');
-          moves({ filename: 'other.json' }, 'the filename field changes');
+          /* The NAME, not the config's copy of it. The name field is the single
+             source now — githubConfig().filename is read FROM it — so moving
+             the config alone would be moving a shadow. */
+          const wasPicked = picked;
+          picked = 'other.json';
+          ok('repo probe: the address key moves when the name changes',
+             ctx.repoAddressKey('github') !== base, ctx.repoAddressKey('github'));
+          picked = wasPicked;
           moves({ branch: 'next' }, 'the branch changes');
           moves({ repo: 'acme/other' }, 'the repository changes');
           /* Not addressing, but a refused token leaves a red line that
@@ -2396,44 +2408,48 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              ctx.repoAddressKey('gitlab') !== ctx.repoAddressKey('github'));
 
           /*
-            THE FILE WRITTEN AND THE FILE READ ARE TWO FILES.
+            THE FILE WRITTEN AND THE FILE READ ARE ONE FILE, AND ONE CONTROL.
 
-            They were one value, and that single fact was behind the card
-            reading wrongly: the name the plugin pushes to was also the only
-            name it would look for, so a repo whose token file is called
-            anything else could only ever be reported as missing. The Json
-            file card names what is written; the repo card picks what is read.
+            They were one VALUE once, and that was a real bug: the name the
+            plugin pushes to was also the only name it would look for, so a repo
+            whose token file is called anything else could only ever be reported
+            as missing. The fix was a second control — "File in the repo" on the
+            repo card — and that fix has now been replaced rather than undone.
+            The name field is a combobox over the same listing, so the name a
+            repo already uses is visible and one click away instead of being
+            guessed at. The bug stays fixed; the second field does not stay.
           */
           ctx.__gh_over = { folder: 'tokens' };
-          ctx.PomRepoFile.set('');
-          ok('repo probe: with nothing picked yet, the read falls back to the pushed name',
+          picked = 'tokens_dtcg.json';
+          ok('repo probe: read and write are the same path, under the chosen folder',
              ctx.repoFilePath('github') === 'tokens/tokens_dtcg.json' &&
              ctx.pushFilePath('github') === 'tokens/tokens_dtcg.json',
-             ctx.repoFilePath('github'));
-          ctx.PomRepoFile.set('something-else.json');
-          ok('repo probe: picking a repo file moves the READ address only',
+             ctx.repoFilePath('github') + '  vs  ' + ctx.pushFilePath('github'));
+          picked = 'something-else.json';
+          ok('repo probe: and picking a name from the repo moves both together',
              ctx.repoFilePath('github') === 'tokens/something-else.json' &&
-             ctx.pushFilePath('github') === 'tokens/tokens_dtcg.json',
+             ctx.pushFilePath('github') === 'tokens/something-else.json',
              ctx.repoFilePath('github') + '  vs  ' + ctx.pushFilePath('github'));
           ok('repo probe: both stay under the same folder',
              ctx.repoFilePath('github').indexOf('tokens/') === 0 &&
              ctx.pushFilePath('github').indexOf('tokens/') === 0);
-          /* The key is about the file being READ, so renaming the export must
-             not spend a request re-reading a repo file that has not moved. */
+          /* One name means one key: the file being read IS the file being
+             written, so a rename is a different address and has to be re-read. */
           const keyBefore = ctx.repoAddressKey('github');
-          ctx.__gh_over = { folder: 'tokens', filename: 'renamed-export.json' };
-          ok('repo probe: renaming the export does not move the read address key',
+          picked = 'a-third.json';
+          ok('repo probe: renaming moves the address key, because it moves the file',
+             ctx.repoAddressKey('github') !== keyBefore, ctx.repoAddressKey('github'));
+          picked = 'something-else.json';
+          ok('repo probe: and naming it back lands on the key it started from',
              ctx.repoAddressKey('github') === keyBefore, ctx.repoAddressKey('github'));
-          ctx.PomRepoFile.set('a-third.json');
-          ok('repo probe: but picking a different repo file does',
-             ctx.repoAddressKey('github') !== keyBefore);
+
           /*
             WRITING OVER A FILE IS NOT THE SAME ACT AS CREATING ONE, and the
             button is the last place it can be said before it happens.
           */
-          ctx.__gh_over = null; ctx.PomRepoFile.set('');
+          ctx.__gh_over = null; picked = 'tokens_dtcg.json';
           ctx.repoFileNames = [];
-          ctx.PomRepoFile.set('tokens_dtcg.json');
+          picked = 'tokens_dtcg.json';
           ok('repo probe: with no listing read yet, a push is not claimed to replace',
              ctx.pushWouldReplace('github') === false);
           ctx.repoFileNames = ['brand.json', 'other.json'];
@@ -2444,30 +2460,25 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              ctx.pushWouldReplace('github') === true);
 
           /*
-            THE LOUD CLAIM HAS TO BE CHECKABLE FROM THE SCREEN.
+            THE LOUD CLAIM HAS TO BE CHECKABLE FROM THE SCREEN, and now it is
+            by construction.
 
-            It first said Replace whenever the pushed name existed anywhere in
-            the folder — true, and read as a mistake: with tokens_dtcg.json on
-            the Json file card and legacy-backup.json picked on the repo card,
-            the button claimed a replacement nothing on screen supported. A
-            claim the reader cannot check is indistinguishable from a wrong
-            one.
+            It once said Replace whenever the pushed name existed anywhere in
+            the folder — true, and read as a mistake, because with one name on
+            the Json file card and another picked on the repo card the button
+            claimed a replacement nothing on screen supported. That second name
+            is gone: the field IS the picker, so what Replace refers to is the
+            one name in front of you.
           */
-          ctx.PomRepoFile.set('legacy-backup.json');
+          picked = 'legacy-backup.json';
           ctx.repoFileNames = ['legacy-backup.json', 'tokens_dtcg.json'];
-          ok('repo probe: a different file shown above is NOT labelled a replace',
-             ctx.pushWouldReplace('github') === false);
-          /* But it still overwrites, and going quiet about that would trade a
-             confusing warning for a missing one — the direction that loses
-             work. It moves to the hover text, naming the file. */
-          ok('repo probe: the overwrite it no longer shouts about is still said, and named',
-             /tokens_dtcg\.json/.test(ctx.pushOverwriteNote('github')) &&
-             /not the file shown above/.test(ctx.pushOverwriteNote('github')),
-             ctx.pushOverwriteNote('github'));
-          ctx.PomRepoFile.set('tokens_dtcg.json');
-          ok('repo probe: when the two names agree the note says so plainly',
+          ok('repo probe: the name on screen being in the folder is a replace',
+             ctx.pushWouldReplace('github') === true);
+          ok('repo probe: and the note names the whole path, which the label cannot',
+             /legacy-backup\.json/.test(ctx.pushOverwriteNote('github')) &&
              /is the file shown above/.test(ctx.pushOverwriteNote('github')),
              ctx.pushOverwriteNote('github'));
+          picked = 'tokens_dtcg.json';
           ctx.repoFileNames = ['brand.json'];
           ok('repo probe: nothing to overwrite means no note at all',
              ctx.pushOverwriteNote('github') === '');

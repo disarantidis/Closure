@@ -674,16 +674,11 @@ declare global {
       setReport: (report: any, copyText: string) => void;
       onAction: (() => void) | null;
     };
-    /* The name the plugin WRITES — Download and every push. A plain field;
-       the repo's own files are PomRepoFile below, deliberately not here. */
+    /* The name the plugin writes AND the file it reads back — one combobox over
+       whatever the chosen folder holds. It was a plain field beside a separate
+       "File in the repo" picker; see mountPrimaryFilename for why that is one
+       control now. */
     PomPrimaryFilename: {
-      get: () => string;
-      set: (value: string) => void;
-      onChange: ((value: string) => void) | null;
-    };
-    /* The file in the repo the comparison READS — and, on the import page under
-       the same name, the file the import PULLS. Two mounts, one selection. */
-    PomRepoFile: {
       get: () => string;
       set: (value: string) => void;
       setOptions: (names: string[]) => void;
@@ -1050,36 +1045,79 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
   the value has to be readable synchronously in the middle of composing a
   push, which React state is not.
 */
+/*
+  ONE NAME, TYPED OR PICKED.
+
+  This was a plain text field, and the repo card carried a second control — "File
+  in the repo" — for choosing which file to compare against. Two fields for one
+  answer: the name you are about to write, and the name you are reading back.
+  They are the same file in every ordinary use, and keeping them apart meant
+  naming it twice and then wondering which one a button meant.
+
+  So the field became the list. Type a name that is not there yet and it is the
+  name; pick one the repository already has and it is that. The options are
+  whatever the folder holds, refreshed by the same listing the push button uses
+  to decide whether it is replacing something.
+
+  WHAT IS LOST, SAID PLAINLY: comparing against one file while pushing to
+  another is no longer expressible, because there is no longer a second address
+  to put it in. That was possible and, as far as anything here knows, never
+  wanted; a repo whose export lives under a different name is renamed by
+  picking it, which is the same two clicks with none of the ambiguity.
+*/
 (function mountPrimaryFilename() {
   const container = document.getElementById('primary-filename-mount');
-  let value = 'tokens.json';
-  let apply: ((v: string) => void) | null = null;
-  const push = (next: string, tell?: boolean) => {
-    value = next;
-    apply?.(next);
-    if (tell) window.PomPrimaryFilename.onChange?.(value);
+  type S = { query: string; value: string; all: string[] };
+  let state: S = { query: 'tokens.json', value: 'tokens.json', all: [] };
+  let apply: ((s: S) => void) | null = null;
+  const put = (next: Partial<S>, tell?: boolean) => {
+    state = { ...state, ...next };
+    apply?.(state);
+    if (tell) window.PomPrimaryFilename.onChange?.(state.value);
   };
+  const focused = () => !!container && container.contains(document.activeElement);
   function View() {
-    const [v, setV] = useState(value);
-    apply = setV;
+    const [s, setS] = useState<S>(state);
+    apply = setS;
+    /* Substring, and never collapsing to nothing: an exact match is a name that
+       has been finished, not a filter with one hit, so the whole list stays
+       open. Same rule as the folder pickers. */
+    const q = s.query.trim().toLowerCase();
+    const options = (q && s.all.indexOf(s.query.trim()) === -1
+      ? s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1)
+      : s.all);
     return (
-      <PomTextField
-        id="primary-filename"
+      <Combobox
         label="File name"
         size="small"
         block
         placeholder="tokens.json"
-        value={v}
-        onInput={(next: string) => push(next, true)}
-        title={'JSON file name — used for both Download and every push destination. ' +
-               '".json" is added automatically if you leave it out.'}
+        value={s.query}
+        /* TYPING IS CHOOSING HERE, unlike the folder and repo-file combos where
+           it only filters. The commonest thing anybody does with this field is
+           write a name the repository has never seen, so a keystroke has to
+           reach the value and not just the list. */
+        onChange={(v: string) => put({ query: v, value: v }, true)}
+        options={options}
+        getKey={(o: string) => o}
+        onPick={(o: string) => put({ query: o, value: o }, true)}
+        renderOption={(o: string, st: { active: boolean }) => (
+          <span style={{ fontWeight: st.active ? 600 : 400 }}>{o}</span>
+        )}
+        emptyMessage={s.all.length
+          ? 'No file in this folder matches — this one will be created'
+          : 'Nothing in this folder yet — this one will be created'}
       />
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomPrimaryFilename = {
-    get: () => value,
-    set: (next: string) => push(next),
+    get: () => state.value,
+    /* A set from outside is the app choosing, not the person — it moves the
+       value silently, and leaves the text alone while somebody is typing in it.
+       Same rule, same reason, as the combos it replaced. */
+    set: (next: string) => put({ value: next, ...(focused() ? null : { query: next }) }),
+    setOptions: (names: string[]) => put({ all: names || [] }),
     onChange: null,
   };
 })();
@@ -1107,7 +1145,7 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
   in step by chooseRepoFile() in ui.template.html rather than by sharing state
   here, because one React root cannot span two places in the document.
 */
-function mountRepoFileCombo(mountId: string, bridgeKey: 'PomRepoFile' | 'PomImportRepoFile') {
+function mountRepoFileCombo(mountId: string, bridgeKey: 'PomImportRepoFile') {
   const container = document.getElementById(mountId);
   /*
     THE TYPED TEXT AND THE CHOSEN FILE ARE TWO DIFFERENT THINGS.
@@ -1184,7 +1222,9 @@ function mountRepoFileCombo(mountId: string, bridgeKey: 'PomRepoFile' | 'PomImpo
     onChange: null,
   };
 }
-mountRepoFileCombo('repo-file-mount', 'PomRepoFile');
+/* One mount, on the import page. The repo card's copy is gone: the Json file
+   card's own name field is a combobox over the same listing now, so choosing
+   there IS choosing the file in the repo. */
 mountRepoFileCombo('import-repo-file-mount', 'PomImportRepoFile');
 
 window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false, CARD_LEVEL);

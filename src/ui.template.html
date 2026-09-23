@@ -2599,7 +2599,9 @@
             already exists has nothing to add.
           -->
           <span id="folder-create-mount" hidden></span>
-          <span id="repo-file-mount" class="repo-file-half"></span>
+          <!-- "File in the repo" used to sit here. The Json file card's own
+               name field is a combobox over this folder's JSONs now, so the
+               file was being named twice on one screen. -->
         </div>
 
         <!-- Only meaningful once BOTH providers are actually added (see
@@ -3419,32 +3421,29 @@
       file named above it. Both names are on screen, and the word on the button
       follows them.
     */
+    /*
+      THE NAME ON SCREEN IS THE NAME BEING PUSHED, so "Replace" is checkable by
+      looking at it.
+
+      This used to need two conditions, because there were two names: the one
+      the Json file card wrote and the one the repo card pointed at. It said
+      Replace whenever the pushed name existed anywhere in the folder — true,
+      and read as a mistake, because nothing on screen supported it. Now there
+      is one name, so the second condition has nothing left to say.
+    */
     function pushWouldReplace(which) {
       if (!which) return false;
       var name = pushFilePath(which).split('/').pop();
-      return !!repoSelectedFile() && repoSelectedFile() === name &&
-             repoFileNames.indexOf(name) !== -1;
+      return !!name && repoFileNames.indexOf(name) !== -1;
     }
 
-    /*
-      THE OTHER OVERWRITE, the one the label no longer shouts about: pushing a
-      name that IS in the repo while this card is pointing at a different file.
-      It still overwrites, and going quiet about it would trade a confusing
-      warning for a missing one — which is the worse of the two, because this
-      is the direction that loses somebody's work.
-
-      So it moves to the button's hover text, where it costs nothing to carry
-      and names the file, rather than to a label that cannot be checked
-      against anything on screen.
-    */
+    /* The hover text names the whole path, which the label cannot. It carried
+       the divergent case too, back when there could be one. */
     function pushOverwriteNote(which) {
       if (!which) return '';
       var name = pushFilePath(which).split('/').pop();
       if (repoFileNames.indexOf(name) === -1) return '';
-      return repoSelectedFile() === name
-        ? 'Overwrites ' + pushFilePath(which) + ', which is the file shown above'
-        : 'Overwrites ' + pushFilePath(which) + ', which is already in this folder — ' +
-          'not the file shown above (' + repoSelectedFile() + ')';
+      return 'Overwrites ' + pushFilePath(which) + ', which is the file shown above';
     }
 
     function normFolder(p) {
@@ -5367,23 +5366,22 @@
       var el = document.getElementById(id);
       if (el) el.addEventListener('input', scheduleSettingsSave);
     });
-    window.PomPrimaryFilename.onChange = scheduleSettingsSave;
     /*
-      Picking a different file in the repo moves the READ address, so the
-      count on the card and anything Compare would fetch are both about a
-      different file now. Straight through refreshRepoReadRow, which only
-      spends a request when the address actually moved — so re-picking what is
-      already selected costs nothing.
+      THE NAME MOVES BOTH ADDRESSES, because it is both of them now.
 
-      Not persisted: the listing runs on every open and re-picks the file this
-      plugin pushes to, which is both deterministic and the one people want.
+      Typing or picking here changes what Download writes, what Push writes and
+      what Compare reads — so the save is scheduled AND the read address is
+      re-checked. refreshRepoReadRow only spends a request when the address
+      actually moved, so a keystroke inside one name costs nothing until the
+      name is a different one.
     */
-    window.PomRepoFile.onChange = function (name) {
-      chooseRepoFile(name);
+    window.PomPrimaryFilename.onChange = function (name) {
+      scheduleSettingsSave();
+      if (window.PomImportRepoFile) window.PomImportRepoFile.set(name);
       refreshRepoReadRow();
     };
     /* Picking on the import page is the same act, and has to land the same
-       way — including on the repo card, which the person may well go back to. */
+       way — including on the main screen, which the person may well go back to. */
     window.PomImportRepoFile.onChange = function (name) {
       chooseRepoFile(name);
       refreshRepoReadRow();
@@ -6171,8 +6169,16 @@
       to whichever one you asked. The widget owns the value; everything else
       asks it.
     */
+    /*
+      ONE NAME FOR BOTH DIRECTIONS.
+
+      This read a second control — "File in the repo" on the repo card — while
+      the Json file card named what gets written. Two fields for one answer, and
+      the folder below filters the list the field above offers, so the pair were
+      always describing the same place anyway. The name field is the list now.
+    */
     function repoSelectedFile() {
-      return (window.PomRepoFile && window.PomRepoFile.get()) || '';
+      return primaryFilename();
     }
     /*
       TWO PICKERS, ONE ANSWER. The repo card asks which file to compare
@@ -6184,11 +6190,11 @@
       one picker's change from bouncing back off the other.
     */
     function setRepoFileOptions(names) {
-      if (window.PomRepoFile) window.PomRepoFile.setOptions(names);
+      if (window.PomPrimaryFilename) window.PomPrimaryFilename.setOptions(names);
       if (window.PomImportRepoFile) window.PomImportRepoFile.setOptions(names);
     }
     function chooseRepoFile(name) {
-      if (window.PomRepoFile) window.PomRepoFile.set(name);
+      if (name && window.PomPrimaryFilename) window.PomPrimaryFilename.set(name);
       if (window.PomImportRepoFile) window.PomImportRepoFile.set(name);
     }
     function repoFilePath(which) {
