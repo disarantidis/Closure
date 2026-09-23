@@ -1911,14 +1911,21 @@
       margin: 12px 0 0;
     }
     .repo-file-half { flex: 1 1 0; min-width: 0; }
+    /* Right-aligned, under the file picker's half of the row above. */
+    .repo-token-row { display: flex; justify-content: flex-end; margin: 8px 0 0; }
+    /*
+      A control ON the wire, between two cards. The wire is painted behind
+      everything (z-index: -1 on .flow-wire), so an in-flow button here sits on
+      top of it without any masking — the line runs up to it and out the other
+      side, which is the join being acted on.
+    */
+    .flow-action {
+      display: flex;
+      justify-content: center;
+      margin: 0 0 16px;
+    }
     .repo-file-half[hidden] { display: none; }
 
-    .json-download-header-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
     /*
       The one line under the repo card's header that says what the last read
       found. Monospaced and dimmed like .import-repo-hint, for the same
@@ -22043,6 +22050,20 @@ html[data-theme=dark] {
       </div>
     </div>
 
+    <!--
+      COMPARE SITS BETWEEN THE TWO THINGS IT COMPARES.
+
+      It was in the repo card's header, which made it look like one more thing
+      the repo card does. It is not: it is about the Json file card above and
+      the repo card below, in equal measure, and the wire running between them
+      is exactly the join it acts on. Put it on that wire and the button needs
+      no label to say what its two sides are — they are the cards it is
+      between.
+    -->
+    <div class="flow-action" id="compare-row" hidden>
+      <span id="repo-read-btn-mount"></span>
+    </div>
+
     <!-- Skeleton twin of the action area, shown while the list loads. -->
     <div class="actions actions-skeleton" id="actions-skeleton"></div>
 
@@ -22090,42 +22111,12 @@ html[data-theme=dark] {
             <p class="json-download-title" id="repo-card-title">Repo settings</p>
           </div>
           <!--
-            COMPARE. Top-right of this card's own header, the same corner the
-            Json file card puts its size tag in — this card is about one
-            repository, so the control that compares against that repository
-            belongs on it rather than buried on the import page.
-
-            WHAT IT IS FOR, not how it works. Reading the file is a step; the
-            answer is the difference between what is in the repo and the
-            variables live in this Figma document right now. Nothing is
-            written and nothing is kept unless the import page's own Apply is
-            pressed afterwards.
-
-            It compares against THE FILE THIS CARD ALREADY NAMES:
-            composeFilePath of the selected folder and primaryFilename(),
-            which is the exact path Push writes and Download produces. So the
-            two sides are this document and the last thing pushed out of it,
-            not this document and whatever JSON happens to be lying around.
-
-            Hidden until a provider is actually readable (isGitLabReady /
-            isGitHubReady) — see refreshRepoReadRow().
+            The header carried a token count and a Compare button. Both have
+            moved to where what they describe actually is: the count sits under
+            the field naming the file it counts, and Compare sits on the wire
+            between the two cards it compares. What is left is the card saying
+            which service it is about, which is all a card header owes anyone.
           -->
-          <div class="json-download-header-actions">
-            <!--
-              HOW MANY TOKENS THE REPO'S COPY HOLDS, as a tag — the same tonal
-              pill the collections card wears for its token count and the Json
-              file card for its size. It is the same kind of fact about the
-              same kind of thing, so it reads as one family rather than this
-              card inventing a sentence for it.
-
-              NO BRANCH IN IT. A tag is a value, not a sentence, and "main"
-              was the half of that line that made it one. The branch is still
-              named where it is load-bearing: the Compare button's tooltip and
-              both sides of the Compare page.
-            -->
-            <span id="repo-token-tag-mount"></span>
-            <span id="repo-read-btn-mount" hidden></span>
-          </div>
         </div>
         <!--
           WHAT A TAG CANNOT SAY.
@@ -22178,6 +22169,17 @@ html[data-theme=dark] {
           -->
           <span id="folder-create-mount" hidden></span>
           <span id="repo-file-mount" class="repo-file-half"></span>
+        </div>
+
+        <!--
+          HOW MANY TOKENS THE REPO'S FILE HOLDS — under the field that names
+          that file, because that is what it is about. It was in the card's
+          header, where it read as a property of the repository rather than of
+          one file in it, and where nothing connected it to the name it counts.
+          Aligned right, under the file picker's own half of the row.
+        -->
+        <div class="repo-token-row">
+          <span id="repo-token-tag-mount"></span>
         </div>
         <!-- Only meaningful once BOTH providers are actually added (see
              updatePushTargetUI()'s tabMode — same gitlabAdded && githubAdded
@@ -53905,7 +53907,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '692db3f 10:02:10';
+    var CLOSURE_BUILD = 'e89c361 10:10:44';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -56383,6 +56385,10 @@ function format(report, opts) {
       if (!mount) return;
       var which = activeRepoProvider();
       mount.hidden = !which;
+      /* The row is on the wire between the cards, so it has to come and go
+         with the button rather than leave a gap in the line. */
+      var compareRow = document.getElementById('compare-row');
+      if (compareRow) compareRow.hidden = !which;
       var fileRow = document.getElementById('repo-file-row');
       if (fileRow) fileRow.hidden = !which;
       refreshFolderCreate();
