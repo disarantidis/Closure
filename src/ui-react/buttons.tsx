@@ -683,7 +683,7 @@ declare global {
     PomCommitMessage: DisabledHandle;
     PomVersionTag: { setLabel: (label: string) => void };
     PomFolderDiscovery: {
-      open: (where: string, paths: string[], added: string[]) => void;
+      open: (provider: string, where: string, paths: string[], added: string[]) => void;
       onAdd: ((path: string) => void) | null;
     };
     PomRemoveGithubDialog: { open: () => void; onConfirm: (() => void) | null };
@@ -3025,8 +3025,8 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
 */
 function mountFolderDiscovery() {
   const container = document.getElementById('folder-discovery-dialog-mount');
-  type S = { open: boolean; where: string; paths: string[]; added: string[] };
-  let state: S = { open: false, where: '', paths: [], added: [] };
+  type S = { open: boolean; provider: string; where: string; paths: string[]; added: string[] };
+  let state: S = { open: false, provider: 'github', where: '', paths: [], added: [] };
   let apply: ((s: S) => void) | null = null;
   const put = (next: Partial<S>) => { state = { ...state, ...next }; apply?.(state); };
   function View() {
@@ -3038,15 +3038,29 @@ function mountFolderDiscovery() {
       <Dialog
         open={s.open}
         onClose={() => put({ open: false })}
-        title={'Folder paths in ' + (s.where || 'this repository')}
+        /* The title names the THING; the repository goes under it, beside its
+           own mark. As one sentence it wrapped to two lines of heading — a
+           repository name is long and nobody reads it as prose — and pushed
+           the rows it was introducing off the top of a small panel. */
+        title="Folder paths"
         size="large"
         actions={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, width: '100%' }}>
+            {/* Two, because leaving and finishing are different intentions and
+                an X in the corner only offers one of them. Close is the quieter
+                of the pair: both shut the dialog, and what has been added is
+                already saved either way. */}
+            <PomButton id="folder-discovery-close" variant="ghost" size="small"
+              label="Close" onClick={() => put({ open: false })} />
             <PomButton id="folder-discovery-done" variant="primary" size="small"
-              label="Okay, complete" onClick={() => put({ open: false })} />
+              label="Complete" onClick={() => put({ open: false })} />
           </div>
         }
       >
+        <p className="folder-discovery-where">
+          {s.provider === 'gitlab' ? IconGitlab(14) : IconGithub(14)}
+          <span>{s.where || 'this repository'}</span>
+        </p>
         <div className="folder-discovery-list">
           {!s.paths.length ? (
             <p className="folder-discovery-empty">
@@ -3064,7 +3078,11 @@ function mountFolderDiscovery() {
                 <span className="folder-discovery-added">{IconCheck(14)} Added</span>
               ) : (
                 <PomButton
-                  variant="outline" size="small" iconOnly icon={IconAdd(16)}
+                  /* medium, to stand as tall as the row it belongs to — small
+                     left it floating against a taller field, which reads as two
+                     controls that happen to be near each other rather than one
+                     row. Same pairing as the folder list's own [path][+]. */
+                  variant="outline" size="medium" iconOnly icon={IconAdd(16)}
                   title={'Track ' + label(p)} aria-label={'Track ' + label(p)}
                   onClick={() => {
                     /* `state`, not the render's `s`. Two rows added in quick
@@ -3087,7 +3105,8 @@ function mountFolderDiscovery() {
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   window.PomFolderDiscovery = {
-    open: (where, paths, added) => put({ open: true, where, paths: paths || [], added: added || [] }),
+    open: (provider, where, paths, added) =>
+      put({ open: true, provider, where, paths: paths || [], added: added || [] }),
     onAdd: null,
   };
 }

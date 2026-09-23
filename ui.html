@@ -636,7 +636,15 @@
       margin-top: 8px;
     }
     .folder-add[hidden] { display: none; }
-    .folder-add input, #folder-new-mount, #github-folder-new-mount { flex: 1; }
+    /*
+      min-width: 0 IS THE WHOLE FIX. A flex item's default min-width is `auto`,
+      which is its CONTENT's width — so the combo refused to shrink past its own
+      intrinsic size, overflowed the row, and carried the + button out with it.
+      The row measured correctly and its children ended 49px to the right of the
+      saved rows above, which is exactly the misalignment that looked like a
+      margin somewhere.
+    */
+    .folder-add input, #folder-new-mount, #github-folder-new-mount { flex: 1; min-width: 0; }
 
     /* Both GitLab and GitHub are equally add/removable — same field/list
        visual language for each provider's own heading + "Remove" action.
@@ -676,12 +684,26 @@
     /* One row per folder the repository has: the path, and a + to track it.
        Same shape as the .folder-add row this card already uses to type one in
        by hand, because it is the same act with the typing done for you. */
+    /* Which repository these came out of — under the title rather than in it,
+       so the heading stays one short line and the repo can be as long as repo
+       names are. */
+    .folder-discovery-where {
+      display: flex; align-items: center; gap: 8px;
+      margin: 0 0 12px;
+      font-size: 12px; font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+    .folder-discovery-where svg { flex: none; opacity: 0.8; }
+
     .folder-discovery-list { display: flex; flex-direction: column; gap: 8px; }
     .folder-discovery-row {
       display: flex; align-items: center; gap: 8px;
     }
     .folder-discovery-path {
+      /* Same min-width: 0 as the folder-add row, and for the same reason: a
+         long path would otherwise refuse to shrink and push the + off the end. */
       flex: 1; min-width: 0;
+      min-height: 50px;
       display: flex; align-items: center; gap: 8px;
       padding: 10px 12px;
       border-radius: 12px;
@@ -50674,7 +50696,7 @@ html[data-theme=dark] {
   })();
   function mountFolderDiscovery() {
     const container = document.getElementById("folder-discovery-dialog-mount");
-    let state = { open: false, where: "", paths: [], added: [] };
+    let state = { open: false, provider: "github", where: "", paths: [], added: [] };
     let apply = null;
     const put = (next) => {
       state = { ...state, ...next };
@@ -50685,58 +50707,76 @@ html[data-theme=dark] {
       apply = setS;
       const isAdded = (p) => s.added.indexOf(p) !== -1;
       const label = (p) => p === "" ? "/" : p;
-      return /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(
         Dialog,
         {
           open: s.open,
           onClose: () => put({ open: false }),
-          title: "Folder paths in " + (s.where || "this repository"),
+          title: "Folder paths",
           size: "large",
-          actions: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { style: { display: "flex", justifyContent: "flex-end", width: "100%" }, children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
-            PomButton,
-            {
-              id: "folder-discovery-done",
-              variant: "primary",
-              size: "small",
-              label: "Okay, complete",
-              onClick: () => put({ open: false })
-            }
-          ) }),
-          children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "folder-discovery-list", children: !s.paths.length ? /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("p", { className: "folder-discovery-empty", children: "Nothing but the repository root, which is already where a push goes when no folder is chosen." }) : s.paths.map((p) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "folder-discovery-row", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { className: "folder-discovery-path", title: label(p), children: [
-              IconFolder(14),
-              /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: label(p) })
-            ] }),
-            isAdded(p) ? (
-              /* Not a disabled +. Disabled says "you may not", and the answer
-                 here is "you already have", which is a different sentence. */
-              /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { className: "folder-discovery-added", children: [
-                IconCheck(14),
-                " Added"
-              ] })
-            ) : /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
+          actions: /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, width: "100%" }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
               PomButton,
               {
-                variant: "outline",
+                id: "folder-discovery-close",
+                variant: "ghost",
                 size: "small",
-                iconOnly: true,
-                icon: IconAdd(16),
-                title: "Track " + label(p),
-                "aria-label": "Track " + label(p),
-                onClick: () => {
-                  if (state.added.indexOf(p) !== -1) return;
-                  put({ added: state.added.concat([p]) });
-                  window.PomFolderDiscovery.onAdd?.(p);
-                }
+                label: "Close",
+                onClick: () => put({ open: false })
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
+              PomButton,
+              {
+                id: "folder-discovery-done",
+                variant: "primary",
+                size: "small",
+                label: "Complete",
+                onClick: () => put({ open: false })
               }
             )
-          ] }, p)) })
+          ] }),
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("p", { className: "folder-discovery-where", children: [
+              s.provider === "gitlab" ? IconGitlab(14) : IconGithub(14),
+              /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: s.where || "this repository" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "folder-discovery-list", children: !s.paths.length ? /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("p", { className: "folder-discovery-empty", children: "Nothing but the repository root, which is already where a push goes when no folder is chosen." }) : s.paths.map((p) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "folder-discovery-row", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { className: "folder-discovery-path", title: label(p), children: [
+                IconFolder(14),
+                /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: label(p) })
+              ] }),
+              isAdded(p) ? (
+                /* Not a disabled +. Disabled says "you may not", and the answer
+                   here is "you already have", which is a different sentence. */
+                /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { className: "folder-discovery-added", children: [
+                  IconCheck(14),
+                  " Added"
+                ] })
+              ) : /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
+                PomButton,
+                {
+                  variant: "outline",
+                  size: "medium",
+                  iconOnly: true,
+                  icon: IconAdd(16),
+                  title: "Track " + label(p),
+                  "aria-label": "Track " + label(p),
+                  onClick: () => {
+                    if (state.added.indexOf(p) !== -1) return;
+                    put({ added: state.added.concat([p]) });
+                    window.PomFolderDiscovery.onAdd?.(p);
+                  }
+                }
+              )
+            ] }, p)) })
+          ]
         }
       );
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime25.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(View, {}) })));
     window.PomFolderDiscovery = {
-      open: (where, paths, added) => put({ open: true, where, paths: paths || [], added: added || [] }),
+      open: (provider, where, paths, added) => put({ open: true, provider, where, paths: paths || [], added: added || [] }),
       onAdd: null
     };
   }
@@ -55306,7 +55346,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'b16207e 13:14:42';
+    var CLOSURE_BUILD = '6d9b7c6 13:19:19';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -56956,7 +56996,7 @@ function format(report, opts) {
       var where = which === 'gitlab' ? c.project : c.repo;
       var saved = which === 'gitlab' ? glFolders : ghFolders;
       folderDiscoveryFor = which;
-      window.PomFolderDiscovery.open(where, lastDiscovered[which] || [], saved.slice());
+      window.PomFolderDiscovery.open(which, where, lastDiscovered[which] || [], saved.slice());
     }
 
     /* Which provider's dialog is open — the bridge is one control shown for
@@ -57111,7 +57151,17 @@ function format(report, opts) {
     */
     function addFolderPath(which) {
       var combo = which === 'github' ? window.PomGithubFolderNew : window.PomFolderNew;
-      var val = normFolder(combo.get());
+      /*
+        WHAT IS IN THE BOX, whether it was picked from the list or typed.
+
+        get() is the SELECTION and getQuery() is the text; a Combobox keeps them
+        apart on purpose, so that typing can filter without counting as
+        choosing. This read only the selection, so the one case the field exists
+        for — a folder that is not on the list yet, typed in by hand — put the
+        path on screen, left the selection empty, and made the + do nothing at
+        all. The button next to a filled field has to act on the filled field.
+      */
+      var val = normFolder(combo.get() || combo.getQuery());
       if (!val) return;
       if (which === 'github') {
         if (ghFolders.indexOf(val) === -1) { ghFolders.push(val); ghActiveFolder = val; }

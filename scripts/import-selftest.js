@@ -1824,7 +1824,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'setRepoFileOptions', 'chooseRepoFile', 'repoIdentityRow',
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
                        'renderImportFolderSelect', 'listRepoFolders',
-                       'refreshFolderImportOffer'];
+                       'refreshFolderImportOffer', 'addFolderPath', 'normFolder'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1873,7 +1873,6 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ctx.repoFolderCache = null;      // listRepoFolders keeps its answer here
           ctx.BLOB_API_MAX = 40 * 1000 * 1000;
           ctx.glFolders = []; ctx.ghFolders = [];
-          ctx.normFolder = (v) => String(v || '').replace(/^\/+|\/+$/g, '');
           const lastDiscovered = { gitlab: null, github: null };
           ctx.lastDiscovered = lastDiscovered;
           ctx.__lastDiscovered = () => lastDiscovered;
@@ -2001,6 +2000,39 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              offer(['Spar', 'tokens'], ['Spar', 'tokens']) === true);
           ok('folder offer: hidden when the repo has no folders at all',
              offer(['Spar'], []) === true);
+
+          /*
+            THE + BESIDE A FIELD WITH SOMETHING IN IT MUST ACT ON IT.
+
+            A Combobox keeps its SELECTION and its TEXT apart on purpose, so
+            that typing can filter without counting as choosing. This read only
+            the selection — so the one case the field exists for, a folder that
+            is not on the list yet and has to be typed, put the path on screen,
+            left the selection empty, and made the button do nothing at all. No
+            error, no message: the commonest shape of a broken control.
+          */
+          ctx.renderGithubFolderList = () => {};
+          ctx.renderFolderList = () => {};
+          ctx.persistSettings = () => {};
+          ctx.ghFolders = []; ctx.ghActiveFolder = '';
+          let typedPath = '', pickedPath = '';
+          ctx.PomGithubFolderNew = {
+            get: () => pickedPath, getQuery: () => typedPath,
+            set: (v) => { pickedPath = v; typedPath = v; },
+          };
+          pickedPath = 'Spar'; typedPath = 'Spar';
+          ctx.addFolderPath('github');
+          ok('add folder: a path chosen from the list is added',
+             ctx.ghFolders.join(',') === 'Spar', JSON.stringify(ctx.ghFolders));
+          pickedPath = ''; typedPath = 'test-folder';
+          ctx.addFolderPath('github');
+          ok('add folder: and so is one that was only typed, which is what the field is for',
+             ctx.ghFolders.join(',') === 'Spar,test-folder', JSON.stringify(ctx.ghFolders));
+          pickedPath = ''; typedPath = '   ';
+          ctx.addFolderPath('github');
+          ok('add folder: an empty field still adds nothing',
+             ctx.ghFolders.join(',') === 'Spar,test-folder', JSON.stringify(ctx.ghFolders));
+          ctx.ghFolders = [];
           ctx.ghFolders = [];
           ctx.__lastDiscovered().github = null;
 
