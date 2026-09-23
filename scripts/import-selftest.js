@@ -2833,6 +2833,35 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
         }
         return null;
       };
+      /*
+        THE HINT HAS TO SURVIVE THE FIXUPS.
+
+        It did not, and the cost was one question on one token out of 111,554 in
+        a real file. 62,859 of its 63,360 references carried the collection they
+        point at; the 501 that did not were exactly the tokens these rebuilds
+        touch, because each rebuilds a token node from scratch and keeps only
+        value and type. A reference is sometimes referenced once, so a dropped
+        hint cannot be recovered from its neighbours.
+      */
+      for (const fn of ['fixBreakpointTypes', 'fixLayoutColumnTypes', 'fixKeyOrder',
+                        'fixFoundationTokens']) {
+        const fnSrc = grabFn(fn), carrySrc = grabFn('carryDescription');
+        if (!fnSrc || !carrySrc) { ok('export: code.js still declares ' + fn, false); continue; }
+        const c2 = { JSON, Object, Array, String, parseFloat, isNaN, RegExp,
+                     normalizeFontWeightLiteral: (v) => v, formatFloatForExport: (v) => v,
+                     getFoundationTokenType: () => null };
+        vmx.createContext(c2);
+        vmx.runInContext(carrySrc + '\n' + fnSrc, c2);
+        const token = { value: '{breakpoint.breakpoint-string}', type: 'text',
+                        aliasCollection: '.breakpoint' };
+        let out2;
+        try { out2 = c2[fn]({ a: { b: Object.assign({}, token) } }, []); }
+        catch (e) { ok('export: ' + fn + ' runs over a token tree', false, e.message); continue; }
+        ok('export: ' + fn + ' keeps the collection an alias points at',
+           !!(out2 && out2.a && out2.a.b && out2.a.b.aliasCollection === '.breakpoint'),
+           JSON.stringify(out2 && out2.a && out2.a.b));
+      }
+
       const body = grabFn('inheritsUnchanged');
       if (!body) {
         ok('export: code.js still declares inheritsUnchanged (run npm run ui:build)', false);
