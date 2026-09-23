@@ -2092,6 +2092,50 @@ const COMPARE_SAMPLE = 40;
       The one-sided lists get two columns instead of three. A column headed
       "here" with nothing under it would be a table drawn around an absence.
     */
+    /*
+      A MOVE IS A PAIR OF PATHS, so its table is from/to rather than
+      token/value: the value is the same on both sides — that is what makes it
+      a move — and printing it twice would spend the width on the one thing
+      that did not change.
+    */
+    const movedTable = (rows: any[]) => {
+      if (!rows.length) return null;
+      const title = 'Architecture \u2014 the same token, somewhere else';
+      return (
+        <div className="json-download-card" data-level={4} key={title}>
+          <div className="json-download-header">
+            <div className="json-download-title-group">
+              <p className="json-download-title">{title}</p>
+            </div>
+            <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
+          </div>
+          <div className="compare-table">
+            <Table
+              caption={title}
+              captionHidden
+              size="small"
+              rules
+              columns={[
+                { key: 'from',
+                  header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
+                                 : s.sides.provider === 'github' ? IconGithub(12) : null, 'Was'),
+                  cell: (x: any) => pathCell(x.from, x.type) },
+                { key: 'path', header: headWith(IconFigma(12), 'Now'),
+                  cell: (x: any) => pathCell(x.path, x.type) },
+              ]}
+              rows={rows.slice(0, COMPARE_SAMPLE)}
+              rowKey={(x: any) => x.path}
+            />
+          </div>
+          {rows.length > COMPARE_SAMPLE && (
+            <p className="compare-more">
+              {`… and ${(rows.length - COMPARE_SAMPLE).toLocaleString()} more — Copy all has every one`}
+            </p>
+          )}
+        </div>
+      );
+    };
+
     const leaves = (title: string, rows: any[], twoSided: boolean) => {
       if (!rows.length) return null;
       const columns: any[] = [
@@ -2229,8 +2273,8 @@ const COMPARE_SAMPLE = 40;
             <div className="compare-section-head">
               <span className="compare-section-title">Architecture</span>
               <span className="compare-section-note">
-                {(r.onlyInFigma.length + r.onlyInRepo.length +
-                  (r.repointed || []).length + (r.aliased || []).length).toLocaleString()}
+                {(r.onlyInFigma.length + r.onlyInRepo.length + (r.repointed || []).length +
+                  (r.aliased || []).length + (r.moved || []).length).toLocaleString()}
                 {' in total'}
               </span>
             </div>
@@ -2250,6 +2294,10 @@ const COMPARE_SAMPLE = 40;
               <div className="compare-stat">
                 <div className="compare-stat-n">{(r.aliased || []).length.toLocaleString()}</div>
                 <div className="compare-stat-label">aliased one side, inlined the other</div>
+              </div>
+              <div className="compare-stat is-wide">
+                <div className="compare-stat-n">{(r.moved || []).length.toLocaleString()}</div>
+                <div className="compare-stat-label">the same token, somewhere else</div>
               </div>
             </div>
           </div>
@@ -2294,6 +2342,9 @@ const COMPARE_SAMPLE = 40;
                   <span className={'compare-count' + (g.aliased ? '' : ' is-zero')} title="same value, aliased one side">
                     {'=' + (g.aliased || 0)}
                   </span>
+                  <span className={'compare-count' + (g.moved ? '' : ' is-zero')} title="moved here from elsewhere">
+                    {'\u21b4' + (g.moved || 0)}
+                  </span>
                 </span>
               </div>
             ))}
@@ -2324,6 +2375,9 @@ const COMPARE_SAMPLE = 40;
             other spells it out. Worth seeing (it says the two exports were
             made differently) and emphatically not a value change. */}
         {leaves('Architecture \u2014 same value, aliased one side', r.aliased || [], true)}
+        {/* Both ends, because the rename is the finding — one column would be
+            a list of paths with no way to see what became what. */}
+        {movedTable(r.moved || [])}
         {leaves('Architecture \u2014 only here', r.onlyInFigma, false)}
         {leaves('Architecture \u2014 only in the repo', r.onlyInRepo, false)}
 

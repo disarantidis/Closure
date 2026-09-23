@@ -307,6 +307,109 @@ function resolveRef(doc, root, ref, seen) {
 }
 
 /*
+  THE SAME TOKEN, SOMEWHERE ELSE.
+
+  A path-keyed diff cannot see a rename: move a branch and every leaf under it
+  is reported once as gone and once as arrived. On the pair this was built
+  against that was 11,216 rows describing 5,608 tokens — a quarter of the
+  whole report, saying twice over that one layer had been relocated.
+
+  A MOVE IS ONLY CLAIMED WHEN A RULE EXPLAINS IT. Pairing on "same value, same
+  leaf name" alone would marry unrelated tokens: hundreds of them are #ffffff
+  and called `background`. So the rules come first — every candidate pair
+  proposes a prefix substitution, those are counted, and only substitutions
+  that explain EIGHT OR MORE tokens are believed. A rename is systematic by
+  nature; a coincidence is not.
+
+  Then each rule is applied exactly: the repo path is rewritten and the result
+  has to exist on the other side with the same value. A rule that explains
+  many tokens still does not get to guess about any single one.
+*/
+var MOVE_RULE_MIN = 8;
+function detectMoves(report) {
+  if (!report.onlyInFigma.length || !report.onlyInRepo.length) return;
+
+  var figmaByPath = new Map();
+  report.onlyInFigma.forEach(function (x) { figmaByPath.set(x.path, x); });
+
+  /* Candidates indexed by what a moved token keeps: its value and its own
+     name. Bounded, because a value like #ffffff under a name like `background`
+     has hundreds of holders and this only needs enough of them to spot a
+     rule. */
+  var byKey = new Map();
+  report.onlyInFigma.forEach(function (x) {
+    var segs = x.path.split('.');
+    var k = x.value + '|' + segs[segs.length - 1];
+    if (!byKey.has(k)) byKey.set(k, []);
+    var arr = byKey.get(k);
+    if (arr.length < 12) arr.push(x.path);
+  });
+
+  var rules = new Map();
+  report.onlyInRepo.forEach(function (x) {
+    var segs = x.path.split('.');
+    var cands = byKey.get(x.value + '|' + segs[segs.length - 1]);
+    if (!cands) return;
+    for (var i = 0; i < cands.length; i++) {
+      var o = cands[i].split('.');
+      /* How much of the tail the two share — the part a move leaves alone. */
+      var n = 0;
+      while (n < segs.length && n < o.length && segs[segs.length - 1 - n] === o[o.length - 1 - n]) n++;
+      if (n === 0) continue;
+      var rp = segs.slice(0, segs.length - n).join('.');
+      var fp = o.slice(0, o.length - n).join('.');
+      if (rp === fp) continue;
+      var key = rp + '\u241f' + fp;
+      rules.set(key, (rules.get(key) || 0) + 1);
+    }
+  });
+
+  var strong = [];
+  rules.forEach(function (n, key) {
+    if (n < MOVE_RULE_MIN) return;
+    var parts = key.split('\u241f');
+    strong.push({ from: parts[0], to: parts[1] });
+  });
+  if (!strong.length) return;
+  /* Longest prefix first, so the most specific rule that fits is the one
+     applied — a general rule would otherwise claim tokens a precise one
+     describes better. */
+  strong.sort(function (a, b) { return b.from.length - a.from.length; });
+
+  var movedFrom = new Set(), movedTo = new Set();
+  report.moved = [];
+  report.onlyInRepo.forEach(function (x) {
+    if (movedFrom.has(x.path)) return;
+    for (var i = 0; i < strong.length; i++) {
+      var rule = strong[i];
+      if (x.path.indexOf(rule.from) !== 0) continue;
+      var target = rule.to + x.path.slice(rule.from.length);
+      var hit = figmaByPath.get(target);
+      if (!hit || hit.value !== x.value || movedTo.has(target)) continue;
+      movedFrom.add(x.path);
+      movedTo.add(target);
+      report.moved.push({ path: target, from: x.path, value: x.value, type: hit.type });
+      return;
+    }
+  });
+
+  if (!report.moved.length) return;
+  report.onlyInFigma = report.onlyInFigma.filter(function (x) { return !movedTo.has(x.path); });
+  report.onlyInRepo = report.onlyInRepo.filter(function (x) { return !movedFrom.has(x.path); });
+  /* The roll-up counts a move once, under where it landed — it is one event,
+     and counting it in two collections would restate the double-count this
+     exists to remove. */
+  report.moved.forEach(function (m) {
+    var g = rootOf(m.path);
+    if (!report._groupIndex.has(g)) {
+      report._groupIndex.set(g, { name: g, onlyInFigma: 0, onlyInRepo: 0, changed: 0,
+                                  repointed: 0, aliased: 0, moved: 0, same: 0 });
+    }
+    report._groupIndex.get(g).moved++;
+  });
+}
+
+/*
   compare(figmaDoc, repoDoc) -> report
 
   `figmaDoc` is what this file exports right now — the exact bytes Download
@@ -334,6 +437,10 @@ function compare(figmaDoc, repoDoc) {
        thing — a difference in how the file was written, not in what it says.
        Architecture, not a value: nobody decided anything. */
     aliased: [],
+    /* The same token, same value, at a different path — one event a
+       path-keyed diff would otherwise report twice, once as gone and once as
+       arrived. */
+    moved: [],
     /* [{ type, count }] for the value changes, commonest first — a colour
        decision and a font-family decision are different acts and the page
        separates them. */
@@ -468,7 +575,7 @@ function compare(figmaDoc, repoDoc) {
   var groups = new Map();
   var bump = function (path, field) {
     var g = groupOf(path);
-    if (!groups.has(g)) groups.set(g, { name: g, onlyInFigma: 0, onlyInRepo: 0, changed: 0, repointed: 0, aliased: 0, same: 0 });
+    if (!groups.has(g)) groups.set(g, { name: g, onlyInFigma: 0, onlyInRepo: 0, changed: 0, repointed: 0, aliased: 0, moved: 0, same: 0 });
     groups.get(g)[field]++;
   };
 
@@ -493,7 +600,25 @@ function compare(figmaDoc, repoDoc) {
     */
     var bucket;
     if (leaf.ref && other.ref) {
-      bucket = 'repointed';
+      /*
+        A REFERENCE THAT MOVED AND LANDED ON A DIFFERENT VALUE IS A DECISION.
+
+        Both sides pointing was treated as pure structure, and mostly it is —
+        but "the token now resolves to a different colour" is a difference in
+        what the file SAYS, however it came about. Measured on the pair this
+        was built against: of 11,964 repoints, 7,669 land on the same value
+        and 4,295 do not. Filing all of them as architecture hid 4,295 real
+        differences; filing all of them as values would hide the re-rooting.
+        So they are told apart by resolving both.
+
+        Unresolvable stays structure: without a value on both sides there is
+        nothing to claim a difference about.
+      */
+      var fv = resolveRef(figmaDoc, rootOf(path), rawOf(figmaDoc, path));
+      var rv = resolveRef(repoDoc, rootOf(path), rawOf(repoDoc, path));
+      bucket = (fv !== null && rv !== null && renderValue(fv) !== renderValue(rv))
+        ? 'changed' : 'repointed';
+      if (bucket === 'changed') leaf = { value: leaf.value, ref: leaf.ref, type: inferType(fv) };
     } else if (leaf.ref !== other.ref) {
       /*
         ONE SIDE POINTS AND THE OTHER HOLDS. Resolve the pointing one and ask
@@ -581,11 +706,15 @@ function compare(figmaDoc, repoDoc) {
     bump(path, 'onlyInRepo');
   });
 
+  report._groupIndex = groups;
+  detectMoves(report);
+  delete report._groupIndex;
+
   /* Sorted by how much there is to look at, so the group that changed most is
      the one at the top rather than whichever happened to be named first. */
   report.groups = Array.from(groups.values()).sort(function (a, b) {
-    var da = a.onlyInFigma + a.onlyInRepo + a.changed + a.repointed + a.aliased;
-    var db = b.onlyInFigma + b.onlyInRepo + b.changed + b.repointed + b.aliased;
+    var da = a.onlyInFigma + a.onlyInRepo + a.changed + a.repointed + a.aliased + a.moved;
+    var db = b.onlyInFigma + b.onlyInRepo + b.changed + b.repointed + b.aliased + b.moved;
     if (da !== db) return db - da;
     return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
   });
@@ -602,7 +731,8 @@ function compare(figmaDoc, repoDoc) {
                      report.onlyInRepo.length === 0 &&
                      report.changed.length === 0 &&
                      report.repointed.length === 0 &&
-                     report.aliased.length === 0;
+                     report.aliased.length === 0 &&
+                     report.moved.length === 0;
   return report;
 }
 
@@ -669,6 +799,8 @@ function format(report, opts) {
        report.repointed, bothSides);
   list('  same value, aliased one side — one file points at it, the other spells it out',
        report.aliased, bothSides);
+  list('  the same token, somewhere else', report.moved,
+       function (r) { return r.from + '\n        ->  ' + r.path; });
 
   out.push(report.sameCount.toLocaleString() + ' identical');
   return out.join('\n');

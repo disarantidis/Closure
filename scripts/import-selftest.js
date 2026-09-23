@@ -2147,8 +2147,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
 
       ok('compare: the group roll-up counts what is under each top-level name',
          JSON.stringify(r.groups) ===
-         JSON.stringify([{ name: 'core', onlyInFigma: 0, onlyInRepo: 1, changed: 1, repointed: 0, aliased: 0, same: 2 },
-                         { name: 'extra', onlyInFigma: 1, onlyInRepo: 0, changed: 0, repointed: 0, aliased: 0, same: 0 }]),
+         JSON.stringify([{ name: 'core', onlyInFigma: 0, onlyInRepo: 1, changed: 1, repointed: 0, aliased: 0, moved: 0, same: 2 },
+                         { name: 'extra', onlyInFigma: 1, onlyInRepo: 0, changed: 0, repointed: 0, aliased: 0, moved: 0, same: 0 }]),
          JSON.stringify(r.groups));
 
       /*
@@ -2171,16 +2171,23 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
         { a: { keeps: tok('{other.blue.500}'), stops: tok('{core.blue.500}'), starts: tok('#00ff00'),
                plain: tok('#222222'), math: tok('{core.base} * 3') } });
       ok('compare: a reference pointing somewhere new is repointed, not changed',
-         moved.repointed.map((x) => x.path).sort().join(',') === 'a.keeps,a.math',
+         moved.repointed.map((x) => x.path).sort().join(',') === 'a.keeps',
          JSON.stringify(moved.repointed.map((x) => x.path)));
+      /* `{core.base} * 2` becoming `* 3` is BOTH sides a reference and yet a
+         different value — the multiplier moved. It reads as a value change
+         now, which is what it is; it counted as a repoint while both-sides-a-
+         reference was enough on its own. */
+      ok('compare: an expression whose arithmetic moved is a value change',
+         moved.changed.some((x) => x.path === 'a.math'),
+         JSON.stringify(moved.changed.map((x) => x.path)));
       /* BOTH sides have to be references. A token that stopped pointing and
          now holds a literal — or started pointing when it did not — has had
          its value changed in the way that matters. */
       ok('compare: starting or stopping pointing is a value change, not a repoint',
-         moved.changed.map((x) => x.path).sort().join(',') === 'a.plain,a.starts,a.stops',
+         moved.changed.map((x) => x.path).sort().join(',') === 'a.math,a.plain,a.starts,a.stops',
          JSON.stringify(moved.changed.map((x) => x.path)));
       ok('compare: the roll-up counts the two separately',
-         moved.groups[0].repointed === 2 && moved.groups[0].changed === 3,
+         moved.groups[0].repointed === 1 && moved.groups[0].changed === 4,
          JSON.stringify(moved.groups));
       ok('compare: a repoint alone still means the documents are not identical',
          JD.compare({ a: { x: tok('{one.two}') } }, { a: { x: tok('{three.four}') } }).identical === false);
@@ -2433,6 +2440,77 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       ok('style: a DTCG colour stays one colour rather than being taken apart',
          colours.changed.length === 1 && colours.changed[0].type === 'color',
          JSON.stringify(colours.changed));
+
+      /*
+        A REPOINT THAT LANDS ON A DIFFERENT VALUE IS A DECISION.
+
+        Both sides pointing was pure structure, and mostly it is — but "this
+        token now resolves to a different colour" is a difference in what the
+        file says, however it came about. Measured on two real exports: of
+        11,964 repoints, 7,669 land on the same value and 4,295 do not.
+      */
+      const sameTarget = JD.compare(
+        { d: { a: tok('#ff0000'), b: tok('#ff0000'), use: tok('{a}') } },
+        { d: { a: tok('#ff0000'), b: tok('#ff0000'), use: tok('{b}') } });
+      ok('repoint: moving to a reference holding the same value is pure structure',
+         sameTarget.repointed.length === 1 && sameTarget.changed.length === 0,
+         JSON.stringify({ r: sameTarget.repointed, c: sameTarget.changed }));
+      const otherTarget = JD.compare(
+        { d: { a: tok('#ff0000'), b: tok('#0000ff'), use: tok('{a}') } },
+        { d: { a: tok('#ff0000'), b: tok('#0000ff'), use: tok('{b}') } });
+      ok('repoint: moving to a reference holding something else is a value change',
+         otherTarget.changed.length === 1 && otherTarget.repointed.length === 0,
+         JSON.stringify({ r: otherTarget.repointed, c: otherTarget.changed }));
+      ok('repoint: and it is typed by what it now resolves to',
+         otherTarget.changed[0].type === 'color', otherTarget.changed[0].type);
+      /* Without a value on both sides there is nothing to claim a difference
+         about, so it stays structure. */
+      const unknowable = JD.compare(
+        { d: { use: tok('{nowhere.a}') } }, { d: { use: tok('{nowhere.b}') } });
+      ok('repoint: an unresolvable pair stays structure rather than guessing',
+         unknowable.repointed.length === 1 && unknowable.changed.length === 0);
+
+      /*
+        THE SAME TOKEN, SOMEWHERE ELSE — one event a path-keyed diff reports
+        twice, once as gone and once as arrived. On two real exports that was
+        11,216 rows describing 5,608 relocated tokens.
+      */
+      const before = { d: {} }, after = { d: {} };
+      before.d.old = {}; after.d.neu = {};
+      for (let i = 0; i < 10; i++) {
+        before.d.old['t' + i] = tok('#' + i + i + i + i + i + i);
+        after.d.neu['t' + i] = tok('#' + i + i + i + i + i + i);
+      }
+      const relocated = JD.compare(after, before);
+      ok('moved: a relocated branch is one move each, not an add and a remove',
+         relocated.moved.length === 10 &&
+         relocated.onlyInFigma.length === 0 && relocated.onlyInRepo.length === 0,
+         JSON.stringify({ moved: relocated.moved.length, add: relocated.onlyInFigma.length,
+                          rm: relocated.onlyInRepo.length }));
+      ok('moved: and it records both ends, so the rename itself is readable',
+         relocated.moved[0].from.indexOf('d.old.') === 0 &&
+         relocated.moved[0].path.indexOf('d.neu.') === 0,
+         JSON.stringify(relocated.moved[0]));
+      /*
+        A MOVE IS ONLY CLAIMED WHEN A RULE EXPLAINS IT. Pairing on "same value,
+        same leaf name" alone would marry unrelated tokens — hundreds of them
+        are #ffffff and called `background`. One token that happens to match
+        is a coincidence, not a rename.
+      */
+      const coincidence = JD.compare(
+        { d: { somewhere: { background: tok('#ffffff') } } },
+        { d: { elsewhere: { background: tok('#ffffff') } } });
+      ok('moved: a single lookalike is not called a move',
+         coincidence.moved.length === 0 &&
+         coincidence.onlyInFigma.length === 1 && coincidence.onlyInRepo.length === 1,
+         JSON.stringify(coincidence.moved));
+      /* And a rule does not get to guess about a token whose value changed on
+         the way — that is a move AND an edit, which this refuses to assert. */
+      const movedAndEdited = { d: { neu: {} } };
+      for (let i = 0; i < 10; i++) movedAndEdited.d.neu['t' + i] = tok('#aaaaaa');
+      const notPaired = JD.compare(movedAndEdited, before);
+      ok('moved: a relocation whose value also changed is not paired up',
+         notPaired.moved.length === 0, JSON.stringify(notPaired.moved.length));
 
       /* The clipboard copy is the only place the full list exists — the page
          caps every list it draws. */
