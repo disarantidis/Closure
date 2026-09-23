@@ -3045,16 +3045,16 @@ function mountFolderDiscovery() {
         title="Folder paths"
         size="large"
         actions={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, width: '100%' }}>
-            {/* Two, because leaving and finishing are different intentions and
-                an X in the corner only offers one of them. Close is the quieter
-                of the pair: both shut the dialog, and what has been added is
-                already saved either way. */}
-            <PomButton id="folder-discovery-close" variant="ghost" size="small"
-              label="Close" onClick={() => put({ open: false })} />
-            <PomButton id="folder-discovery-done" variant="primary" size="small"
-              label="Complete" onClick={() => put({ open: false })} />
-          </div>
+          /*
+            ONE BUTTON, FULL WIDTH. There were two — Close and Complete — on the
+            theory that leaving and finishing are different intentions. They are
+            not, here: every + saves as it is pressed, so by the time either
+            button is reachable the work is already done and both of them do the
+            identical nothing. Two controls that cannot differ in effect only
+            ask the reader to look for a difference.
+          */
+          <PomButton id="folder-discovery-close" variant="primary" size="medium" block
+            label="Close" onClick={() => put({ open: false })} />
         }
       >
         <p className="folder-discovery-where">

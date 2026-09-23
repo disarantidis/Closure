@@ -50714,28 +50714,27 @@ html[data-theme=dark] {
           onClose: () => put({ open: false }),
           title: "Folder paths",
           size: "large",
-          actions: /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, width: "100%" }, children: [
+          actions: (
+            /*
+              ONE BUTTON, FULL WIDTH. There were two — Close and Complete — on the
+              theory that leaving and finishing are different intentions. They are
+              not, here: every + saves as it is pressed, so by the time either
+              button is reachable the work is already done and both of them do the
+              identical nothing. Two controls that cannot differ in effect only
+              ask the reader to look for a difference.
+            */
             /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
               PomButton,
               {
                 id: "folder-discovery-close",
-                variant: "ghost",
-                size: "small",
+                variant: "primary",
+                size: "medium",
+                block: true,
                 label: "Close",
                 onClick: () => put({ open: false })
               }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
-              PomButton,
-              {
-                id: "folder-discovery-done",
-                variant: "primary",
-                size: "small",
-                label: "Complete",
-                onClick: () => put({ open: false })
-              }
             )
-          ] }),
+          ),
           children: [
             /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("p", { className: "folder-discovery-where", children: [
               s.provider === "gitlab" ? IconGitlab(14) : IconGithub(14),
@@ -55346,7 +55345,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '6d9b7c6 13:19:19';
+    var CLOSURE_BUILD = '7b39a3f 13:22:33';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
