@@ -723,12 +723,6 @@ declare global {
       setOptions: (names: string[]) => void;
       onChange: ((value: string) => void) | null;
     };
-    /* Two groups in one document whose names differ only in spelling — see
-       mountNameWarning. A reading of one file, not a comparison. */
-    PomNameWarning: {
-      show: (where: string, items: { root: string; names: string[]; tokens: number; sameValues: boolean }[]) => void;
-      hide: () => void;
-    };
     PomClosureWarning: {
       show: (title: string, groups: { ref: string; froms: string[] }[], more?: number, note?: string,
              copyText?: string) => void;
@@ -2322,74 +2316,17 @@ function useClipboard() {
   };
 })();
 
-/* ── one name, spelled two ways ──────────────────────────────────────────────
+/*
+  A WARNING ABOUT TWO SPELLINGS OF ONE NAME LIVED HERE, on the export screen
+  and on the import page. It is on the Compare page now and nowhere else.
 
-  A READING OF ONE DOCUMENT, WHICH IS WHY IT IS NOT ON THE COMPARE PAGE.
-
-  Two groups whose names differ only in spelling — `letter-spacing` and
-  `letterSpacing` in the same root — are two groups as far as everything
-  downstream is concerned. Nothing breaks. It simply means half the tokens
-  point at one and half at the other, and the day anybody compares two exports
-  that split differently, every one of those tokens reads as changed. That is
-  what produced a hundred rows of a comparison with one cause.
-
-  So it is reported where the document is, not where two documents are: after
-  an export, and after reading a file to import. Both have a document in hand
-  and nothing to compare it against, and both are earlier than the moment the
-  damage shows.
-
-  `warning`, not `error`. Nothing has failed and nothing will; this is a shape
-  worth straightening before it costs anybody an afternoon.
+  It was a true thing said in a place nothing could be done about it: you
+  cannot rename a Figma variable from the export screen, and the export is
+  correct whichever spelling a token went through. It becomes worth acting on
+  at exactly one moment — two files side by side, a hundred tokens reading as
+  changed, and this the reason why — so that is where it is said. See the
+  `spellings` card in the Compare page's own view.
 */
-(function mountNameWarning() {
-  const container = document.getElementById('name-warning-mount');
-  let set: (u: any) => void = () => {};
-  type Dup = { root: string; names: string[]; tokens: number; sameValues: boolean };
-  function View() {
-    const [s, setS] = useState<{ open: boolean; where: string; items: Dup[] }>(
-      { open: false, where: '', items: [] });
-    set = setS;
-    if (!s.open || !s.items.length) return null;
-    const n = s.items.length;
-    /* The pairs whose two halves DISAGREE are the ones that cost something —
-       the same token name resolves to two answers depending on which spelling
-       it went through. Worth the one number even in a headline. */
-    const split = s.items.filter((d) => !d.sameValues).length;
-    return (
-      /*
-        THE HEADLINE AND NOTHING ELSE.
-
-        It listed every pair, and on a real file that is seven of them with a
-        line of explanation each — an amber block taller than the export card
-        it was warning about, pushing Push and Download off the bottom of the
-        panel. The finding is worth interrupting for; the inventory is not,
-        because nothing here is done about it on this screen.
-
-        The list lives on the Compare page, which is where the cost of it shows
-        up and where there is room to read it.
-      */
-      <Alert
-        tone="warning"
-        title={n === 1 ? 'One name is spelled two ways' : n + ' names are spelled two ways'}
-      >
-        <p className="closure-warning-subtitle">
-          {s.where}{' '}
-          {split > 0
-            ? (split === n ? (n === 1 ? 'It is' : 'They are') : split + ' of them are') +
-              ' one idea written as two groups holding different values, so half the tokens ' +
-              'point at one and half at the other.'
-            : 'Each is one name written as two groups, holding the same values.'}
-          {' '}Compare against a repository to see which.
-        </p>
-      </Alert>
-    );
-  }
-  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
-  window.PomNameWarning = {
-    show: (where, items) => set(() => ({ open: true, where, items })),
-    hide: () => set((s: any) => ({ ...s, open: false })),
-  };
-})();
 
 /*
   THE SIX KINDS OF DIFFERENCE, IN THE ORDER THE PAGE ALREADY USES.
@@ -2401,8 +2338,8 @@ function useClipboard() {
   `~` is the only one that is a DECISION. The other five are things that moved
   without anybody choosing: a token that exists on one side only, a reference
   that still points but somewhere else, a value one file aliases and the other
-  spells out, a token at a new path. Hence the order, and hence `~` keeping
-  full ink in the rows while the rest stay quiet.
+  spells out, a token at a new path. Hence the order, and hence `~` being the
+  one tag drawn in the loud variant.
 */
 const COUNT_KEYS: { sym: string; field: string; label: string }[] = [
   { sym: '~', field: 'changed', label: 'value changed' },
@@ -2457,14 +2394,29 @@ const COMPARE_SAMPLE = 40;
 
     const sides = (
       <div className="json-download-card" data-level={4}>
+        {/*
+          EACH SIDE IN ITS OWN MARK. The names alone read as two files with no
+          hint of which is which — "Untitled" and "GitHub" tell you nothing
+          about direction until you have read both lines and worked it out. The
+          logo says it before the words do, and it is the same pair of marks the
+          column headers in every table below already use.
+        */}
         <div className="compare-sides">
           <div className="compare-side">
-            <span className="compare-side-name">{s.sides.figma}</span>
+            <span className="compare-side-name">
+              <span className="compare-side-mark" aria-hidden>{IconFigma(14)}</span>
+              {s.sides.figma}
+            </span>
             <span className="compare-side-detail">{s.sides.figmaDetail}</span>
           </div>
           <div className="compare-side-arrow">compared with</div>
           <div className="compare-side">
-            <span className="compare-side-name">{s.sides.repo}</span>
+            <span className="compare-side-name">
+              <span className="compare-side-mark" aria-hidden>
+                {s.sides.provider === 'gitlab' ? IconGitlab(14) : IconGithub(14)}
+              </span>
+              {s.sides.repo}
+            </span>
             <span className="compare-side-detail">{s.sides.repoDetail}</span>
           </div>
         </div>
@@ -3128,13 +3080,26 @@ const COMPARE_SAMPLE = 40;
                 <div className="compare-group" key={g.name}>
                   <span className="compare-group-name">{g.name}</span>
                   <span className="compare-group-counts">
+                    {/*
+                      TAGS, THE SAME SHAPE AS THE KEY ABOVE THEM. Bare figures
+                      in a row read as one number broken into parts — `~40 +15
+                      −25` looked like an equation. A tag each makes them
+                      countable at a glance, and it is the legend's own shape,
+                      so the eye matches a row to the key by form as well as by
+                      symbol.
+
+                      `primary` for the values mark, tonal for the rest: it is
+                      the only one of the six that is a decision somebody made.
+                    */}
                     {shown.length
                       ? shown.map((k) => (
-                          <span key={k.sym}
-                                className={'compare-count' + (k.field === 'changed' ? ' is-value' : '')}
-                                title={k.label}>
-                            {k.sym + (g[k.field] || 0)}
-                          </span>
+                          <Tag key={k.sym}
+                               variant={k.field === 'changed' ? 'primary' : 'tonal'}
+                               size="small"
+                               label={(g[k.field] || 0) + ' ' + k.label}>
+                            <span className="compare-key-sym" aria-hidden>{k.sym}</span>
+                            {(g[k.field] || 0).toLocaleString()}
+                          </Tag>
                         ))
                       /* A collection can be in this list and have nothing in
                          it — the list is every collection either side holds,
