@@ -102,7 +102,40 @@ function isReference(raw) {
 }
 
 /*
-  Every leaf in the document, as path -> { value, ref }.
+  WHAT KIND OF TOKEN THIS IS.
+
+  A colour changing and a font-family changing are not the same kind of
+  decision, and a report that files them together makes you sort them by eye.
+
+  DECLARED FIRST, INHERITED SECOND, INFERRED LAST. DTCG lets a group carry a
+  $type that its children take unless they say otherwise, so the walk passes
+  the nearest ancestor's down; Tokens Studio's legacy shape writes `type` on
+  the token itself. Only when neither says anything does this look at the
+  value — and it says so by answering 'unknown' rather than guessing a name
+  that would then be indistinguishable from a declared one.
+*/
+function declaredType(node) {
+  if (Object.prototype.hasOwnProperty.call(node, '$type')) return node.$type;
+  if (Object.prototype.hasOwnProperty.call(node, 'type')) return node.type;
+  return null;
+}
+
+function inferType(raw) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    if ('hex' in raw || 'colorSpace' in raw || 'components' in raw) return 'color';
+    if ('unit' in raw) return 'dimension';
+    if ('fontFamily' in raw || 'fontSize' in raw) return 'typography';
+    return 'composite';
+  }
+  if (Array.isArray(raw)) return 'composite';
+  var s = String(raw);
+  if (/^#[0-9a-fA-F]{3,8}$/.test(s) || /^rgba?\(/i.test(s)) return 'color';
+  if (s !== '' && !isNaN(Number(s))) return 'number';
+  return 'unknown';
+}
+
+/*
+  Every leaf in the document, as path -> { value, ref, type }.
 
   Paths are dot-joined, which is how every reference in these files is
   already written ({core.blue.500}), so a path in this report can be pasted
@@ -110,20 +143,24 @@ function isReference(raw) {
 */
 function flatten(doc) {
   var out = new Map();
-  (function walk(node, path) {
+  (function walk(node, path, inherited) {
     if (!node || typeof node !== 'object' || Array.isArray(node)) return;
     if (isToken(node)) {
       var raw = tokenValue(node);
-      out.set(path.join('.'), { value: renderValue(raw), ref: isReference(raw) });
+      var t = declaredType(node) || inherited || inferType(raw);
+      out.set(path.join('.'), { value: renderValue(raw), ref: isReference(raw), type: t });
       return;
     }
+    /* A group's own $type is the default for everything under it, until one
+       of them declares its own. */
+    var groupType = declaredType(node) || inherited;
     var keys = Object.keys(node);
     for (var i = 0; i < keys.length; i++) {
       /* Metadata, not tokens — see the header. */
       if (keys[i].charAt(0) === '$') continue;
-      walk(node[keys[i]], path.concat(keys[i]));
+      walk(node[keys[i]], path.concat(keys[i]), groupType);
     }
-  })(doc, []);
+  })(doc, [], null);
   return out;
 }
 
@@ -227,6 +264,10 @@ function compare(figmaDoc, repoDoc) {
     comparable: true,
     problem: null,
     onlyInFigma: [], onlyInRepo: [], changed: [], repointed: [],
+    /* [{ type, count }] for the value changes, commonest first — a colour
+       decision and a font-family decision are different acts and the page
+       separates them. */
+    changedByType: [],
     sameCount: 0,
     figmaTokens: 0, repoTokens: 0,
     groups: [],
@@ -362,7 +403,7 @@ function compare(figmaDoc, repoDoc) {
   };
 
   F.forEach(function (leaf, path) {
-    if (!R.has(path)) { report.onlyInFigma.push({ path: path, value: leaf.value }); bump(path, 'onlyInFigma'); return; }
+    if (!R.has(path)) { report.onlyInFigma.push({ path: path, value: leaf.value, type: leaf.type }); bump(path, 'onlyInFigma'); return; }
     var other = R.get(path);
     if (other.value === leaf.value) { report.sameCount++; bump(path, 'same'); return; }
     /*
@@ -381,12 +422,15 @@ function compare(figmaDoc, repoDoc) {
       its value changed in the way that matters, so it stays in `changed`.
     */
     var bucket = (leaf.ref && other.ref) ? 'repointed' : 'changed';
-    report[bucket].push({ path: path, figma: leaf.value, repo: other.value });
+    /* The type comes from THIS side. Where the two disagree the token's kind
+       itself changed, which is a change worth seeing under the new kind
+       rather than the old one. */
+    report[bucket].push({ path: path, figma: leaf.value, repo: other.value, type: leaf.type });
     bump(path, bucket);
   });
   R.forEach(function (leaf, path) {
     if (F.has(path)) return;
-    report.onlyInRepo.push({ path: path, value: leaf.value });
+    report.onlyInRepo.push({ path: path, value: leaf.value, type: leaf.type });
     bump(path, 'onlyInRepo');
   });
 
@@ -398,6 +442,14 @@ function compare(figmaDoc, repoDoc) {
     if (da !== db) return db - da;
     return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
   });
+
+  var typeCount = new Map();
+  report.changed.forEach(function (c) {
+    typeCount.set(c.type, (typeCount.get(c.type) || 0) + 1);
+  });
+  report.changedByType = Array.from(typeCount.entries())
+    .map(function (e) { return { type: e[0], count: e[1] }; })
+    .sort(function (a, b) { return b.count - a.count || (a.type < b.type ? -1 : 1); });
 
   report.identical = report.onlyInFigma.length === 0 &&
                      report.onlyInRepo.length === 0 &&

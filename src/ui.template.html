@@ -1150,6 +1150,46 @@
     .compare-section-title { font-size: 12px; font-weight: 700; }
     .compare-section-note { font-size: 11px; opacity: 0.6; }
 
+    /* The value changes by kind of token — a row of small counts under the
+       total, because the MIX is the finding: 760 colours against 6 numbers
+       says "re-tinted" in a way one total of 1,060 never does. */
+    .compare-types {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+      margin: 8px 2px 0;
+      font-size: 11px;
+    }
+    .compare-type { display: flex; align-items: baseline; gap: 4px; }
+    .compare-type-n { font-weight: 700; }
+    .compare-type-name { opacity: 0.6; }
+
+    /* A column header wearing its side's mark. baseline-aligned so the glyph
+       sits on the word's line rather than above it. */
+    .compare-col-head { display: inline-flex; align-items: center; gap: 4px; }
+    .compare-col-icon { display: flex; flex-shrink: 0; opacity: 0.8; }
+
+    /* A composite shown as only the sub-values that moved. One per line, key
+       quiet and value plain — the key is there to say WHICH part changed, and
+       the value is the answer. */
+    .compare-sub { display: flex; flex-direction: column; gap: 2px; }
+    .compare-sub-row { display: flex; flex-direction: column; }
+    .compare-sub-key {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      opacity: 0.5;
+    }
+    .compare-sub-val {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+      opacity: 0.85;
+    }
+    /* Said, not implied by absence: the parts that did not move are still
+       part of the token, and a cell showing two of five sub-values without
+       saying so reads as a token with two sub-values. */
+    .compare-sub-same { font-size: 10px; opacity: 0.45; margin-top: 2px; }
+
     /* The key above the per-collection rows: which column is which kind.
        Same order as the sections above it, so the eye learns it once. */
     .compare-group-key {
@@ -3780,7 +3820,7 @@
       var repoWhere = repoFilePath(which) + ' @ ' + branch;
       var figmaWhere = primaryFilename();
       window.PomCompare.setSides(
-        lastFigmaFileName || 'This Figma file', figmaWhere, label, repoWhere);
+        lastFigmaFileName || 'This Figma file', figmaWhere, label, repoWhere, which);
 
       /*
         THE EXACT BYTES DOWNLOAD WRITES AND PUSH SENDS — getTokensToExport(),
@@ -3836,7 +3876,8 @@
             lastFigmaFileName || 'This Figma file',
             figmaWhere + '  ·  ' + tokensLabel(report.figmaTokens),
             label,
-            repoWhere + '  ·  ' + tokensLabel(report.repoTokens));
+            repoWhere + '  ·  ' + tokensLabel(report.repoTokens),
+            which);
           window.PomCompare.setReport(report, window.PomJsonDiff.format(report, {
             figmaLabel: (lastFigmaFileName || 'this Figma file') + ' (' + figmaWhere + ')',
             repoLabel: label + ' ' + repoWhere,

@@ -200,6 +200,17 @@ const IconFigma = svg(
   { viewBox: '0 0 16 24' },
 );
 
+/*
+  THE TWO SERVICES' OWN MARKS, filled, 24-square — the same paths the repo
+  card's inline SVGs carry in ui.template.html. Two copies of one shape is a
+  thing to avoid in general; here the template's are static markup in a
+  non-React header and these are needed inside a React table, and the
+  alternative (mounting a React root per table cell) costs more than the
+  duplication. If either ever changes, both change.
+*/
+const IconGithub = svg('M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z', { fill: true });
+const IconGitlab = svg('M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024', { fill: true });
+
 /* ── size / variant maps (mount prop shape → Pomegranate) ───────────────────── */
 function btnVariant(v?: string): 'primary' | 'tonal' | 'ghost' {
   if (v === 'filled') return 'primary';
@@ -545,7 +556,11 @@ declare global {
          a mode flag — the page cannot then be busy AND showing a report, which
          is the state three sibling containers taking turns produce. */
       setBusy: (label: string) => void;
-      setSides: (figma: string, figmaDetail: string, repo: string, repoDetail: string) => void;
+      /* `provider` names the service the repo side is, so the table's own
+         column header can wear its mark. Optional: a comparison can be shown
+         without one, and then the column is just "Repo". */
+      setSides: (figma: string, figmaDetail: string, repo: string, repoDetail: string,
+                 provider?: 'github' | 'gitlab' | null) => void;
       /* `actionLabel` puts a button in the warning. A refusal that names the
          fix and then makes you go and do it somewhere else is a worse version
          of one that just does it. */
@@ -1742,7 +1757,8 @@ const COMPARE_SAMPLE = 40;
 
 (function mountCompare() {
   const container = document.getElementById('compare-mount');
-  type Sides = { figma: string; figmaDetail: string; repo: string; repoDetail: string };
+  type Sides = { figma: string; figmaDetail: string; repo: string; repoDetail: string;
+                 provider?: 'github' | 'gitlab' | null };
   type S = {
     busy: string;
     sides: Sides;
@@ -1879,10 +1895,86 @@ const COMPARE_SAMPLE = 40;
       return <span className="compare-cell-path" title={path}>{nodes}</span>;
     };
 
+    /* A column header that carries a mark. The icon is decorative — the word
+       beside it is the accessible name, and a header read out twice is worse
+       than one read out once. */
+    const headWith = (icon: ReactNode, label: string) => (
+      <span className="compare-col-head">
+        {icon && <span className="compare-col-icon" aria-hidden="true">{icon}</span>}
+        {label}
+      </span>
+    );
+
+    /*
+      A COMPOSITE IS A BAG OF SUB-VALUES, AND ONLY SOME OF THEM MOVED.
+
+      A typography token renders as {fontFamily:...,fontSize:...,fontWeight:
+      ...,letterSpacing:...,lineHeight:...}. Put two of those side by side and
+      the page has asked somebody to diff two 200-character strings by eye —
+      which is the exact job this page exists to do for them.
+
+      So the two are taken apart and only the keys that DIFFER are shown. The
+      form being parsed is renderValue's own output, so this is reading a
+      format this file controls rather than guessing at someone else's: keys
+      at depth zero, nested braces and brackets skipped. A reference like
+      {core.blue.500} has no colon at depth zero and comes back null, which is
+      correct — it is one value, not a bag.
+    */
+    const compositePairs = (v: string): [string, string][] | null => {
+      if (v.charAt(0) !== '{' || v.charAt(v.length - 1) !== '}') return null;
+      const body = v.slice(1, -1);
+      const out: [string, string][] = [];
+      let depth = 0, start = 0;
+      for (let i = 0; i <= body.length; i++) {
+        const ch = body[i];
+        if (ch === '{' || ch === '[') depth++;
+        else if (ch === '}' || ch === ']') depth--;
+        else if ((ch === ',' && depth === 0) || i === body.length) {
+          const part = body.slice(start, i);
+          const c = part.indexOf(':');
+          if (c > 0) out.push([part.slice(0, c), part.slice(c + 1)]);
+          start = i + 1;
+        }
+      }
+      return out.length ? out : null;
+    };
+
+    /* The sub-keys whose values are not the same on both sides — plus the
+       ones only one side has at all, which are a difference too. */
+    const changedKeys = (a: [string, string][], b: [string, string][]) => {
+      const ma = new Map(a), mb = new Map(b);
+      const keys: string[] = [];
+      ma.forEach((v, k) => { if (mb.get(k) !== v) keys.push(k); });
+      mb.forEach((v, k) => { if (!ma.has(k)) keys.push(k); });
+      return keys;
+    };
+
     const TAGGABLE = 22;
-    const valueCell = (v: string) => {
+    const valueCell = (v: string, other?: string) => {
       const sw = swatchOf(v);
       const short = sw || v;
+      /* Both sides composite: show only the sub-values that moved, and say how
+         many did not, so "the rest is the same" is stated rather than implied
+         by absence. */
+      if (other !== undefined) {
+        const mine = compositePairs(v), theirs = compositePairs(other);
+        if (mine && theirs) {
+          const keys = changedKeys(mine, theirs);
+          const map = new Map(mine);
+          const same = mine.length - keys.filter((k) => map.has(k)).length;
+          return (
+            <span className="compare-sub" title={v}>
+              {keys.map((k) => (
+                <span className="compare-sub-row" key={k}>
+                  <span className="compare-sub-key">{k}</span>
+                  <span className="compare-sub-val">{map.has(k) ? map.get(k) : '—'}</span>
+                </span>
+              ))}
+              {same > 0 && <span className="compare-sub-same">{`+${same} unchanged`}</span>}
+            </span>
+          );
+        }
+      }
       if (short.length > TAGGABLE) return <span className="compare-cell-text" title={v}>{v}</span>;
       return (
         <span title={v}>
@@ -1932,9 +2024,40 @@ const COMPARE_SAMPLE = 40;
         across three lines with the `0` stranded on the last. The tags get what
         they need and the path gets the rest.
       */
+      /*
+        THE COLUMNS SAY WHICH SIDE THEY ARE, IN THAT SIDE'S OWN MARK.
+
+        "Here" was the Figma side, and "here" only means anything to someone
+        who already knows which page they are on — while the other column had
+        a name. So it is Figma, beside the Figma mark, against Repo beside the
+        mark of whichever service the repo actually is. Two named sides, each
+        recognisable before it is read.
+      */
       if (twoSided) {
-        columns.push({ key: 'repo', header: 'Repo', width: '92px', cell: (x: any) => valueCell(x.repo) });
-        columns.push({ key: 'figma', header: 'Here', width: '92px', cell: (x: any) => valueCell(x.figma) });
+        /*
+          THE COLUMN WIDTH FOLLOWS WHAT IS IN IT. 92px is right for a tagged
+          hex and absurd for a composite: the typography table drew its values
+          as two twenty-line towers beside a token that had room to spare. A
+          table of pills gets pills' width; a table of structures gets a share.
+        */
+        const sample = rows.slice(0, COMPARE_SAMPLE);
+        const wide = sample.some((x: any) =>
+          (swatchOf(x.repo) || x.repo).length > TAGGABLE ||
+          (swatchOf(x.figma) || x.figma).length > TAGGABLE);
+        const w = wide ? '36%' : '92px';
+        columns.push({
+          key: 'repo',
+          header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
+                         : s.sides.provider === 'github' ? IconGithub(12) : null, 'Repo'),
+          width: w,
+          cell: (x: any) => valueCell(x.repo, x.figma),
+        });
+        columns.push({
+          key: 'figma',
+          header: headWith(IconFigma(12), 'Figma'),
+          width: w,
+          cell: (x: any) => valueCell(x.figma, x.repo),
+        });
       } else {
         columns.push({ key: 'value', header: 'Value', width: '120px', cell: (x: any) => valueCell(x.value) });
       }
@@ -1997,6 +2120,22 @@ const COMPARE_SAMPLE = 40;
                 <div className="compare-stat-label">a different colour, number or string</div>
               </div>
             </div>
+            {/*
+              BROKEN DOWN BY WHAT KIND OF TOKEN CHANGED. A colour decision and
+              a font-family decision are different acts, and on a real pair of
+              exports the mix is the story: 760 colours against 6 numbers says
+              "re-tinted", which a single total of 1,060 does not.
+            */}
+            {(r.changedByType || []).length > 1 && (
+              <div className="compare-types">
+                {r.changedByType.map((t: any) => (
+                  <span className="compare-type" key={t.type}>
+                    <span className="compare-type-n">{t.count.toLocaleString()}</span>
+                    <span className="compare-type-name">{t.type}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="compare-section">
@@ -2066,7 +2205,22 @@ const COMPARE_SAMPLE = 40;
           </div>
         </div>
 
-        {leaves('Values \u2014 changed', r.changed, true)}
+        {/*
+          ONE TABLE PER KIND, not one table with a type column. The column
+          would spend width the token path needs on a word that repeats down
+          the whole run, and a reader looking for "what happened to the
+          colours" would still be scanning for the rows that say colour. The
+          heading answers it instead, and each table is capped on its own so
+          a small kind is not pushed off the bottom of a large one.
+
+          The single-kind case keeps the plain heading: "Values — changed
+          (color)" reads as a filter applied to something, when it is simply
+          everything there is.
+        */}
+        {(r.changedByType || []).length > 1
+          ? r.changedByType.map((t: any) =>
+              leaves('Values \u2014 ' + t.type, r.changed.filter((c: any) => c.type === t.type), true))
+          : leaves('Values \u2014 changed', r.changed, true)}
         {/* Last of the three lists on purpose: it is usually the longest and
             almost always the least interesting, because a re-rooting moves
             thousands of references without anyone having decided anything. */}
@@ -2102,8 +2256,8 @@ const COMPARE_SAMPLE = 40;
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomCompare = {
     setBusy: (label) => set((s) => ({ ...s, busy: label, problem: null, report: null })),
-    setSides: (figma, figmaDetail, repo, repoDetail) =>
-      set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail } })),
+    setSides: (figma, figmaDetail, repo, repoDetail, provider) =>
+      set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail, provider } })),
     setProblem: (title, message, fix, actionLabel) =>
       set((s) => ({ ...s, busy: '', report: null, problem: { title, message, fix, actionLabel } })),
     setReport: (report, copyText) =>

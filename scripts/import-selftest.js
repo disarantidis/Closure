@@ -2318,6 +2318,39 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       ok('compare: one root in common is still a comparison',
          JD.compare({ core: { a: tok('#fff') }, brandnew: { c: tok('#eee') } }, setsShaped).comparable === true);
 
+      /*
+        WHAT KIND OF TOKEN CHANGED, because a colour decision and a
+        font-family decision are not the same act. Declared first (DTCG's
+        $type or the legacy `type`), inherited from the nearest ancestor
+        group second — DTCG lets a group set a default its children take —
+        and only inferred from the value when nothing says.
+      */
+      const typed = JD.compare(
+        { c: { a: { $value: '#fff', $type: 'color' } },
+          d: { $type: 'dimension', a: { $value: 4 }, b: { $value: 8 } },
+          s: { a: { $value: 'Inter', $type: 'fontFamily' } } },
+        { c: { a: { $value: '#000', $type: 'color' } },
+          d: { $type: 'dimension', a: { $value: 5 }, b: { $value: 9 } },
+          s: { a: { $value: 'Helvetica', $type: 'fontFamily' } } });
+      ok('types: every changed row carries its own type',
+         typed.changed.every((c) => !!c.type), JSON.stringify(typed.changed));
+      ok('types: a group\'s $type is inherited by children that do not declare one',
+         typed.changed.filter((c) => c.type === 'dimension').length === 2,
+         JSON.stringify(typed.changed.map((c) => c.path + ':' + c.type)));
+      ok('types: the roll-up is by count, commonest first',
+         JSON.stringify(typed.changedByType) ===
+         JSON.stringify([{ type: 'dimension', count: 2 }, { type: 'color', count: 1 },
+                         { type: 'fontFamily', count: 1 }]),
+         JSON.stringify(typed.changedByType));
+      /* Inference is the LAST resort and says so — a guessed type that named
+         itself 'color' would be indistinguishable from a declared one. */
+      const guessed = JD.compare({ a: { x: tok('#fff') } }, { a: { x: tok('#000') } });
+      ok('types: with nothing declared it is inferred from the value',
+         guessed.changed[0].type === 'color', guessed.changed[0].type);
+      const nameless = JD.compare({ a: { x: { value: 'hello' } } }, { a: { x: { value: 'world' } } });
+      ok('types: and an unrecognisable value answers "unknown" rather than guessing',
+         nameless.changed[0].type === 'unknown', nameless.changed[0].type);
+
       /* The clipboard copy is the only place the full list exists — the page
          caps every list it draws. */
       const text = JD.format(r, { figmaLabel: 'my file', repoLabel: 'GitHub tokens.json' });
