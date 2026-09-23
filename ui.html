@@ -1903,6 +1903,10 @@
        the Compare button — and .json-download-header's space-between would
        otherwise push them to opposite ends of the row with the title stranded
        between them. */
+    /* Sits between the card's header and its folder/commit rows, at the same
+       inset as they have — it is one more field in the same column. */
+    .repo-file-row { margin: 12px 0 0; }
+
     .json-download-header-actions {
       display: flex;
       align-items: center;
@@ -22132,6 +22136,23 @@ html[data-theme=dark] {
           functions rather than written to directly.
         -->
         <p class="repo-read-status" id="repo-read-status" hidden></p>
+
+        <!--
+          WHICH FILE IN THE REPO. Shown whenever a provider is readable, and
+          shown even when the repo holds exactly one JSON — a list of one
+          still answers "what is up there", and a control that appears and
+          disappears with the count is harder to learn than one that is always
+          in the same place.
+
+          This is the READ side of the card. The Json file card above names
+          what the plugin WRITES; Push uses that, Compare uses this, and until
+          they were separated the card could offer "Compare" while pointing at
+          a name the repo had never had. Two files, which is what a comparison
+          has.
+        -->
+        <div class="repo-file-row" id="repo-file-row" hidden>
+          <span id="repo-file-mount"></span>
+        </div>
         <!-- Only meaningful once BOTH providers are actually added (see
              updatePushTargetUI()'s tabMode — same gitlabAdded && githubAdded
              gate the Settings page's own GitLab/GitHub tab switcher uses).
@@ -49037,55 +49058,79 @@ html[data-theme=dark] {
   }
   (function mountPrimaryFilename() {
     const container = document.getElementById("primary-filename-mount");
-    let state = { value: "tokens.json", all: [] };
+    let value = "tokens.json";
     let apply = null;
     const push = (next, tell) => {
-      state = { ...state, ...next };
-      apply?.(state);
-      if (tell) window.PomPrimaryFilename.onChange?.(state.value);
+      value = next;
+      apply?.(next);
+      if (tell) window.PomPrimaryFilename.onChange?.(value);
     };
     function View() {
-      const [s, setS] = (0, import_react18.useState)(state);
-      apply = setS;
-      const shared = {
-        label: "File name",
-        size: "small",
-        block: true,
-        placeholder: "tokens.json"
-      };
-      if (!s.all.length) {
-        return /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(
-          PomTextField,
-          {
-            ...shared,
-            id: "primary-filename",
-            value: s.value,
-            onInput: (v) => push({ value: v }, true),
-            title: 'JSON file name \u2014 used for both Download and every push destination. ".json" is added automatically if you leave it out.'
-          }
-        );
-      }
-      const q = s.value.trim().toLowerCase();
-      const options = q ? s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1) : s.all;
+      const [v, setV] = (0, import_react18.useState)(value);
+      apply = setV;
       return /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(
-        Combobox,
+        PomTextField,
         {
-          ...shared,
-          value: s.value,
-          onChange: (v) => push({ value: v }, true),
-          options,
-          getKey: (o) => o,
-          onPick: (o) => push({ value: o }, true),
-          renderOption: (o, st) => /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { style: { fontWeight: st.active ? 600 : 400 }, children: o }),
-          emptyMessage: "No JSON in the repo matches that \u2014 it will be created on the first push"
+          id: "primary-filename",
+          label: "File name",
+          size: "small",
+          block: true,
+          placeholder: "tokens.json",
+          value: v,
+          onInput: (next) => push(next, true),
+          title: 'JSON file name \u2014 used for both Download and every push destination. ".json" is added automatically if you leave it out.'
         }
       );
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime24.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(View, {}) })));
     window.PomPrimaryFilename = {
-      get: () => state.value,
-      set: (value) => push({ value }),
-      setOptions: (names) => push({ all: names || [] }),
+      get: () => value,
+      set: (next) => push(next),
+      onChange: null
+    };
+  })();
+  (function mountRepoFile() {
+    const container = document.getElementById("repo-file-mount");
+    let state = { query: "", selected: "", all: [] };
+    let apply = null;
+    const put = (next, tell) => {
+      state = { ...state, ...next };
+      apply?.(state);
+      if (tell) window.PomRepoFile.onChange?.(state.selected);
+    };
+    const commit = (name) => put({ selected: name, query: name }, true);
+    function View() {
+      const [s, setS] = (0, import_react18.useState)(state);
+      apply = setS;
+      const q = s.query.trim().toLowerCase();
+      const options = !q || s.query === s.selected ? s.all : s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1);
+      return /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(
+        Combobox,
+        {
+          label: "File in the repo",
+          size: "small",
+          block: true,
+          placeholder: "nothing pushed yet",
+          value: s.query,
+          onChange: (v) => {
+            if (s.all.indexOf(v) !== -1) commit(v);
+            else put({ query: v });
+          },
+          options,
+          getKey: (o) => o,
+          onPick: (o) => commit(o),
+          renderOption: (o, st) => /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { style: { fontWeight: st.active ? 600 : 400 }, children: o }),
+          emptyMessage: s.all.length ? "No JSON in this folder matches that" : "No JSON files in this folder yet"
+        }
+      );
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime24.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(View, {}) })));
+    window.PomRepoFile = {
+      get: () => state.selected,
+      /* A set from outside is the app choosing, not the user — it moves both,
+         silently, because the caller is already acting on the new value. */
+      set: (next) => put({ selected: next, query: next }),
+      setOptions: (names) => put({ all: names || [] }),
       onChange: null
     };
   })();
@@ -53794,7 +53839,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '0bbab24 09:09:45';
+    var CLOSURE_BUILD = 'caf6c1b 09:20:21';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -53996,6 +54041,20 @@ function format(report, opts) {
     // declared further down would still be hoisted but not yet assigned at
     // that point, reading as undefined and throwing.
     var PUSH_TARGET_LABELS = { gitlab: 'Push to GitLab', github: 'Push to GitHub' };
+    /*
+      WHAT THE REPO ALREADY HOLDS, as of the last listing — the file names in
+      the folder being pushed to.
+
+      It exists so the Push button can say which of two things it is about to
+      do. Writing over a file that is already there is not the same act as
+      creating one, and a button that says the same word for both is the
+      reason someone finds out afterwards.
+    */
+    var repoFileNames = [];
+    function pushWouldReplace(which) {
+      if (!which) return false;
+      return repoFileNames.indexOf(pushFilePath(which).split('/').pop()) !== -1;
+    }
 
     function normFolder(p) {
       return String(p || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
@@ -54623,6 +54682,9 @@ function format(report, opts) {
       var key = repoAddressKey(which);
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
       var branch = (which === 'gitlab' ? gitlabConfig() : githubConfig()).branch;
+      /* Two files, named separately, because they are two files: the one this
+         plugin would write, and the one already in the repo. They are usually
+         the same name and the page must not imply that they always are. */
       var repoWhere = repoFilePath(which) + ' @ ' + branch;
       var figmaWhere = primaryFilename();
       window.PomCompare.setSides(
@@ -55149,6 +55211,17 @@ function format(report, opts) {
       if (el) el.addEventListener('input', scheduleSettingsSave);
     });
     window.PomPrimaryFilename.onChange = scheduleSettingsSave;
+    /*
+      Picking a different file in the repo moves the READ address, so the
+      count on the card and anything Compare would fetch are both about a
+      different file now. Straight through refreshRepoReadRow, which only
+      spends a request when the address actually moved — so re-picking what is
+      already selected costs nothing.
+
+      Not persisted: the listing runs on every open and re-picks the file this
+      plugin pushes to, which is both deterministic and the one people want.
+    */
+    window.PomRepoFile.onChange = function () { refreshRepoReadRow(); };
     // Show/hide each Clear button as its token field gains or loses content.
     // Immediate, not debounced — this is pure UI, nothing is written here.
     ['gl-token', 'gh-token'].forEach(function(id) {
@@ -55692,7 +55765,23 @@ function format(report, opts) {
         // just needsBigSetup, specifically so this never runs for
         // noPushDestination — PUSH_TARGET_LABELS has no entry for it, and
         // the button is hidden in that state anyway.
-        window.PomButtons.push.setLabel(blockedByCommitMsg ? 'Add commit message' : PUSH_TARGET_LABELS[r.effectiveTarget]);
+        /*
+          "PUSH AND REPLACE" WHEN THERE IS SOMETHING THERE TO REPLACE.
+
+          The file name on the Json file card is already in the repo's folder,
+          so this push overwrites it rather than adding to it. Saying so on
+          the button is the last moment it can be said before it happens —
+          and the difference matters most in exactly the case this plugin
+          makes easy, where the repo's copy is something you did not write.
+
+          Only when the LISTING has actually been read (repoFileNames); an
+          empty list means "not known yet" as much as "nothing there", and
+          guessing "Replace" would be worse than the plain label.
+        */
+        window.PomButtons.push.setLabel(
+          blockedByCommitMsg ? 'Add commit message'
+          : pushWouldReplace(r.effectiveTarget) ? 'Push and Replace'
+          : PUSH_TARGET_LABELS[r.effectiveTarget]);
       }
       window.PomButtons.download.setDisabled(!exportReady);
     }
@@ -55795,9 +55884,38 @@ function format(report, opts) {
       return null;
     }
 
-    /* The address the read is about — the file this card already names, so
-       the two can never drift apart. */
+    /*
+      TWO ADDRESSES, NOT ONE. They were the same value and that was the bug
+      behind the whole card reading oddly: the name the plugin WRITES was also
+      the name it went looking for, so a repo whose file was called something
+      else could only ever be reported as missing.
+
+      repoFilePath is the READ address — the folder, plus whichever file in
+      the repo is selected on this card. pushFilePath is the WRITE address —
+      the same folder, plus the name the Json file card carries. They are
+      equal in the ordinary case, where you compare against the file you push
+      to, and the point is that they no longer HAVE to be.
+    */
+    /*
+      ONE SOURCE OF TRUTH, AND IT IS THE CONTROL.
+
+      This was a `repoFileName` variable kept in step with the combo box by
+      convention, which is two copies of one fact and lasted about as long as
+      you would expect: the read address moved to brand.json while the field
+      on screen still read tokens_dtcg.json, and both were "right" according
+      to whichever one you asked. The widget owns the value; everything else
+      asks it.
+    */
+    function repoSelectedFile() {
+      return (window.PomRepoFile && window.PomRepoFile.get()) || '';
+    }
     function repoFilePath(which) {
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      /* Before any listing has landed there is nothing picked, and the file
+         this plugin pushes to is the only sensible guess at what to read. */
+      return composeFilePath(c.folder, repoSelectedFile() || c.filename);
+    }
+    function pushFilePath(which) {
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
       return composeFilePath(c.folder, c.filename);
     }
@@ -55930,6 +56048,9 @@ function format(report, opts) {
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
       var where = which === 'gitlab' ? c.host + '#' + c.project : c.repo;
       return which + '|' + where + '|' + c.branch + '|' + repoFilePath(which) + '|' + c.token;
+      /* repoFilePath, not pushFilePath — this key is about the file being
+         read, so renaming the export does not spend a request re-reading a
+         repo file that has not moved. */
     }
 
     /* The address the line on screen is describing. null means it describes
@@ -55954,6 +56075,8 @@ function format(report, opts) {
       if (!mount) return;
       var which = activeRepoProvider();
       mount.hidden = !which;
+      var fileRow = document.getElementById('repo-file-row');
+      if (fileRow) fileRow.hidden = !which;
       if (!which) { repoCheckedFor = null; repoReadStatus(''); return; }
       /* The title names BOTH sides, because that is what makes it a
          comparison rather than a download: the file in the repo, and the
@@ -56005,16 +56128,50 @@ function format(report, opts) {
       var current = function () { return repoCheckedFor === key; };
       var branch = (which === 'gitlab' ? gitlabConfig() : githubConfig()).branch;
       var wanted = repoFilePath(which).split('/').pop();
+      /*
+        FORGET WHAT THE LAST FOLDER HELD before asking about this one. The
+        address has moved — that is the only reason this runs — so the old
+        listing describes somewhere else, and leaving it up means the Push
+        button says "Push and Replace" about a file in a folder nobody is
+        pushing to any more. Unknown is the honest state, and it reads as the
+        plain label.
+      */
+      repoFileNames = [];
+      updateActionUI();
       repoReadStatus('Reading ' + wanted + '…');
       listRepoJsonFiles(which).then(function (files) {
         if (!current()) return null;
-        /* The field learns what is actually in the repo whether or not the
-           name it is holding is one of them. */
-        window.PomPrimaryFilename.setOptions(files.map(function (f) { return f.name; }));
-        if (!files.some(function (f) { return f.name === wanted; })) {
-          repoReadStatus(files.length
-            ? 'No ' + wanted + ' — the repo holds ' + files.map(function (f) { return f.name; }).join(', ')
-            : 'No ' + wanted + ' on ' + branch + ' yet');
+        var names = files.map(function (f) { return f.name; });
+        repoFileNames = names;
+        window.PomRepoFile.setOptions(names);
+        /* The Push button's label depends on whether the name it writes is
+           already up there, which is exactly what this listing just settled. */
+        updateActionUI();
+        /*
+          WHAT TO SELECT, when nothing has been chosen by hand.
+
+          The file this plugin pushes to, if the repo has it — comparing
+          against what you last wrote is the thing people come here for, and
+          it makes the two cards line up by default. Failing that, the first
+          JSON in the folder, because one named file is a better starting
+          point than an empty field next to a repo that demonstrably has
+          something in it.
+        */
+        if (names.indexOf(repoSelectedFile()) === -1) {
+          var mine = pushFilePath(which).split('/').pop();
+          window.PomRepoFile.set(names.indexOf(mine) !== -1 ? mine : (names[0] || ''));
+          wanted = repoSelectedFile() || wanted;
+          /* Choosing for them moved the address, so the key this check is
+             answering under has to move with it — otherwise the fetch below
+             lands as "a reply about a file nobody is looking at" and is
+             dropped by its own staleness guard. */
+          key = repoAddressKey(which);
+          repoCheckedFor = key;
+        }
+        if (names.indexOf(repoSelectedFile()) === -1) {
+          repoReadStatus(names.length
+            ? 'No ' + wanted + ' — the repo holds ' + names.join(', ')
+            : 'Nothing pushed to ' + branch + ' yet');
           return null;
         }
         return fetchRepoDoc(which, key).then(function (got) {
@@ -56275,7 +56432,9 @@ function format(report, opts) {
       var c = gitlabConfig();
       if (!c.token || !c.project) return Promise.reject({ message: 'GitLab is not configured' });
       var host = c.host.replace(/\/+$/, '');
-      var filePath = composeFilePath(c.folder, c.filename);
+      /* repoFilePath, not the push name: this is the file being READ, which
+         the repo card picks and which need not be the one we write. */
+      var filePath = repoFilePath('gitlab');
       var url = host + '/api/v4/projects/' + encodeURIComponent(c.project) +
                 '/repository/files/' + encodeURIComponent(filePath) +
                 '/raw?ref=' + encodeURIComponent(c.branch);
@@ -56294,7 +56453,8 @@ function format(report, opts) {
       if (!c.token || !c.repo) return Promise.reject({ message: 'GitHub is not configured' });
       var parts = c.repo.split('/');
       if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
-      var filePath = composeFilePath(c.folder, c.filename);
+      /* The READ address — see fetchGitLabFile above. */
+      var filePath = repoFilePath('github');
       var url = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
                 encodeURIComponent(parts[1]) + '/contents/' +
                 filePath.split('/').map(encodeURIComponent).join('/') +

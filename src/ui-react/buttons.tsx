@@ -512,7 +512,15 @@ declare global {
       setReport: (report: any, copyText: string) => void;
       onAction: (() => void) | null;
     };
+    /* The name the plugin WRITES — Download and every push. A plain field;
+       the repo's own files are PomRepoFile below, deliberately not here. */
     PomPrimaryFilename: {
+      get: () => string;
+      set: (value: string) => void;
+      onChange: ((value: string) => void) | null;
+    };
+    /* The file in the repo the comparison READS. */
+    PomRepoFile: {
       get: () => string;
       set: (value: string) => void;
       setOptions: (names: string[]) => void;
@@ -748,84 +756,141 @@ mountVersionTag('version-tag-mount');
 function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(mountId, <PomTextField {...props} />, level); }
 
 /*
-  THE FILE NAME FIELD, WHICH GROWS A DROPDOWN WHEN THERE IS SOMETHING TO PICK.
+  THE FILE NAME THIS PLUGIN WRITES. Nothing else.
 
-  It was a plain TextField, and for a repo holding exactly one JSON that was
-  right. It is wrong the moment the repo holds two: the name in this field is
-  what the comparison goes looking for, and typing it from memory against a
-  repo you cannot see is how you end up being told "no tokens.json on main"
-  about a repo whose file is called tokens_dtcg.json.
+  It briefly grew a dropdown of the JSON files found in the repo, and that was
+  a modelling mistake: this card is about the document the plugin PRODUCES —
+  Download saves it, Push writes it — and the repo's existing files are a
+  different set of things entirely. Offering them here said "pick which file
+  you are generating" about files you are not generating. The repo's side of
+  it now lives on the repo card, where the thing being picked actually is (see
+  mountRepoFile below), and the two cards name two files, which is the truth:
+  a comparison has two sides.
 
-  So when the repo is readable the plugin lists the JSON files actually in it
-  (listRepoJsonFiles() in ui.template.html) and hands them here. With names to
-  offer this is a Combobox — type to filter, or pick from the list. With none
-  it stays the TextField it was, because a combobox whose list is empty is a
-  text field that also says "nothing found" every time you focus it.
-
-  Either way it is STILL FREE TEXT. The name you push to does not have to
-  exist yet — the first push to a new repo creates it — so the list is an
-  offer, never a constraint.
-
-  THE VALUE LIVES HERE, NOT IN REACT STATE. `get()` is called in the middle of
-  composing a push, and a setState is not visible until the next render; the
-  bridge keeps the authoritative copy and React follows it.
+  So this is a plain text field again. It stays CONTROLLED through the bridge
+  rather than going back to a DOM lookup, because that refactor was right for
+  its own reasons — one accessor instead of five getElementById calls — and
+  the value has to be readable synchronously in the middle of composing a
+  push, which React state is not.
 */
 (function mountPrimaryFilename() {
   const container = document.getElementById('primary-filename-mount');
-  type S = { value: string; all: string[] };
-  let state: S = { value: 'tokens.json', all: [] };
-  let apply: ((s: S) => void) | null = null;
-  const push = (next: Partial<S>, tell?: boolean) => {
-    state = { ...state, ...next };
-    apply?.(state);
-    if (tell) window.PomPrimaryFilename.onChange?.(state.value);
+  let value = 'tokens.json';
+  let apply: ((v: string) => void) | null = null;
+  const push = (next: string, tell?: boolean) => {
+    value = next;
+    apply?.(next);
+    if (tell) window.PomPrimaryFilename.onChange?.(value);
   };
   function View() {
-    const [s, setS] = useState<S>(state);
-    apply = setS;
-    const shared = {
-      label: 'File name',
-      size: 'small' as const,
-      block: true,
-      placeholder: 'tokens.json',
-    };
-    if (!s.all.length) {
-      return (
-        <PomTextField
-          {...shared}
-          id="primary-filename"
-          value={s.value}
-          onInput={(v: string) => push({ value: v }, true)}
-          title={'JSON file name — used for both Download and every push destination. ' +
-                 '".json" is added automatically if you leave it out.'}
-        />
-      );
-    }
-    /* THE CALLER FILTERS — Combobox's decision 4. Substring, not prefix: the
-       name you half-remember is as often the middle of it ("dtcg") as the
-       start. */
-    const q = s.value.trim().toLowerCase();
-    const options = q ? s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1) : s.all;
+    const [v, setV] = useState(value);
+    apply = setV;
     return (
-      <Combobox
-        {...shared}
-        value={s.value}
-        onChange={(v: string) => push({ value: v }, true)}
-        options={options}
-        getKey={(o: string) => o}
-        onPick={(o: string) => push({ value: o }, true)}
-        renderOption={(o: string, st: { active: boolean }) => (
-          <span style={{ fontWeight: st.active ? 600 : 400 }}>{o}</span>
-        )}
-        emptyMessage={'No JSON in the repo matches that — it will be created on the first push'}
+      <PomTextField
+        id="primary-filename"
+        label="File name"
+        size="small"
+        block
+        placeholder="tokens.json"
+        value={v}
+        onInput={(next: string) => push(next, true)}
+        title={'JSON file name — used for both Download and every push destination. ' +
+               '".json" is added automatically if you leave it out.'}
       />
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomPrimaryFilename = {
-    get: () => state.value,
-    set: (value: string) => push({ value: value }),
-    setOptions: (names: string[]) => push({ all: names || [] }),
+    get: () => value,
+    set: (next: string) => push(next),
+    onChange: null,
+  };
+})();
+
+/*
+  WHICH FILE IN THE REPO THE COMPARISON IS AGAINST.
+
+  On the repo card, because that is what it is about. A Combobox and not a
+  plain dropdown: these are file names, a repo can hold a lot of them, and
+  typing three characters to narrow the list is faster than scrolling it. It
+  shows even when the repo holds exactly one — a list of one still answers
+  "what is up there", which is the question this control exists for, and a
+  field that appears and disappears with the count is harder to learn than one
+  that is always in the same place.
+
+  It is the READ side, and only the read side. Push writes the name from the
+  Json file card above; this names the file Compare goes and fetches. Those
+  were one value until they were separated here, which is why the card could
+  say "Compare" while pointing at a file the repo did not have.
+*/
+(function mountRepoFile() {
+  const container = document.getElementById('repo-file-mount');
+  /*
+    THE TYPED TEXT AND THE CHOSEN FILE ARE TWO DIFFERENT THINGS.
+
+    They were one, and the control ate its own input: typing "brand" reported
+    a new selection, which moved the read address, which re-listed the repo,
+    which found no file called "brand" and helpfully picked a default —
+    overwriting the three characters that had just been typed. You could not
+    filter, because filtering looked exactly like choosing.
+
+    `query` is what is in the box and only ever filters. `selected` is the
+    file the comparison is against, and only a PICK changes it — or typing a
+    name that exactly matches one, which is the same act done by keyboard.
+  */
+  type S = { query: string; selected: string; all: string[] };
+  let state: S = { query: '', selected: '', all: [] };
+  let apply: ((s: S) => void) | null = null;
+  const put = (next: Partial<S>, tell?: boolean) => {
+    state = { ...state, ...next };
+    apply?.(state);
+    if (tell) window.PomRepoFile.onChange?.(state.selected);
+  };
+  const commit = (name: string) => put({ selected: name, query: name }, true);
+  function View() {
+    const [s, setS] = useState<S>(state);
+    apply = setS;
+    /* THE CALLER FILTERS — Combobox's decision 4. Substring, not prefix: the
+       name you half-remember is as often the middle of it ("dtcg") as the
+       start. While the box still holds the selection, the whole list shows —
+       a list that collapses to the one thing already chosen is a list with
+       nothing to choose from. */
+    const q = s.query.trim().toLowerCase();
+    const options = (!q || s.query === s.selected)
+      ? s.all
+      : s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1);
+    return (
+      <Combobox
+        label="File in the repo"
+        size="small"
+        block
+        placeholder="nothing pushed yet"
+        value={s.query}
+        onChange={(v: string) => {
+          /* Typing filters. It commits only when what was typed IS one of the
+             options — the keyboard way of picking. */
+          if (s.all.indexOf(v) !== -1) commit(v);
+          else put({ query: v });
+        }}
+        options={options}
+        getKey={(o: string) => o}
+        onPick={(o: string) => commit(o)}
+        renderOption={(o: string, st: { active: boolean }) => (
+          <span style={{ fontWeight: st.active ? 600 : 400 }}>{o}</span>
+        )}
+        emptyMessage={s.all.length
+          ? 'No JSON in this folder matches that'
+          : 'No JSON files in this folder yet'}
+      />
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomRepoFile = {
+    get: () => state.selected,
+    /* A set from outside is the app choosing, not the user — it moves both,
+       silently, because the caller is already acting on the new value. */
+    set: (next: string) => put({ selected: next, query: next }),
+    setOptions: (names: string[]) => put({ all: names || [] }),
     onChange: null,
   };
 })();
