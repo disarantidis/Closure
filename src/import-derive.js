@@ -818,8 +818,38 @@ function derive(ir, opts) {
       if (spec.col === name && spec.ft !== null) sample.push(spec.path.split('.').join('/'));
     }
 
+    /*
+      THE GROUP TREE, which is the other half of what Figma's rail shows.
+
+      A collection's panel lists its collections at the top and, under a
+      "Groups" heading, every folder in its variable names with the number of
+      variables beneath it — nested, and counting through the nesting, so
+      `scheme` reports everything in `scheme/basic` and `scheme/shades` too.
+      That is exactly what the three readings move around, so a preview that
+      leaves it out is missing the change it is previewing.
+
+      Every prefix of every path except the leaf, counted. Sorting the keys
+      gives the tree its order for free: '/' sorts before any name character,
+      so a parent always precedes its own children.
+    */
+    const groupCount = new Map();
+    for (const spec of vars.values()) {
+      if (spec.col !== name || spec.ft === null) continue;
+      const segs = spec.path.split('.');
+      for (let i = 1; i < segs.length; i++) {
+        const key = segs.slice(0, i).join('/');
+        groupCount.set(key, (groupCount.get(key) || 0) + 1);
+      }
+    }
+    const groups = [...groupCount.keys()].sort().map((path) => ({
+      path,
+      depth: path.split('/').length - 1,
+      name: path.slice(path.lastIndexOf('/') + 1),
+      count: groupCount.get(path),
+    }));
+
     const entry = {
-      name, modes: modes.slice(), variables: count, fromGroup: g, sample,
+      name, modes: modes.slice(), variables: count, fromGroup: g, sample, groups,
       verdict: verdict.get(g),
       overlap: ev.overlap === undefined ? null : +(ev.overlap * 100).toFixed(1),
       evidence: ev.note,

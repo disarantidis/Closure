@@ -1774,7 +1774,9 @@
     */
     .import-fig {
       display: grid;
-      grid-template-columns: 104px 1fr;
+      /* 124, not 104: the rail carries an indented group tree now, and at the
+         old width a name two levels in had about 40px left to show itself. */
+      grid-template-columns: 124px 1fr;
       gap: 0;
       border: 1px solid var(--app-border);
       border-radius: 10px;
@@ -1811,6 +1813,26 @@
       cursor: pointer;
     }
     .import-fig-rail-item.is-on { background: var(--background); color: var(--app-text); }
+    /* The second heading in the rail. Not sticky — only the first one can be,
+       and a second sticky header would sit on top of the list it names. */
+    .import-fig-rail-head.is-sub {
+      position: static;
+      margin-top: 4px;
+      border-top: 1px solid var(--app-border);
+      padding-top: 6px;
+    }
+    /* A group is not a control: the collections above it switch the table, and
+       these describe the one already shown. Same row shape, no button. */
+    .import-fig-rail-group {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      align-items: center;
+      padding: 3px 8px;
+      color: var(--app-text-muted);
+      min-width: 0;
+    }
+    .import-fig-rail-group.is-more { opacity: 0.65; }
     .import-fig-rail-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .import-fig-rail-count { opacity: 0.6; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
@@ -51093,7 +51115,31 @@ html[data-theme=dark] {
               ]
             },
             x.name
-          ))
+          )),
+          (c.groups || []).length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-fig-rail-head is-sub", children: "Groups" }),
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-fig-rail-group", style: { paddingLeft: 8 }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-fig-rail-name", children: "All" }),
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-fig-rail-count", children: c.variables.toLocaleString() })
+            ] }),
+            c.groups.slice(0, 5).map((g) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
+              "span",
+              {
+                className: "import-fig-rail-group",
+                style: { paddingLeft: 8 + g.depth * 10 },
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-fig-rail-name", title: g.path, children: g.name }),
+                  /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-fig-rail-count", children: g.count.toLocaleString() })
+                ]
+              },
+              g.path
+            )),
+            c.groups.length > 5 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-fig-rail-group is-more", style: { paddingLeft: 8 }, children: [
+              "+",
+              c.groups.length - 5,
+              " more"
+            ] })
+          ] })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-fig-table", children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-fig-title", children: c.name }),
@@ -54017,8 +54063,38 @@ function derive(ir, opts) {
       if (spec.col === name && spec.ft !== null) sample.push(spec.path.split('.').join('/'));
     }
 
+    /*
+      THE GROUP TREE, which is the other half of what Figma's rail shows.
+
+      A collection's panel lists its collections at the top and, under a
+      "Groups" heading, every folder in its variable names with the number of
+      variables beneath it — nested, and counting through the nesting, so
+      `scheme` reports everything in `scheme/basic` and `scheme/shades` too.
+      That is exactly what the three readings move around, so a preview that
+      leaves it out is missing the change it is previewing.
+
+      Every prefix of every path except the leaf, counted. Sorting the keys
+      gives the tree its order for free: '/' sorts before any name character,
+      so a parent always precedes its own children.
+    */
+    const groupCount = new Map();
+    for (const spec of vars.values()) {
+      if (spec.col !== name || spec.ft === null) continue;
+      const segs = spec.path.split('.');
+      for (let i = 1; i < segs.length; i++) {
+        const key = segs.slice(0, i).join('/');
+        groupCount.set(key, (groupCount.get(key) || 0) + 1);
+      }
+    }
+    const groups = [...groupCount.keys()].sort().map((path) => ({
+      path,
+      depth: path.split('/').length - 1,
+      name: path.slice(path.lastIndexOf('/') + 1),
+      count: groupCount.get(path),
+    }));
+
     const entry = {
-      name, modes: modes.slice(), variables: count, fromGroup: g, sample,
+      name, modes: modes.slice(), variables: count, fromGroup: g, sample, groups,
       verdict: verdict.get(g),
       overlap: ev.overlap === undefined ? null : +(ev.overlap * 100).toFixed(1),
       evidence: ev.note,
@@ -56170,7 +56246,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'ae74a0d 18:16:36';
+    var CLOSURE_BUILD = 'ea034a9 18:20:17';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

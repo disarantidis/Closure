@@ -2058,6 +2058,36 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             ctx.refreshFolderImportOffer();
             return offerRow.hidden;
           };
+          /*
+            THE GROUP TREE THE PREVIEW DRAWS. Figma's rail lists a collection's
+            folders under a "Groups" heading with the number of variables
+            beneath each one, counting THROUGH the nesting — which is exactly
+            what the three readings move, so the preview has to carry it.
+
+            Pinned because all three parts are easy to get wrong on their own:
+            a parent has to count its children's variables too, a parent has to
+            come before its children, and the leaf is never a group.
+          */
+          {
+            const fsg = require('fs'), pathg = require('path');
+            const plan = derive(toIR(JSON.parse(fsg.readFileSync(
+              pathg.join(__dirname, '__fixtures__/legacy-sample.json'), 'utf8'))), {});
+            const mode = (plan.collections || []).find((c) => c.name === 'mode');
+            const g = (mode && mode.groups) || [];
+            const find = (p) => g.find((x) => x.path === p);
+            ok('preview groups: a parent counts what is nested inside it',
+               !!find('colours') && find('colours').count === 2 &&
+               !!find('colours/brand') && find('colours/brand').count === 1,
+               JSON.stringify(g));
+            ok('preview groups: a parent is listed before its own children',
+               g.findIndex((x) => x.path === 'colours') <
+               g.findIndex((x) => x.path === 'colours/brand'));
+            ok('preview groups: depth is the nesting, and the leaf is not a group',
+               find('colours').depth === 0 && find('colours/brand').depth === 1 &&
+               !g.some((x) => x.path.split('/').length > 2),
+               JSON.stringify(g.map((x) => x.path)));
+                    }
+
           ok('folder offer: absent until a sync has listed something to choose from',
              offer([], null) === true);
           ok('folder offer: shown once a listing exists, with nothing saved yet',

@@ -1774,7 +1774,9 @@
     */
     .import-fig {
       display: grid;
-      grid-template-columns: 104px 1fr;
+      /* 124, not 104: the rail carries an indented group tree now, and at the
+         old width a name two levels in had about 40px left to show itself. */
+      grid-template-columns: 124px 1fr;
       gap: 0;
       border: 1px solid var(--app-border);
       border-radius: 10px;
@@ -1811,6 +1813,26 @@
       cursor: pointer;
     }
     .import-fig-rail-item.is-on { background: var(--background); color: var(--app-text); }
+    /* The second heading in the rail. Not sticky — only the first one can be,
+       and a second sticky header would sit on top of the list it names. */
+    .import-fig-rail-head.is-sub {
+      position: static;
+      margin-top: 4px;
+      border-top: 1px solid var(--app-border);
+      padding-top: 6px;
+    }
+    /* A group is not a control: the collections above it switch the table, and
+       these describe the one already shown. Same row shape, no button. */
+    .import-fig-rail-group {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      align-items: center;
+      padding: 3px 8px;
+      color: var(--app-text-muted);
+      min-width: 0;
+    }
+    .import-fig-rail-group.is-more { opacity: 0.65; }
     .import-fig-rail-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .import-fig-rail-count { opacity: 0.6; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 

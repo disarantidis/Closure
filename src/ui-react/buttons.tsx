@@ -3085,6 +3085,39 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
               <span className="import-fig-rail-count">{x.variables.toLocaleString()}</span>
             </button>
           ))}
+          {/*
+            AND THE GROUPS UNDER THEM, which is the other half of what Figma's
+            rail shows and the half these three readings actually move. Read as
+            a group a segment stays in the names and becomes a folder here;
+            read as modes or collections it leaves this list entirely. A
+            preview that showed only the collection count could not show that.
+
+            "All" first, like the panel, because the tree is a filter of the
+            whole and the whole is the thing it filters.
+          */}
+          {(c.groups || []).length > 0 && (
+            <>
+              <span className="import-fig-rail-head is-sub">Groups</span>
+              <span className="import-fig-rail-group" style={{ paddingLeft: 8 }}>
+                <span className="import-fig-rail-name">All</span>
+                <span className="import-fig-rail-count">{c.variables.toLocaleString()}</span>
+              </span>
+              {c.groups.slice(0, 5).map((g: any) => (
+                <span key={g.path} className="import-fig-rail-group"
+                      /* Indented by its own depth, which is how a tree says
+                         which folder something is in without drawing lines. */
+                      style={{ paddingLeft: 8 + g.depth * 10 }}>
+                  <span className="import-fig-rail-name" title={g.path}>{g.name}</span>
+                  <span className="import-fig-rail-count">{g.count.toLocaleString()}</span>
+                </span>
+              ))}
+              {c.groups.length > 5 && (
+                <span className="import-fig-rail-group is-more" style={{ paddingLeft: 8 }}>
+                  +{c.groups.length - 5} more
+                </span>
+              )}
+            </>
+          )}
         </span>
         <span className="import-fig-table">
           <span className="import-fig-title">{c.name}</span>
