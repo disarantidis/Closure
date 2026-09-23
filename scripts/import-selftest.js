@@ -1856,9 +1856,6 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             get: () => picked, set: (v) => { picked = v; }, setOptions: () => {}, onChange: null,
           };
           ctx.primaryFilename = () => picked;
-          /* The repo card's read-only echo of that name. */
-          let shown = '';
-          ctx.PomRepoFile = { set: (v) => { shown = v; } };
           /* The compare card's two side tags, fed from the same place. */
           let sides = {};
           ctx.PomCompareSides = {
@@ -1933,23 +1930,29 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              JSON.stringify(importOptions));
 
           /*
-            THE REPO CARD SHOWS WHERE IT LANDS, including when that is somewhere
-            the repository does not have yet. A name being invented is exactly
-            the case somebody wants the destination for, so blanking it would
-            answer "where does this go" with silence.
+            ONE FIELD, NOT A FIELD AND AN ECHO OF IT.
 
-            The NAME and nothing else. A "· new" suffix was tried and truncated
-            in the real field, and the push button already carries that fact
-            where it changes what happens.
+            The repo card used to carry a read-only copy of this name so that
+            its address read folder-then-file. The name field itself sits in
+            that address now, so the copy is gone — and with it the only way the
+            two could ever have shown different names.
+
+            The name the push lands on is whatever the field holds, INCLUDING a
+            name the repository does not have yet: inventing one is most of what
+            this plugin does, and a destination that blanked itself the moment
+            you typed something new would answer "where does this go" with
+            silence.
           */
           ctx.repoListed = true;
           ctx.repoFileNames = ['a.json', 'b.json'];
           ctx.chooseRepoFile('a.json');
-          ok('repo file: the repo card echoes a name the folder holds',
-             shown === 'a.json', shown);
+          ok('repo file: the address takes a name the folder holds',
+             picked === 'a.json' && ctx.repoSelectedFile() === 'a.json',
+             picked + ' / ' + ctx.repoSelectedFile());
           ctx.chooseRepoFile('invented.json');
-          ok('repo file: and echoes one it does not, rather than going blank',
-             shown === 'invented.json', shown);
+          ok('repo file: and one it does not, rather than reverting or blanking',
+             picked === 'invented.json' && ctx.repoSelectedFile() === 'invented.json',
+             picked + ' / ' + ctx.repoSelectedFile());
           /*
             THE COMPARE CARD NAMES BOTH OPERANDS. The button said what it would
             do without saying what to, and both sides are knowable: this Figma

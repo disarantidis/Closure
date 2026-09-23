@@ -2223,9 +2223,11 @@
     .figma-card {
       background: var(--background);
       border-radius: 24px;
-      /* A frame round two cards, so it is thin: the cards inside carry their
-         own padding and the content should not pay twice for being grouped. */
-      padding: var(--spacing-component-3);
+      /* A card's own padding, not a frame's. It was thin — var(--spacing-
+         component-3) — because it held two cards that carried their own, and
+         content should not pay twice for being grouped. It holds one row now,
+         so it pays once, at the rung every other card on this screen uses. */
+      padding: var(--spacing-component-4);
       /*
         NO MARGIN AT ALL — .collections-wrap supplies both.
 
@@ -2266,9 +2268,11 @@
       --app-surface: var(--background);
     }
 
-    /* Sits in by the subcards' own inset, so the title lines up with the names
-       under it rather than with the frame around them. */
-    .figma-card-header { padding: 4px var(--spacing-component-4) 0; }
+    /* It sat in by the subcard's own inset, so the title lined up with the
+       names under it rather than with the frame around them. There is no
+       subcard under it any more and nothing left to line up with, so the card
+       pads it directly and this adds nothing. */
+    .figma-card-header { padding: 0; }
     #figma-card-icon-mount { display: flex; }
     /* Title left, trailing affordance flush right — the file-size tag on
        the Json file card, the read button on the repo card. */
@@ -2288,23 +2292,34 @@
       color: var(--app-text);
     }
     .json-download-title-icon { flex-shrink: 0; }
+    /* The header's trailing pair — the size tag and Download. justify-content:
+       space-between already holds the title at one end and these at the other;
+       this is only the gap between the two of them. */
+    #json-download-card .json-download-header #download-btn-mount { display: flex; }
     /* The header's trailing group. Two things now — the token-count tag and
        the Compare button — and .json-download-header's space-between would
        otherwise push them to opposite ends of the row with the title stranded
        between them. */
     /* Sits between the card's header and its folder/commit rows, at the same
        inset as they have — it is one more field in the same column. */
-    /* Folder and file, side by side — the two halves of one address. They
-       share the width evenly and each may be narrower than its content, which
-       is what min-width: 0 is for: without it a flex item refuses to shrink
-       below its intrinsic size and the pair overflows the card instead of
-       truncating inside it. */
+    /* The folder half of the address. A row of its own once; now one cell of
+       .json-download-fields, still a flex box because it holds two pickers
+       (one per provider, one shown) and the create button. It takes an equal
+       share with the file name beside it, and hides on its own — see the
+       markup's comment on why that is not the whole row. */
     .repo-file-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin: 12px 0 0;
+      flex: 2 1 0;
+      min-width: 0;
     }
+    .repo-file-row[hidden] { display: none; }
+    /* The push side's three controls, sharing the folder cell. */
+    .folder-push-cell { display: flex; align-items: center; gap: 8px; flex: 1 1 0; min-width: 0; }
+    .folder-push-cell[hidden] { display: none; }
+    #compare-folder-mount[hidden] { display: none; }
+    #download-btn-mount[hidden] { display: none; }
     .repo-file-half { flex: 1 1 0; min-width: 0; }
     /*
       A control ON the wire, between two cards. The wire is painted behind
@@ -2455,12 +2470,30 @@
       letter-spacing: var(--type-body-m-letter-spacing);
       margin: 0;
     }
-    /* Field takes the row; Download sits fixed-width at the right, same
-       field-plus-button pairing .push-download-row used before Download
-       lived here instead. */
-    .json-download-fields { display: flex; align-items: center; gap: 10px; }
+    /*
+      FOLDER, FILE, DOWNLOAD — one line, and the reason Download is a glyph.
+
+      Two fields and a labelled button do not fit across a subcard inside a
+      card: at 308px of usable width the pair came out at 96px each with
+      "Download" still taking 112, and a folder path truncated to five
+      characters is not a path. The button carries the one icon everybody
+      already reads, and the two fields get the rest of the row.
+    */
+    .json-download-fields { display: flex; align-items: center; gap: 8px; }
+    /*
+      TWO TO THREE, NOT ONE TO ONE, because the two names are not the same
+      length. A folder in this plugin is "ODS" or "brand/core"; a file is
+      "odstokens.json". Split evenly, the folder had room it did not need and
+      the file lost the end of its name — measured at 420px, which is the only
+      width this window is ever opened at.
+
+      Each half may be narrower than its content — that is what min-width: 0
+      is for: without it a flex item refuses to shrink below its intrinsic
+      size and the row overflows the card instead of truncating inside it.
+    */
     #primary-filename-mount,
-    #json-download-field-skeleton-mount { flex: 1; min-width: 0; }
+    #compare-pick-mount { flex: 3 1 0; min-width: 0; }
+    #primary-filename-mount[hidden], #compare-pick-mount[hidden] { display: none; }
     
     .commit-input-wrap {
       margin-bottom: 4px;
@@ -22503,58 +22536,6 @@ html[data-theme=dark] {
         </div>
         <span id="figma-card-tag-mount"></span>
       </div>
-    <!-- Skeleton twin, shown until the same moment #skeleton-list hides
-         (the 'extracted' handler, or 'error') — this card's own content
-         (a static filename field + Download) never actually needed to
-         wait on extraction, but showing it fully rendered while the
-         file-variables card AND the push-settings card both still read as
-         skeletons was reported as inconsistent: one of three stacked
-         cards looking "already done" while its neighbours load reads as
-         broken, not as a deliberately-instant card. Synced to the same
-         reveal moment as #skeleton-list now, purely for that consistency
-         — see the 'extracted'/'error' handlers, which toggle this pair
-         together. -->
-    <div class="json-download-card is-sub" id="json-download-skeleton" data-level="3">
-      <div class="json-download-header">
-        <div class="json-download-title-group">
-          <span id="json-download-icon-skeleton-mount"></span>
-          <span id="json-download-title-skeleton-mount"></span>
-        </div>
-        <span id="json-download-tag-skeleton-mount"></span>
-      </div>
-      <div class="json-download-fields">
-        <span id="json-download-field-skeleton-mount"></span>
-        <span id="json-download-btn-skeleton-mount"></span>
-      </div>
-    </div>
-    <div class="json-download-card is-sub" id="json-download-card" data-level="3" hidden>
-      <div class="json-download-header">
-        <div class="json-download-title-group">
-          <!-- Plain inline SVG, not React-mounted — same reasoning as the
-               GitLab/GitHub marks on the repo card below: this card's
-               title row is static markup, not a React root. Lucide's
-               "file-text" glyph — a document, reading as "this is the
-               file" the way the collections card's braces icon reads as
-               "these are the variables". -->
-          <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <path d="M14 2v6h6"/>
-            <path d="M16 13H8"/>
-            <path d="M16 17H8"/>
-            <path d="M10 9H8"/>
-          </svg>
-          <p class="json-download-title">Json file</p>
-        </div>
-        <!-- The file-size tag that used to sit on the collections card
-             (beside its token count) — it describes this JSON file, so it
-             reads better here, at the right of this card's own title. -->
-        <span id="json-file-size-mount"></span>
-      </div>
-      <div class="json-download-fields">
-        <span id="primary-filename-mount"></span>
-        <div id="download-btn-mount"></div>
-      </div>
-    </div>
 
     </div>
 
@@ -22686,44 +22667,105 @@ html[data-theme=dark] {
         <p class="repo-read-status" id="repo-read-status" hidden></p>
 
         <!--
-          WHICH FILE IN THE REPO. Shown whenever a provider is readable, and
-          shown even when the repo holds exactly one JSON — a list of one
-          still answers "what is up there", and a control that appears and
-          disappears with the count is harder to learn than one that is always
-          in the same place.
+          ONE CARD FOR THE FILE, AND IT SITS WHERE THE FILE GOES.
 
-          This is the READ side of the card. The Json file card above names
-          what the plugin WRITES; Push uses that, Compare uses this, and until
-          they were separated the card could offer "Compare" while pointing at
-          a name the repo had never had. Two files, which is what a comparison
-          has.
+          It used to live in the Figma card, under the collections it is made
+          from, and it named the file; then this card echoed that name back a
+          few hundred pixels down in a read-only "File in the repo" field. Two
+          fields for one name, and the editable one nowhere near the folder
+          that completes its path — which is also how the two could disagree.
+
+          So the card moved down here and the echo is gone. The address is
+          written the way it is read, folder then file, on one line, in the
+          card that is about the repository. What the Figma card keeps is what
+          only it can say: which document this came out of, and how much of it
+          there is.
         -->
-        <div class="repo-file-row" id="repo-file-row" hidden>
-          <!--
-            THE ADDRESS, LEFT TO RIGHT: folder, then file. It is the order the
-            path itself is written in and the order they are chosen in — the
-            folder decides which files there are to choose from.
+        <div class="json-download-card is-sub" id="json-download-card" data-level="3">
+          <div class="json-download-header">
+            <div class="json-download-title-group">
+              <!-- Plain inline SVG, not React-mounted — same reasoning as the
+                   GitLab/GitHub marks on this card's own title above: these
+                   title rows are static markup, not React roots. Lucide's
+                   "file-text" glyph — a document, reading as "this is the
+                   file" the way the collections card's braces icon reads as
+                   "these are the variables". -->
+              <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <path d="M14 2v6h6"/>
+                <path d="M16 13H8"/>
+                <path d="M16 17H8"/>
+                <path d="M10 9H8"/>
+              </svg>
+              <p class="json-download-title">Json file</p>
+            </div>
+            <!-- The file-size tag that used to sit on the collections card
+                 (beside its token count) — it describes this JSON file, so it
+                 reads better here, at the right of this card's own title. -->
+            <span id="json-file-size-mount"></span>
+            <!--
+              DOWNLOAD SITS IN THE HEADER, NOT IN THE ROW BELOW IT — and this
+              is the measurement that put it here.
 
-            Only one provider's folder picker is ever shown; updateTargetRow
-            decides which. Both live here rather than in the provider blocks
-            below so that the folder and the file share one row instead of
-            being separated by the block boundary.
-          -->
-          <span id="folder-select-mount" class="repo-file-half"></span>
-          <span id="github-folder-select-mount" class="repo-file-half"></span>
-          <!--
-            CREATE THE PATH THAT IS IN THE BOX. Sits with the folder picker
-            because it belongs to it: a folder you type is not on any list, so
-            picking cannot commit it and something has to. Hidden unless what
-            is typed is actually new — an Add button beside a folder that
-            already exists has nothing to add.
-          -->
-          <span id="folder-create-mount" hidden></span>
-          <!-- One cell, two controls: in Push it shows where the push lands and
-               is read-only; in Compare it is the picker for what to read. Same
-               place, because it is the same half of one address. -->
-          <span id="repo-file-mount" class="repo-file-half"></span>
-          <span id="compare-pick-mount" class="repo-file-half"></span>
+              The plugin's window is 420px. Inside the repo card and inside
+              this subcard, the field row has 312px to spend, and a Combobox
+              costs about 90px of chrome before it shows a character: a clear
+              ×, a rule, a chevron, and the padding around them. Two of them
+              plus a 50px button left the folder 18px of text and the file 70
+              — "ODS" clipped mid-letter and "tokens.json" reading "tokens".
+
+              In the header it costs the row nothing, and it is a better fit
+              for what it is: the one thing this card DOES, at the card's own
+              level, rather than a third control in an address.
+            -->
+            <div id="download-btn-mount"></div>
+          </div>
+          <div class="json-download-fields">
+            <!--
+              THE FOLDER HALF HIDES ON ITS OWN, and that is why it still has a
+              wrapper of its own after the file name moved in beside it.
+
+              It is the only part of this row that needs a repository. The name
+              and Download do not: downloading with nothing configured is a
+              whole supported workflow, not a half-finished one (see
+              pushTarget()'s noPushDestination), so hiding the row would take
+              away the two controls that still work.
+
+              Only one provider's picker is ever shown; updateTargetRow decides
+              which. Both live here rather than in a provider block so that the
+              folder and the file share one line instead of being separated by
+              a block boundary.
+            -->
+            <span class="repo-file-row" id="repo-file-row" hidden>
+              <!-- The push side: a combobox, because the folder you are about
+                   to push into may not exist yet, and the + beside it is how
+                   it gets made. One wrapper so the mode can take all three
+                   away at once without fighting updateTargetRow over which
+                   provider's picker is the visible one. -->
+              <span class="folder-push-cell" id="folder-push-cell">
+              <span id="folder-select-mount" class="repo-file-half"></span>
+              <span id="github-folder-select-mount" class="repo-file-half"></span>
+              <!--
+                CREATE THE PATH THAT IS IN THE BOX. Sits with the folder picker
+                because it belongs to it: a folder you type is not on any list,
+                so picking cannot commit it and something has to. Hidden unless
+                what is typed is actually new — an Add button beside a folder
+                that already exists has nothing to add.
+              -->
+              <span id="folder-create-mount" hidden></span>
+              </span>
+              <!-- The read side: a closed list of the saved paths. There is
+                   nothing to invent when you are reading — see the comment on
+                   PomCompareFolder — so it does not take typing. -->
+              <span id="compare-folder-mount" class="repo-file-half" hidden></span>
+            </span>
+            <!-- One cell, two controls: in Push it is the name being written,
+                 editable here and nowhere else now; in Compare it is the picker
+                 for what to read instead. Same place, because it is the same
+                 half of one address. -->
+            <span id="primary-filename-mount" class="repo-file-half"></span>
+            <span id="compare-pick-mount" class="repo-file-half"></span>
+          </div>
         </div>
 
         <!-- Only meaningful once BOTH providers are actually added (see
@@ -49315,6 +49357,7 @@ html[data-theme=dark] {
   var GROUND = 2;
   var CARD_LEVEL = 2;
   var TOP_CARD_LEVEL = 4;
+  var SUBCARD_LEVEL = 3;
   var svg = (d, opts) => (size) => {
     const vb = opts?.viewBox ?? "0 0 24 24";
     const parts = vb.split(/\s+/).map(Number);
@@ -49637,6 +49680,33 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
+  function mountLiveDropdown(mountId, base, onSelect, level = GROUND) {
+    const container = document.getElementById(mountId);
+    let set = () => {
+    };
+    function View() {
+      const [s, setS] = (0, import_react16.useState)({ items: [], value: "" });
+      set = setS;
+      const options = s.items.map((it) => ({
+        value: it.value ?? it.label ?? it.primaryText ?? "",
+        label: it.label ?? it.primaryText ?? it.value ?? ""
+      }));
+      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+        DropDownSelect,
+        {
+          label: "Folder path",
+          size: "small",
+          block: true,
+          value: s.value,
+          options: options.length ? options : [{ value: "", label: "\u2014" }],
+          onChange: (v) => onSelect(v),
+          ...base.style ? { style: base.style } : null
+        }
+      );
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
+    return { setItems: (items, value) => set(() => ({ items, value })) };
+  }
   window.PomImportApplyBtn = mountLiveButton(
     "import-apply-btn-mount",
     { id: "import-apply-btn", variant: "filled", size: "large", label: "Import into this file", block: true },
@@ -49650,23 +49720,33 @@ html[data-theme=dark] {
       { disabled: true, loading: false, success: false, label: null },
       CARD_LEVEL
     ),
-    // Standard button now, matching Push/"Add Repo Settings" — was icon-only
-    // (icon: IconDownload(...), no visible text) and tonal, the odd one out
-    // beside those two filled, labeled buttons. leftIcon/buttonLeftIcon (not
-    // icon) is what tells PomButton's iconOnly check to render label text
-    // instead of collapsing to shape="square" — see PomButton's own comment
-    // on that prop bag split. size: 'medium' (not 'large') band-matches this
-    // button to #primary-filename-mount's own field size ('small',
-    // PomTextField's default) — same "medium IS a small field's box" alias
-    // the folder-add/settings icon buttons below already use, not fieldRung:
-    // that axis also borrows the field's label lift/drop as button padding,
-    // which reads right on a field's own value but drops a button's centred
-    // label off-centre for no reason — see the note below folder-add-btn-mount.
+    /*
+        A GLYPH, BECAUSE THE ROW IT STANDS IN NOW HOLDS TWO FIELDS.
+    
+        It was a labeled button, matching Push, while it had a row to itself and
+        one field beside it. Sharing that row with the folder path as well, the
+        word "Download" cost 112px the two fields needed more — see
+        .json-download-fields' own note on the arithmetic. `icon` rather than
+        leftIcon/buttonLeftIcon is what tells PomButton this IS an icon button and
+        collapses it to shape="square"; the accessible name comes from aria-label,
+        which is the only name it has left.
+    
+        Still `filled`: it is the one thing this card DOES, and demoting it to
+        tonal at the same time as dropping its label would leave it reading as a
+        hint. `small`, not the `medium` that band-matches a small FIELD: it stands
+        in a header beside a small Tag now, and the rule is to match the band of
+        the row you are actually in.
+    
+        It is also a PUSH-ONLY control. There is nothing to download while the card
+        is comparing — the file being read is already in the repository — so
+        applyRepoMode takes it off the header rather than leaving a button that
+        would produce the wrong file.
+      */
     download: mountLiveIconButton(
       "download-btn-mount",
-      { id: "download-btn", variant: "filled", size: "medium", leftIcon: true, buttonLeftIcon: IconDownload(24), label: "Download", title: "Download" },
+      { id: "download-btn", variant: "filled", size: "small", icon: IconDownload(16), "aria-label": "Download", title: "Download" },
       true,
-      CARD_LEVEL
+      SUBCARD_LEVEL
     )
   };
   function mountButton(mountId, props, level) {
@@ -49675,7 +49755,6 @@ html[data-theme=dark] {
   function mountIconButton(mountId, props, level) {
     mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(PomButton, { ...props }), level);
   }
-  var SUBCARD_LEVEL = 3;
   mountButton("folder-import-mount", { id: "folder-import-btn", variant: "tonal", size: "medium", block: true, label: "Add Paths from Repo", leftIcon: true, buttonLeftIcon: IconFolder(16) }, SUBCARD_LEVEL);
   mountButton("github-folder-import-mount", { id: "github-folder-import-btn", variant: "tonal", size: "medium", block: true, label: "Add Paths from Repo", leftIcon: true, buttonLeftIcon: IconFolder(16) }, SUBCARD_LEVEL);
   mountIconButton("folder-add-btn-mount", { id: "folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
@@ -49735,10 +49814,6 @@ html[data-theme=dark] {
     "Check the connection and find the folders in this repository",
     CARD_LEVEL
   );
-  function q(s) {
-    const t = s.query.trim().toLowerCase();
-    return t && s.all.indexOf(s.query.trim()) === -1 ? s.all.filter((n) => n.toLowerCase().indexOf(t) !== -1) : s.all;
-  }
   function mountCompareSides() {
     const icon2 = document.getElementById("compare-card-icon-mount");
     if (icon2) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(icon2).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(import_jsx_runtime23.Fragment, { children: IconCompare(16) })));
@@ -49760,28 +49835,23 @@ html[data-theme=dark] {
       const [s, setS] = (0, import_react16.useState)(state);
       applyPick = setS;
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-pick", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
-        Combobox,
+        DropDownSelect,
         {
           label: "File in the repo",
           size: "small",
           block: true,
-          placeholder: "nothing named yet",
-          value: s.query,
+          placeholder: s.all.length ? "pick a file" : "no JSON files here yet",
+          value: s.file,
+          options: s.all.length ? s.all.map((o) => ({ value: o, label: o })) : [{ value: "", label: "No JSON files in this folder yet" }],
           onChange: (v) => {
-            if (s.all.indexOf(v) !== -1) window.PomCompareSides.onPick?.(v);
-            else put({ query: v });
-          },
-          options: q(s),
-          getKey: (o) => o,
-          onPick: (o) => window.PomCompareSides.onPick?.(o),
-          renderOption: (o, st) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontWeight: st.active ? 600 : 400 }, children: o }),
-          emptyMessage: s.all.length ? "No JSON in this folder matches that" : "No JSON files in this folder yet"
+            if (v) window.PomCompareSides.onPick?.(v);
+          }
         }
       ) });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
     const pickEl = document.getElementById("compare-pick-mount");
-    if (pickEl) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(pickEl).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Pick, {}) })));
+    if (pickEl) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(pickEl).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: SUBCARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Pick, {}) })));
     window.PomCompareSides = {
       set: (next) => {
         state = { ...state, ...next };
@@ -49800,6 +49870,13 @@ html[data-theme=dark] {
     };
   }
   mountCompareSides();
+  window.PomCompareFolder = mountLiveDropdown(
+    "compare-folder-mount",
+    {},
+    (v) => window.PomCompareFolder?.onChange?.(v),
+    SUBCARD_LEVEL
+  );
+  window.PomCompareFolder.onChange = null;
   window.PomRepoReadBtn = mountLiveTitleButton(
     "repo-read-btn-mount",
     /*
@@ -49902,8 +49979,8 @@ html[data-theme=dark] {
     function View() {
       const [s, setS] = (0, import_react16.useState)(state);
       apply = setS;
-      const q2 = s.query.trim().toLowerCase();
-      const options = q2 && s.all.indexOf(s.query.trim()) === -1 ? s.all.filter((n) => n.toLowerCase().indexOf(q2) !== -1) : s.all;
+      const q = s.query.trim().toLowerCase();
+      const options = q && s.all.indexOf(s.query.trim()) === -1 ? s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1) : s.all;
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
         Combobox,
         {
@@ -49921,7 +49998,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: SUBCARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
     window.PomPrimaryFilename = {
       get: () => state.value,
       /* A set from outside is the app choosing, not the person — it moves the
@@ -49945,8 +50022,8 @@ html[data-theme=dark] {
     function View() {
       const [s, setS] = (0, import_react16.useState)(state);
       apply = setS;
-      const q2 = s.query.trim().toLowerCase();
-      const options = !q2 || s.query === s.selected ? s.all : s.all.filter((n) => n.toLowerCase().indexOf(q2) !== -1);
+      const q = s.query.trim().toLowerCase();
+      const options = !q || s.query === s.selected ? s.all : s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1);
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
         Combobox,
         {
@@ -49983,34 +50060,6 @@ html[data-theme=dark] {
       onChange: null
     };
   }
-  function mountRepoFileDisplay() {
-    const container = document.getElementById("repo-file-mount");
-    let apply = null;
-    let value = "";
-    function View() {
-      const [v, setV] = (0, import_react16.useState)(value);
-      apply = setV;
-      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
-        PomTextField,
-        {
-          id: "repo-file-display",
-          label: "File in the repo",
-          size: "small",
-          block: true,
-          readonly: true,
-          value: v,
-          placeholder: "nothing named yet",
-          title: "Where the push lands in this repository. The name is set on the Json file card."
-        }
-      );
-    }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
-    window.PomRepoFile = { set: (next) => {
-      value = next;
-      apply?.(next);
-    } };
-  }
-  mountRepoFileDisplay();
   mountRepoFileCombo("import-repo-file-mount", "PomImportRepoFile");
   window.PomCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false, CARD_LEVEL);
   mountButton("add-repo-settings-btn-mount", { id: "add-repo-settings-btn", variant: "filled", size: "large", label: "Add Repo Settings", block: true }, CARD_LEVEL);
@@ -50210,11 +50259,6 @@ html[data-theme=dark] {
     ] }),
     TOP_CARD_LEVEL
   );
-  mountOnce("json-download-icon-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Skeleton, { shape: "circle", size: 16, label: "Loading" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-title-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Skeleton, { shape: "block", width: 80, height: 16, label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-tag-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Skeleton, { shape: "block", width: 60, height: 22, label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-field-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Skeleton, { shape: "block", height: 50, width: "100%", label: "" }), TOP_CARD_LEVEL);
-  mountOnce("json-download-btn-skeleton-mount", /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Skeleton, { shape: "block", width: 125, height: 50, label: "" }), TOP_CARD_LEVEL);
   mountOnce(
     "actions-skeleton",
     /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "export-panel", "data-level": TOP_CARD_LEVEL, children: [
@@ -50250,7 +50294,7 @@ html[data-theme=dark] {
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) }));
     window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? "error" : "success", message })) };
   })();
-  function mountFolderCombo(mountId, bridgeKey, placeholder) {
+  function mountFolderCombo(mountId, bridgeKey, placeholder, leadIcon = true, level = CARD_LEVEL) {
     const container = document.getElementById(mountId);
     let state = { query: "", selected: "", all: [] };
     let apply = null;
@@ -50264,9 +50308,9 @@ html[data-theme=dark] {
     function View() {
       const [s, setS] = (0, import_react16.useState)(state);
       apply = setS;
-      const q2 = s.query.trim().toLowerCase();
+      const q = s.query.trim().toLowerCase();
       const hay = (n) => n === "/" ? "/ repo root repository" : n.toLowerCase();
-      const matches = !q2 || s.query === s.selected ? s.all : s.all.filter((n) => hay(n).indexOf(q2) !== -1);
+      const matches = !q || s.query === s.selected ? s.all : s.all.filter((n) => hay(n).indexOf(q) !== -1);
       const LIMIT = 50;
       const options = matches.slice(0, LIMIT);
       const hidden = matches.length - options.length;
@@ -50278,7 +50322,7 @@ html[data-theme=dark] {
           label: "Folder path",
           size: "small",
           block: true,
-          icon: IconFolder(16),
+          ...leadIcon ? { icon: IconFolder(16) } : null,
           placeholder,
           value: s.query,
           onChange: (v) => {
@@ -50297,7 +50341,7 @@ html[data-theme=dark] {
         }
       );
     }
-    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
     const focused = () => !!container && container.contains(document.activeElement);
     return {
       setItems: (items, selectedValue) => put({
@@ -50316,9 +50360,9 @@ html[data-theme=dark] {
       onChange: null
     };
   }
-  mountIconButton("folder-create-mount", { id: "folder-create-btn", variant: "outline", size: "medium", title: "Use this folder path \u2014 created on the first push", "aria-label": "Use this folder path", icon: IconAdd(16) }, CARD_LEVEL);
-  window.PomFolderSelect = { ...mountFolderCombo("folder-select-mount", "PomFolderSelect", "choose a folder"), onChange: null };
-  window.PomGithubFolderSelect = { ...mountFolderCombo("github-folder-select-mount", "PomGithubFolderSelect", "choose a folder"), onChange: null };
+  mountIconButton("folder-create-mount", { id: "folder-create-btn", variant: "outline", size: "medium", title: "Use this folder path \u2014 created on the first push", "aria-label": "Use this folder path", icon: IconAdd(16) }, SUBCARD_LEVEL);
+  window.PomFolderSelect = { ...mountFolderCombo("folder-select-mount", "PomFolderSelect", "choose a folder", false, SUBCARD_LEVEL), onChange: null };
+  window.PomGithubFolderSelect = { ...mountFolderCombo("github-folder-select-mount", "PomGithubFolderSelect", "choose a folder", false, SUBCARD_LEVEL), onChange: null };
   window.PomImportFolderSelect = { ...mountFolderCombo("import-folder-select-mount", "PomImportFolderSelect", "choose a folder"), onChange: null };
   window.PomFolderNew = { ...mountFolderCombo("folder-new-mount", "PomFolderNew", "find or type a folder"), onChange: null };
   window.PomGithubFolderNew = { ...mountFolderCombo("github-folder-new-mount", "PomGithubFolderNew", "find or type a folder"), onChange: null };
@@ -51208,30 +51252,30 @@ html[data-theme=dark] {
         setAnswers((a) => ({ ...a, [id]: value }));
         window.PomImportQuestions.onAnswer?.(id, value);
       };
-      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-5)" }, children: questions.map((q2) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 6 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontSize: 12, color: "var(--app-text)", lineHeight: 1.5 }, children: q2.question }),
-        q2.evidence && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontSize: 11, color: "var(--app-text-muted)", lineHeight: 1.5 }, children: q2.evidence }),
-        q2.options && q2.options.length <= 3 ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-5)" }, children: questions.map((q) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 6 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontSize: 12, color: "var(--app-text)", lineHeight: 1.5 }, children: q.question }),
+        q.evidence && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontSize: 11, color: "var(--app-text-muted)", lineHeight: 1.5 }, children: q.evidence }),
+        q.options && q.options.length <= 3 ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
           SegmentedControl,
           {
-            label: q2.question,
+            label: q.question,
             size: "small",
-            value: answers[q2.id] ?? "",
-            options: q2.options.map((o) => ({ value: o, label: o })),
-            onChange: (v) => answer(q2.id, v)
+            value: answers[q.id] ?? "",
+            options: q.options.map((o) => ({ value: o, label: o })),
+            onChange: (v) => answer(q.id, v)
           }
-        ) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: 4 }, children: (q2.options || []).map((o) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+        ) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: 4 }, children: (q.options || []).map((o) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
           PomButton,
           {
-            variant: answers[q2.id] === o ? "primary" : "tonal",
+            variant: answers[q.id] === o ? "primary" : "tonal",
             size: "small",
             label: o,
             block: true,
-            onClick: () => answer(q2.id, o)
+            onClick: () => answer(q.id, o)
           },
           o
         )) })
-      ] }, q2.id)) });
+      ] }, q.id)) });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
     window.PomImportQuestions = { set: (qs) => set(qs), onAnswer: null };
@@ -51250,8 +51294,8 @@ html[data-theme=dark] {
       apply = setS;
       const isAdded = (p) => s.added.indexOf(p) !== -1;
       const label = (p) => p === "" ? "/" : p;
-      const q2 = s.query.trim().toLowerCase();
-      const shown = q2 ? s.paths.filter((p) => label(p).toLowerCase().indexOf(q2) !== -1) : s.paths;
+      const q = s.query.trim().toLowerCase();
+      const shown = q ? s.paths.filter((p) => label(p).toLowerCase().indexOf(q) !== -1) : s.paths;
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
         Dialog,
         {
@@ -56084,7 +56128,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'b61f50a 17:08:23';
+    var CLOSURE_BUILD = '278d77e 17:33:48';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -56609,6 +56653,9 @@ function format(report, opts) {
 
     function renderFolderSelect() {
       window.PomFolderSelect.setItems(withRootOption(glFolders), folderDisplay(glActiveFolder));
+      if (activeRepoProvider() === 'gitlab') {
+        window.PomCompareFolder.setItems(withRootOption(glFolders), folderDisplay(glActiveFolder));
+      }
     }
 
     // GitHub's independent folder-path list — same shape/behavior as
@@ -56652,6 +56699,9 @@ function format(report, opts) {
     // to the current mainProviderTab (see updatePushTargetUI()).
     function renderGithubFolderSelect() {
       window.PomGithubFolderSelect.setItems(withRootOption(ghFolders), folderDisplay(ghActiveFolder));
+      if (activeRepoProvider() === 'github') {
+        window.PomCompareFolder.setItems(withRootOption(ghFolders), folderDisplay(ghActiveFolder));
+      }
     }
 
     // Settings has no view/edit mode: every field is editable the moment
@@ -58380,6 +58430,12 @@ function format(report, opts) {
       refreshRepoReadRow(); // a different folder is a different file to compare
     }
     window.PomFolderSelect.onChange = function(value) { chooseFolder('gitlab', value); };
+    /* One folder, asked for two ways — the dropdown answers into exactly the
+       same place the combobox does, for whichever provider is active. */
+    window.PomCompareFolder.onChange = function (value) {
+      var which = activeRepoProvider();
+      if (which) chooseFolder(which, value);
+    };
 
     /*
       THE + BESIDE THE FOLDER PICKER, on the main screen.
@@ -58829,19 +58885,19 @@ function format(report, opts) {
       document.querySelector('.flow-wrap').classList.toggle('is-loading', stillLoading);
     }
 
-    // Swaps the Json file card's skeleton for the real one — synced to the
-    // same moment #skeleton-list hides (both call sites call this right
-    // alongside that), purely so this card doesn't read as "already done"
-    // while its neighbours are still loading (see the HTML comment on
-    // #json-download-skeleton). This card's own content never actually
-    // needed the wait; this is consistency with the other two, not a real
-    // data dependency.
-    function revealJsonDownloadCard() {
-      var skel = document.getElementById('json-download-skeleton');
-      var real = document.getElementById('json-download-card');
-      if (skel) skel.hidden = true;
-      if (real) real.hidden = false;
-    }
+    /*
+      THE JSON FILE CARD HAD A SKELETON TWIN, AND IT NO LONGER NEEDS ONE.
+
+      It existed for one reason: the card used to sit on its own, above two
+      neighbours that were still loading, and a card reading "already done"
+      beside two in outline was reported as broken rather than as fast. Its
+      content never actually waited on anything.
+
+      Inside the repo card it waits by construction — #actions-skeleton stands
+      in for that whole block, this card included — so the twin, the swap and
+      the four Skeleton mounts that filled it are all gone rather than kept in
+      sync with a card they no longer cover.
+    */
 
     // Single source of truth for "what can actually be pushed right now" —
     // shared by the main-screen UI (updateActionUI/updatePushTargetUI) and
@@ -59128,11 +59184,25 @@ function format(report, opts) {
       /* One slot, one button: the two actions are alternatives, not a pair. */
       if (el('push-btn-mount')) el('push-btn-mount').hidden = comparing;
       if (el('repo-read-btn-mount')) el('repo-read-btn-mount').hidden = !comparing;
-      /* The same half of the address, read-only for a push (there is one file
-         it can go to) and a picker for a comparison (there are as many as the
-         folder holds). */
-      if (el('repo-file-mount')) el('repo-file-mount').hidden = comparing;
+      /*
+        THE ADDRESS IS ASKED FOR TWICE OVER, ONE CONTROL PER MODE, AND THE
+        DIFFERENCE IS WHETHER YOU MAY TYPE.
+
+        Pushing, both halves are things you can invent: a folder the repo does
+        not have yet, a file it has never held. Both are comboboxes, and the +
+        beside the folder commits a new one.
+
+        Comparing, neither is. You can only read what is already up there, so
+        both halves are closed lists — offering to type a name that cannot be
+        read is a choice with no outcome at the end of it.
+      */
+      if (el('folder-push-cell')) el('folder-push-cell').hidden = comparing;
+      if (el('compare-folder-mount')) el('compare-folder-mount').hidden = !comparing;
+      if (el('primary-filename-mount')) el('primary-filename-mount').hidden = comparing;
       if (el('compare-pick-mount')) el('compare-pick-mount').hidden = !comparing;
+      /* And there is nothing to download while comparing: the file on the
+         other side is already in the repository. */
+      if (el('download-btn-mount')) el('download-btn-mount').hidden = comparing;
       showCompareSides();
     }
 
@@ -59207,8 +59277,13 @@ function format(report, opts) {
       refreshRepoReadRow();
     };
 
+    /*
+      THE NAME USED TO BE ECHOED into a read-only field in the repo card. That
+      field is gone — the editable one lives there now — so all this still owes
+      anyone is the Compare side, which names the same file when nothing has
+      been picked to compare against.
+    */
     function showRepoFile() {
-      if (window.PomRepoFile) window.PomRepoFile.set(primaryFilename());
       showCompareSides();
     }
     function chooseRepoFile(name) {
@@ -60297,7 +60372,6 @@ function format(report, opts) {
 
         loadingState.style.display = 'none';
         if (skeletonList) skeletonList.hidden = true;
-        revealJsonDownloadCard();
         updateFlowWireVisibility();
         emptyState.style.display = 'none';
 
@@ -60587,7 +60661,6 @@ function format(report, opts) {
 
       if (msg.type === 'error') {
         if (skeletonList) skeletonList.hidden = true;
-        revealJsonDownloadCard();
         setActionsLoading(false);
         loadingState.style.display = 'flex';
         loadingState.querySelector('p').textContent = 'Error: ' + msg.message;

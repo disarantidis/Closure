@@ -79,6 +79,15 @@ const CARD_LEVEL: Level = 2;
    and TextField both compute their own fill via fieldLevel, where the
    2-vs-4 distinction doesn't exist. */
 const TOP_CARD_LEVEL: Level = 4;
+/* ONE RUNG IN FROM A CARD — the ground of anything mounted inside a subcard:
+   .provider-subcard, and .json-download-card.is-sub inside the repo card.
+
+   CARD_LEVEL means "the ground is 2-or-4, so compute at 3", which is right in
+   a card and wrong in a card inside one: a control mounted that way on a
+   level-3 subcard painted rgb(37,37,37) onto rgb(37,37,37) and vanished — it
+   read as bare text, which is what a ghost button looks like. Ground 3 lifts
+   to 4 and is visible against the surface it actually stands on. */
+const SUBCARD_LEVEL: Level = 3;
 
 import '../vendor/pomegranate/styles/tokens.css';
 import '../vendor/pomegranate/styles/fonts.css';
@@ -635,6 +644,12 @@ declare global {
       setOptions: (names: string[]) => void;
       onPick: ((name: string) => void) | null;
     };
+    /* Compare's folder picker — a closed list of the saved paths, fed and
+       answered by the same chooseFolder() the push combobox uses. */
+    PomCompareFolder: {
+      setItems: (items: any[], selectedValue: string) => void;
+      onChange: ((value: string) => void) | null;
+    };
     PomGithubSyncBtn: LiveBusyHandle;
     PomGitlabSyncBtn: LiveBusyHandle;
     PomAddGitlabBtn: LiveToggleIconHandle;
@@ -693,9 +708,6 @@ declare global {
       onChange: ((value: string) => void) | null;
     };
     PomImportRepoWhere: { set: (rows: { provider: string; name: string; branch: string }[]) => void };
-    /* A read-only view of the name the Json file card carries — see
-       mountRepoFileDisplay. It shows, it does not ask. */
-    PomRepoFile: { set: (value: string) => void };
     PomImportRepoFile: {
       get: () => string;
       set: (value: string) => void;
@@ -753,23 +765,33 @@ window.PomButtons = {
     { disabled: true, loading: false, success: false, label: null },
     CARD_LEVEL,
   ),
-  // Standard button now, matching Push/"Add Repo Settings" — was icon-only
-  // (icon: IconDownload(...), no visible text) and tonal, the odd one out
-  // beside those two filled, labeled buttons. leftIcon/buttonLeftIcon (not
-  // icon) is what tells PomButton's iconOnly check to render label text
-  // instead of collapsing to shape="square" — see PomButton's own comment
-  // on that prop bag split. size: 'medium' (not 'large') band-matches this
-  // button to #primary-filename-mount's own field size ('small',
-  // PomTextField's default) — same "medium IS a small field's box" alias
-  // the folder-add/settings icon buttons below already use, not fieldRung:
-  // that axis also borrows the field's label lift/drop as button padding,
-  // which reads right on a field's own value but drops a button's centred
-  // label off-centre for no reason — see the note below folder-add-btn-mount.
+  /*
+    A GLYPH, BECAUSE THE ROW IT STANDS IN NOW HOLDS TWO FIELDS.
+
+    It was a labeled button, matching Push, while it had a row to itself and
+    one field beside it. Sharing that row with the folder path as well, the
+    word "Download" cost 112px the two fields needed more — see
+    .json-download-fields' own note on the arithmetic. `icon` rather than
+    leftIcon/buttonLeftIcon is what tells PomButton this IS an icon button and
+    collapses it to shape="square"; the accessible name comes from aria-label,
+    which is the only name it has left.
+
+    Still `filled`: it is the one thing this card DOES, and demoting it to
+    tonal at the same time as dropping its label would leave it reading as a
+    hint. `small`, not the `medium` that band-matches a small FIELD: it stands
+    in a header beside a small Tag now, and the rule is to match the band of
+    the row you are actually in.
+
+    It is also a PUSH-ONLY control. There is nothing to download while the card
+    is comparing — the file being read is already in the repository — so
+    applyRepoMode takes it off the header rather than leaving a button that
+    would produce the wrong file.
+  */
   download: mountLiveIconButton(
     'download-btn-mount',
-    { id: 'download-btn', variant: 'filled', size: 'medium', leftIcon: true, buttonLeftIcon: IconDownload(24), label: 'Download', title: 'Download' },
+    { id: 'download-btn', variant: 'filled', size: 'small', icon: IconDownload(16), 'aria-label': 'Download', title: 'Download' },
     true,
-    CARD_LEVEL,
+    SUBCARD_LEVEL,
   ),
 };
 
@@ -795,7 +817,9 @@ function mountIconButton(mountId: string, props: any, level?: Level) { mountOnce
   text, which is what a ghost button looks like. Its ground is 3, so its fill
   computes at 4 and is visible against the subcard it stands on.
 */
-const SUBCARD_LEVEL: Level = 3;
+/* Declared with the other rungs, up beside CARD_LEVEL — Download reaches for
+   it well above the line this used to sit on, and a const read before its own
+   declaration is a ReferenceError rather than a fallback. */
 mountButton('folder-import-mount', { id: 'folder-import-btn', variant: 'tonal', size: 'medium', block: true, label: 'Add Paths from Repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, SUBCARD_LEVEL);
 mountButton('github-folder-import-mount', { id: 'github-folder-import-btn', variant: 'tonal', size: 'medium', block: true, label: 'Add Paths from Repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, SUBCARD_LEVEL);
 
@@ -983,44 +1007,41 @@ function mountCompareSides() {
     the one you are replacing. It defaults to the pushed name, so the ordinary
     case needs no decision at all.
 
-    IN THE ROW WITH THE BUTTON, not under the Figma tag. Beside the tag it had
-    whatever width was left — 70px against a real file name, a picker too narrow
-    to read the file it picks — and giving it a floor made the row wrap every
-    time, at 144px. The title row has the slack: a title, a field and an icon
-    button come to 342 of 366, so it keeps 178px of value and the card stays at
-    its shortest.
+    A DROPDOWN, NOT A COMBOBOX, and that is the whole difference between the
+    two modes. Pushing, a name that is not in the repository is the ordinary
+    case — you are about to create it — so the field has to accept typing.
+    Comparing, there is nothing to invent: you can only read a file that is
+    already up there, and a box that lets you type one that is not is offering
+    a choice with no outcome. So this side is a closed list.
+
+    It costs nothing to read, either: a Combobox spends about 90px on a clear
+    ×, a rule and a chevron before it shows a character, which is most of what
+    a 420px window has to give two fields.
   */
   function Pick() {
     const [s, setS] = useState<S>(state);
     applyPick = setS;
     return (
       <span className="compare-card-pick">
-          <Combobox
+          <DropDownSelect
             label="File in the repo"
             size="small"
             block
-            placeholder="nothing named yet"
-            value={s.query}
-            onChange={(v: string) => {
-              if (s.all.indexOf(v) !== -1) window.PomCompareSides.onPick?.(v);
-              else put({ query: v });
-            }}
-            options={q(s)}
-            getKey={(o: string) => o}
-            onPick={(o: string) => window.PomCompareSides.onPick?.(o)}
-            renderOption={(o: string, st: { active: boolean }) => (
-              <span style={{ fontWeight: st.active ? 600 : 400 }}>{o}</span>
-            )}
-            emptyMessage={s.all.length
-              ? 'No JSON in this folder matches that'
-              : 'No JSON files in this folder yet'}
+            placeholder={s.all.length ? 'pick a file' : 'no JSON files here yet'}
+            value={s.file}
+            options={s.all.length
+              ? s.all.map((o) => ({ value: o, label: o }))
+              : [{ value: '', label: 'No JSON files in this folder yet' }]}
+            onChange={(v: string) => { if (v) window.PomCompareSides.onPick?.(v); }}
           />
       </span>
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   const pickEl = document.getElementById('compare-pick-mount');
-  if (pickEl) flushSync(() => createRoot(pickEl).render(<LevelContext.Provider value={CARD_LEVEL}><Pick /></LevelContext.Provider>));
+  /* SUBCARD_LEVEL for the picker, CARD_LEVEL for the Figma tag above: they are
+     mounted into two different cards and only one of them moved. */
+  if (pickEl) flushSync(() => createRoot(pickEl).render(<LevelContext.Provider value={SUBCARD_LEVEL}><Pick /></LevelContext.Provider>));
   window.PomCompareSides = {
     set: (next) => {
       state = { ...state, ...next };
@@ -1039,6 +1060,27 @@ function mountCompareSides() {
   };
 }
 mountCompareSides();
+
+/*
+  THE FOLDER, THE SAME WAY, FOR THE SAME REASON.
+
+  The push side's folder picker is a Combobox because a folder you are about
+  to push into may not exist yet — typing one and pressing + is how it gets
+  made. Reading, that cannot happen: a folder with nothing in it holds no file
+  to compare against, and git has no empty directories anyway. So Compare gets
+  the saved paths as a closed list and nothing to type into.
+
+  It is fed and answered by exactly the same code as the combobox it replaces
+  — see chooseFolder() in ui.template.html — so the two controls can never
+  hold different folders.
+*/
+window.PomCompareFolder = mountLiveDropdown(
+  'compare-folder-mount',
+  {},
+  (v: string) => window.PomCompareFolder?.onChange?.(v),
+  SUBCARD_LEVEL,
+) as any;
+window.PomCompareFolder.onChange = null;
 
 window.PomRepoReadBtn = mountLiveTitleButton(
   'repo-read-btn-mount',
@@ -1253,7 +1295,9 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  /* SUBCARD_LEVEL — it stands on .json-download-card.is-sub now; see the note
+     above PomFolderSelect on what mounting it a rung low did. */
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={SUBCARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomPrimaryFilename = {
     get: () => state.value,
     /* A set from outside is the app choosing, not the person — it moves the
@@ -1366,41 +1410,14 @@ function mountRepoFileCombo(mountId: string, bridgeKey: 'PomImportRepoFile') {
   };
 }
 /*
-  WHERE THE FILE LANDS, BESIDE THE FOLDER IT LANDS IN — and read-only, because
-  the answer is decided one card up.
+  THE READ-ONLY ECHO IS GONE, and mountRepoFileDisplay with it.
 
-  The address reads left to right: folder, then file. This completes that line
-  without offering a second place to change it, which is what made the old
-  picker a problem — two controls for one name. readOnly is the kit's own
-  grammar for this and not a disabled control: the surface settles while the
-  VALUE keeps full contrast (SelectableCard.tsx says it plainly — "an answer
-  decided elsewhere, not a control asleep"). A disabled field would dim the
-  name, which is the one thing here worth reading.
+  It existed to complete the repo card's address — folder, then file — while
+  the editable name lived a card and a half away, and it was read-only so that
+  one name would not have two controls. The name field itself sits beside the
+  folder now, so the line completes with the real thing and the copy has
+  nothing left to say. It is also how the two could disagree.
 */
-function mountRepoFileDisplay() {
-  const container = document.getElementById('repo-file-mount');
-  let apply: ((v: string) => void) | null = null;
-  let value = '';
-  function View() {
-    const [v, setV] = useState(value);
-    apply = setV;
-    return (
-      <PomTextField
-        id="repo-file-display"
-        label="File in the repo"
-        size="small"
-        block
-        readonly
-        value={v}
-        placeholder="nothing named yet"
-        title="Where the push lands in this repository. The name is set on the Json file card."
-      />
-    );
-  }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
-  window.PomRepoFile = { set: (next: string) => { value = next; apply?.(next); } };
-}
-mountRepoFileDisplay();
 
 mountRepoFileCombo('import-repo-file-mount', 'PomImportRepoFile');
 
@@ -1688,25 +1705,10 @@ mountOnce('skeleton-list',
   </div>,
   TOP_CARD_LEVEL,
 );
-// The Json file card's own skeleton pieces — mounted individually into
-// #json-download-skeleton's existing markup (ui.template.html), which
-// already carries the real card's own classes/data-level, rather than one
-// div here the way skeleton-list/actions-skeleton are: this skeleton and
-// the real card share the exact same outer structure, just swapping which
-// one is hidden (see the 'extracted'/'error' handlers), so there's no
-// separate wrapper shape to define. Reads as this card's icon/title/tag/
-// field/button, in outline, same shapes at roughly the real sizes.
-mountOnce('json-download-icon-skeleton-mount', <Skeleton shape="circle" size={16} label="Loading" />, TOP_CARD_LEVEL);
-mountOnce('json-download-title-skeleton-mount', <Skeleton shape="block" width={80} height={16} label="" />, TOP_CARD_LEVEL);
-mountOnce('json-download-tag-skeleton-mount', <Skeleton shape="block" width={60} height={22} label="" />, TOP_CARD_LEVEL);
-// 50px, not 44 — matches the field/button band Download shares with the
-// real field itself, confirmed via computed style: field/Download both
-// render at exactly 50px tall today. Same number in both skeleton pieces
-// below for that reason, not independently chosen.
-mountOnce('json-download-field-skeleton-mount', <Skeleton shape="block" height={50} width={'100%'} label="" />, TOP_CARD_LEVEL);
-// 125x50 — the real Download button is a labeled button now (icon +
-// "Download" text, ~127px wide), not the old icon-only 44x44 square.
-mountOnce('json-download-btn-skeleton-mount', <Skeleton shape="block" width={125} height={50} label="" />, TOP_CARD_LEVEL);
+// The Json file card's own skeleton pieces used to mount here, into a twin
+// of the card in ui.template.html. The card moved inside the repo card, where
+// #actions-skeleton already stands in for the whole block, so the twin went
+// and these went with it.
 // Mirrors the real push-settings card's current shape: a small icon+title
 // row (whichever provider ends up shown — GitLab or GitHub, not known
 // yet), one full-width folder-path field (the filename field that used to
@@ -1780,7 +1782,16 @@ type FolderComboBridge = {
   set: (value: string) => void;
   onChange: ((value: string) => void) | null;
 };
-function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: string): FolderComboBridge {
+/*
+  `leadIcon` — the folder glyph, and the main card's own row is the one place
+  it is dropped. That row runs two pickers side by side in 312px, where the
+  glyph and the padding reserved for it cost 30px the folder's own value does
+  not have. The field is labelled "Folder path" a line above it, so the picture
+  was saying a second time what the words already said, at a price only that
+  row pays. Settings and the import page keep it — they give the field a line
+  to itself.
+*/
+function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: string, leadIcon = true, level: Level = CARD_LEVEL): FolderComboBridge {
   const container = document.getElementById(mountId);
   type S = { query: string; selected: string; all: string[] };
   let state: S = { query: '', selected: '', all: [] };
@@ -1833,7 +1844,7 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
         label="Folder path"
         size="small"
         block
-        icon={IconFolder(16)}
+        {...(leadIcon ? { icon: IconFolder(16) } : null)}
         placeholder={placeholder}
         value={s.query}
         onChange={(v: string) => {
@@ -1860,7 +1871,7 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
   /*
     AN UPDATE FROM OUTSIDE MUST NOT TAKE THE FIELD AWAY FROM WHOEVER IS TYPING
     IN IT.
@@ -1895,9 +1906,23 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
   };
 }
 
-mountIconButton('folder-create-mount', { id: 'folder-create-btn', variant: 'outline', size: 'medium', title: 'Use this folder path — created on the first push', 'aria-label': 'Use this folder path', icon: IconAdd(16) }, CARD_LEVEL);
-window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', 'choose a folder'), onChange: null };
-window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', 'choose a folder'), onChange: null };
+mountIconButton('folder-create-mount', { id: 'folder-create-btn', variant: 'outline', size: 'medium', title: 'Use this folder path — created on the first push', 'aria-label': 'Use this folder path', icon: IconAdd(16) }, SUBCARD_LEVEL);
+/*
+  THE GROUND MOVED UNDER THESE FOUR, and a field that does not follow it
+  disappears.
+
+  Everything in the repo card's address row — both folder pickers, the name
+  combobox, Compare's own file dropdown — used to stand on a level-4 card and
+  mounted at CARD_LEVEL, which means "the ground is 2-or-4, so compute at 3".
+  They live in .json-download-card.is-sub now, which is level 3, so rung 3 IS
+  the surface behind them: measured, Compare's file dropdown painted
+  rgb(37,37,37) onto rgb(37,37,37) and the field vanished into the card.
+
+  Ground 3 lifts to 4. Same mistake, same fix, as the Add-Paths button in
+  Settings — see SUBCARD_LEVEL's own note.
+*/
+window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', 'choose a folder', false, SUBCARD_LEVEL), onChange: null };
+window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', 'choose a folder', false, SUBCARD_LEVEL), onChange: null };
 /* The import page's own pair. One combo rather than one per provider, like the
    file picker beside it: the page shows whichever provider the repo card is on,
    and a second hidden copy for the other one would be state that can disagree. */
