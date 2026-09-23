@@ -2250,7 +2250,7 @@
       So the aliases are computed again at this scope, and every --app-*
       consumer inside the card follows the pole.
     */
-    [data-tense="inverted"] {
+    [data-scheme="inverted"] {
       --app-text: var(--text);
       --app-text-muted: var(--text-recessive);
       --app-border: var(--stroke);
@@ -2518,11 +2518,18 @@
       card does too: its heading is not a box either.
     -->
     <!--
-      data-tense="inverted" on the CARD, not on a wrapper inside it. The
-      collections card carried it and was the one light surface in the column;
-      the card is the Figma file now, so the whole card is.
+      data-scheme="inverted", NOT data-tense.
+
+      They look interchangeable and are not. tense repaints the LEVEL axis —
+      [data-tense='inverted'] [data-level] — so the card and its subcard flipped
+      and everything keyed to the FILL axis did not: the kit's Tag and Button
+      write data-fill, never data-level, so the size tag, the tokens button and
+      Download stayed on the dark ladder and sat as black chips on a white card.
+      scheme repaints both ([data-scheme='inverted'] [data-level] AND
+      [data-scheme='inverted'] [data-fill], tokens.css), which is what "the card
+      is in one scheme" means: everything in it is too.
     -->
-    <div class="figma-card" id="figma-card" data-level="4" data-tense="inverted" style="display: none;">
+    <div class="figma-card" id="figma-card" data-level="4" data-scheme="inverted" style="display: none;">
       <!--
         THE FILE'S OWN NAME, not the word "Figma". A card titled with the name
         of the tool it came from says nothing the mark beside it has not

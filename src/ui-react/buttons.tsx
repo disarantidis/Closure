@@ -2013,7 +2013,17 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     if (!size) return null;
     return <Tag variant="tonal" size="small">{size}</Tag>;
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  /*
+    THE LEVEL OF THE SURFACE IT ACTUALLY STANDS ON, which stopped being the
+    same thing when this card became a subcard.
+
+    A Tag lifts one rung off its ground (fieldLevel, Tag.tsx). Mounted at
+    CARD_LEVEL it computed rung 3 — correct while the Json file card was a
+    top-level card, and wrong once it moved inside the Figma card, because the
+    card itself is now rung 3: the tag painted the same colour as the thing
+    behind it and the pill disappeared. Its ground is 3, so it lifts to 4.
+  */
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={SUBCARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomJsonFileCard = { setSize: (size) => set(size) };
 })();
 
