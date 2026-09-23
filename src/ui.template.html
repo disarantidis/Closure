@@ -2246,7 +2246,12 @@
       background: var(--background);
       border-radius: 24px;
       padding: var(--spacing-component-6);
-      margin: 0 0 16px;
+      /* The same 16px gutter .json-download-card and .export-panel take. It had
+         none, so this one card ran 32px wider than the ones directly above and
+         below it — the edges of a stack are read against each other, and one
+         that does not line up reads as a mistake before it reads as anything
+         else. */
+      margin: 0 16px 16px;
       display: flex;
       flex-direction: column;
       /*
@@ -2276,6 +2281,10 @@
       display: flex; align-items: center; justify-content: center;
       gap: 8px; flex-wrap: wrap;
     }
+    /* Between the two, because that is what it is between. The button below
+       says the verb; this says the relation, and a reader gets the shape of
+       the sentence before reading either name. */
+    .compare-card-vs { display: flex; opacity: 0.55; flex: none; }
     .repo-file-half[hidden] { display: none; }
 
     /*

@@ -937,11 +937,12 @@ function mountCompareSides() {
     apply = setS;
     return (
       <span className="compare-card-sides">
-        <Tag variant="tonal" size="small" leading={IconFigma(12)}>
+        <Tag variant="tonal" size="medium" leading={IconFigma(14)}>
           {s.figma || 'This Figma file'}
         </Tag>
-        <Tag variant="tonal" size="small"
-          leading={s.provider === 'gitlab' ? IconGitlab(12) : IconGithub(12)}>
+        <span className="compare-card-vs" aria-hidden="true">{IconCompare(16)}</span>
+        <Tag variant="tonal" size="medium"
+          leading={s.provider === 'gitlab' ? IconGitlab(14) : IconGithub(14)}>
           {s.file || 'nothing named yet'}
         </Tag>
       </span>
@@ -956,8 +957,12 @@ mountCompareSides();
 
 window.PomRepoReadBtn = mountLiveTitleButton(
   'repo-read-btn-mount',
-  { id: 'repo-read-btn', variant: 'tonal', size: 'small',
-    label: 'Compare', leftIcon: true, buttonLeftIcon: IconCompare(16) },
+  /* The same button as Download one card up — filled, medium, a 24px glyph
+     beside the word. They are the two things this screen offers to DO with the
+     document it has built, and one of them being a small tonal button said the
+     comparison was the lesser of the pair. */
+  { id: 'repo-read-btn', variant: 'filled', size: 'medium',
+    label: 'Compare', leftIcon: true, buttonLeftIcon: IconCompare(24) },
   'Compare this file with the one in the repo',
   CARD_LEVEL,
 );

@@ -2246,7 +2246,12 @@
       background: var(--background);
       border-radius: 24px;
       padding: var(--spacing-component-6);
-      margin: 0 0 16px;
+      /* The same 16px gutter .json-download-card and .export-panel take. It had
+         none, so this one card ran 32px wider than the ones directly above and
+         below it — the edges of a stack are read against each other, and one
+         that does not line up reads as a mistake before it reads as anything
+         else. */
+      margin: 0 16px 16px;
       display: flex;
       flex-direction: column;
       /*
@@ -2276,6 +2281,10 @@
       display: flex; align-items: center; justify-content: center;
       gap: 8px; flex-wrap: wrap;
     }
+    /* Between the two, because that is what it is between. The button below
+       says the verb; this says the relation, and a reader gets the shape of
+       the sentence before reading either name. */
+    .compare-card-vs { display: flex; opacity: 0.55; flex: none; }
     .repo-file-half[hidden] { display: none; }
 
     /*
@@ -49611,13 +49620,14 @@ html[data-theme=dark] {
       const [s, setS] = (0, import_react18.useState)(state);
       apply = setS;
       return /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { className: "compare-card-sides", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(Tag, { variant: "tonal", size: "small", leading: IconFigma(12), children: s.figma || "This Figma file" }),
+        /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(Tag, { variant: "tonal", size: "medium", leading: IconFigma(14), children: s.figma || "This Figma file" }),
+        /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "compare-card-vs", "aria-hidden": "true", children: IconCompare(16) }),
         /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
           Tag,
           {
             variant: "tonal",
-            size: "small",
-            leading: s.provider === "gitlab" ? IconGitlab(12) : IconGithub(12),
+            size: "medium",
+            leading: s.provider === "gitlab" ? IconGitlab(14) : IconGithub(14),
             children: s.file || "nothing named yet"
           }
         )
@@ -49634,13 +49644,17 @@ html[data-theme=dark] {
   mountCompareSides();
   window.PomRepoReadBtn = mountLiveTitleButton(
     "repo-read-btn-mount",
+    /* The same button as Download one card up — filled, medium, a 24px glyph
+       beside the word. They are the two things this screen offers to DO with the
+       document it has built, and one of them being a small tonal button said the
+       comparison was the lesser of the pair. */
     {
       id: "repo-read-btn",
-      variant: "tonal",
-      size: "small",
+      variant: "filled",
+      size: "medium",
       label: "Compare",
       leftIcon: true,
-      buttonLeftIcon: IconCompare(16)
+      buttonLeftIcon: IconCompare(24)
     },
     "Compare this file with the one in the repo",
     CARD_LEVEL
@@ -55822,7 +55836,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '2dd9541 14:45:47';
+    var CLOSURE_BUILD = '4e0acd5 14:51:06';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
