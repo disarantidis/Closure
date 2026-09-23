@@ -493,16 +493,22 @@ function mountLiveTitleButton(mountId: string, base: any, initialTitle: string, 
    loading, but it is `block` — full width — which is right for Push at the
    bottom of a card and wrong for a button sitting in a heading row beside a
    title. mountLiveTitleButton is the right shape and carries only a title. */
-type LiveBusyHandle = { setLoading: (v: boolean) => void };
+type LiveBusyHandle = { setLoading: (v: boolean) => void; setLabel: (v: string) => void };
 function mountLiveBusyButton(mountId: string, base: any, title: string, level: Level = GROUND): LiveBusyHandle {
   const container = document.getElementById(mountId);
-  let set: (v: boolean) => void = () => {};
+  let set: (u: (s: any) => any) => void = () => {};
   function View() {
-    const [loading, setL] = useState(false); set = setL;
-    return <PomButton {...base} loading={loading} title={title} aria-label={title} />;
+    const [s, setS] = useState({ loading: false, label: base.label }); set = setS;
+    /* aria-label stays the ACTION while the visible label becomes a time —
+       "Synced 4m ago" says when, and a screen reader still needs to be told
+       what pressing it does. */
+    return <PomButton {...base} label={s.label} loading={s.loading} title={title} aria-label={title} />;
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
-  return { setLoading: (v) => set(v) };
+  return {
+    setLoading: (loading) => set((s) => ({ ...s, loading })),
+    setLabel: (label) => set((s) => ({ ...s, label })),
+  };
 }
 
 type LiveToggleIconHandle = { setMode: (mode: 'add' | 'remove') => void };

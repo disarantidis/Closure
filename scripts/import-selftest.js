@@ -1825,7 +1825,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
                        'renderImportFolderSelect', 'listRepoFolders',
                        'refreshFolderImportOffer', 'addFolderPath', 'normFolder',
-                       'foldersMissingFromRepo', 'githubCommitTree'];
+                       'foldersMissingFromRepo', 'githubCommitTree', 'syncedAgo'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -2042,6 +2042,26 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              JSON.stringify(ctx.foldersMissingFromRepo('github')));
           ctx.ghFolders = [];
           ctx.__lastDiscovered().github = null;
+
+          /*
+            WHEN IT LAST ASKED, on the button that asks. The line that used to
+            sit under the heading said "owner/repo on main — connected", which
+            is four facts already on screen a few pixels above it plus one word.
+            What is genuinely new is WHEN.
+          */
+          {
+            const ago = (ms) => ctx.syncedAgo(Date.now() - ms);
+            ok('sync label: under a minute is not a number of minutes',
+               ago(20 * 1000) === 'Synced just now', ago(20 * 1000));
+            ok('sync label: minutes, while minutes are the useful unit',
+               ago(7 * 60000) === 'Synced 7m ago' && ago(59 * 60000) === 'Synced 59m ago',
+               ago(7 * 60000) + ' / ' + ago(59 * 60000));
+            ok('sync label: hours after sixty of them',
+               ago(60 * 60000) === 'Synced 1h ago' && ago(3 * 3600000) === 'Synced 3h ago',
+               ago(60 * 60000) + ' / ' + ago(3 * 3600000));
+            ok('sync label: and days, rather than a two-digit hour count',
+               ago(50 * 3600000) === 'Synced 2d ago', ago(50 * 3600000));
+          }
 
           /*
             DELETING A FOLDER OUT OF A REPOSITORY, AND MOVING WHAT WAS IN IT.

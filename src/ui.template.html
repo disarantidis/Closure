@@ -4785,6 +4785,7 @@
       error about a feature they were not using.
     */
     function loadRepoFolders() {
+      refreshSyncLabels();      // time has passed since this page was last open
       [['gitlab', 'PomFolderNew'], ['github', 'PomGithubFolderNew']].forEach(function (pair) {
         var which = pair[0], combo = window[pair[1]];
         var ready = which === 'gitlab' ? isGitLabReady() : isGitHubReady();
@@ -4819,6 +4820,37 @@
       answer to a question that was just asked on purpose, and it should still
       be there while the fields above it are being corrected.
     */
+    /*
+      WHEN IT LAST ASKED, on the button that asks.
+
+      In memory rather than persisted: after a reload nothing has been synced
+      IN THIS SESSION, and the plain "Sync" that shows then is the true answer.
+      A remembered timestamp would claim knowledge of a repository this run has
+      never looked at.
+    */
+    var lastSyncedAt = { gitlab: null, github: null };
+
+    function syncedAgo(at) {
+      var mins = Math.floor((Date.now() - at) / 60000);
+      if (mins < 1) return 'Synced just now';
+      if (mins < 60) return 'Synced ' + mins + 'm ago';
+      var hours = Math.floor(mins / 60);
+      if (hours < 24) return 'Synced ' + hours + 'h ago';
+      return 'Synced ' + Math.floor(hours / 24) + 'd ago';
+    }
+
+    function refreshSyncLabels() {
+      [['gitlab', 'PomGitlabSyncBtn'], ['github', 'PomGithubSyncBtn']].forEach(function (pair) {
+        var btn = window[pair[1]];
+        if (!btn) return;
+        var at = lastSyncedAt[pair[0]];
+        btn.setLabel(at ? syncedAgo(at) : 'Sync');
+      });
+    }
+    /* A minute is the smallest unit it shows, so a minute is how often it can
+       become wrong. Cheap, and it only ever writes two strings. */
+    setInterval(refreshSyncLabels, 60000);
+
     function syncStatus(which, text, kind) {
       var el = document.getElementById(which === 'gitlab' ? 'gl-sync-status' : 'gh-sync-status');
       if (!el) return;
@@ -4857,9 +4889,21 @@
           saved list instead, where it can be taken or ignored.
         */
         var saved = which === 'gitlab' ? glFolders : ghFolders;
-        syncStatus(which, where + ' on ' + c.branch + ' — connected' +
-          (res.truncated ? ', and it holds more folders than this can list — type a path if one is missing' : ''),
-          'ok');
+        /*
+          NOTHING TO SAY WHEN IT WORKED. The line used to read "owner/repo on
+          main — connected", which is four facts already on screen a few pixels
+          above it plus one word. What is genuinely new is WHEN, and that goes
+          on the button, where it answers "do I need to press this again"
+          without a sentence.
+
+          The line stays for the failures, which is the half that cannot be
+          inferred from anywhere else.
+        */
+        lastSyncedAt[which] = Date.now();
+        syncStatus(which, res.truncated
+          ? 'This repo holds more folders than one listing can hold — type a path if one is missing'
+          : '', res.truncated ? 'ok' : null);
+        refreshSyncLabels();
         refreshFolderImportOffer();
         if (!saved.length) openFolderDiscovery(which);
       }, function (err) {
