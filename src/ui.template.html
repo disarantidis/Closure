@@ -1184,53 +1184,43 @@
     .compare-count { opacity: 0.75; }
     .compare-count.is-zero { opacity: 0.25; }
 
-    /* The leaves themselves. Monospaced, because every one of them is a token
-       path that can be pasted into a search of the source and found. */
-    .compare-leaves { display: flex; flex-direction: column; gap: 6px; }
-    .compare-leaf {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 11px;
-      overflow-wrap: anywhere;
-    }
-    .compare-leaf-path { opacity: 0.9; }
-    .compare-leaf-val { opacity: 0.65; padding-left: 12px; }
     /*
-      The two sides of one changed token, beside each other rather than
-      stacked — the comparison is the point, and stacking makes the eye travel
-      down and back to make it. Equal columns, each free to shrink below its
-      content (min-width: 0) so a long value wraps inside its own cell instead
-      of pushing the pair out of the card.
+      THE TABLE OF DIFFERENCES: token, then what each side holds.
+
+      Monospaced paths, because every one of them can be pasted into a search
+      of the source and found — and `anywhere` breaking, because a token path
+      has no spaces to break at and would otherwise decide the column's width
+      for it.
+
+      font-size is set on the wrapper rather than the cells: Table renders its
+      own markup and the rung it walks is padding, not type, so the size comes
+      from the surface it stands on.
     */
-    .compare-leaf-pair {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-top: 3px;
+    .compare-table { font-size: 11px; }
+    .compare-table table { width: 100%; table-layout: fixed; }
+    .compare-cell-path {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      opacity: 0.9;
+      /* break-word, NOT anywhere: the real break opportunities are the <wbr>s
+         the cell renders at each dot (see pathCell), and this is only the
+         fallback for a single segment too long to fit on its own. `anywhere`
+         here would override them and go back to breaking mid-segment. */
+      overflow-wrap: break-word;
     }
-    .compare-side-val {
-      display: flex;
-      align-items: baseline;
-      gap: 5px;
-      min-width: 0;
-      opacity: 0.75;
+    /* A value too long to be a pill — a reference, mostly. Same treatment as
+       the path, one step quieter. */
+    .compare-cell-text {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       overflow-wrap: anywhere;
+      opacity: 0.7;
     }
-    .compare-side-tag {
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      opacity: 0.55;
-      flex-shrink: 0;
-    }
-    .compare-side-text { min-width: 0; }
-    /* The colour itself, next to the hex that names it — the one comparison
+    /* The colour itself, inside the tag that names it — the one comparison
        nobody should have to do in their head. */
     .compare-swatch {
-      width: 10px;
-      height: 10px;
+      width: 9px;
+      height: 9px;
       border-radius: 2px;
-      flex-shrink: 0;
-      align-self: center;
+      display: block;
       border: 1px solid var(--app-border);
     }
     .compare-more { font-size: 11px; opacity: 0.6; margin: 2px 0 0; }

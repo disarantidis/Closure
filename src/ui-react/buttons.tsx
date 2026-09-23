@@ -35,6 +35,7 @@ import { Toast } from '../vendor/pomegranate/panel/node/Toast';
 import { Alert } from '../vendor/pomegranate/panel/node/Alert';
 import { Skeleton } from '../vendor/pomegranate/panel/node/Skeleton';
 import { Tag } from '../vendor/pomegranate/panel/node/Tag';
+import { Table } from '../vendor/pomegranate/panel/node/Table';
 import { SelectableCard } from '../vendor/pomegranate/panel/node/SelectableCard';
 import { FileUploadItem } from '../vendor/pomegranate/panel/node/FileUploadItem';
 import { Spinner } from '../vendor/pomegranate/panel/node/Spinner';
@@ -1846,31 +1847,97 @@ const COMPARE_SAMPLE = 40;
       const m = /hex:(#[0-9a-f]{3,8})/i.exec(v) || /^(#[0-9a-f]{3,8})$/i.exec(v);
       return m ? m[1] : null;
     };
-    const sideCell = (label: string, v: string) => {
+    /*
+      A VALUE IN A CELL — a tag when it is short enough to be one, plain text
+      when it is not.
+
+      A hex fits a pill and reads better as one; a reference like
+      {restrictions.neutral.basic.background} does not, and forcing it into a
+      tag gets a pill that is wider than its column and clipped. So the shape
+      follows the content: colours and short scalars are tagged, anything
+      longer wraps as text. The full value is on the title either way.
+    */
+    /*
+      A TOKEN PATH BREAKS AT ITS OWN JOINTS.
+
+      A browser has no break opportunity inside foundation.core-colours.brand
+      — a dot is not one — so the choice was between overflowing the column
+      and `anywhere`, which breaks mid-segment and produced
+      "foundation.core-c / olours.brand.dark / .50": three lines, none of them
+      a thing. <wbr> before each dot offers the breaks the path actually has,
+      so it wraps as "foundation / .core-colours / .brand.dark.50" and every
+      line is a piece of the name. The anywhere fallback stays in CSS for the
+      one segment long enough to need it.
+    */
+    const pathCell = (path: string) => {
+      const parts = path.split('.');
+      const nodes: ReactNode[] = [];
+      parts.forEach((seg, i) => {
+        if (i) { nodes.push(<wbr key={'w' + i} />); nodes.push('.'); }
+        nodes.push(seg);
+      });
+      return <span className="compare-cell-path" title={path}>{nodes}</span>;
+    };
+
+    const TAGGABLE = 22;
+    const valueCell = (v: string) => {
       const sw = swatchOf(v);
+      const short = sw || v;
+      if (short.length > TAGGABLE) return <span className="compare-cell-text" title={v}>{v}</span>;
       return (
-        <div className="compare-side-val" title={v}>
-          <span className="compare-side-tag">{label}</span>
-          {sw && <span className="compare-swatch" style={{ background: sw }} />}
-          <span className="compare-side-text">{sw || v}</span>
-        </div>
+        <span title={v}>
+          <Tag
+            variant="tonal"
+            size="small"
+            leading={sw ? <span className="compare-swatch" style={{ background: sw }} /> : undefined}
+          >
+            {short}
+          </Tag>
+        </span>
       );
     };
-    const pairRow = (keyPrefix: string) => (x: any) => (
-      <div className="compare-leaf" key={keyPrefix + x.path}>
-        <div className="compare-leaf-path">{x.path}</div>
-        <div className="compare-leaf-pair">
-          {sideCell('repo', x.repo)}
-          {sideCell('here', x.figma)}
-        </div>
-      </div>
-    );
 
     /* A leaf list, capped. The count in the heading is the REAL one, not the
        length of what is shown — a heading that said 40 when there were 13,137
        would be the page quietly lying about the size of the difference. */
-    const leaves = (title: string, rows: any[], render: (row: any) => ReactNode) => {
+    /*
+      ONE TABLE PER KIND: the token in the first column, and what each side
+      holds in the second and third.
+
+      Stacked rows made the eye travel to compare two values; side-by-side
+      cells fixed that, and a real table finishes it — the "repo" and "here"
+      labels stop repeating on every row and become column headers, said once
+      where they belong. Pomegranate's own Table, so the column owns its
+      alignment and width rather than every cell restating them.
+
+      The one-sided lists get two columns instead of three. A column headed
+      "here" with nothing under it would be a table drawn around an absence.
+    */
+    const leaves = (title: string, rows: any[], twoSided: boolean) => {
       if (!rows.length) return null;
+      const columns: any[] = [
+        {
+          key: 'path',
+          header: 'Token',
+          cell: (x: any) => pathCell(x.path),
+        },
+      ];
+      /*
+        FIXED WIDTHS FOR THE VALUE COLUMNS, not a share of the table.
+
+        A hex in a tag is about 80px whatever the panel is doing, so a
+        percentage overpays for it on a wide pane and starves it on a narrow
+        one — and every pixel it overpays comes out of the token column, which
+        is the one that needs them: at 30% each, `brand.light.100` broke
+        across three lines with the `0` stranded on the last. The tags get what
+        they need and the path gets the rest.
+      */
+      if (twoSided) {
+        columns.push({ key: 'repo', header: 'Repo', width: '92px', cell: (x: any) => valueCell(x.repo) });
+        columns.push({ key: 'figma', header: 'Here', width: '92px', cell: (x: any) => valueCell(x.figma) });
+      } else {
+        columns.push({ key: 'value', header: 'Value', width: '120px', cell: (x: any) => valueCell(x.value) });
+      }
       return (
         <div className="json-download-card" data-level={4} key={title}>
           <div className="json-download-header">
@@ -1879,7 +1946,17 @@ const COMPARE_SAMPLE = 40;
             </div>
             <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
           </div>
-          <div className="compare-leaves">{rows.slice(0, COMPARE_SAMPLE).map(render)}</div>
+          <div className="compare-table">
+            <Table
+              caption={title}
+              captionHidden
+              size="small"
+              rules
+              columns={columns}
+              rows={rows.slice(0, COMPARE_SAMPLE)}
+              rowKey={(x: any) => x.path}
+            />
+          </div>
           {rows.length > COMPARE_SAMPLE && (
             <p className="compare-more">
               {`… and ${(rows.length - COMPARE_SAMPLE).toLocaleString()} more — Copy all has every one`}
@@ -1989,23 +2066,13 @@ const COMPARE_SAMPLE = 40;
           </div>
         </div>
 
-        {leaves('Values \u2014 changed', r.changed, pairRow('c'))}
+        {leaves('Values \u2014 changed', r.changed, true)}
         {/* Last of the three lists on purpose: it is usually the longest and
             almost always the least interesting, because a re-rooting moves
             thousands of references without anyone having decided anything. */}
-        {leaves('Architecture \u2014 pointing somewhere new', r.repointed || [], pairRow('p'))}
-        {leaves('Architecture \u2014 only here', r.onlyInFigma, (x: any) => (
-          <div className="compare-leaf" key={'f' + x.path}>
-            <div className="compare-leaf-path">{x.path}</div>
-            <div className="compare-leaf-val">{x.value}</div>
-          </div>
-        ))}
-        {leaves('Architecture \u2014 only in the repo', r.onlyInRepo, (x: any) => (
-          <div className="compare-leaf" key={'r' + x.path}>
-            <div className="compare-leaf-path">{x.path}</div>
-            <div className="compare-leaf-val">{x.value}</div>
-          </div>
-        ))}
+        {leaves('Architecture \u2014 pointing somewhere new', r.repointed || [], true)}
+        {leaves('Architecture \u2014 only here', r.onlyInFigma, false)}
+        {leaves('Architecture \u2014 only in the repo', r.onlyInRepo, false)}
 
         <div className="json-download-card" data-level={4}>
           <PomButton
