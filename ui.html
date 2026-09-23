@@ -22394,16 +22394,19 @@ html[data-theme=dark] {
       <!-- The other way in. The repo settings already name a file, a folder and
            a branch, and the push already writes there — so "what is in the
            repo" is an address this plugin knows. Both providers get their own
-           button rather than a guess: a push goes to both, a comparison has to
-           be against one of them, and only the person knows which. Hidden
-           whole when neither is configured.
+           button rather than a guess: a push goes to both, an import comes from
+           one of them, and only the person knows which. Hidden whole when
+           neither is configured.
 
-           COMPARE, not "read". Reading is how it works, not what it is for:
-           nothing is written to Figma by it and nothing is kept — what comes
-           back is the difference between the file in the repo and the
-           variables live in this document right now. -->
+           IMPORT, NOT COMPARE — and the difference is the whole reason this
+           route exists on THIS page. It briefly said compare, to match the
+           button on the main screen that shares its fetch, and that was
+           wrong: this one hands the repo's document to runImport, which is
+           the way tokens get INTO Figma. Comparison needs variables to
+           compare against, and the usual state of a file somebody is
+           importing into is that it has none. -->
       <div class="import-repo" id="import-repo" hidden>
-        <p class="import-repo-title">…or compare against the one in the repo</p>
+        <p class="import-repo-title">…or import the one in the repo</p>
         <p class="import-repo-hint" id="import-repo-hint"></p>
         <div class="import-repo-actions">
           <span id="import-pull-gitlab-mount"></span>
@@ -49267,8 +49270,8 @@ html[data-theme=dark] {
     "Compare this file with the one in the repo",
     CARD_LEVEL
   );
-  mountButton("import-pull-gitlab-mount", { id: "import-pull-gitlab-btn", variant: "tonal", size: "small", label: "Compare with GitLab" });
-  mountButton("import-pull-github-mount", { id: "import-pull-github-btn", variant: "tonal", size: "small", label: "Compare with GitHub" });
+  mountButton("import-pull-gitlab-mount", { id: "import-pull-gitlab-btn", variant: "tonal", size: "small", label: "Import from GitLab" });
+  mountButton("import-pull-github-mount", { id: "import-pull-github-btn", variant: "tonal", size: "small", label: "Import from GitHub" });
   mountButton("import-empty-btn-mount", { id: "import-empty-btn", variant: "tonal", size: "medium", label: "Import from JSON", leftIcon: true, buttonLeftIcon: IconImport(16) });
   (function mountThemeToggle() {
     const container = document.getElementById("theme-toggle-btn-mount");
@@ -54881,7 +54884,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'd42bb38 11:32:25';
+    var CLOSURE_BUILD = 'bbf6f1d 11:52:14';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -55662,10 +55665,16 @@ function format(report, opts) {
       detecting the shape, measuring the architecture, compiling, and diffing
       against what is in Figma right now — is the same code a dropped file
       goes through. The repo is a source of bytes, not a second pipeline.
+
+      WHICH IS WHY THIS IS AN IMPORT AND NOT A COMPARISON. The document it
+      fetches is handed to runImport, the same as a file dropped on this page:
+      the end of that road is Apply, writing variables into Figma. The main
+      screen's Compare button shares this fetch and does something else
+      entirely with it, and for a while both were labelled the same way.
     */
     function pullFromRepo(which) {
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
-      showToast('Comparing with ' + label + '…');
+      showToast('Reading from ' + label + '…');
       (which === 'gitlab' ? fetchGitLabFile() : fetchGitHubFile()).then(function (res) {
         importState.fileName = res.where;
         importState.fileBytes = res.text.length;
@@ -55701,7 +55710,7 @@ function format(report, opts) {
           runImport(doc, res.where);
         }, 0); });
       }, function (err) {
-        showToast((err && err.message) || ('Could not read from ' + label + ' to compare'), true);
+        showToast((err && err.message) || ('Could not read from ' + label), true);
       });
     }
     document.getElementById('import-pull-gitlab-btn').addEventListener('click', function () { pullFromRepo('gitlab'); });

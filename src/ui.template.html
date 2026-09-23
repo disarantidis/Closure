@@ -2512,16 +2512,19 @@
       <!-- The other way in. The repo settings already name a file, a folder and
            a branch, and the push already writes there — so "what is in the
            repo" is an address this plugin knows. Both providers get their own
-           button rather than a guess: a push goes to both, a comparison has to
-           be against one of them, and only the person knows which. Hidden
-           whole when neither is configured.
+           button rather than a guess: a push goes to both, an import comes from
+           one of them, and only the person knows which. Hidden whole when
+           neither is configured.
 
-           COMPARE, not "read". Reading is how it works, not what it is for:
-           nothing is written to Figma by it and nothing is kept — what comes
-           back is the difference between the file in the repo and the
-           variables live in this document right now. -->
+           IMPORT, NOT COMPARE — and the difference is the whole reason this
+           route exists on THIS page. It briefly said compare, to match the
+           button on the main screen that shares its fetch, and that was
+           wrong: this one hands the repo's document to runImport, which is
+           the way tokens get INTO Figma. Comparison needs variables to
+           compare against, and the usual state of a file somebody is
+           importing into is that it has none. -->
       <div class="import-repo" id="import-repo" hidden>
-        <p class="import-repo-title">…or compare against the one in the repo</p>
+        <p class="import-repo-title">…or import the one in the repo</p>
         <p class="import-repo-hint" id="import-repo-hint"></p>
         <div class="import-repo-actions">
           <span id="import-pull-gitlab-mount"></span>
@@ -3712,10 +3715,16 @@
       detecting the shape, measuring the architecture, compiling, and diffing
       against what is in Figma right now — is the same code a dropped file
       goes through. The repo is a source of bytes, not a second pipeline.
+
+      WHICH IS WHY THIS IS AN IMPORT AND NOT A COMPARISON. The document it
+      fetches is handed to runImport, the same as a file dropped on this page:
+      the end of that road is Apply, writing variables into Figma. The main
+      screen's Compare button shares this fetch and does something else
+      entirely with it, and for a while both were labelled the same way.
     */
     function pullFromRepo(which) {
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
-      showToast('Comparing with ' + label + '…');
+      showToast('Reading from ' + label + '…');
       (which === 'gitlab' ? fetchGitLabFile() : fetchGitHubFile()).then(function (res) {
         importState.fileName = res.where;
         importState.fileBytes = res.text.length;
@@ -3751,7 +3760,7 @@
           runImport(doc, res.where);
         }, 0); });
       }, function (err) {
-        showToast((err && err.message) || ('Could not read from ' + label + ' to compare'), true);
+        showToast((err && err.message) || ('Could not read from ' + label), true);
       });
     }
     document.getElementById('import-pull-gitlab-btn').addEventListener('click', function () { pullFromRepo('gitlab'); });

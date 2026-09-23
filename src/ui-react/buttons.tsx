@@ -815,12 +815,19 @@ window.PomRepoReadBtn = mountLiveTitleButton(
   CARD_LEVEL,
 );
 
-/* One per provider, because a comparison is against ONE repo and only the
-   person knows which. The page hides whichever is not configured. Same word
-   as the repo card's own button above, because it is the same action reached
-   from a different screen — two names for it would read as two features. */
-mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'tonal', size: 'small', label: 'Compare with GitLab' });
-mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'tonal', size: 'small', label: 'Compare with GitHub' });
+/*
+  One per provider, because an import comes from ONE repo and only the person
+  knows which. The page hides whichever is not configured.
+
+  IMPORT, not Compare. These were renamed to match the repo card's button on
+  the main screen, on the grounds that they share a fetch — but they do not
+  share a purpose: that one opens the Compare page, these hand the document to
+  runImport and end at Apply, writing variables into Figma. And the case that
+  makes the old label plainly wrong is the common one: a file being imported
+  into usually has no variables yet, so there is nothing to compare with.
+*/
+mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'tonal', size: 'small', label: 'Import from GitLab' });
+mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'tonal', size: 'small', label: 'Import from GitHub' });
 
 mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', leftIcon: true, buttonLeftIcon: IconImport(16) });
 
