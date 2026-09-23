@@ -260,8 +260,15 @@ const TYPE_ICON: Record<string, (size: number) => ReactNode> = {
   boolean: IconTypeBoolean,
   duration: IconTypeTiming, timing: IconTypeTiming,
   cubicBezier: IconTypeEasing, easing: IconTypeEasing,
+  /* Kept for a document that DECLARES one of these on a token that is not a
+     bag — the comparison itself no longer produces them as categories, since
+     a style is judged by the types of its parts (see compare()'s composite
+     branch). */
   typography: IconTypeTypography,
   shadow: IconTypeShadow, boxShadow: IconTypeShadow,
+  /* Parts of more than one kind moved. Deliberately iconless: there is no one
+     picture for "a colour and a number", and a wrong one would be worse than
+     none. */
 };
 
 /* ── size / variant maps (mount prop shape → Pomegranate) ───────────────────── */

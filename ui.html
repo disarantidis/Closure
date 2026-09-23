@@ -48927,9 +48927,16 @@ html[data-theme=dark] {
     timing: IconTypeTiming,
     cubicBezier: IconTypeEasing,
     easing: IconTypeEasing,
+    /* Kept for a document that DECLARES one of these on a token that is not a
+       bag — the comparison itself no longer produces them as categories, since
+       a style is judged by the types of its parts (see compare()'s composite
+       branch). */
     typography: IconTypeTypography,
     shadow: IconTypeShadow,
     boxShadow: IconTypeShadow
+    /* Parts of more than one kind moved. Deliberately iconless: there is no one
+       picture for "a colour and a number", and a wrong one would be worse than
+       none. */
   };
   function btnVariant(v) {
     if (v === "filled") return "primary";
@@ -53844,6 +53851,26 @@ function declaredType(node) {
   return null;
 }
 
+/*
+  IS THIS ONE VALUE, OR A BAG OF THEM?
+
+  Not every object is a style. A DTCG colour is {alpha, colorSpace,
+  components, hex} and a dimension is {value, unit} — single values that
+  happen to be written as objects, and taking them apart is nonsense: the
+  first attempt at decomposing composites split every colour into a
+  `components` array and a `hex` string, decided those were two different
+  kinds, and reported 760 colour changes as "mixed".
+
+  A style is the rest: typography, shadow, anything whose parts are
+  themselves tokens of their own kinds.
+*/
+function isSingleValue(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return true;
+  if ('hex' in raw || 'colorSpace' in raw || 'components' in raw) return true;
+  if ('unit' in raw && 'value' in raw) return true;
+  return false;
+}
+
 function inferType(raw) {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     if ('hex' in raw || 'colorSpace' in raw || 'components' in raw) return 'color';
@@ -54214,36 +54241,63 @@ function compare(figmaDoc, repoDoc) {
         ? 'aliased' : 'changed';
     } else {
       /*
-        THE SAME QUESTION ONE LEVEL DOWN. A typography token is a bag of five
-        sub-values, and on these files exactly one of them differs: fontFamily,
-        aliased on one side and inlined on the other — the same non-change as
-        above, wearing a composite. Whole-value comparison cannot see it,
-        because the bag as a whole does differ.
+        A COMPOSITE IS NOT A TYPE. IT IS A STYLE MADE OF TYPED PARTS.
 
-        So when both sides are bags, the differing entries are resolved
-        individually and the token counts as aliased only if EVERY one of them
-        agrees. One genuine difference anywhere in the bag makes it a value
-        change, which is the safe direction: a real change must never be
-        filed as a non-change.
+        "shadow" and "typography" are not kinds of token the way colour and
+        number are — Figma's variable types are colour, number, string and
+        boolean, and a shadow is a style built out of a colour and four
+        numbers. Filing a shadow under a type called "shadow" invents a
+        category and then hides, inside it, what actually moved.
+
+        So a differing composite is judged by its PARTS. Every sub-value that
+        differs is examined on its own, and the row is:
+
+          repointed  every differing part is a reference on both sides,
+                     pointing somewhere new — which is what the two shadows in
+                     the pair this was built against actually are: five
+                     sub-values, all of them {mode.neutral.…} becoming
+                     {mode.secondary.…}. Not a value change at all.
+          aliased    every differing part resolves to the same value
+          changed    anything genuinely different, TYPED BY THE PARTS that
+                     differ — a shadow whose blur moved is a number change,
+                     not a "shadow change" — or 'mixed' when the parts that
+                     moved are of more than one kind.
+
+        One genuine difference makes the whole row a value change, which is
+        the safe direction: a real change must never be filed as a non-change.
       */
       bucket = 'changed';
       var fRaw = rawOf(figmaDoc, path), rRaw = rawOf(repoDoc, path);
-      if (fRaw && rRaw && typeof fRaw === 'object' && typeof rRaw === 'object' &&
-          !Array.isArray(fRaw) && !Array.isArray(rRaw)) {
+      if (fRaw && rRaw && !isSingleValue(fRaw) && !isSingleValue(rRaw)) {
         var rt = rootOf(path);
         var keys = Object.keys(fRaw).concat(Object.keys(rRaw));
-        var allAgree = true, sawOne = false;
-        for (var ki = 0; ki < keys.length && allAgree; ki++) {
+        var seen = {};
+        var allRefs = true, allAgree = true, sawOne = false;
+        var partTypes = {};
+        for (var ki = 0; ki < keys.length; ki++) {
           var k = keys[ki];
-          if (k.charAt(0) === '$') continue;
+          if (k.charAt(0) === '$' || seen[k]) continue;
+          seen[k] = 1;
           var fv = fRaw[k], rv = rRaw[k];
           if (renderValue(fv) === renderValue(rv)) continue;
           sawOne = true;
+          if (!(isReference(fv) && isReference(rv))) allRefs = false;
           var fr = isReference(fv) ? resolveRef(figmaDoc, rt, fv) : fv;
           var rr = isReference(rv) ? resolveRef(repoDoc, rt, rv) : rv;
-          if (fr === null || rr === null || renderValue(fr) !== renderValue(rr)) allAgree = false;
+          if (fr === null || rr === null || renderValue(fr) !== renderValue(rr)) {
+            allAgree = false;
+            /* The part's own kind, read off the resolved value where there is
+               one — a reference's type is the type of what it points at. */
+            partTypes[inferType(fr === null ? fv : fr)] = 1;
+          }
         }
-        if (sawOne && allAgree) bucket = 'aliased';
+        if (sawOne && allRefs) bucket = 'repointed';
+        else if (sawOne && allAgree) bucket = 'aliased';
+        else if (sawOne) {
+          var names = Object.keys(partTypes);
+          leaf = { value: leaf.value, ref: leaf.ref,
+                   type: names.length === 1 ? names[0] : 'mixed' };
+        }
       }
     }
     /* The type comes from THIS side. Where the two disagree the token's kind
@@ -54429,7 +54483,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'b54dc89 11:00:52';
+    var CLOSURE_BUILD = '40e2c52 11:05:02';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

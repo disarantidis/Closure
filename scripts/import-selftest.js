@@ -2392,6 +2392,48 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       ok('alias: a self-referencing token resolves to nothing rather than looping',
          cyclic.changed.length + cyclic.aliased.length === 1);
 
+      /*
+        A COMPOSITE IS NOT A TYPE. IT IS A STYLE MADE OF TYPED PARTS.
+
+        "shadow" and "typography" are not kinds of token the way colour and
+        number are — a shadow is a style built from a colour and four numbers.
+        Filing one under a type called "shadow" invents a category and hides
+        inside it what actually moved.
+      */
+      const shadow = (c, blur) => ({ $type: 'shadow', $value: { color: c, blur: blur, x: 0, y: 2 } });
+      /* Every part a reference, all of them pointing somewhere new: not a
+         value change at all — which is exactly what the two shadows in the
+         real pair turned out to be. */
+      const shadowMoved = JD.compare(
+        { d: { s: shadow('{mode.secondary.c}', '{mode.secondary.b}') } },
+        { d: { s: shadow('{mode.neutral.c}', '{mode.neutral.b}') } });
+      ok('style: a composite whose parts all point somewhere new is repointed, not changed',
+         shadowMoved.repointed.length === 1 && shadowMoved.changed.length === 0,
+         JSON.stringify({ changed: shadowMoved.changed, repointed: shadowMoved.repointed }));
+      /* A part that genuinely moved types the row by ITS kind. */
+      const shadowBlur = JD.compare(
+        { d: { s: shadow('#000000', 8) } }, { d: { s: shadow('#000000', 4) } });
+      ok('style: a shadow whose blur moved is a NUMBER change, not a "shadow" change',
+         shadowBlur.changed.length === 1 && shadowBlur.changed[0].type === 'number',
+         JSON.stringify(shadowBlur.changed));
+      const shadowBoth = JD.compare(
+        { d: { s: shadow('#ffffff', 8) } }, { d: { s: shadow('#000000', 4) } });
+      ok('style: parts of more than one kind read as mixed rather than picking one',
+         shadowBoth.changed[0].type === 'mixed', JSON.stringify(shadowBoth.changed));
+
+      /* NOT EVERY OBJECT IS A STYLE. A DTCG colour is {alpha, colorSpace,
+         components, hex} and a dimension is {value, unit} — single values
+         written as objects. The first attempt took them apart, decided
+         `components` and `hex` were two different kinds, and reported 760
+         colour changes as "mixed". */
+      const dtcgColour = (hex, c) => ({ $type: 'color', $value: { colorSpace: 'srgb', components: c, hex: hex, alpha: 1 } });
+      const colours = JD.compare(
+        { d: { c: dtcgColour('#ff0000', [1, 0, 0]) } },
+        { d: { c: dtcgColour('#00ff00', [0, 1, 0]) } });
+      ok('style: a DTCG colour stays one colour rather than being taken apart',
+         colours.changed.length === 1 && colours.changed[0].type === 'color',
+         JSON.stringify(colours.changed));
+
       /* The clipboard copy is the only place the full list exists — the page
          caps every list it draws. */
       const text = JD.format(r, { figmaLabel: 'my file', repoLabel: 'GitHub tokens.json' });
