@@ -1899,6 +1899,16 @@
       color: var(--app-text);
     }
     .json-download-title-icon { flex-shrink: 0; }
+    /* The header's trailing group. Two things now — the token-count tag and
+       the Compare button — and .json-download-header's space-between would
+       otherwise push them to opposite ends of the row with the title stranded
+       between them. */
+    .json-download-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
     /*
       The one line under the repo card's header that says what the last read
       found. Monospaced and dimmed like .import-repo-hint, for the same
@@ -22090,13 +22100,36 @@ html[data-theme=dark] {
             Hidden until a provider is actually readable (isGitLabReady /
             isGitHubReady) — see refreshRepoReadRow().
           -->
-          <span id="repo-read-btn-mount" hidden></span>
+          <div class="json-download-header-actions">
+            <!--
+              HOW MANY TOKENS THE REPO'S COPY HOLDS, as a tag — the same tonal
+              pill the collections card wears for its token count and the Json
+              file card for its size. It is the same kind of fact about the
+              same kind of thing, so it reads as one family rather than this
+              card inventing a sentence for it.
+
+              NO BRANCH IN IT. A tag is a value, not a sentence, and "main"
+              was the half of that line that made it one. The branch is still
+              named where it is load-bearing: the Compare button's tooltip and
+              both sides of the Compare page.
+            -->
+            <span id="repo-token-tag-mount"></span>
+            <span id="repo-read-btn-mount" hidden></span>
+          </div>
         </div>
         <!--
-          WHAT IS IN THE REPO — the other side of the comparison, named
-          before it is asked for. Written by repoReadStatus() off the check
-          that runs on open, so the button above says "compare" to something
-          already on screen rather than to an unknown.
+          WHAT A TAG CANNOT SAY.
+
+          The answer itself is the tag above — a token count, which is a
+          value. This line is for the states that are sentences: still
+          reading, no such file (and what the repo holds instead), or a read
+          that failed. Those cannot be a pill, and squeezing them into one
+          would be how "Could not read GitHub — the token was refused" ends
+          up truncated to "Could not".
+
+          Exactly one of the two is ever showing — see repoReadStatus() and
+          repoTokenTag(), which is why they are set through a pair of
+          functions rather than written to directly.
         -->
         <p class="repo-read-status" id="repo-read-status" hidden></p>
         <!-- Only meaningful once BOTH providers are actually added (see
@@ -48803,7 +48836,7 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime24.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(View, {}) })));
     return { setDisabled: (v) => set(v) };
   }
-  function mountLiveTitleIconButton(mountId, base, initialTitle, level = GROUND) {
+  function mountLiveTitleButton(mountId, base, initialTitle, level = GROUND) {
     const container = document.getElementById(mountId);
     let set = () => {
     };
@@ -48945,9 +48978,16 @@ html[data-theme=dark] {
   mountIconButton("import-back-btn-mount", { id: "import-back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
   mountButton("import-copy-btn-mount", { id: "import-copy-btn", variant: "outline", size: "small", label: "Copy", block: true }, CARD_LEVEL);
   mountButton("import-choose-btn-mount", { id: "import-choose-btn", variant: "filled", size: "large", label: "Choose a JSON file" });
-  window.PomRepoReadBtn = mountLiveTitleIconButton(
+  window.PomRepoReadBtn = mountLiveTitleButton(
     "repo-read-btn-mount",
-    { id: "repo-read-btn", variant: "tonal", size: "small", icon: IconCompare(16) },
+    {
+      id: "repo-read-btn",
+      variant: "tonal",
+      size: "small",
+      label: "Compare",
+      leftIcon: true,
+      buttonLeftIcon: IconCompare(16)
+    },
     "Compare this file with the one in the repo",
     CARD_LEVEL
   );
@@ -49375,6 +49415,19 @@ html[data-theme=dark] {
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime24.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(View, {}) })));
     window.PomJsonFileCard = { setSize: (size) => set(size) };
+  })();
+  (function mountRepoTokenTag() {
+    const container = document.getElementById("repo-token-tag-mount");
+    let set = () => {
+    };
+    function View() {
+      const [label, setLabel] = (0, import_react18.useState)("");
+      set = setLabel;
+      if (!label) return null;
+      return /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Tag, { variant: "tonal", size: "small", children: label });
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime24.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(View, {}) })));
+    window.PomRepoTokenTag = { set: (label) => set(label) };
   })();
   function useClipboard() {
     const [copied, setCopied] = (0, import_react18.useState)("");
@@ -53741,7 +53794,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '2d31acf 19:58:14';
+    var CLOSURE_BUILD = '0bbab24 09:09:45';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -55756,12 +55809,28 @@ function format(report, opts) {
       return formatTokenCount(n) + ' token' + (n === 1 ? '' : 's');
     }
 
+    /*
+      THE TAG AND THE LINE ARE ONE CONTROL WITH TWO FACES, and they are set
+      together so they cannot both be on screen saying different things — a
+      stale "5k tokens" pill beside "Could not read GitHub" is worse than
+      either alone, and is what two independent writers produce.
+
+      A count is a value and goes in the tag; anything that needs a sentence
+      goes in the line.
+    */
     function repoReadStatus(text, tone) {
       var el = document.getElementById('repo-read-status');
-      if (!el) return;
-      el.hidden = !text;
-      el.textContent = text || '';
-      if (tone) el.setAttribute('data-tone', tone); else el.removeAttribute('data-tone');
+      if (el) {
+        el.hidden = !text;
+        el.textContent = text || '';
+        if (tone) el.setAttribute('data-tone', tone); else el.removeAttribute('data-tone');
+      }
+      if (window.PomRepoTokenTag) window.PomRepoTokenTag.set('');
+    }
+    function repoTokenTag(label) {
+      if (window.PomRepoTokenTag) window.PomRepoTokenTag.set(label || '');
+      var el = document.getElementById('repo-read-status');
+      if (el) { el.hidden = true; el.textContent = ''; el.removeAttribute('data-tone'); }
     }
 
     /*
@@ -55955,7 +56024,7 @@ function format(report, opts) {
              many tokens the repo's copy holds is the one number that answers
              "is the repo behind" at a glance — and it is the same walk the
              Compare page counts with, so the two can never disagree. */
-          repoReadStatus(tokensLabel(window.PomJsonDiff.countTokens(got.doc)) + '  ·  ' + branch);
+          repoTokenTag(tokensLabel(window.PomJsonDiff.countTokens(got.doc)));
         });
       }).then(null, function (err) {
         if (!current()) return;

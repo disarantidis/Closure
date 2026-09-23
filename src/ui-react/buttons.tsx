@@ -341,20 +341,24 @@ function mountLiveIconButton(mountId: string, base: any, initialDisabled: boolea
 // label like mountLiveButton's setLabel. Built for the Repository settings
 // Add/Remove pills: same control, same position, the icon and its
 // title/aria-label change in place instead of the row disappearing.
-/* Icon-only button whose accessible name is rewritten from outside — the
-   glyph is fixed, the title is not. Kept separate from
+/* A button whose accessible name is rewritten from outside — everything
+   else about it is fixed, the title is not. Kept separate from
    mountLiveToggleIconButton above, which swaps BOTH and between two fixed
    states; this one's title is an arbitrary string that is only known at
    runtime (a file path). title and aria-label move together on purpose: for
    an icon-only button they are the only name it has, and letting them drift
    would leave the tooltip and the screen reader describing different
    buttons. */
-type LiveTitleIconHandle = { setTitle: (t: string) => void };
-function mountLiveTitleIconButton(mountId: string, base: any, initialTitle: string, level: Level = GROUND): LiveTitleIconHandle {
+type LiveTitleHandle = { setTitle: (t: string) => void };
+function mountLiveTitleButton(mountId: string, base: any, initialTitle: string, level: Level = GROUND): LiveTitleHandle {
   const container = document.getElementById(mountId);
   let set: (t: string) => void = () => {};
   function View() {
     const [title, setT] = useState(initialTitle); set = setT;
+    /* aria-label deliberately carries MORE than the visible label — "Compare
+       this file with the one in the repo" rather than "Compare". WCAG 2.5.3
+       asks that the accessible name CONTAIN the visible one, which it does,
+       so a voice user saying "click Compare" still matches. */
     return <PomButton {...base} title={title} aria-label={title} />;
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
@@ -471,7 +475,7 @@ declare global {
       onRemove: (() => void) | null;
     };
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
-    PomRepoReadBtn: LiveTitleIconHandle;
+    PomRepoReadBtn: LiveTitleHandle;
     PomAddGitlabBtn: LiveToggleIconHandle;
     PomAddGithubBtn: LiveToggleIconHandle;
     PomExportMode: { onChange: ((index: number) => void) | null };
@@ -489,6 +493,7 @@ declare global {
       onClearVariables: (() => void) | null;
     };
     PomJsonFileCard: { setSize: (sizeLabel: string) => void };
+    PomRepoTokenTag: { set: (label: string) => void };
     /* The file name field, which is a plain TextField until the repo turns
        out to hold JSON files to choose from and a Combobox after that.
        `get` is synchronous and exact — it reads the value this bridge owns,
@@ -662,9 +667,22 @@ mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'fill
   that path changes when the folder or the provider tab does (see
   refreshRepoReadRow()).
 */
-window.PomRepoReadBtn = mountLiveTitleIconButton(
+/*
+  LABELLED, NOT ICON-ONLY. Two arrows in a square is a fine reminder of an
+  action you already know about and a poor way to find out one exists — and
+  this is the only route to the Compare page.
+
+  leftIcon + buttonLeftIcon, NOT `icon`: PomButton reads `icon` as "this is an
+  icon button" and from there the label stops being a label, becoming the
+  aria-label and the tooltip instead. That is exactly how this button rendered
+  as a bare glyph while carrying a perfectly good name — the same trap the
+  empty state's Import button fell into. The title still carries the full
+  sentence, including which file and which branch.
+*/
+window.PomRepoReadBtn = mountLiveTitleButton(
   'repo-read-btn-mount',
-  { id: 'repo-read-btn', variant: 'tonal', size: 'small', icon: IconCompare(16) },
+  { id: 'repo-read-btn', variant: 'tonal', size: 'small',
+    label: 'Compare', leftIcon: true, buttonLeftIcon: IconCompare(16) },
   'Compare this file with the one in the repo',
   CARD_LEVEL,
 );
@@ -1311,6 +1329,24 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomJsonFileCard = { setSize: (size) => set(size) };
+})();
+
+/* The repo card's token-count tag — the same tonal pill as the size tag above
+   and the collections card's own count, because it is the same kind of fact:
+   one number describing the thing the card is about. Empty renders nothing at
+   all rather than an empty pill, so the header closes up while the read is
+   still in flight. */
+(function mountRepoTokenTag() {
+  const container = document.getElementById('repo-token-tag-mount');
+  let set: (v: string) => void = () => {};
+  function View() {
+    const [label, setLabel] = useState('');
+    set = setLabel;
+    if (!label) return null;
+    return <Tag variant="tonal" size="small">{label}</Tag>;
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomRepoTokenTag = { set: (label) => set(label) };
 })();
 
 /* ── reference-closure warning (inline alert) ────────────────────────────────
