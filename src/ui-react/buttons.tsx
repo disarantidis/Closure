@@ -486,8 +486,10 @@ declare global {
     PomAddGithubBtn: LiveToggleIconHandle;
     PomExportMode: { onChange: ((index: number) => void) | null };
     PomToast: { show: (message: string, isError?: boolean) => void };
-    PomFolderSelect: FolderSelectBridge;
-    PomGithubFolderSelect: FolderSelectBridge;
+    PomFolderSelect: FolderComboBridge;
+    PomGithubFolderSelect: FolderComboBridge;
+    PomFolderNew: FolderComboBridge;
+    PomGithubFolderNew: FolderComboBridge;
     PomFolderList: FolderListBridge;
     PomGithubFolderList: FolderListBridge;
     PomCollectionsAccordion: {
@@ -894,8 +896,14 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
   window.PomRepoFile = {
     get: () => state.selected,
     /* A set from outside is the app choosing, not the user — it moves both,
-       silently, because the caller is already acting on the new value. */
-    set: (next: string) => put({ selected: next, query: next }),
+       silently, because the caller is already acting on the new value. The
+       one exception is while somebody is typing in the box: the selection
+       still moves, the text they are composing does not. Same rule, and the
+       same reason, as the folder combo's. */
+    set: (next: string) => put({
+      selected: next,
+      ...(container && container.contains(document.activeElement) ? null : { query: next }),
+    }),
     setOptions: (names: string[]) => put({ all: names || [] }),
     onChange: null,
   };
@@ -911,8 +919,6 @@ window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commi
 // forward.
 mountButton('add-repo-settings-btn-mount', { id: 'add-repo-settings-btn', variant: 'filled', size: 'large', label: 'Add Repo Settings', block: true }, CARD_LEVEL);
 
-mountTextField('folder-new-mount', { id: 'folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' }, CARD_LEVEL);
-mountTextField('github-folder-new-mount', { id: 'github-folder-new', label: 'Folder path', icon: IconFolder(16), placeholder: 'e.g. src/something' }, CARD_LEVEL);
 
 mountTextField('gl-token-mount', { id: 'gl-token', type: 'password', label: 'GitLab Token', placeholder: 'glpat-… (stored only on this machine)' }, CARD_LEVEL);
 mountTextField('gl-host-mount', { id: 'gl-host', label: 'GitLab Host', placeholder: 'https://gitlab.com' }, CARD_LEVEL);
@@ -1210,15 +1216,148 @@ mountOnce('actions-skeleton',
   window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? 'error' : 'success', message })) };
 })();
 
-/* ── folder-path dropdowns (main screen) ───────────────────────────────────── */
-window.PomFolderSelect = {
-  ...mountLiveDropdown('folder-select-mount', { id: 'folder-select' }, (v) => window.PomFolderSelect.onChange?.(v), CARD_LEVEL),
-  onChange: null,
+/* ── folder-path pickers ───────────────────────────────────────────────────────
+  A COMBOBOX, NOT A DROPDOWN, AND THE SAME ONE IN BOTH PLACES.
+
+  A plain dropdown can only offer what is already saved, which left the one
+  case people actually hit with nowhere to go: the folder you want does not
+  exist in the repo yet, or does exist and has never been added here. Typing
+  is how you say a folder that is not on the list — and a folder typed here is
+  created in the repo by the push that writes into it, because git has no
+  empty directories to create in advance.
+
+  The Settings one is fed the repo's real directory listing (thousands, on a
+  large repo — see listRepoFolders) and exists to FIND the two or three that
+  matter. The main-screen one is fed only what Settings kept, and exists to
+  CHOOSE among them, or to name a new one on the spot.
+
+  Same control either way, because it is the same act: say which folder.
+*/
+type FolderComboBridge = {
+  setItems: (items: any[], selectedValue: string) => void;
+  getQuery: () => string;
+  commit: (value: string) => void;
+  /* Options only — leaves the selection alone. The Settings picker is a
+     search box, not a field holding a value. */
+  setOptions: (paths: string[]) => void;
+  get: () => string;
+  set: (value: string) => void;
+  onChange: ((value: string) => void) | null;
 };
-window.PomGithubFolderSelect = {
-  ...mountLiveDropdown('github-folder-select-mount', { id: 'github-folder-select' }, (v) => window.PomGithubFolderSelect.onChange?.(v), CARD_LEVEL),
-  onChange: null,
-};
+function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: string): FolderComboBridge {
+  const container = document.getElementById(mountId);
+  type S = { query: string; selected: string; all: string[] };
+  let state: S = { query: '', selected: '', all: [] };
+  let apply: ((s: S) => void) | null = null;
+  const bridge = () => (window as any)[bridgeKey] as FolderComboBridge;
+  const put = (next: Partial<S>, tell?: boolean) => {
+    state = { ...state, ...next };
+    apply?.(state);
+    if (tell) bridge().onChange?.(state.selected);
+  };
+  const commit = (name: string) => put({ selected: name, query: name }, true);
+  function View() {
+    const [s, setS] = useState<S>(state);
+    apply = setS;
+    const q = s.query.trim().toLowerCase();
+    const matches = (!q || s.query === s.selected)
+      ? s.all
+      : s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1);
+    /* A CAP, because a real repo has thousands of directories and a listbox
+       is not a scrollbar. The footer says how many were left out, which is
+       also the nudge to type another character. */
+    const LIMIT = 50;
+    const options = matches.slice(0, LIMIT);
+    const hidden = matches.length - options.length;
+    /*
+      A FOLDER THAT DOES NOT EXIST YET NEEDS A BUTTON, and the footer tells you
+      which one.
+
+      Typing alone cannot commit a new path: it matches no option, so the
+      "typed text IS an option" rule never fires for exactly the case this
+      control exists for. Two other mechanisms were built and dropped —
+      committing on blur, which silently turns an abandoned half-typed filter
+      into a folder, and a button inside this footer, whose onClick could not
+      be made to fire from the harness this was verified in while option
+      clicks in the same list fired fine. The create action lives beside the
+      field instead, on a control of this app's own (see #folder-create-mount
+      in ui.template.html), which is also where Settings has always put it.
+
+      The footer says the path back to you, because "+" over a filter you have
+      half-typed is how a folder called `tok` gets created.
+    */
+    const typed = s.query.trim().replace(/^\/+|\/+$/g, '');
+    const isNew = !!typed && s.all.indexOf(typed) === -1;
+    return (
+      <Combobox
+        label="Folder path"
+        size="small"
+        block
+        icon={IconFolder(16)}
+        placeholder={placeholder}
+        value={s.query}
+        onChange={(v: string) => {
+          if (s.all.indexOf(v) !== -1) commit(v);
+          else put({ query: v });
+        }}
+        options={options}
+        getKey={(o: string) => o}
+        onPick={(o: string) => commit(o)}
+        renderOption={(o: string, st: { active: boolean }) => (
+          <span style={{ fontWeight: st.active ? 600 : 400 }}>{o || '(repo root)'}</span>
+        )}
+        footer={isNew
+          ? <span>{`Press + to use “${typed}” — created on the first push`}</span>
+          : hidden > 0 ? <span>{`+${hidden.toLocaleString()} more — type to narrow`}</span> : undefined}
+        emptyMessage={s.all.length
+          ? 'No folder here by that name'
+          : 'No folders in this repo yet'}
+      />
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  /*
+    AN UPDATE FROM OUTSIDE MUST NOT TAKE THE FIELD AWAY FROM WHOEVER IS TYPING
+    IN IT.
+
+    setItems is called by every render of the screen around this control, and
+    it carried the selection into the query — so typing "brand/new/place" and
+    having anything at all re-render (a settings save, a repo check, a tab
+    switch) silently replaced it with the folder already chosen. It was not
+    that the new path failed to commit; it never survived long enough to be
+    committed.
+
+    So the query follows the selection only while nobody is in the field. The
+    options and the selection always update, because those are facts about the
+    world rather than about what someone is halfway through saying.
+  */
+  const focused = () => !!container && container.contains(document.activeElement);
+  return {
+    setItems: (items, selectedValue) => put({
+      all: items.map((it: any) => (it && it.value !== undefined ? it.value : it)),
+      selected: selectedValue || '',
+      ...(focused() ? null : { query: selectedValue || '' }),
+    }),
+    setOptions: (paths) => put({ all: paths || [] }),
+    get: () => state.selected,
+    /* What is in the box right now, which is not the same as what is chosen —
+       the create button acts on this, because a path that does not exist yet
+       can only ever be the typed half. */
+    getQuery: () => state.query.trim(),
+    set: (value) => put({ selected: value, ...(focused() ? null : { query: value }) }),
+    commit: (value: string) => commit(value),
+    onChange: null,
+  };
+}
+
+mountIconButton('folder-create-mount', { id: 'folder-create-btn', variant: 'outline', size: 'medium', title: 'Use this folder path — created on the first push', 'aria-label': 'Use this folder path', icon: IconAdd(16) }, CARD_LEVEL);
+window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', '(repo root)'), onChange: null };
+window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', '(repo root)'), onChange: null };
+/* The Settings pair — fed the repo's real directories, and read by the Add
+   button beside each. `get()` rather than a DOM lookup, same reason as the
+   file name field: a Combobox owns its own input id. */
+window.PomFolderNew = { ...mountFolderCombo('folder-new-mount', 'PomFolderNew', 'find or type a folder'), onChange: null };
+window.PomGithubFolderNew = { ...mountFolderCombo('github-folder-new-mount', 'PomGithubFolderNew', 'find or type a folder'), onChange: null };
 
 /* ── folder-path lists (Settings) — rebuilt often, every row remounts ──────── */
 function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithubFolderList', idPrefix: string, level: Level = GROUND) {

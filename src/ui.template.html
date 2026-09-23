@@ -560,20 +560,14 @@
       margin-bottom: 14px;
     }
 
-    /* Folder path row on the main screen: just the folder dropdown now —
-       the file name field that used to sit beside it (one per provider)
-       moved out into its own .json-download-card between this card and the
-       file-variables card above it, since Download was never tied to
-       either push destination anyway (see primaryFilename()). Still a grid
-       of its own (not flex) so the GitLab and GitHub rows keep matching
-       widths, same reasoning as when this held two columns. */
-    .filename-row { display: grid; grid-template-columns: 1fr; gap: 8px; }
-    #folder-select-mount, #github-folder-select-mount { min-width: 0; }
-    /* One block per provider (header + its filename-row) — see the HTML
-       comment above .gitlab-target-wrap. Only needs its own top margin
-       when a second block can follow it; .commit-input-wrap's own 4px is
-       enough otherwise, so this is additive, not a replacement. */
-    .target-block + .target-block { margin-top: 12px; }
+    /*
+      .filename-row and .target-block lived here, along with the per-provider
+      blocks they laid out. Each block held exactly one control — that
+      provider's folder picker — and it has moved up into .repo-file-row to
+      sit beside the file picker, which is where the other half of the same
+      address already was. Nothing is left to lay out.
+    */
+
     /*
       .target-row-header / .target-row-title / .target-row-empty lived here.
 
@@ -1905,7 +1899,19 @@
        between them. */
     /* Sits between the card's header and its folder/commit rows, at the same
        inset as they have — it is one more field in the same column. */
-    .repo-file-row { margin: 12px 0 0; }
+    /* Folder and file, side by side — the two halves of one address. They
+       share the width evenly and each may be narrower than its content, which
+       is what min-width: 0 is for: without it a flex item refuses to shrink
+       below its intrinsic size and the pair overflows the card instead of
+       truncating inside it. */
+    .repo-file-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 0 0;
+    }
+    .repo-file-half { flex: 1 1 0; min-width: 0; }
+    .repo-file-half[hidden] { display: none; }
 
     .json-download-header-actions {
       display: flex;
@@ -2269,7 +2275,27 @@
           has.
         -->
         <div class="repo-file-row" id="repo-file-row" hidden>
-          <span id="repo-file-mount"></span>
+          <!--
+            THE ADDRESS, LEFT TO RIGHT: folder, then file. It is the order the
+            path itself is written in and the order they are chosen in — the
+            folder decides which files there are to choose from.
+
+            Only one provider's folder picker is ever shown; updateTargetRow
+            decides which. Both live here rather than in the provider blocks
+            below so that the folder and the file share one row instead of
+            being separated by the block boundary.
+          -->
+          <span id="folder-select-mount" class="repo-file-half"></span>
+          <span id="github-folder-select-mount" class="repo-file-half"></span>
+          <!--
+            CREATE THE PATH THAT IS IN THE BOX. Sits with the folder picker
+            because it belongs to it: a folder you type is not on any list, so
+            picking cannot commit it and something has to. Hidden unless what
+            is typed is actually new — an Add button beside a folder that
+            already exists has nothing to add.
+          -->
+          <span id="folder-create-mount" hidden></span>
+          <span id="repo-file-mount" class="repo-file-half"></span>
         </div>
         <!-- Only meaningful once BOTH providers are actually added (see
              updatePushTargetUI()'s tabMode — same gitlabAdded && githubAdded
@@ -2296,20 +2322,14 @@
              this repo used to show the GitHub one here before it became
              GitLab-only, then GitLab's own). When a provider has zero saved
              folder paths the whole block hides rather than showing an empty,
-             nothing-selected dropdown (see updateTargetRow()). Once the tab
+             nothing-selected dropdown — it is a Combobox now, and is where a
+             new path gets named (see updateTargetRow()). Once the tab
              switcher above is active,
              only the selected provider's block is ever shown — see
              updatePushTargetUI(). -->
-        <div class="commit-input-wrap target-block" id="gitlab-target-wrap">
-          <div class="filename-row" id="gitlab-filename-row">
-            <span id="folder-select-mount"></span>
-          </div>
-        </div>
-        <div class="commit-input-wrap target-block" id="github-target-wrap" hidden>
-          <div class="filename-row" id="github-filename-row">
-            <span id="github-folder-select-mount"></span>
-          </div>
-        </div>
+        <!-- The per-provider folder blocks that used to live here are gone:
+             their one control moved up into .repo-file-row so the folder and
+             the file sit on the same line. -->
         <div class="commit-input-wrap" id="commit-wrap">
           <span id="commit-message-mount"></span>
         </div>
@@ -4156,9 +4176,41 @@
       document.getElementById('import-changes').hidden = false;
     }
 
+    /*
+      FILL THE SETTINGS PICKERS FROM THE REPOSITORY.
+
+      Here and not at load: it is one request per repo and the largest this
+      plugin makes (48,749 entries on a repo the size of next.js), so it is
+      spent when somebody opens the page that shows the answer. Cached by
+      address inside listRepoFolders, so reopening Settings is free.
+
+      A FAILURE IS SILENT. The field still accepts anything typed, which is
+      exactly what it did before discovery existed — so a repo that cannot be
+      listed leaves someone where they already were, rather than holding an
+      error about a feature they were not using.
+    */
+    function loadRepoFolders() {
+      [['gitlab', 'PomFolderNew'], ['github', 'PomGithubFolderNew']].forEach(function (pair) {
+        var which = pair[0], combo = window[pair[1]];
+        var ready = which === 'gitlab' ? isGitLabReady() : isGitHubReady();
+        if (!ready) { combo.setOptions([]); return; }
+        listRepoFolders(which).then(function (res) {
+          combo.setOptions(res.folders);
+          /* Said once, and only when it is true: a repo big enough for GitHub
+             to cap the response would otherwise look like it has fewer
+             folders than it has, and the missing one would be hunted for in
+             the wrong place. */
+          if (res.truncated) {
+            showToast('This repo is too large to list every folder — type a path if it is missing', true);
+          }
+        }, function () { combo.setOptions([]); });
+      });
+    }
+
     document.getElementById('settings-btn').addEventListener('click', function() {
       document.getElementById('main-page').classList.add('hidden');
       document.getElementById('settings-page').classList.add('visible');
+      loadRepoFolders();
     });
 
     document.getElementById('back-btn').addEventListener('click', function() {
@@ -4247,48 +4299,113 @@
       if (field) field.focus();   // land ready to type the replacement
     };
 
-    // Add a new folder path.
-    document.getElementById('folder-add-btn').addEventListener('click', function() {
-      var input = document.getElementById('folder-new');
-      var val = normFolder(input.value);
+    /*
+      ADD A FOLDER PATH — found in the repo, or invented.
+
+      The field beside this button is a Combobox over the repository's real
+      directories now, so the usual act is "find it and press Add". Typing a
+      path that is not in the list still works and is the point: the folder
+      you want may not exist yet, and pushing a file into it is what creates
+      it. Both arrive here as the same string.
+
+      Read through the bridge rather than getElementById — a Combobox owns its
+      own input id (useId), so there is no 'folder-new' element to look up.
+    */
+    function addFolderPath(which) {
+      var combo = which === 'github' ? window.PomGithubFolderNew : window.PomFolderNew;
+      var val = normFolder(combo.get());
       if (!val) return;
-      if (glFolders.indexOf(val) === -1) { glFolders.push(val); glActiveFolder = val; }
-      setFieldValue('folder-new', '');
-      renderFolderList();
-    });
-    document.getElementById('folder-new').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('folder-add-btn').click(); }
-    });
+      if (which === 'github') {
+        if (ghFolders.indexOf(val) === -1) { ghFolders.push(val); ghActiveFolder = val; }
+      } else {
+        if (glFolders.indexOf(val) === -1) { glFolders.push(val); glActiveFolder = val; }
+      }
+      combo.set('');
+      if (which === 'github') renderGithubFolderList(); else renderFolderList();
+      persistSettings();
+    }
+    document.getElementById('folder-add-btn').addEventListener('click', function() { addFolderPath('gitlab'); });
 
     // Main-screen folder dropdown → sets the active target path and persists it.
-    window.PomFolderSelect.onChange = function(value) {
-      glActiveFolder = value;
-      renderFolderList();   // refresh the "in use" marker in Settings
-      persistSettings();    // remember the pick
-      refreshRepoReadRow(); // a different folder is a different file to compare
-    };
+    /*
+      A FOLDER NAMED ON THE MAIN SCREEN IS A FOLDER BEING ADDED.
 
-    // Add a new folder path to GitHub's own list.
-    document.getElementById('github-folder-add-btn').addEventListener('click', function() {
-      var input = document.getElementById('github-folder-new');
-      var val = normFolder(input.value);
-      if (!val) return;
-      if (ghFolders.indexOf(val) === -1) { ghFolders.push(val); ghActiveFolder = val; }
-      setFieldValue('github-folder-new', '');
-      renderGithubFolderList();
+      The main screen offers what Settings kept, which is the point of keeping
+      it — but "all of them are restricted and none of them is the one I want"
+      has to have an answer that is not "go to Settings". Typing one here adds
+      it to the saved list, exactly as the Settings Add button would, and the
+      push that writes into it is what creates it in the repo.
+    */
+    function chooseFolder(which, value) {
+      var val = normFolder(value);
+      var list = which === 'github' ? ghFolders : glFolders;
+      if (val && list.indexOf(val) === -1) list.push(val);
+      if (which === 'github') ghActiveFolder = val; else glActiveFolder = val;
+      if (which === 'github') renderGithubFolderList(); else renderFolderList();
+      persistSettings();    // remember both the pick and any new path
+      refreshRepoReadRow(); // a different folder is a different file to compare
+    }
+    window.PomFolderSelect.onChange = function(value) { chooseFolder('gitlab', value); };
+
+    /*
+      THE + BESIDE THE FOLDER PICKER, on the main screen.
+
+      It answers the one question the picker cannot: none of these is the
+      folder I want. What is typed becomes a saved path and the selected one,
+      and the push that writes into it is what creates it in the repo — git
+      has no empty directories to make in advance.
+
+      It shows only while what is typed is genuinely new. Beside a folder that
+      already exists it would have nothing to add, and a button that sometimes
+      does nothing is worse than one that is sometimes absent.
+    */
+    function activeFolderCombo() {
+      var which = activeRepoProvider();
+      if (!which) return null;
+      return which === 'github' ? window.PomGithubFolderSelect : window.PomFolderSelect;
+    }
+    function refreshFolderCreate() {
+      var mount = document.getElementById('folder-create-mount');
+      if (!mount) return;
+      var which = activeRepoProvider();
+      var combo = activeFolderCombo();
+      if (!which || !combo) { mount.hidden = true; return; }
+      var typed = normFolder(combo.getQuery());
+      var list = which === 'github' ? ghFolders : glFolders;
+      mount.hidden = !typed || list.indexOf(typed) !== -1;
+    }
+    document.getElementById('folder-create-btn').addEventListener('click', function () {
+      var which = activeRepoProvider();
+      var combo = activeFolderCombo();
+      if (!which || !combo) return;
+      var typed = normFolder(combo.getQuery());
+      if (!typed) return;
+      /* Through the combo's own commit so the field, the saved list and the
+         selection all move together — the same path a pick takes. */
+      combo.commit(typed);
+      refreshFolderCreate();
     });
-    document.getElementById('github-folder-new').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('github-folder-add-btn').click(); }
+    /*
+      The button's visibility depends on what is in a field, and a field being
+      typed into reports nothing to the page — so it is re-derived from the one
+      event that does arrive, the input's own.
+
+      ON THE NEXT TICK, NOT THIS ONE. This listener is in the capture phase and
+      React's is on the bubble, so reading the combo here gets the value from
+      BEFORE the keystroke: the button stayed hidden for the character that
+      should have revealed it, and appeared one keystroke late for ever after.
+    */
+    function refreshFolderCreateSoon() { setTimeout(refreshFolderCreate, 0); }
+    ['folder-select-mount', 'github-folder-select-mount'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', refreshFolderCreateSoon, true);
     });
+
+    document.getElementById('github-folder-add-btn').addEventListener('click', function() { addFolderPath('github'); });
 
     // Main-screen GitHub folder dropdown (shown only when relevant to the
     // current mainProviderTab) → same behavior as GitLab's own dropdown above.
-    window.PomGithubFolderSelect.onChange = function(value) {
-      ghActiveFolder = value;
-      renderGithubFolderList();
-      persistSettings();
-      refreshRepoReadRow(); // a different folder is a different file to compare
-    };
+    window.PomGithubFolderSelect.onChange = function(value) { chooseFolder('github', value); };
 
     // ── GitHub connection: optional, add/remove ────────────────────────────
     // Data-only init, factored out so the onboarding dialog (see
@@ -4792,10 +4909,19 @@
       empty folder list now leaves nothing in the block at all, and the
       honest rendering of that is no block rather than an empty box.
     */
-    function updateTargetRow(prefix, wanted, ready, isEmpty) {
-      var show = wanted && ready && !isEmpty;
-      document.getElementById(prefix + '-target-wrap').hidden = !show;
-      document.getElementById(prefix + '-filename-row').hidden = !show;
+    /*
+      WHICH PROVIDER'S FOLDER PICKER IS ON SCREEN. One control, one row, and
+      the row itself is shown by refreshRepoReadRow.
+
+      `isEmpty` NO LONGER HIDES IT. It used to: an empty dropdown with nothing
+      to select read as broken, so a provider with no saved paths showed an
+      explanatory row instead. The control is a Combobox now — with no saved
+      paths it is still the place you name one, and hiding it would take away
+      the only answer to "none of these is the folder I want".
+    */
+    function updateTargetRow(prefix, wanted, ready) {
+      var mountId = prefix === 'github' ? 'github-folder-select-mount' : 'folder-select-mount';
+      document.getElementById(mountId).hidden = !(wanted && ready);
     }
 
     // Once both providers are added, the folder-path blocks below are
@@ -4997,6 +5123,68 @@
     }
 
     /*
+      EVERY DIRECTORY IN THE REPOSITORY, in one request.
+
+      The recursive tree endpoint, not a walk: GitHub's git/trees?recursive=1
+      and GitLab's repository/tree?recursive=true each return the whole thing
+      at once. Measured against a real large repo (vercel/next.js): 48,749
+      entries, 15,890 of them directories, truncated: false. A per-directory
+      walk of that is thousands of requests for the same answer.
+
+      WHICH IS ALSO WHY NOTHING SHOWS ALL OF THEM. 15,890 checkboxes is not a
+      picker, and it is the reason the Settings page filters rather than
+      lists: you find the two or three folders that matter and those become
+      the ones the main screen offers.
+
+      TRUNCATION IS REPORTED, NOT HIDDEN. GitHub caps the response and says so
+      in `truncated`; a repo big enough to hit it would otherwise silently
+      appear to have fewer folders than it has, and someone would go looking
+      for the missing one in the wrong place.
+    */
+    var repoFolderCache = null;    // { key, folders, truncated }
+    function listRepoFolders(which) {
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      var where = which === 'gitlab' ? c.host + '#' + c.project : c.repo;
+      var key = which + '|' + where + '|' + c.branch + '|' + c.token;
+      if (repoFolderCache && repoFolderCache.key === key) return Promise.resolve(repoFolderCache);
+
+      var url, headers;
+      if (which === 'gitlab') {
+        url = c.host.replace(/\/+$/, '') + '/api/v4/projects/' + encodeURIComponent(c.project) +
+              '/repository/tree?recursive=true&per_page=100&ref=' + encodeURIComponent(c.branch);
+        headers = { 'PRIVATE-TOKEN': c.token };
+      } else {
+        var parts = (c.repo || '').split('/');
+        if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
+        url = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
+              encodeURIComponent(parts[1]) + '/git/trees/' + encodeURIComponent(c.branch) +
+              '?recursive=1';
+        headers = { 'Authorization': 'token ' + c.token, 'Accept': 'application/vnd.github+json' };
+      }
+      return fetch(url, { method: 'GET', headers: headers }).then(function (r) {
+        /* An empty repo has no tree at all, which is a fine answer: no
+           folders yet, and the first push makes one. */
+        if (r.status === 404 || r.status === 409) return { tree: [], truncated: false };
+        if (r.status === 401 || r.status === 403) throw { status: r.status, message: 'the token was refused' };
+        if (!r.ok) throw { status: r.status, message: 'the repo answered ' + r.status };
+        return r.json();
+      }).then(function (body) {
+        /* GitHub wraps it in { tree, truncated }; GitLab returns the array
+           itself and paginates rather than truncating. */
+        var rows = Array.isArray(body) ? body : (body && body.tree) || [];
+        var folders = rows.filter(function (e) {
+          return e && (e.type === 'tree' || e.type === 'dir');
+        }).map(function (e) { return e.path; });
+        folders.sort();
+        repoFolderCache = {
+          key: key, folders: folders,
+          truncated: !Array.isArray(body) && !!(body && body.truncated),
+        };
+        return repoFolderCache;
+      });
+    }
+
+    /*
       The repo's document, parsed, and kept.
 
       THE COMPARISON NEEDS THE BYTES AND SO DOES THE TOKEN COUNT, so this is
@@ -5065,6 +5253,7 @@
       mount.hidden = !which;
       var fileRow = document.getElementById('repo-file-row');
       if (fileRow) fileRow.hidden = !which;
+      refreshFolderCreate();
       if (!which) { repoCheckedFor = null; repoReadStatus(''); return; }
       /* The title names BOTH sides, because that is what makes it a
          comparison rather than a download: the file in the repo, and the
@@ -5188,12 +5377,12 @@
         window.PomMainProviderTab.setValue(mainProviderTab);
         var showGl = mainProviderTab === 'gitlab';
         var showGh = mainProviderTab === 'github';
-        updateTargetRow('gitlab', showGl, r.glReady, glFolders.length === 0);
-        updateTargetRow('github', showGh, r.ghReady, ghFolders.length === 0);
+        updateTargetRow('gitlab', showGl, r.glReady);
+        updateTargetRow('github', showGh, r.ghReady);
         if (showGh && r.ghReady) renderGithubFolderSelect();
       } else {
-        updateTargetRow('gitlab', r.wantsGitLab, r.glReady, glFolders.length === 0);
-        updateTargetRow('github', r.wantsGitHub, r.ghReady, ghFolders.length === 0);
+        updateTargetRow('gitlab', r.wantsGitLab, r.glReady);
+        updateTargetRow('github', r.wantsGitHub, r.ghReady);
         if (r.wantsGitHub && r.ghReady) renderGithubFolderSelect();
       }
       updateActionUI();
@@ -5210,6 +5399,7 @@
     function goToProviderSettingsField(provider, fieldId) {
       document.getElementById('main-page').classList.add('hidden');
       document.getElementById('settings-page').classList.add('visible');
+      loadRepoFolders();
       activeSettingsTab = provider;
       window.PomRepoTab.setValue(activeSettingsTab);
       updateProviderSectionVisibility();
@@ -5252,6 +5442,7 @@
       } else {
         document.getElementById('main-page').classList.add('hidden');
         document.getElementById('settings-page').classList.add('visible');
+        loadRepoFolders();
       }
     }
     document.getElementById('add-repo-settings-btn').addEventListener('click', goToFirstUnreadyProvider);
