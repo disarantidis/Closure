@@ -44,13 +44,36 @@ function splitSet(setName) {
     : { group: setName.slice(0, i), variant: setName.slice(i + 1), grouped: true };
 }
 
-function normaliseValue(raw) {
+function normaliseValue(raw, refCol) {
   if (typeof raw === 'string') {
     const m = PURE_REF.exec(raw.trim());
-    if (m) return { ref: m[1] };
+    if (m) return refCol ? { ref: m[1], refCol } : { ref: m[1] };
     if (raw.indexOf('{') !== -1) return { expr: raw };
   }
   return { literal: raw };
+}
+
+/*
+  WHICH COLLECTION A REFERENCE MEANT, when the file bothers to say.
+
+  "{a.b.c}" names a path, and a path can be visible from several collections at
+  once — which is the ordinary state of anything built on Figma's extended
+  collections, where one primitive is listed by every collection that inherits
+  it. Left at that the reference is genuinely ambiguous and the import has to
+  stop and ask, once per reference, about something the exporter knew.
+
+  So Closure's exporter writes it down (code.source.js, token.aliasCollection),
+  and this reads it back out of wherever the two shapes put it: a plain key in
+  legacy, swept into the vendor extension by the DTCG writer. Absent on a file
+  from anywhere else, and absent on Closure's own older exports, which is why
+  nothing depends on it being there.
+*/
+const CLOSURE_EXT = 'com.closure.legacyJson';
+function refCollectionOf(node) {
+  if (!node || typeof node !== 'object') return null;
+  if (node.aliasCollection) return node.aliasCollection;
+  const ext = node.$extensions && node.$extensions[CLOSURE_EXT];
+  return (ext && ext.aliasCollection) || null;
 }
 
 /* ── Tokens Studio / Closure "legacy" ──────────────────────────────────────
@@ -76,7 +99,7 @@ function fromLegacy(doc) {
             group, variant, set,
             path: path.concat(k).join('.'),
             type: v.type,
-            value: normaliseValue(v.value),
+            value: normaliseValue(v.value, refCollectionOf(v)),
             description: v.description || '',
           });
         } else {
@@ -138,7 +161,7 @@ function fromDtcg(doc) {
             group, variant, set: top,
             path: path.concat(k).join('.'),
             type: v.$type || t || null,
-            value: normaliseValue(v.$value),
+            value: normaliseValue(v.$value, refCollectionOf(v)),
             description: v.$description || '',
           });
         } else {
@@ -168,7 +191,7 @@ function fromFlat(doc, name) {
       const typ = v.$type || v.type;
       if (val !== undefined && typ) {
         rows.push({ group, variant: group, set: group, path: path.concat(k).join('.'),
-                    type: typ, value: normaliseValue(val),
+                    type: typ, value: normaliseValue(val, refCollectionOf(v)),
                     description: v.$description || v.description || '' });
       } else walk(v, path.concat(k));
     }
@@ -219,7 +242,8 @@ function toIR(doc, opts) {
   return fromFlat(doc, opts && opts.name);
 }
 
-  var api = { toIR, detect, fromLegacy, fromDtcg, fromFlat, splitSet, normaliseValue };
+  var api = { toIR, detect, fromLegacy, fromDtcg, fromFlat, splitSet, normaliseValue,
+              refCollectionOf };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.PomImportIR = api;

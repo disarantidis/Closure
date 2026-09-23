@@ -4307,6 +4307,18 @@
       if (plan.losses.composites.length) {
         html += fact(plan.losses.composites.length, 'shadows and type styles — not variables in Figma', true);
       }
+      /*
+        SETTLED, NOT HIDDEN. Each of these is a path several collections define
+        with the identical value in every mode — one variable that every
+        collection extending its owner also lists, written out once per
+        collection. Picking between identical answers is not a decision, so it
+        is not asked; but it is still something the import did on its own, and
+        a number here is the difference between quiet and silent.
+      */
+      if (plan.refDuplicates && plan.refDuplicates.length) {
+        html += fact(plan.refDuplicates.length,
+                     'paths defined identically in several collections — read as one');
+      }
       document.getElementById('import-facts').innerHTML = html;
       document.getElementById('import-summary').hidden = false;
     }

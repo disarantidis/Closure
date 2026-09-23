@@ -209,6 +209,48 @@ function findParentCollection(collections, modeCollectionName) {
 }
 
 // --- CONSTRUCT PROPER ALIAS PATH ---
+/*
+  DOES THIS COLLECTION HOLD ITS OWN VALUE FOR THE VARIABLE, or is it only
+  seeing the owner's?
+
+  An extended collection lists every variable it inherits among its own
+  variableIds, so a collection can "have" a variable it has nothing to say
+  about. Writing those out is what turned one colour into 38 identical copies —
+  45% of a real 40 MB export — and what made a "{path}" reference ambiguous on
+  the way back in, since 38 documents defined the path and the reference named
+  none of them.
+
+  Unchanged means unchanged, and anything else counts as an override. A mode is
+  inherited when its parent mode holds the identical value, or when the owner
+  holds ONE value across all of its modes and this is it. A mode passing
+  neither is an override, and one override makes the whole variable worth
+  writing here — the failure to avoid is dropping a real value, never keeping a
+  copy.
+
+  `ownValues` is the OWNER's valuesByMode; `collectionValues` is what this
+  collection sees, keyed by its own mode ids.
+*/
+function inheritsUnchanged(collectionValues, ownValues, colModes) {
+  var own = ownValues || {};
+  var distinct = {};
+  Object.keys(own).forEach(function(k) { distinct[JSON.stringify(own[k])] = 1; });
+  var keys = Object.keys(distinct);
+  var single = keys.length === 1 ? keys[0] : null;
+
+  var parentOf = {};
+  (colModes || []).forEach(function(m) { parentOf[m.modeId] = m.parentModeId || null; });
+
+  var ids = Object.keys(collectionValues || {});
+  /* Nothing to compare is not evidence of inheritance. */
+  if (!ids.length) return false;
+  return ids.every(function(mId) {
+    var here = JSON.stringify(collectionValues[mId]);
+    var pm = parentOf[mId];
+    if (pm && own[pm] !== undefined && JSON.stringify(own[pm]) === here) return true;
+    return single !== null && single === here;
+  });
+}
+
 function buildAliasPath(aliasedVar, aliasedVarCollection, currentCollectionName, collections) {
   if (!aliasedVar) return null;
   
@@ -814,6 +856,29 @@ function transformToFinalFormat(rawData, options) {
         }
 
         var token = { type: finalType, value: tokenValue };
+
+        /*
+          WHICH COLLECTION THE ALIAS POINTS AT — the one fact "{a.b.c}" cannot
+          carry, and the reason importing this file back used to be impossible.
+
+          In Figma an alias names a variable, and a variable belongs to exactly
+          one collection. Written as a path that collection is gone, and when
+          the same path is visible from several collections — which is the
+          normal state of a file built on extended collections — nothing in the
+          document says which one was meant. The importer had to stop and ask,
+          once per reference: 4,880 questions on a real file, about a fact the
+          exporter was holding at this line and dropping.
+
+          A plain extra key on the token: the DTCG writer sweeps anything it has
+          no home for into $extensions["com.closure.legacyJson"] (see
+          dtcg-format.js), so it survives both shapes and every other tool
+          ignores it. It names a COLLECTION, not a variable id, because ids are
+          local to the file that produced them and this has to survive being
+          imported somewhere else — which is the entire point of the round trip.
+        */
+        if (aliasData && aliasData.isAlias && aliasData.aliasedVarCollection) {
+          token.aliasCollection = aliasData.aliasedVarCollection;
+        }
 
         // Figma's per-variable description. Carried on every mode's token (the
         // description belongs to the variable, not the mode) and surfaced as
@@ -3076,6 +3141,24 @@ figma.ui.onmessage = function(msg) {
         });
       });
 
+      /*
+        WHICH COLLECTION A VARIABLE ACTUALLY LIVES IN.
+
+        Not variableIdToCollection, which cannot answer this: an extended
+        collection lists every variable it INHERITS in its own variableIds, so
+        one primitive appears in the ids of every collection that extends its
+        owner, and the loop above keeps whichever came last. For a file where
+        eleven collections extend one base that is an arbitrary borrower, and
+        it is arbitrary for exactly the variables this matters for.
+
+        variable.variableCollectionId is the owner, stated by Figma. Mapped
+        through this rather than inferred.
+      */
+      var collectionIdToName = new Map();
+      collections.forEach(function(col) {
+        collectionIdToName.set(col.id, stripIcons(col.name));
+      });
+
       // --- DIAGNOSTIC: log each collection's extended-collection properties ---
       collections.forEach(function(col) {
         var isExt = !!col.isExtension;
@@ -3186,6 +3269,27 @@ figma.ui.onmessage = function(msg) {
               var variable = pair.variable;
               var collectionValues = pair.collectionValues;
 
+              /*
+                IS THIS COLLECTION THE VARIABLE'S HOME, OR IS IT BORROWING IT?
+
+                An extended collection lists every variable it inherits in its
+                own variableIds, so walking collections and writing what each
+                one can see emits a single primitive once per collection. On a
+                real file that was one colour written into 38 documents, 45% of
+                a 40 MB export — and, worse, it is what made references to it
+                ambiguous on the way back in: 38 definitions of a path, and a
+                "{path}" naming none of them.
+
+                So: written where it lives, plus anywhere it is actually
+                OVERRIDDEN, because an override is a real value that exists
+                nowhere else. Never written where it is merely visible.
+              */
+              var ownerCollection = collectionIdToName.get(variable.variableCollectionId) || null;
+              var borrowed = !!(ownerCollection && ownerCollection !== stripIcons(col.name));
+              if (borrowed && inheritsUnchanged(collectionValues, variable.valuesByMode, col.modes)) {
+                return;                           // visible here, but it lives elsewhere
+              }
+
               var valuesByMode = {}, resolvedValuesByMode = {}, aliasInfo = {};
 
               Object.entries(collectionValues).forEach(function(entry) {
@@ -3198,7 +3302,10 @@ figma.ui.onmessage = function(msg) {
                       var currentVal = val;
                       var firstAliasedVar = await figma.variables.getVariableByIdAsync(currentVal.id);
                       if (firstAliasedVar) {
-                        var aliasedVarCollection = variableIdToCollection.get(firstAliasedVar.id);
+                        /* The owner, not a borrower — see collectionIdToName. */
+                        var aliasedVarCollection =
+                              collectionIdToName.get(firstAliasedVar.variableCollectionId) ||
+                              variableIdToCollection.get(firstAliasedVar.id);
                         var aliasPath = buildAliasPath(firstAliasedVar, aliasedVarCollection, col.name, collections);
                         aliasInfo[mId] = {
                           isAlias: true,
@@ -3232,6 +3339,10 @@ figma.ui.onmessage = function(msg) {
                 valuesByMode: valuesByMode,
                 resolvedValuesByMode: resolvedValuesByMode,
                 aliasInfo: aliasInfo,
+                /* Where it lives, and whether this collection is only holding
+                   an override of it — carried so the export can say so. */
+                ownerCollection: ownerCollection,
+                borrowed: borrowed,
                 codeSyntax: variable.codeSyntax,
                 // Where Figma allows this variable to be used (CORNER_RADIUS, GAP,
                 // FONT_SIZE, ...). It is the same semantic distinction the token

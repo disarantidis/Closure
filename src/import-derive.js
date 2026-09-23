@@ -284,6 +284,14 @@ function levelCandidates(ir, opts) {
   return out;
 }
 
+/* The first segment of a dotted path, which is the name family a token belongs
+   to ("restrictions.basic.text" -> "restrictions"). A leading dot is part of
+   the name, not a separator — ".core.red" is one root, not an empty one. */
+function rootOfPath(path) {
+  const i = path.indexOf('.', path.charAt(0) === '.' ? 1 : 0);
+  return i === -1 ? path : path.slice(0, i);
+}
+
 function derive(ir, opts) {
   opts = opts || {};
   /*
@@ -325,6 +333,10 @@ function derive(ir, opts) {
     blocked: [],
     losses: { composites: [], expressions: [], unresolvedRefs: [], typeConflicts: [], emptyCollections: [] },
     refCollisions: [],
+    /* Paths several collections list with the SAME value in every mode — one
+       inherited variable written out once per collection, not a decision. Kept
+       so the count is reportable, but never asked about. */
+    refDuplicates: [],
     /* Every open question, by id. compile() refuses while this is non-empty,
        and each entry names exactly what a decision for it must say. */
     unresolved: [],
@@ -582,22 +594,117 @@ function derive(ir, opts) {
      carries no meaning — so a duplicate nobody references is not a question,
      and asking about it would bury the real ones. */
   const referenced = new Set();
+  /* A reference that NAMES its collection answers itself — see refCollectionOf
+     in import-ir.js. Only the ones that do not can make a path ambiguous, so
+     only they are counted here; a path every reference already resolves is not
+     a question however many collections list it. */
+  const referencedBlind = new Set();
   for (const spec of vars.values()) {
-    for (const v of spec.values.values()) if (v.ref !== undefined) referenced.add(v.ref);
+    for (const v of spec.values.values()) {
+      if (v.ref === undefined) continue;
+      referenced.add(v.ref);
+      if (!v.refCol) referencedBlind.add(v.ref);
+    }
   }
 
+  /*
+    THE SAME ANSWER SPELLED SIX WAYS IS NOT A QUESTION.
+
+    A path listed by several collections is usually one variable that several
+    collections INHERIT — Figma's extended collections, where a primitive
+    defined once is visible from every collection built on it, and an exporter
+    walking collections writes it out once per collection. On a real file 3,457
+    of 4,880 collisions were that: every candidate holding the identical value
+    in every mode, so every button on the panel resolved to the same colour.
+
+    Asking those buries the ones that matter, and there is no answer to give:
+    whichever is picked, nothing about the imported file differs. So they are
+    settled here and reported as a note. Only a path whose candidates actually
+    disagree is put to the person.
+  */
+  const sameEverywhere = (list) => {
+    const seen = new Set();
+    for (const s of list) {
+      for (const v of s.values.values()) {
+        seen.add(JSON.stringify(v));
+        if (seen.size > 1) return false;
+      }
+    }
+    return true;
+  };
+
   const refTarget = new Map();              // path -> the one spec it resolves to
+  const byPathCol = new Map();              // path -> Map(collection -> spec)
+  const pending = [];                       // genuinely ambiguous, grouped below
   for (const [p, list] of byPath) {
     const live = list.filter((s) => s.ft !== null);
+    if (live.length) {
+      const m = new Map();
+      for (const s of live) m.set(s.col, s);
+      byPathCol.set(p, m);
+    }
     if (live.length <= 1) { if (live.length) refTarget.set(p, live[0]); continue; }
     if (!referenced.has(p)) continue;       // duplicated, but nothing can hit it
     const id = 'ref:' + p;
     const answer = claim(id);
     const picked = answer && live.filter((s) => s.col === answer)[0];
     if (picked) { refTarget.set(p, picked); continue; }
+    /* Every reference to it says which collection it means. */
+    if (!referencedBlind.has(p)) { refTarget.set(p, live[0]); continue; }
+    if (sameEverywhere(live)) {
+      /* Deterministic, so two runs of the same file agree: the order byPath
+         was built in, which is the order the document declares its sets. */
+      refTarget.set(p, live[0]);
+      plan.refDuplicates.push({ path: p, collections: live.map((s) => s.col), used: live[0].col });
+      continue;
+    }
     plan.refCollisions.push({ path: p, collections: live.map((s) => s.col) });
-    ask(id, 'Path "' + p + '" is defined in ' + live.length + ' collections. Which one do references to it mean?',
-        live.map((s) => s.col), { evidence: 'defined in: ' + live.map((s) => s.col).join(', ') });
+    pending.push({ path: p, live });
+  }
+
+  /*
+    ONE QUESTION PER SITUATION, NOT PER TOKEN.
+
+    What is left is genuinely ambiguous, and on a real file it was still 1,423
+    questions — a wall nobody gets through, which is the same as refusing the
+    import. But they are not 1,423 different situations: they collapse to seven,
+    because every "restrictions.*" path defined in the same three collections is
+    the same decision asked over and over. Grouped by the token's own root and
+    the exact set of collections defining it — two paths only share a question
+    when they are ambiguous in identical ways.
+
+    A per-path decision still wins (claim('ref:' + path) above is tried first),
+    so answering the group is a default, not a ceiling.
+  */
+  const groups2 = new Map();
+  for (const it of pending) {
+    const cols = it.live.map((s) => s.col);
+    const key = rootOfPath(it.path) + '\u0000' + cols.join(',');
+    if (!groups2.has(key)) groups2.set(key, { cols, paths: [], live: it.live });
+    groups2.get(key).paths.push(it.path);
+  }
+  for (const [key, g] of groups2) {
+    const id = 'refgroup:' + key.replace('\u0000', '|');
+    const answer = claim(id);
+    const hit = answer && g.live.filter((s) => s.col === answer)[0];
+    for (const path of g.paths) {
+      const m = byPathCol.get(path);
+      const picked = (answer && m && m.get(answer)) || null;
+      if (picked) refTarget.set(path, picked);
+    }
+    if (hit || (answer && g.paths.every((x) => refTarget.has(x)))) continue;
+    const root = key.slice(0, key.indexOf('\u0000'));
+    ask(id, g.paths.length === 1
+          ? 'Path "' + g.paths[0] + '" is defined in ' + g.cols.length +
+            ' collections. Which one do references to it mean?'
+          : g.paths.length + ' paths under "' + root + '" are defined in ' + g.cols.length +
+            ' collections. Which one do references to them mean?',
+        g.cols.slice(),
+        { evidence: 'defined in: ' + g.cols.join(', ') +
+                    (g.paths.length > 1
+                      ? '  ·  e.g. ' + g.paths.slice(0, 3).join(', ') +
+                        (g.paths.length > 3 ? ', …' : '')
+                      : '') });
   }
 
   /* ── 6. walk every value, classify what can and cannot land ────────────── */
@@ -610,7 +717,12 @@ function derive(ir, opts) {
     importable++;
     for (const [mode, v] of spec.values) {
       if (v.ref !== undefined) {
-        const target = refTarget.get(v.ref);
+        /* The collection the exporter recorded wins over the path's single
+           winner: the winner is one guess for the whole document, this is the
+           fact for this reference. Falls through when the file does not carry
+           it, or names a collection this document does not define. */
+        const hinted = v.refCol && byPathCol.has(v.ref) ? byPathCol.get(v.ref).get(v.refCol) : null;
+        const target = hinted || refTarget.get(v.ref);
         if (!target) {
           const known = byPath.has(v.ref);
           plan.losses.unresolvedRefs.push({ collection: spec.col, path: spec.path, mode, ref: v.ref,

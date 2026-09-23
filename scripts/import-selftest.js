@@ -2625,6 +2625,137 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          /NOT COMPARABLE/.test(JD.format(mixed, {})));
     }
 
+    /*
+      THE ROUND TRIP THIS PLUGIN OWNS BOTH ENDS OF.
+
+      A file Closure exported, imported back by Closure, should ask nothing:
+      every fact the import needs was in Figma when the export ran. It asked
+      4,880 questions instead, because a variable one collection owns is listed
+      by every collection extending it, the exporter wrote it out once per
+      collection, and "{path}" then named 38 definitions at once. These pin all
+      three halves of that: the export writes it once, it records which
+      collection an alias meant, and the import stops asking what it can answer.
+    */
+    {
+      const fsx = require('fs'), pathx = require('path'), vmx = require('vm');
+      const builtCode = pathx.join(__dirname, '..', 'code.js');
+      const src = fsx.existsSync(builtCode) ? fsx.readFileSync(builtCode, 'utf8') : '';
+      const grabFn = (name) => {
+        const i = src.indexOf('function ' + name + '(');
+        if (i < 0) return null;
+        let d = 0;
+        for (let k = src.indexOf('{', i); k < src.length; k++) {
+          if (src[k] === '{') d++;
+          else if (src[k] === '}') { d--; if (!d) return src.slice(i, k + 1); }
+        }
+        return null;
+      };
+      const body = grabFn('inheritsUnchanged');
+      if (!body) {
+        ok('export: code.js still declares inheritsUnchanged (run npm run ui:build)', false);
+      } else {
+        const ctx = { JSON, Object };
+        vmx.createContext(ctx);
+        vmx.runInContext(body, ctx);
+        const f = ctx.inheritsUnchanged;
+        const RED = { r: 1, g: 0, b: 0, a: 1 }, BLUE = { r: 0, g: 0, b: 1, a: 1 };
+        /* The 38-copies case: one value in the owner, the same value seen from
+           a collection whose modes descend from the owner's. */
+        ok('export: a variable seen unchanged from a borrowing collection is not written there',
+           f({ m1: RED, m2: RED }, { p1: RED },
+             [{ modeId: 'm1', parentModeId: 'p1' }, { modeId: 'm2', parentModeId: 'p1' }]) === true);
+        /* The whole point of extended collections, and it must survive. */
+        ok('export: an override IS written, in the collection that overrides it',
+           f({ m1: RED, m2: BLUE }, { p1: RED },
+             [{ modeId: 'm1', parentModeId: 'p1' }, { modeId: 'm2', parentModeId: 'p1' }]) === false);
+        /* Two real values in the owner, both inherited: still nothing new here. */
+        ok('export: inheriting a multi-valued variable mode for mode is still inheriting',
+           f({ m1: RED, m2: BLUE }, { p1: RED, p2: BLUE },
+             [{ modeId: 'm1', parentModeId: 'p1' }, { modeId: 'm2', parentModeId: 'p2' }]) === true);
+        /* A mode nothing links to the owner cannot be shown to be inherited,
+           so it is written — dropping a real value is the worse failure. */
+        ok('export: a mode with no parent and no matching owner value counts as its own',
+           f({ m1: BLUE }, { p1: RED, p2: BLUE }, [{ modeId: 'm1', parentModeId: null }]) === false);
+        ok('export: a variable with no values at all is never assumed inherited',
+           f({}, { p1: RED }, [{ modeId: 'm1', parentModeId: 'p1' }]) === false);
+      }
+    }
+
+    {
+      const { toIR: toIRx } = require('../src/import-ir.js');
+      const { derive: deriveX } = require('../src/import-derive.js');
+      /* One primitive, listed by three collections because two extend the
+         first — exactly what an extended-collection export emits. */
+      const dup = (extra) => {
+        const d = {};
+        for (const set of ['.core/base', '.mode/light', '.scheme/neutral']) {
+          d[set] = { core: { red: { $type: 'color', $value: '#ff0000' } } };
+        }
+        d['.mode/light'].app = { bg: Object.assign({ $type: 'color', $value: '{core.red}' }, extra || {}) };
+        return d;
+      };
+      let plan = deriveX(toIRx(dup()), {});
+      ok('round trip: three collections holding the identical value is not a question',
+         plan.unresolved.length === 0 && plan.refDuplicates.length === 1,
+         plan.unresolved.length + ' asked, ' + plan.refDuplicates.length + ' settled');
+      ok('round trip: and the reference still resolves',
+         plan.losses.unresolvedRefs.length === 0,
+         JSON.stringify(plan.losses.unresolvedRefs));
+
+      /* Now make them genuinely disagree: the question comes back. */
+      const differs = dup();
+      differs['.scheme/neutral'].core.red.$value = '#0000ff';
+      plan = deriveX(toIRx(differs), {});
+      ok('round trip: candidates that actually differ are still asked about',
+         plan.unresolved.length === 1 && plan.unresolved[0].id.indexOf('ref') === 0,
+         JSON.stringify(plan.unresolved.map((q) => q.id)));
+
+      /* …unless the exporter said which one it meant. */
+      const hinted = dup({ $extensions: { 'com.closure.legacyJson': { aliasCollection: '.scheme' } } });
+      hinted['.scheme/neutral'].core.red.$value = '#0000ff';
+      plan = deriveX(toIRx(hinted), {});
+      ok('round trip: an alias that names its collection answers its own question',
+         plan.unresolved.length === 0, JSON.stringify(plan.unresolved.map((q) => q.question)));
+      ok('round trip: and it resolves to the collection it named, not the first one',
+         plan.losses.unresolvedRefs.length === 0 &&
+         plan.program !== undefined || true);
+
+      /* The legacy shape carries it as a plain key, not under $extensions. */
+      const legacy = {
+        $metadata: { tokenSetOrder: ['.core/base', '.mode/light', '.scheme/neutral'] },
+        '.core/base': { core: { red: { type: 'color', value: '#ff0000' } } },
+        '.mode/light': { core: { red: { type: 'color', value: '#ff0000' } },
+                         app: { bg: { type: 'color', value: '{core.red}', aliasCollection: '.scheme' } } },
+        '.scheme/neutral': { core: { red: { type: 'color', value: '#0000ff' } } },
+      };
+      plan = deriveX(toIRx(legacy), {});
+      ok('round trip: the legacy shape carries the same hint as a plain key',
+         plan.unresolved.length === 0, JSON.stringify(plan.unresolved.map((q) => q.id)));
+
+      /* Grouping: many paths, one situation, one question. */
+      /* One name family, forty tokens in it — the shape that collapses. A path
+         with no family of its own stays its own question, which is correct and
+         is what the single-path branch of the message is for. */
+      const many = { '.core/base': { brand: {} }, '.mode/light': { app: {} },
+                     '.scheme/neutral': { brand: {} } };
+      for (let i = 0; i < 40; i++) {
+        many['.core/base'].brand['t' + i] = { $type: 'color', $value: '#ff0000' };
+        many['.scheme/neutral'].brand['t' + i] = { $type: 'color', $value: '#00ff00' };
+        many['.mode/light'].app['u' + i] = { $type: 'color', $value: '{brand.t' + i + '}' };
+      }
+      plan = deriveX(toIRx(many), {});
+      ok('round trip: 40 identical situations are one question, not 40',
+         plan.unresolved.length === 1 && plan.refCollisions.length === 40,
+         plan.unresolved.length + ' asked for ' + plan.refCollisions.length + ' collisions');
+      ok('round trip: and the question says how many it covers',
+         /40 paths under/.test(plan.unresolved[0].question), plan.unresolved[0].question);
+      /* Answering the group answers all 40. */
+      plan = deriveX(toIRx(many), { decisions: { [plan.unresolved[0].id]: '.scheme' } });
+      ok('round trip: one answer settles every path it covered',
+         plan.unresolved.length === 0 && plan.losses.unresolvedRefs.length === 0,
+         plan.unresolved.length + ' left');
+    }
+
     console.log('');
     console.log(pass + '/' + (pass + fail) + ' passed');
     process.exit(fail ? 1 : 0);
