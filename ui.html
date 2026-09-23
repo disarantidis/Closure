@@ -49364,7 +49364,7 @@ html[data-theme=dark] {
       const [s, setS] = (0, import_react18.useState)(state);
       apply = setS;
       const q = s.query.trim().toLowerCase();
-      const hay = (n) => n === "" ? "repo root" : n.toLowerCase();
+      const hay = (n) => n === "/" ? "/ repo root repository" : n.toLowerCase();
       const matches = !q || s.query === s.selected ? s.all : s.all.filter((n) => hay(n).indexOf(q) !== -1);
       const LIMIT = 50;
       const options = matches.slice(0, LIMIT);
@@ -49387,7 +49387,10 @@ html[data-theme=dark] {
           options,
           getKey: (o) => o,
           onPick: (o) => commit(o),
-          renderOption: (o, st) => /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { style: { fontWeight: st.active ? 600 : 400 }, children: o || "(repo root)" }),
+          renderOption: (o, st) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("span", { style: { fontWeight: st.active ? 600 : 400 }, children: [
+            o,
+            o === "/" && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { style: { opacity: 0.6 }, children: "  repository root" })
+          ] }),
           footer: isNew ? /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { children: `Press + to use \u201C${typed}\u201D \u2014 created on the first push` }) : hidden > 0 ? /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { children: `+${hidden.toLocaleString()} more \u2014 type to narrow` }) : void 0,
           emptyMessage: s.all.length ? "No folder here by that name" : "No folders in this repo yet"
         }
@@ -49413,8 +49416,8 @@ html[data-theme=dark] {
     };
   }
   mountIconButton("folder-create-mount", { id: "folder-create-btn", variant: "outline", size: "medium", title: "Use this folder path \u2014 created on the first push", "aria-label": "Use this folder path", icon: IconAdd(16) }, CARD_LEVEL);
-  window.PomFolderSelect = { ...mountFolderCombo("folder-select-mount", "PomFolderSelect", "(repo root)"), onChange: null };
-  window.PomGithubFolderSelect = { ...mountFolderCombo("github-folder-select-mount", "PomGithubFolderSelect", "(repo root)"), onChange: null };
+  window.PomFolderSelect = { ...mountFolderCombo("folder-select-mount", "PomFolderSelect", "choose a folder"), onChange: null };
+  window.PomGithubFolderSelect = { ...mountFolderCombo("github-folder-select-mount", "PomGithubFolderSelect", "choose a folder"), onChange: null };
   window.PomFolderNew = { ...mountFolderCombo("folder-new-mount", "PomFolderNew", "find or type a folder"), onChange: null };
   window.PomGithubFolderNew = { ...mountFolderCombo("github-folder-new-mount", "PomGithubFolderNew", "find or type a folder"), onChange: null };
   function mountFolderList(mountId, bridgeKey, idPrefix, level = GROUND) {
@@ -53902,7 +53905,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '267842d 09:54:00';
+    var CLOSURE_BUILD = '692db3f 10:02:10';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -54288,18 +54291,35 @@ function format(report, opts) {
       a list of folders containing an empty string is a list with a hole in it,
       and chooseFolder already declines to save one.
     */
-    var ROOT_FOLDER_LABEL = '(repo root)';
+    /*
+      THE ROOT IS WRITTEN "/", BECAUSE A CHOSEN THING HAS TO LOOK CHOSEN.
+
+      It was the empty string, which is what the root actually is — no folder —
+      and that is exactly why it could not be seen. An empty value leaves the
+      field empty, an empty field shows its placeholder, and a placeholder is
+      grey: choosing the root looked identical to having chosen nothing at all.
+
+      "/" is the root written down. It is real text in the field, in the
+      colour every other value has, it is the notation a path already uses, and
+      it survives the round trip for free — normFolder strips leading and
+      trailing slashes, so "/" arrives at the rest of the app as the empty
+      folder it has always been, with nothing to special-case.
+    */
+    var ROOT_FOLDER_VALUE = '/';
     function withRootOption(folders) {
-      var items = [{ label: ROOT_FOLDER_LABEL, value: '' }];
+      var items = [{ label: ROOT_FOLDER_VALUE, value: ROOT_FOLDER_VALUE }];
       folders.forEach(function (path) {
         if (!path) return;                 // the root is already first
         items.push({ label: path, value: path });
       });
       return items;
     }
+    /* '' is how the root is STORED; '/' is how it is shown. The one place the
+       two meet. */
+    function folderDisplay(path) { return path || ROOT_FOLDER_VALUE; }
 
     function renderFolderSelect() {
-      window.PomFolderSelect.setItems(withRootOption(glFolders), glActiveFolder);
+      window.PomFolderSelect.setItems(withRootOption(glFolders), folderDisplay(glActiveFolder));
     }
 
     // GitHub's independent folder-path list — same shape/behavior as
@@ -54340,7 +54360,7 @@ function format(report, opts) {
     // Main screen: GitHub's own folder dropdown, shown only when relevant
     // to the current mainProviderTab (see updatePushTargetUI()).
     function renderGithubFolderSelect() {
-      window.PomGithubFolderSelect.setItems(withRootOption(ghFolders), ghActiveFolder);
+      window.PomGithubFolderSelect.setItems(withRootOption(ghFolders), folderDisplay(ghActiveFolder));
     }
 
     // Settings has no view/edit mode: every field is editable the moment

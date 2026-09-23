@@ -3193,18 +3193,35 @@
       a list of folders containing an empty string is a list with a hole in it,
       and chooseFolder already declines to save one.
     */
-    var ROOT_FOLDER_LABEL = '(repo root)';
+    /*
+      THE ROOT IS WRITTEN "/", BECAUSE A CHOSEN THING HAS TO LOOK CHOSEN.
+
+      It was the empty string, which is what the root actually is — no folder —
+      and that is exactly why it could not be seen. An empty value leaves the
+      field empty, an empty field shows its placeholder, and a placeholder is
+      grey: choosing the root looked identical to having chosen nothing at all.
+
+      "/" is the root written down. It is real text in the field, in the
+      colour every other value has, it is the notation a path already uses, and
+      it survives the round trip for free — normFolder strips leading and
+      trailing slashes, so "/" arrives at the rest of the app as the empty
+      folder it has always been, with nothing to special-case.
+    */
+    var ROOT_FOLDER_VALUE = '/';
     function withRootOption(folders) {
-      var items = [{ label: ROOT_FOLDER_LABEL, value: '' }];
+      var items = [{ label: ROOT_FOLDER_VALUE, value: ROOT_FOLDER_VALUE }];
       folders.forEach(function (path) {
         if (!path) return;                 // the root is already first
         items.push({ label: path, value: path });
       });
       return items;
     }
+    /* '' is how the root is STORED; '/' is how it is shown. The one place the
+       two meet. */
+    function folderDisplay(path) { return path || ROOT_FOLDER_VALUE; }
 
     function renderFolderSelect() {
-      window.PomFolderSelect.setItems(withRootOption(glFolders), glActiveFolder);
+      window.PomFolderSelect.setItems(withRootOption(glFolders), folderDisplay(glActiveFolder));
     }
 
     // GitHub's independent folder-path list — same shape/behavior as
@@ -3245,7 +3262,7 @@
     // Main screen: GitHub's own folder dropdown, shown only when relevant
     // to the current mainProviderTab (see updatePushTargetUI()).
     function renderGithubFolderSelect() {
-      window.PomGithubFolderSelect.setItems(withRootOption(ghFolders), ghActiveFolder);
+      window.PomGithubFolderSelect.setItems(withRootOption(ghFolders), folderDisplay(ghActiveFolder));
     }
 
     // Settings has no view/edit mode: every field is editable the moment

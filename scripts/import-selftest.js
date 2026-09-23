@@ -1820,7 +1820,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
         };
         const names = ['repoFilePath', 'pushFilePath', 'repoSelectedFile', 'listRepoJsonFiles',
                        'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
-                       'pushOverwriteNote', 'withRootOption'];
+                       'pushOverwriteNote', 'withRootOption', 'folderDisplay'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1847,8 +1847,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ctx.PomRepoFile = { get: () => picked, set: (v) => { picked = v; }, setOptions: () => {}, onChange: null };
           ctx.repoFileNames = [];
           ctx.repoFileName = undefined;
-          /* withRootOption reads it; the label lives beside it in the template. */
-          ctx.ROOT_FOLDER_LABEL = '(repo root)';
+          /* withRootOption reads it; it lives beside it in the template. */
+          ctx.ROOT_FOLDER_VALUE = '/';
           ctx.window = ctx;
           vmx.createContext(ctx);
           vmx.runInContext(lifted.join('\n'), ctx);
@@ -2060,13 +2060,27 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           */
           ok('folders: the root is offered even when two paths are saved',
              JSON.stringify(ctx.withRootOption(['tokens/out', 'src/theme'])) ===
-             JSON.stringify([{ label: '(repo root)', value: '' },
-                             { label: 'tokens/out', value: '' + 'tokens/out' },
+             JSON.stringify([{ label: '/', value: '/' },
+                             { label: 'tokens/out', value: 'tokens/out' },
                              { label: 'src/theme', value: 'src/theme' }]),
              JSON.stringify(ctx.withRootOption(['tokens/out', 'src/theme'])));
           ok('folders: and when none are',
              JSON.stringify(ctx.withRootOption([])) ===
-             JSON.stringify([{ label: '(repo root)', value: '' }]));
+             JSON.stringify([{ label: '/', value: '/' }]));
+
+          /*
+            A CHOSEN THING HAS TO LOOK CHOSEN.
+
+            The root was the empty string — which is what it is — and an empty
+            value leaves the field empty, an empty field shows its placeholder,
+            and a placeholder is grey. Choosing the root was pixel-identical to
+            having chosen nothing. "/" is the root written down, and it costs
+            no translation layer: normFolder already strips slashes, so it
+            arrives at the rest of the app as the empty folder it always was.
+          */
+          ok('folders: the root is DISPLAYED as a value, not as an empty field',
+             ctx.folderDisplay('') === '/' && ctx.folderDisplay('tokens/out') === 'tokens/out',
+             ctx.folderDisplay(''));
           /* Prepended, never stored: a saved list holding an empty string is a
              list with a hole in it, and an already-saved '' would otherwise
              produce the root twice. */

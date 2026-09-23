@@ -1293,11 +1293,10 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
     const [s, setS] = useState<S>(state);
     apply = setS;
     const q = s.query.trim().toLowerCase();
-    /* The repo root is the empty string, so it matches no query by its value
-       and would vanish the moment anyone typed. It is searched by the words it
-       is DRAWN with instead — "root" finds it, which is what someone typing
-       would expect and the only thing they could type. */
-    const hay = (n: string) => (n === '' ? 'repo root' : n.toLowerCase());
+    /* "/" is one character and matches almost nothing anyone would type, so
+       the root is searched by the words it MEANS as well — "root" and "repo"
+       both find it, which is what someone looking for it would reach for. */
+    const hay = (n: string) => (n === '/' ? '/ repo root repository' : n.toLowerCase());
     const matches = (!q || s.query === s.selected)
       ? s.all
       : s.all.filter((n) => hay(n).indexOf(q) !== -1);
@@ -1342,7 +1341,12 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
         getKey={(o: string) => o}
         onPick={(o: string) => commit(o)}
         renderOption={(o: string, st: { active: boolean }) => (
-          <span style={{ fontWeight: st.active ? 600 : 400 }}>{o || '(repo root)'}</span>
+          <span style={{ fontWeight: st.active ? 600 : 400 }}>
+            {o}
+            {/* The list can afford to say what "/" means; the field cannot,
+                and does not need to — there it is a value in a path field. */}
+            {o === '/' && <span style={{ opacity: 0.6 }}>{'  repository root'}</span>}
+          </span>
         )}
         footer={isNew
           ? <span>{`Press + to use “${typed}” — created on the first push`}</span>
@@ -1389,8 +1393,8 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
 }
 
 mountIconButton('folder-create-mount', { id: 'folder-create-btn', variant: 'outline', size: 'medium', title: 'Use this folder path — created on the first push', 'aria-label': 'Use this folder path', icon: IconAdd(16) }, CARD_LEVEL);
-window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', '(repo root)'), onChange: null };
-window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', '(repo root)'), onChange: null };
+window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', 'choose a folder'), onChange: null };
+window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', 'choose a folder'), onChange: null };
 /* The Settings pair — fed the repo's real directories, and read by the Add
    button beside each. `get()` rather than a DOM lookup, same reason as the
    file name field: a Combobox owns its own input id. */
