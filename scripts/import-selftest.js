@@ -1824,7 +1824,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'setRepoFileOptions', 'chooseRepoFile', 'repoIdentityRow',
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
                        'renderImportFolderSelect', 'listRepoFolders',
-                       'refreshFolderImportOffer', 'addFolderPath', 'normFolder'];
+                       'refreshFolderImportOffer', 'addFolderPath', 'normFolder',
+                       'foldersMissingFromRepo'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1986,6 +1987,9 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             createElement: el,
             getElementById: (id) => (id === 'github-folder-import-row' ? offerRow : null),
           };
+          /* The offer refresh also drives the missing-folder row, which has no
+             DOM here — its own decision is tested directly below. */
+          ctx.refreshFolderMissingOffer = () => {};
           const offer = (saved, found) => {
             ctx.ghFolders = saved;
             ctx.__lastDiscovered().github = found;
@@ -2000,6 +2004,44 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              offer(['Spar', 'tokens'], ['Spar', 'tokens']) === true);
           ok('folder offer: hidden when the repo has no folders at all',
              offer(['Spar'], []) === true);
+
+          /*
+            SAVED HERE IS NOT THE SAME AS PRESENT THERE.
+
+            A folder path typed by hand exists only in the plugin: nothing has
+            been written to the repository, and nothing could have been, because
+            git has no empty directories. Until something is committed into it,
+            it looks exactly like a path Sync found — and the difference only
+            shows up later, as a push into somewhere that was never there.
+
+            The silent case is the one worth pinning. With no sync yet, nothing
+            is KNOWN about the repository, and calling a path missing then is a
+            claim rather than a reading — it would tell somebody to create
+            folders that are already sitting there.
+          */
+          ctx.ghFolders = ['Spar', 'Test'];
+          ctx.__lastDiscovered().github = null;
+          ok('missing folders: nothing is claimed before a sync has happened',
+             ctx.foldersMissingFromRepo('github') === null);
+          ctx.__lastDiscovered().github = ['Spar'];
+          ok('missing folders: a saved path the repo does not have is reported',
+             (ctx.foldersMissingFromRepo('github') || []).join(',') === 'Test',
+             JSON.stringify(ctx.foldersMissingFromRepo('github')));
+          ctx.__lastDiscovered().github = ['Spar', 'Test'];
+          ok('missing folders: and one it does have is not',
+             (ctx.foldersMissingFromRepo('github') || []).length === 0,
+             JSON.stringify(ctx.foldersMissingFromRepo('github')));
+          /* The root is not a folder anybody can create — it is there by
+             definition, and offering to make it would be offering to do
+             nothing. It is stored as '' (see folderDisplay), so without this it
+             counts as a path the repo has never heard of. */
+          ctx.ghFolders = ['', 'Spar'];
+          ctx.__lastDiscovered().github = ['Spar'];
+          ok('missing folders: the repo root is never one of them',
+             (ctx.foldersMissingFromRepo('github') || []).length === 0,
+             JSON.stringify(ctx.foldersMissingFromRepo('github')));
+          ctx.ghFolders = [];
+          ctx.__lastDiscovered().github = null;
 
           /*
             THE + BESIDE A FIELD WITH SOMETHING IN IT MUST ACT ON IT.

@@ -140,6 +140,9 @@ const IconSettings = svg(
 const IconCheck = svg('M20 6L9 17l-5-5');
 const IconFolder = svg('M3 7a2 2 0 012-2h3.5l2 2H19a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z');
 const IconAdd = svg('M12 5v14M5 12h14');
+/* An arrow out of a tray — "send this up there". Distinct from IconSync's two
+   arrows, which mean "go and read it again": one writes, the other does not. */
+const IconUpload = svg('M12 16V4 M7 9l5-5 5 5 M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2');
 /* Two arrows chasing each other — "go and ask the repo again". Not the plain
    circular arrow, which reads as undo as often as it reads as refresh. */
 const IconSync = svg('M21 12a9 9 0 0 1-9 9 9 9 0 0 1-7.5-4 M3 12a9 9 0 0 1 9-9 9 9 0 0 1 7.5 4 M20 4v5h-5 M4 20v-5h5');
@@ -611,6 +614,8 @@ declare global {
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
     PomRepoReadBtn: LiveTitleHandle;
     PomGithubSyncBtn: LiveBusyHandle;
+    PomFolderPushMissing: LiveBusyHandle;
+    PomGithubFolderPushMissing: LiveBusyHandle;
     PomGitlabSyncBtn: LiveBusyHandle;
     PomAddGitlabBtn: LiveToggleIconHandle;
     PomAddGithubBtn: LiveToggleIconHandle;
@@ -749,6 +754,17 @@ function mountIconButton(mountId: string, props: any, level?: Level) { mountOnce
    answer the same question and should not have two different doors. */
 mountButton('folder-import-mount', { id: 'folder-import-btn', variant: 'tonal', size: 'small', block: true, label: 'Add existing folder paths from repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
 mountButton('github-folder-import-mount', { id: 'github-folder-import-btn', variant: 'tonal', size: 'small', block: true, label: 'Add existing folder paths from repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
+
+/* Creates the folders that exist only here — see pushMissingFolders(). A live
+   handle because it is a write to somebody's repository and the round trip is
+   a real one; a button that looks idle through it reads as one that missed the
+   click, and the temptation then is to click it again. */
+window.PomFolderPushMissing = mountLiveBusyButton('folder-missing-mount',
+  { id: 'folder-missing-btn', variant: 'outline', size: 'small', block: true, label: 'Create in the repo', leftIcon: true, buttonLeftIcon: IconUpload(16) },
+  'Commit an empty .gitkeep so the folder exists in Git', CARD_LEVEL);
+window.PomGithubFolderPushMissing = mountLiveBusyButton('github-folder-missing-mount',
+  { id: 'github-folder-missing-btn', variant: 'outline', size: 'small', block: true, label: 'Create in the repo', leftIcon: true, buttonLeftIcon: IconUpload(16) },
+  'Commit an empty .gitkeep so the folder exists in Git', CARD_LEVEL);
 
 mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);

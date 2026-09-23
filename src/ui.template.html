@@ -721,6 +721,15 @@
        it — a button offering to add what is already added has nothing to do. */
     .folder-import-row { margin-top: 8px; }
     .folder-import-row[hidden] { display: none; }
+    .folder-missing-row { margin-top: 8px; }
+    .folder-missing-row[hidden] { display: none; }
+    .folder-missing-note {
+      margin: 0 0 6px;
+      font-size: 11px; line-height: 1.5; opacity: 0.75;
+      overflow-wrap: anywhere;
+    }
+    .folder-missing-note.is-done { color: var(--app-text); opacity: 1; }
+    .folder-missing-note.is-error { color: var(--app-danger); opacity: 1; }
     /* The provider name + its logo badge, side by side (was plain text). */
     .provider-section-heading .folder-paths-title {
       display: flex;
@@ -2889,6 +2898,17 @@
             <div class="folder-import-row" id="folder-import-row" hidden>
               <span id="folder-import-mount"></span>
             </div>
+            <!--
+              A SAVED PATH IS NOT YET A PATH IN THE REPOSITORY. One typed by
+              hand exists only in this plugin until something is committed into
+              it — git has no empty directories — and until then it looks
+              identical to one Sync found. This says which, and offers to make
+              it real.
+            -->
+            <div class="folder-missing-row" id="folder-missing-row" hidden>
+              <p class="folder-missing-note" id="folder-missing-note"></p>
+              <span id="folder-missing-mount"></span>
+            </div>
             <div class="folder-add" id="folder-add">
               <span id="folder-new-mount"></span>
               <span id="folder-add-btn-mount"></span>
@@ -2936,6 +2956,17 @@
             <div class="folder-list" id="github-folder-list"></div>
             <div class="folder-import-row" id="github-folder-import-row" hidden>
               <span id="github-folder-import-mount"></span>
+            </div>
+            <!--
+              A SAVED PATH IS NOT YET A PATH IN THE REPOSITORY. One typed by
+              hand exists only in this plugin until something is committed into
+              it — git has no empty directories — and until then it looks
+              identical to one Sync found. This says which, and offers to make
+              it real.
+            -->
+            <div class="folder-missing-row" id="github-folder-missing-row" hidden>
+              <p class="folder-missing-note" id="github-folder-missing-note"></p>
+              <span id="github-folder-missing-mount"></span>
             </div>
             <div class="folder-add" id="github-folder-add">
               <span id="github-folder-new-mount"></span>
@@ -4736,10 +4767,145 @@
           var missing = (found || []).filter(function (p) { return saved.indexOf(normFolder(p)) === -1; });
           el.hidden = !saved.length || !missing.length;
         });
+      refreshFolderMissingOffer();
+    }
+
+    /*
+      SAVED HERE IS NOT THE SAME AS PRESENT THERE.
+
+      A folder path typed by hand exists only in this plugin. Nothing has been
+      written to the repository — it cannot have been, because git has no empty
+      directories: a folder comes into being when the first file is committed
+      into it and not before. Until then it looks exactly like a path Sync found,
+      and the difference only shows up later, as a push into somewhere that was
+      never there.
+
+      So: say which, and offer to make them real. THE REPO ROOT IS NEVER ONE OF
+      THEM — it exists by definition, and offering to create it would be
+      offering to do nothing.
+
+      Silent until a sync has actually happened. With lastDiscovered still null
+      nothing is known about the repository, and "these are missing" would be a
+      claim rather than a reading.
+    */
+    function foldersMissingFromRepo(which) {
+      var found = lastDiscovered[which];
+      if (!found) return null;                 // never asked; nothing to say
+      var saved = which === 'gitlab' ? glFolders : ghFolders;
+      return saved.filter(function (p) {
+        var v = normFolder(p);
+        return v && found.indexOf(v) === -1;
+      });
+    }
+
+    function refreshFolderMissingOffer() {
+      ['gitlab', 'github'].forEach(function (which) {
+        var prefix = which === 'gitlab' ? 'folder' : 'github-folder';
+        var row = document.getElementById(prefix + '-missing-row');
+        var note = document.getElementById(prefix + '-missing-note');
+        if (!row || !note) return;
+        var missing = foldersMissingFromRepo(which);
+        row.hidden = !missing || !missing.length;
+        if (row.hidden) return;
+        /* Named, not counted. "1 folder path" makes you go and work out which
+           one; the name is the same length and answers it. */
+        note.className = 'folder-missing-note';
+        note.textContent = (missing.length === 1
+          ? '"' + missing[0] + '" is saved here but is not in the repository yet.'
+          : missing.length + ' saved paths are not in the repository yet: ' + missing.join(', ') + '.');
+      });
+    }
+
+    /*
+      MAKE THEM REAL — one empty .gitkeep per folder, which is how git has
+      always been told to keep a directory that has nothing in it yet.
+
+      A separate act from Push on purpose. Push writes the token document, and
+      it writes it to ONE folder; this is about the others, and it should not
+      require exporting anything to happen. It is also the smallest possible
+      write: an empty file, at a path nothing else uses.
+    */
+    function pushMissingFolders(which) {
+      var missing = foldersMissingFromRepo(which) || [];
+      if (!missing.length) return;
+      var btn = which === 'gitlab' ? window.PomFolderPushMissing : window.PomGithubFolderPushMissing;
+      var prefix = which === 'gitlab' ? 'folder' : 'github-folder';
+      var note = document.getElementById(prefix + '-missing-note');
+      btn.setLoading(true);
+      note.className = 'folder-missing-note';
+      note.textContent = 'Creating ' + missing.join(', ') + '…';
+      /* One after another rather than all at once: each is a commit on the same
+         branch, and several in flight race each other for the branch tip. */
+      var done = [];
+      missing.reduce(function (chain, folder) {
+        return chain.then(function () {
+          return createRepoFolder(which, folder).then(function () { done.push(folder); });
+        });
+      }, Promise.resolve()).then(function () {
+        btn.setLoading(false);
+        note.className = 'folder-missing-note is-done';
+        note.textContent = done.length === 1
+          ? '"' + done[0] + '" now exists in the repository.'
+          : done.length + ' folder paths now exist in the repository.';
+        /* The repo has changed, so what the last sync saw is stale. */
+        lastDiscovered[which] = (lastDiscovered[which] || []).concat(done);
+        repoFolderCache = null;
+        refreshFolderImportOffer();
+        document.getElementById(prefix + '-missing-row').hidden = true;
+      }, function (err) {
+        btn.setLoading(false);
+        note.className = 'folder-missing-note is-error';
+        note.textContent = 'Could not create ' +
+          (done.length ? 'the rest — ' : missing[0] + ' — ') +
+          ((err && err.message) || 'the request failed');
+      });
+    }
+
+    /* An empty file at <folder>/.gitkeep. Both hosts create a file and its
+       parent directories in one call, so this is the whole of it. */
+    function createRepoFolder(which, folder) {
+      var path = normFolder(folder) + '/.gitkeep';
+      var msg = 'Create ' + normFolder(folder) + '/ for design tokens';
+      if (which === 'gitlab') {
+        var g = gitlabConfig();
+        var base = g.host.replace(/\/+$/, '') + '/api/v4/projects/' +
+                   encodeURIComponent(g.project) + '/repository/files/' + encodeURIComponent(path);
+        return fetch(base, {
+          method: 'POST',
+          headers: { 'PRIVATE-TOKEN': g.token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ branch: g.branch, content: '', encoding: 'text', commit_message: msg }),
+        }).then(function (r) {
+          /* Already there is success, not failure — somebody else may have made
+             it between the sync and this click. */
+          if (r.ok || r.status === 400) return null;
+          return r.json().then(function (e) {
+            throw { status: r.status, message: (e && (e.message || e.error)) || 'the request failed' };
+          }, function () { throw { status: r.status, message: 'the repo answered ' + r.status }; });
+        });
+      }
+      var c = githubConfig();
+      var parts = (c.repo || '').split('/');
+      if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
+      var url = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
+                encodeURIComponent(parts[1]) + '/contents/' +
+                path.split('/').map(encodeURIComponent).join('/');
+      return fetch(url, {
+        method: 'PUT',
+        headers: { 'Authorization': 'token ' + c.token, 'Accept': 'application/vnd.github+json',
+                   'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, content: '', branch: c.branch }),
+      }).then(function (r) {
+        if (r.ok || r.status === 422) return null;   // 422 = it is already there
+        return r.json().then(function (e) {
+          throw { status: r.status, message: (e && e.message) || 'the request failed' };
+        }, function () { throw { status: r.status, message: 'the repo answered ' + r.status }; });
+      });
     }
 
     document.getElementById('gh-sync-btn').addEventListener('click', function () { syncRepo('github'); });
     document.getElementById('gl-sync-btn').addEventListener('click', function () { syncRepo('gitlab'); });
+    document.getElementById('folder-missing-btn').addEventListener('click', function () { pushMissingFolders('gitlab'); });
+    document.getElementById('github-folder-missing-btn').addEventListener('click', function () { pushMissingFolders('github'); });
     document.getElementById('folder-import-btn').addEventListener('click', function () { openFolderDiscovery('gitlab'); });
     document.getElementById('github-folder-import-btn').addEventListener('click', function () { openFolderDiscovery('github'); });
 
