@@ -2317,6 +2317,14 @@
       justify-content: center;
       margin: 0 0 16px;
     }
+    .mode-card {
+      background: var(--background);
+      border-radius: 24px;
+      padding: var(--spacing-component-3);
+      margin: 0 16px 16px;
+    }
+    .mode-card[hidden] { display: none; }
+
     .compare-card {
       background: var(--background);
       border-radius: 24px;
@@ -2394,12 +2402,6 @@
     .compare-card > span { display: block; }
     .compare-card[hidden] { display: none; }
     #compare-card-icon-mount { display: flex; }
-    /* The three marks read as one line, so they sit tighter than a mark-plus-
-       word pair would and the middle one is quieter: it is the relation, not
-       an operand. */
-    .repo-card-figma, .repo-card-between { display: flex; }
-    .repo-card-between { opacity: 0.5; }
-    .export-panel .json-download-title-group { gap: 6px; }
     /*
       The two sides, side by side — which is the whole claim the card makes, so
       they wrap rather than truncate: a file name cut in half names nothing.
@@ -22597,6 +22599,19 @@ html[data-theme=dark] {
          elevated rung, giving the strongest contrast tokens.css offers
          without inventing a one-off colour. -->
     <!--
+      THE CHOICE IS ITS OWN CARD, above the card it governs.
+
+      In that card's header it was a control tucked beside a title, competing
+      with it for the row and reading as a setting OF the header. It decides
+      what the whole card below is for, which is a bigger thing than a header
+      can hold — so it gets the width, the size and the place a decision
+      deserves: its own surface, immediately above what it changes.
+    -->
+    <div class="mode-card" id="mode-card" data-level="4" hidden>
+      <span id="repo-mode-mount"></span>
+    </div>
+
+    <!--
       THE COMPARE CARD IS GONE — it is this card's Compare mode now.
 
       It asked for a folder and a file in the repository, which is exactly what
@@ -22636,25 +22651,6 @@ html[data-theme=dark] {
                  the provider is named on this screen: the row below used to
                  repeat the same word and the same mark a few pixels down,
                  which is the duplication that removed it. -->
-            <!--
-              BOTH ENDS AND THE RELATION BETWEEN THEM: this Figma file, the
-              thing being done, and the repository it is being done with. The
-              header said only the second name, which is the half nobody needed
-              telling — the card is full of GitHub's fields. What it did not say
-              is that the card is about two places at once.
-
-              The word is gone with it. Three marks are shorter than "GitHub"
-              and say more, and the segmented control beside them already spells
-              out which of the two things is happening; the group carries the
-              sentence as its accessible name — see nameRepoCard.
-            -->
-            <!-- MOUNTED, NOT DRAWN AGAIN. The provider marks below are inline
-                 because nothing else in this file draws them; these two are
-                 IconFigma and IconCompare, which buttons.tsx already owns and
-                 which appear on three other cards. A second copy of a logo is a
-                 second thing to keep in step with a brand that changes. -->
-            <span class="repo-card-figma" id="repo-card-figma-mount" aria-hidden="true"></span>
-            <span class="repo-card-between" id="repo-card-between-mount" aria-hidden="true"></span>
             <svg id="repo-card-icon-generic" class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M6 3v12"/>
               <circle cx="18" cy="6" r="3"/>
@@ -22667,15 +22663,16 @@ html[data-theme=dark] {
             <svg id="repo-card-icon-github" class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none">
               <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
             </svg>
+            <!--
+              The header carried a token count and a Compare button. Both have
+              moved to where what they describe actually is: the count sits
+              under the field naming the file it counts, and the Push/Compare
+              switch is a card of its own above this one. What is left is the
+              card saying which service it is about, which is all a card header
+              owes anyone.
+            -->
+            <p class="json-download-title" id="repo-card-title">Repo settings</p>
           </div>
-          <!--
-            The header carried a token count and a Compare button. Both have
-            moved to where what they describe actually is: the count sits under
-            the field naming the file it counts, and Compare sits on the wire
-            between the two cards it compares. What is left is the card saying
-            which service it is about, which is all a card header owes anyone.
-          -->
-          <span id="repo-mode-mount"></span>
         </div>
         <!--
           WHEN THERE IS SOMETHING TO SAY.
@@ -50149,12 +50146,6 @@ html[data-theme=dark] {
     });
     window.PomRepoTab = { onChange: null, setValue: (v) => setters.forEach((s) => s(v)) };
   })();
-  (function mountRepoCardMarks() {
-    const f = document.getElementById("repo-card-figma-mount");
-    if (f) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(f).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(import_jsx_runtime23.Fragment, { children: IconFigma(14) })));
-    const b = document.getElementById("repo-card-between-mount");
-    if (b) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(b).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(import_jsx_runtime23.Fragment, { children: IconCompare(14) })));
-  })();
   (function mountRepoModeControl() {
     const container = document.getElementById("repo-mode-mount");
     let set = () => {
@@ -50166,11 +50157,12 @@ html[data-theme=dark] {
         SegmentedControl,
         {
           label: "What to do with this repository",
-          size: "small",
+          size: "medium",
+          block: true,
           value,
           options: [
-            { value: "push", label: "Push", leading: IconUpload(14) },
-            { value: "compare", label: "Compare", leading: IconCompare(14) }
+            { value: "push", label: "Push", leading: IconUpload(16) },
+            { value: "compare", label: "Compare", leading: IconCompare(16) }
           ],
           onChange: (v) => {
             setValue(v);
@@ -56092,7 +56084,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'f95f919 15:59:21';
+    var CLOSURE_BUILD = 'd58193b 16:05:29';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -59021,18 +59013,7 @@ function format(report, opts) {
       else if (gitlabAdded) which = 'gitlab';
       else if (githubAdded) which = 'github';
       var title = which === 'gitlab' ? 'GitLab' : which === 'github' ? 'GitHub' : 'Repo settings';
-      /*
-        THE SENTENCE THE MARKS DRAW, written for anyone not looking at them.
-        The three glyphs are aria-hidden individually — read one at a time they
-        are noise — and the group they sit in carries the whole thing.
-      */
-      var group = document.querySelector('.export-panel .json-download-title-group');
-      if (group) {
-        group.setAttribute('role', 'img');
-        group.setAttribute('aria-label', which
-          ? 'This Figma file and ' + title
-          : 'This Figma file and a repository — not configured yet');
-      }
+      document.getElementById('repo-card-title').textContent = title;
       /*
         style.display, NOT .hidden — these are <svg> elements.
 
@@ -59139,6 +59120,9 @@ function format(report, opts) {
     function applyRepoMode() {
       var comparing = repoMode === 'compare';
       var el = function (id) { return document.getElementById(id); };
+      /* The switch only means something once there is a repository to push to
+         or read from — it comes and goes with the card it governs. */
+      if (el('mode-card')) el('mode-card').hidden = !activeRepoProvider();
       /* The commit message is a thing you write, and Compare writes nothing. */
       if (el('commit-wrap')) el('commit-wrap').hidden = comparing;
       /* One slot, one button: the two actions are alternatives, not a pair. */
