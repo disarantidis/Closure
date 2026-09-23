@@ -1821,7 +1821,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
         const names = ['repoFilePath', 'pushFilePath', 'repoSelectedFile', 'listRepoJsonFiles',
                        'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
                        'pushOverwriteNote', 'withRootOption', 'folderDisplay',
-                       'setRepoFileOptions', 'chooseRepoFile', 'repoIdentityRow',
+                       'setRepoFileOptions', 'chooseRepoFile', 'repoIdentity',
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
                        'renderImportFolderSelect', 'listRepoFolders',
                        'refreshFolderImportOffer', 'addFolderPath', 'normFolder',
@@ -1858,12 +1858,11 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             get: () => importPicked, set: (v) => { importPicked = v; },
             setOptions: (n) => { importOptions = n; }, onChange: null,
           };
-          /* Enough DOM for repoIdentityRow: it builds a row out of three
-             elements and clones the card's mark, which is absent here. */
+          /* Enough DOM for the folder-offer row below; the identity is plain
+             data now and needs none. */
           const el = (tag) => ({
             tagName: tag, className: '', textContent: '', children: [],
             appendChild(c) { this.children.push(c); return c; },
-            get text() { return this.children.map((c) => c.textContent).join(' '); },
           });
           ctx.document = { createElement: el, getElementById: () => null };
           ctx.repoFileNames = [];
@@ -1920,19 +1919,25 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             The scheme is dropped from both — nobody checks whether it says
             https, and it only makes the line longer.
           */
-          let row = ctx.repoIdentityRow('gitlab');
+          let row = ctx.repoIdentity('gitlab');
           ok('import repo: GitLab is named host/project, without the scheme',
-             row.text === 'gitlab.com/me/my repo main', row.text);
-          row = ctx.repoIdentityRow('github');
-          ok('import repo: GitHub is named owner/repo and the branch',
-             row.text === 'acme/tokens main', row.text);
+             row.name === 'gitlab.com/me/my repo' && row.branch === 'main',
+             JSON.stringify(row));
+          row = ctx.repoIdentity('github');
+          ok('import repo: GitHub is named owner/repo, and the branch is its own field',
+             row.name === 'acme/tokens' && row.branch === 'main', JSON.stringify(row));
           /* The folder is NOT here — it is the dropdown below, and a path named
              in two places is a path one of them gets wrong the moment it moves.
-             GitLab's config puts it at tokens/out, so if the row still carried
-             it, it would say so. */
+             GitLab's config puts it at tokens/out, so if this still carried it,
+             it would say so. */
           ok('import repo: and the folder is left to the picker that owns it',
-             ctx.repoIdentityRow('gitlab').text.indexOf('tokens/out') === -1,
-             ctx.repoIdentityRow('gitlab').text);
+             JSON.stringify(ctx.repoIdentity('gitlab')).indexOf('tokens/out') === -1,
+             JSON.stringify(ctx.repoIdentity('gitlab')));
+          /* The branch is a Tag in the row now, so it has to arrive as its own
+             string rather than glued onto the end of the name. */
+          ok('import repo: the branch is separable, because it is a tag and not text',
+             ctx.repoIdentity('github').name.indexOf('main') === -1,
+             ctx.repoIdentity('github').name);
           /* Put the picker back where it was found: everything below reads the
              address, and an address still pointing at themes.json makes the
              next test's filename change look like it did nothing. */

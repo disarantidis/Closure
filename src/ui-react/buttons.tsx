@@ -689,6 +689,7 @@ declare global {
       setOptions: (names: string[]) => void;
       onChange: ((value: string) => void) | null;
     };
+    PomImportRepoWhere: { set: (rows: { provider: string; name: string; branch: string }[]) => void };
     PomImportRepoFile: {
       get: () => string;
       set: (value: string) => void;
@@ -938,8 +939,45 @@ window.PomRepoReadBtn = mountLiveTitleButton(
    afterthought said the repo route was the lesser one. The provider's mark
    trails the label: the label already says which service, and the mark is what
    is recognised before the label is read. */
-mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'filled', size: 'large', label: 'Import from GitLab', rightIcon: true, buttonRightIcon: IconGitlab(18) });
-mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'filled', size: 'large', label: 'Import from GitHub', rightIcon: true, buttonRightIcon: IconGithub(18) });
+mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'filled', size: 'large', block: true, label: 'Import from GitLab', rightIcon: true, buttonRightIcon: IconGitlab(18) });
+mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'filled', size: 'large', block: true, label: 'Import from GitHub', rightIcon: true, buttonRightIcon: IconGithub(18) });
+
+/*
+  WHICH REPOSITORY, AS COMPONENTS RATHER THAN AS MARKUP.
+
+  This was built by hand in ui.template.html — a cloned <svg> and two spans —
+  which was fine while the branch was plain text. It is a Tag now, and a Tag is
+  not a span with a border: it computes its own fill from the level it stands
+  on (fieldLevel(useLevel()), see Tag.tsx) and writes data-fill for the
+  stylesheet to resolve. Hand-writing .nd-tag would be copying a contract
+  instead of using it, so the row moves here and the real component does it.
+*/
+function mountImportRepoWhere() {
+  const container = document.getElementById('import-repo-where-mount');
+  type Row = { provider: string; name: string; branch: string };
+  let set: (rows: Row[]) => void = () => {};
+  function View() {
+    const [rows, setRows] = useState<Row[]>([]);
+    set = setRows;
+    if (!rows.length) return null;
+    return (
+      <span className="import-repo-where">
+        {rows.map((r) => (
+          <span className="import-repo-where-row" key={r.provider}>
+            <span className="import-repo-mark">
+              {r.provider === 'gitlab' ? IconGitlab(18) : IconGithub(18)}
+            </span>
+            <span className="import-repo-name">{r.name}</span>
+            {r.branch ? <Tag variant="tonal" size="small">{r.branch}</Tag> : null}
+          </span>
+        ))}
+      </span>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomImportRepoWhere = { set: (rows) => set(rows || []) };
+}
+mountImportRepoWhere();
 
 mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', leftIcon: true, buttonLeftIcon: IconImport(16) });
 

@@ -1482,10 +1482,14 @@
     /* Sits under the drop target as the second route in, quieter than it —
        the drop zone is the thing to try first on a file you already have. */
     .import-repo {
-      margin-top: 12px;
-      padding: 16px;
-      border: 1px solid var(--app-border);
-      border-radius: 16px;
+      margin-top: 16px;
+      /* The same surface the cards above it stand on: one fill name moved by
+         [data-level] (THEMING.md), never a border drawn round the ground. An
+         outline here made this the only card on the page that was a box
+         instead of a plane. */
+      background: var(--background);
+      padding: var(--spacing-component-6);
+      border-radius: 24px;
       /* Left, not centred. Centring was right when the card was one line and a
          small button; it holds two labelled pickers now, and a field whose
          label is centred over it reads as a caption for the card rather than a
@@ -1527,10 +1531,19 @@
       display: block; margin: 0 0 6px;
       font-size: 11px; opacity: 0.7;
     }
+    /*
+      A BLOCK BUTTON IS ONLY AS WIDE AS WHAT HOLDS IT. Each button is mounted
+      into a <span>, and a span in a centred flex row is a flex item sized to
+      its content — so `block: true` made the button fill a box that had already
+      shrunk to fit it, and nothing changed. The mounts stretch, and the button
+      fills them.
+    */
     .import-repo-actions {
-      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
-      margin-top: 14px;
+      display: flex; flex-direction: column; align-items: stretch; gap: 8px;
+      margin-top: 16px;
     }
+    .import-repo-actions > span { display: block; width: 100%; }
+    .import-repo-actions > span[hidden] { display: none; }
 
     .import-card {
       background: var(--background);
@@ -2688,12 +2701,12 @@
            the way tokens get INTO Figma. Comparison needs variables to
            compare against, and the usual state of a file somebody is
            importing into is that it has none. -->
-      <div class="import-repo" id="import-repo" hidden>
+      <div class="import-repo" id="import-repo" data-level="4" hidden>
         <!-- No title. "…or import from the repo" labelled a card whose every
              other line already says it: the repository is named at the top, the
              folder and file are pickers, and the button reads "Import from
              GitHub". The repository IS the heading now. -->
-        <div class="import-repo-where" id="import-repo-where"></div>
+        <span id="import-repo-where-mount"></span>
         <!--
           THE PATH, AS TWO CONTROLS RATHER THAN A SENTENCE. The folder used to
           be a word in the line above, which says where the file is without
@@ -4057,10 +4070,10 @@
          and silent about everything that makes the file consequential: the
          service, the account, the repo, the branch. One row per configured
          provider, because with both added there genuinely are two answers. */
-      var where = document.getElementById('import-repo-where');
-      where.textContent = '';
-      if (gl) where.appendChild(repoIdentityRow('gitlab'));
-      if (gh) where.appendChild(repoIdentityRow('github'));
+      var rows = [];
+      if (gl) rows.push(repoIdentity('gitlab'));
+      if (gh) rows.push(repoIdentity('github'));
+      window.PomImportRepoWhere.set(rows);
       renderImportFolderSelect();
       /* The listing is what fills the file picker, and it is the repo card's
          listing — the same folder, the same branch, cached under the same key,
@@ -4070,45 +4083,30 @@
     }
 
     /*
-      The card's own marks, cloned rather than copied. There is exactly one
-      copy of each logo's path data in this file and it is the markup at the
-      top of the repo card; a second copy is a second thing to keep in step
-      with a brand that does occasionally change its mark.
+      WHO THE REPOSITORY IS, as three strings.
+
+      It used to build the row out of DOM here, cloning the repo card's own
+      <svg> so the logo lived in one place. The row is a React mount now (see
+      mountImportRepoWhere) because the branch is a Tag, and a Tag computes its
+      fill from the level it stands on rather than wearing a class — so this
+      stopped being markup and became what it should always have been: the
+      facts, handed to something that knows how to draw them.
     */
-    function repoIdentityRow(which) {
-      var row = document.createElement('div');
-      row.className = 'import-repo-where-row';
-      var src = document.getElementById('repo-card-icon-' + which);
-      if (src) {
-        var mark = src.cloneNode(true);
-        mark.removeAttribute('id');
-        mark.setAttribute('class', 'import-repo-mark');
-        /* The card's heading mark, so it is heading-sized. */
-        mark.setAttribute('width', '18');
-        mark.setAttribute('height', '18');
-        mark.style.display = '';        // the card hides the two it is not using
-        row.appendChild(mark);
-      }
+    function repoIdentity(which) {
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
-      var name = document.createElement('span');
-      name.className = 'import-repo-name';
-      /* GitLab is self-hostable, so the host is part of the answer; GitHub is
-         not, so owner/repo is the whole of it. The scheme is noise either
-         way — nobody is checking whether it says https. */
-      name.textContent = which === 'gitlab'
-        ? (String(c.host || '').replace(/^https?:\/\//, '').replace(/\/$/, '') + '/' + c.project)
-        : c.repo;
-      row.appendChild(name);
-      var path = document.createElement('span');
-      path.className = 'import-repo-path';
-      /* The branch only. The folder is a control below, and naming it twice
-         means one of the two is wrong the moment the control is used. */
-      path.textContent = c.branch;
-      row.appendChild(path);
-      return row;
+      return {
+        provider: which,
+        /* GitLab is self-hostable, so the host is part of the answer; GitHub is
+           not, so owner/repo is the whole of it. The scheme is noise either
+           way — nobody is checking whether it says https. */
+        name: which === 'gitlab'
+          ? (String(c.host || '').replace(/^https?:\/\//, '').replace(/\/$/, '') + '/' + c.project)
+          : c.repo,
+        branch: c.branch,
+      };
     }
 
-    /*
+/*
       WHICH OF THEM. A repo holding one JSON and a repo holding nine look the
       same from here unless the page says so, and the second is ordinary —
       a themes file beside a primitives file beside whatever a build step
