@@ -1357,14 +1357,32 @@
 
     /* The key above the per-collection rows: which column is which kind.
        Same order as the sections above it, so the eye learns it once. */
-    .compare-group-key {
+    /* The legend's own heading — the row it used to share with four marks is
+       six tags now, and they wrap, so the words go above them. */
+    .compare-key-title {
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.04em;
       opacity: 0.5;
+      font-family: inherit;
+      margin-top: 12px;
+    }
+    .compare-key {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+      padding-bottom: 8px;
       border-bottom: 1px solid var(--app-border);
     }
-    .compare-group-key .compare-group-name { font-family: inherit; }
+    /* The mark itself, in the column's own face, so the tag reads as "this
+       symbol means this" rather than as a phrase starting with punctuation. */
+    .compare-key-sym {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 700;
+      margin-right: 5px;
+      opacity: 0.9;
+    }
     /* The values column is the one worth reading; it keeps full ink while the
        three architecture columns stay quiet. */
     .compare-count.is-value { opacity: 1; font-weight: 600; }
@@ -50858,6 +50876,14 @@ html[data-theme=dark] {
       hide: () => set((s) => ({ ...s, open: false }))
     };
   })();
+  var COUNT_KEYS = [
+    { sym: "~", field: "changed", label: "value changed" },
+    { sym: "+", field: "onlyInFigma", label: "only here" },
+    { sym: "\u2212", field: "onlyInRepo", label: "only in the repo" },
+    { sym: "\u2192", field: "repointed", label: "points somewhere new" },
+    { sym: "=", field: "aliased", label: "aliased one side" },
+    { sym: "\u21B4", field: "moved", label: "moved here" }
+  ];
   var COMPARE_SAMPLE = 40;
   (function mountCompare() {
     const container = document.getElementById("compare-mount");
@@ -51245,26 +51271,31 @@ html[data-theme=dark] {
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: r.sameCount.toLocaleString() }),
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "identical" })
           ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-group compare-group-key", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-group-name", children: "per collection" }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-group-counts", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count", title: "value changed", children: "~ values" }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count", title: "only here", children: "+" }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count", title: "only in the repo", children: "-" }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count", title: "reference repointed", children: "\u2192 architecture" })
-            ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-groups", children: r.groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-group", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-group-name", children: g.name }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-group-counts", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count is-value" + (g.changed ? "" : " is-zero"), title: "value changed", children: "~" + g.changed }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count" + (g.onlyInFigma ? "" : " is-zero"), title: "only here", children: "+" + g.onlyInFigma }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count" + (g.onlyInRepo ? "" : " is-zero"), title: "only in the repo", children: "-" + g.onlyInRepo }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count" + (g.repointed ? "" : " is-zero"), title: "reference repointed", children: "\u2192" + (g.repointed || 0) }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count" + (g.aliased ? "" : " is-zero"), title: "same value, aliased one side", children: "=" + (g.aliased || 0) }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count" + (g.moved ? "" : " is-zero"), title: "moved here from elsewhere", children: "\u21B4" + (g.moved || 0) })
-            ] })
-          ] }, g.name)) })
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-group-name compare-key-title", children: "per collection" }),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-key", children: COUNT_KEYS.map((k) => (
+            /* `label` as well as children: Tag takes the accessible name
+               separately once the visible content is markup, and the mark is
+               drawn in a face a screen reader should not try to pronounce. */
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(Tag, { variant: "tonal", size: "small", label: k.sym + " means " + k.label, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-key-sym", "aria-hidden": true, children: k.sym }),
+              k.label
+            ] }, k.sym)
+          )) }),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-groups", children: r.groups.map((g) => {
+            const shown = COUNT_KEYS.filter((k) => (g[k.field] || 0) > 0);
+            return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-group", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-group-name", children: g.name }),
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-group-counts", children: shown.length ? shown.map((k) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+                "span",
+                {
+                  className: "compare-count" + (k.field === "changed" ? " is-value" : ""),
+                  title: k.label,
+                  children: k.sym + (g[k.field] || 0)
+                },
+                k.sym
+              )) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-count is-zero", title: "nothing differs here", children: "identical" }) })
+            ] }, g.name);
+          }) })
         ] }),
         patterns(r.changedPatterns || []),
         spellings(r.duplicateNames || []),
@@ -56681,7 +56712,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '156e633 19:20:59';
+    var CLOSURE_BUILD = '0fef992 19:26:57';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

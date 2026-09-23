@@ -2391,6 +2391,28 @@ function useClipboard() {
   };
 })();
 
+/*
+  THE SIX KINDS OF DIFFERENCE, IN THE ORDER THE PAGE ALREADY USES.
+
+  One list, read by the legend at the top of the per-collection block and by
+  every row under it — so a mark cannot come to mean one thing in the key and
+  another in the column, which is how the old key ended up naming four of six.
+
+  `~` is the only one that is a DECISION. The other five are things that moved
+  without anybody choosing: a token that exists on one side only, a reference
+  that still points but somewhere else, a value one file aliases and the other
+  spells out, a token at a new path. Hence the order, and hence `~` keeping
+  full ink in the rows while the rest stay quiet.
+*/
+const COUNT_KEYS: { sym: string; field: string; label: string }[] = [
+  { sym: '~', field: 'changed', label: 'value changed' },
+  { sym: '+', field: 'onlyInFigma', label: 'only here' },
+  { sym: '\u2212', field: 'onlyInRepo', label: 'only in the repo' },
+  { sym: '\u2192', field: 'repointed', label: 'points somewhere new' },
+  { sym: '=', field: 'aliased', label: 'aliased one side' },
+  { sym: '\u21b4', field: 'moved', label: 'moved here' },
+];
+
 /* ── the Compare page ──────────────────────────────────────────────────────── */
 /*
   WHAT DIFFERS BETWEEN THIS FILE'S EXPORT AND THE REPO'S JSON.
@@ -3068,45 +3090,61 @@ const COMPARE_SAMPLE = 40;
             </div>
           </div>
 
-          {/* ~ is the values column; +, - and the arrow are architecture.
-              Same order as the sections above, so the eye learns it once. */}
-          <div className="compare-group compare-group-key">
-            <span className="compare-group-name">per collection</span>
-            <span className="compare-group-counts">
-              <span className="compare-count" title="value changed">~ values</span>
-              <span className="compare-count" title="only here">+</span>
-              <span className="compare-count" title="only in the repo">-</span>
-              <span className="compare-count" title="reference repointed">{'\u2192 architecture'}</span>
-            </span>
+          {/*
+            EVERY SYMBOL NAMED, AND ONLY ONCE.
+
+            The key said "~ values + - → architecture" — four of the six marks,
+            two of them labelled by the group they belong to rather than by what
+            they count, and `=` and `↳` not mentioned at all. Someone reading a
+            row had to infer three of the six from position.
+
+            Tags, because the key is a legend and not a row of numbers: it
+            should not line up under the counts as if it were one more
+            collection with six figures of its own.
+          */}
+          <div className="compare-group-name compare-key-title">per collection</div>
+          <div className="compare-key">
+            {COUNT_KEYS.map((k) => (
+              /* `label` as well as children: Tag takes the accessible name
+                 separately once the visible content is markup, and the mark is
+                 drawn in a face a screen reader should not try to pronounce. */
+              <Tag key={k.sym} variant="tonal" size="small" label={k.sym + ' means ' + k.label}>
+                <span className="compare-key-sym" aria-hidden>{k.sym}</span>{k.label}
+              </Tag>
+            ))}
           </div>
           <div className="compare-groups">
-            {r.groups.map((g: any) => (
-              <div className="compare-group" key={g.name}>
-                <span className="compare-group-name">{g.name}</span>
-                <span className="compare-group-counts">
-                  <span className={'compare-count is-value' + (g.changed ? '' : ' is-zero')} title="value changed">
-                    {'~' + g.changed}
+            {r.groups.map((g: any) => {
+              /*
+                ONLY WHAT HAPPENED. Six figures per row, four of them zero, is
+                four numbers to read past to find the one that is not — and on a
+                file with thirty collections that is a hundred and twenty zeroes
+                on screen. A row now carries the marks that have a count, so the
+                shape of a collection is legible across the column: a row with
+                one `~` did one thing, a row with `~` and `→` did two.
+              */
+              const shown = COUNT_KEYS.filter((k) => (g[k.field] || 0) > 0);
+              return (
+                <div className="compare-group" key={g.name}>
+                  <span className="compare-group-name">{g.name}</span>
+                  <span className="compare-group-counts">
+                    {shown.length
+                      ? shown.map((k) => (
+                          <span key={k.sym}
+                                className={'compare-count' + (k.field === 'changed' ? ' is-value' : '')}
+                                title={k.label}>
+                            {k.sym + (g[k.field] || 0)}
+                          </span>
+                        ))
+                      /* A collection can be in this list and have nothing in
+                         it — the list is every collection either side holds,
+                         not every collection that differs. Saying so beats a
+                         row of blanks that reads as a rendering fault. */
+                      : <span className="compare-count is-zero" title="nothing differs here">identical</span>}
                   </span>
-                  <span className={'compare-count' + (g.onlyInFigma ? '' : ' is-zero')} title="only here">
-                    {'+' + g.onlyInFigma}
-                  </span>
-                  <span className={'compare-count' + (g.onlyInRepo ? '' : ' is-zero')} title="only in the repo">
-                    {'-' + g.onlyInRepo}
-                  </span>
-                  {/* An arrow, because that is what a reference that moved
-                      did — it still points, just somewhere else. */}
-                  <span className={'compare-count' + (g.repointed ? '' : ' is-zero')} title="reference repointed">
-                    {'\u2192' + (g.repointed || 0)}
-                  </span>
-                  <span className={'compare-count' + (g.aliased ? '' : ' is-zero')} title="same value, aliased one side">
-                    {'=' + (g.aliased || 0)}
-                  </span>
-                  <span className={'compare-count' + (g.moved ? '' : ' is-zero')} title="moved here from elsewhere">
-                    {'\u21b4' + (g.moved || 0)}
-                  </span>
-                </span>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
 

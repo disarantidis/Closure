@@ -1357,14 +1357,32 @@
 
     /* The key above the per-collection rows: which column is which kind.
        Same order as the sections above it, so the eye learns it once. */
-    .compare-group-key {
+    /* The legend's own heading — the row it used to share with four marks is
+       six tags now, and they wrap, so the words go above them. */
+    .compare-key-title {
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.04em;
       opacity: 0.5;
+      font-family: inherit;
+      margin-top: 12px;
+    }
+    .compare-key {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+      padding-bottom: 8px;
       border-bottom: 1px solid var(--app-border);
     }
-    .compare-group-key .compare-group-name { font-family: inherit; }
+    /* The mark itself, in the column's own face, so the tag reads as "this
+       symbol means this" rather than as a phrase starting with punctuation. */
+    .compare-key-sym {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 700;
+      margin-right: 5px;
+      opacity: 0.9;
+    }
     /* The values column is the one worth reading; it keeps full ink while the
        three architecture columns stay quiet. */
     .compare-count.is-value { opacity: 1; font-weight: 600; }
