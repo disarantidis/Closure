@@ -2302,16 +2302,15 @@
        between them. */
     /* Sits between the card's header and its folder/commit rows, at the same
        inset as they have — it is one more field in the same column. */
-    /* The folder half of the address. A row of its own once; now one cell of
-       .json-download-fields, still a flex box because it holds two pickers
-       (one per provider, one shown) and the create button. It takes an equal
-       share with the file name beside it, and hides on its own — see the
-       markup's comment on why that is not the whole row. */
+    /* The folder line of the address. Still a flex box, because it holds two
+       pickers (one per provider, one shown at a time) and the create button.
+       It hides on its own — see the markup's comment on why that is not the
+       whole of .json-download-fields. */
     .repo-file-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      flex: 2 1 0;
+      flex: none;
       min-width: 0;
     }
     .repo-file-row[hidden] { display: none; }
@@ -2479,20 +2478,27 @@
       characters is not a path. The button carries the one icon everybody
       already reads, and the two fields get the rest of the row.
     */
-    .json-download-fields { display: flex; align-items: center; gap: 8px; }
     /*
-      TWO TO THREE, NOT ONE TO ONE, because the two names are not the same
-      length. A folder in this plugin is "ODS" or "brand/core"; a file is
-      "odstokens.json". Split evenly, the folder had room it did not need and
-      the file lost the end of its name — measured at 420px, which is the only
-      width this window is ever opened at.
+      ONE PER LINE, AND THE ARITHMETIC IS WHY.
 
-      Each half may be narrower than its content — that is what min-width: 0
-      is for: without it a flex item refuses to shrink below its intrinsic
-      size and the row overflows the card instead of truncating inside it.
+      This window is 420px and is never opened at any other width. Inside the
+      repo card and inside this subcard a row has 312px, and each of these
+      fields spends about 105 of it on chrome before it shows a character: a
+      leading glyph, a clear ×, a rule and a chevron. Side by side that left
+      roughly 100px for two values — measured, the folder got 18, where "ODS"
+      alone needs 35 and "brand/core" needs 82.
+
+      Stacked, each gets 209. Every folder and every file name this plugin
+      deals with is then readable without hovering, which is worth the 58px of
+      height it costs. Side by side they were only ever legible while the name
+      field had no glyph and the folder had given its own up.
     */
+    .json-download-fields { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+    /* Each may still be narrower than its content — min-width: 0 is what lets
+       a flex item shrink below its intrinsic size and truncate inside the card
+       rather than overflowing it. */
     #primary-filename-mount,
-    #compare-pick-mount { flex: 3 1 0; min-width: 0; }
+    #compare-pick-mount { flex: none; min-width: 0; }
     #primary-filename-mount[hidden], #compare-pick-mount[hidden] { display: none; }
     
     .commit-input-wrap {

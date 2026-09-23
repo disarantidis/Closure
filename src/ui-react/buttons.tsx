@@ -583,12 +583,13 @@ function mountLiveDropdown(mountId: string, base: any, onSelect: (v: string) => 
     }));
     return (
       <DropDownSelect
-        label="Folder path"
+        label={base.label ?? 'Folder path'}
         size="small"
         block
         value={s.value}
         options={options.length ? options : [{ value: '', label: '—' }]}
         onChange={(v: string) => onSelect(v)}
+        {...(base.icon ? { icon: base.icon } : null)}
         {...(base.style ? { style: base.style } : null)}
       />
     );
@@ -1024,7 +1025,14 @@ function mountCompareSides() {
     return (
       <span className="compare-card-pick">
           <DropDownSelect
-            label="File in the repo"
+            /* THE SAME TWO WORDS AS PUSH. The modes ask for one address in two
+               grammars — a combobox you may type into, a list you may only
+               pick from — and calling the same half "File in the repo" on one
+               side and "JSON name" on the other made them read as two
+               different questions. The mode switch above already says which
+               direction this is going. */
+            label="JSON name"
+            icon={IconFile(16)}
             size="small"
             block
             placeholder={s.all.length ? 'pick a file' : 'no JSON files here yet'}
@@ -1076,7 +1084,7 @@ mountCompareSides();
 */
 window.PomCompareFolder = mountLiveDropdown(
   'compare-folder-mount',
-  {},
+  { label: 'Folder path', icon: IconFolder(16) },
   (v: string) => window.PomCompareFolder?.onChange?.(v),
   SUBCARD_LEVEL,
 ) as any;
@@ -1273,7 +1281,8 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
       : s.all);
     return (
       <Combobox
-        label="File name"
+        label="JSON name"
+        icon={IconFile(16)}
         size="small"
         block
         placeholder="tokens.json"
@@ -1782,16 +1791,7 @@ type FolderComboBridge = {
   set: (value: string) => void;
   onChange: ((value: string) => void) | null;
 };
-/*
-  `leadIcon` — the folder glyph, and the main card's own row is the one place
-  it is dropped. That row runs two pickers side by side in 312px, where the
-  glyph and the padding reserved for it cost 30px the folder's own value does
-  not have. The field is labelled "Folder path" a line above it, so the picture
-  was saying a second time what the words already said, at a price only that
-  row pays. Settings and the import page keep it — they give the field a line
-  to itself.
-*/
-function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: string, leadIcon = true, level: Level = CARD_LEVEL): FolderComboBridge {
+function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: string, level: Level = CARD_LEVEL): FolderComboBridge {
   const container = document.getElementById(mountId);
   type S = { query: string; selected: string; all: string[] };
   let state: S = { query: '', selected: '', all: [] };
@@ -1844,7 +1844,7 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
         label="Folder path"
         size="small"
         block
-        {...(leadIcon ? { icon: IconFolder(16) } : null)}
+        icon={IconFolder(16)}
         placeholder={placeholder}
         value={s.query}
         onChange={(v: string) => {
@@ -1921,8 +1921,8 @@ mountIconButton('folder-create-mount', { id: 'folder-create-btn', variant: 'outl
   Ground 3 lifts to 4. Same mistake, same fix, as the Add-Paths button in
   Settings — see SUBCARD_LEVEL's own note.
 */
-window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', 'choose a folder', false, SUBCARD_LEVEL), onChange: null };
-window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', 'choose a folder', false, SUBCARD_LEVEL), onChange: null };
+window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', 'choose a folder', SUBCARD_LEVEL), onChange: null };
+window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', 'choose a folder', SUBCARD_LEVEL), onChange: null };
 /* The import page's own pair. One combo rather than one per provider, like the
    file picker beside it: the page shows whichever provider the repo card is on,
    and a second hidden copy for the other one would be state that can disagree. */

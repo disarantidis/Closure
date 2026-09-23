@@ -2302,16 +2302,15 @@
        between them. */
     /* Sits between the card's header and its folder/commit rows, at the same
        inset as they have — it is one more field in the same column. */
-    /* The folder half of the address. A row of its own once; now one cell of
-       .json-download-fields, still a flex box because it holds two pickers
-       (one per provider, one shown) and the create button. It takes an equal
-       share with the file name beside it, and hides on its own — see the
-       markup's comment on why that is not the whole row. */
+    /* The folder line of the address. Still a flex box, because it holds two
+       pickers (one per provider, one shown at a time) and the create button.
+       It hides on its own — see the markup's comment on why that is not the
+       whole of .json-download-fields. */
     .repo-file-row {
       display: flex;
       align-items: center;
       gap: 8px;
-      flex: 2 1 0;
+      flex: none;
       min-width: 0;
     }
     .repo-file-row[hidden] { display: none; }
@@ -2479,20 +2478,27 @@
       characters is not a path. The button carries the one icon everybody
       already reads, and the two fields get the rest of the row.
     */
-    .json-download-fields { display: flex; align-items: center; gap: 8px; }
     /*
-      TWO TO THREE, NOT ONE TO ONE, because the two names are not the same
-      length. A folder in this plugin is "ODS" or "brand/core"; a file is
-      "odstokens.json". Split evenly, the folder had room it did not need and
-      the file lost the end of its name — measured at 420px, which is the only
-      width this window is ever opened at.
+      ONE PER LINE, AND THE ARITHMETIC IS WHY.
 
-      Each half may be narrower than its content — that is what min-width: 0
-      is for: without it a flex item refuses to shrink below its intrinsic
-      size and the row overflows the card instead of truncating inside it.
+      This window is 420px and is never opened at any other width. Inside the
+      repo card and inside this subcard a row has 312px, and each of these
+      fields spends about 105 of it on chrome before it shows a character: a
+      leading glyph, a clear ×, a rule and a chevron. Side by side that left
+      roughly 100px for two values — measured, the folder got 18, where "ODS"
+      alone needs 35 and "brand/core" needs 82.
+
+      Stacked, each gets 209. Every folder and every file name this plugin
+      deals with is then readable without hovering, which is worth the 58px of
+      height it costs. Side by side they were only ever legible while the name
+      field had no glyph and the folder had given its own up.
     */
+    .json-download-fields { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+    /* Each may still be narrower than its content — min-width: 0 is what lets
+       a flex item shrink below its intrinsic size and truncate inside the card
+       rather than overflowing it. */
     #primary-filename-mount,
-    #compare-pick-mount { flex: 3 1 0; min-width: 0; }
+    #compare-pick-mount { flex: none; min-width: 0; }
     #primary-filename-mount[hidden], #compare-pick-mount[hidden] { display: none; }
     
     .commit-input-wrap {
@@ -49694,12 +49700,13 @@ html[data-theme=dark] {
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
         DropDownSelect,
         {
-          label: "Folder path",
+          label: base.label ?? "Folder path",
           size: "small",
           block: true,
           value: s.value,
           options: options.length ? options : [{ value: "", label: "\u2014" }],
           onChange: (v) => onSelect(v),
+          ...base.icon ? { icon: base.icon } : null,
           ...base.style ? { style: base.style } : null
         }
       );
@@ -49837,7 +49844,8 @@ html[data-theme=dark] {
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-pick", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
         DropDownSelect,
         {
-          label: "File in the repo",
+          label: "JSON name",
+          icon: IconFile(16),
           size: "small",
           block: true,
           placeholder: s.all.length ? "pick a file" : "no JSON files here yet",
@@ -49872,7 +49880,7 @@ html[data-theme=dark] {
   mountCompareSides();
   window.PomCompareFolder = mountLiveDropdown(
     "compare-folder-mount",
-    {},
+    { label: "Folder path", icon: IconFolder(16) },
     (v) => window.PomCompareFolder?.onChange?.(v),
     SUBCARD_LEVEL
   );
@@ -49984,7 +49992,8 @@ html[data-theme=dark] {
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
         Combobox,
         {
-          label: "File name",
+          label: "JSON name",
+          icon: IconFile(16),
           size: "small",
           block: true,
           placeholder: "tokens.json",
@@ -50294,7 +50303,7 @@ html[data-theme=dark] {
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) }));
     window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? "error" : "success", message })) };
   })();
-  function mountFolderCombo(mountId, bridgeKey, placeholder, leadIcon = true, level = CARD_LEVEL) {
+  function mountFolderCombo(mountId, bridgeKey, placeholder, level = CARD_LEVEL) {
     const container = document.getElementById(mountId);
     let state = { query: "", selected: "", all: [] };
     let apply = null;
@@ -50322,7 +50331,7 @@ html[data-theme=dark] {
           label: "Folder path",
           size: "small",
           block: true,
-          ...leadIcon ? { icon: IconFolder(16) } : null,
+          icon: IconFolder(16),
           placeholder,
           value: s.query,
           onChange: (v) => {
@@ -50361,8 +50370,8 @@ html[data-theme=dark] {
     };
   }
   mountIconButton("folder-create-mount", { id: "folder-create-btn", variant: "outline", size: "medium", title: "Use this folder path \u2014 created on the first push", "aria-label": "Use this folder path", icon: IconAdd(16) }, SUBCARD_LEVEL);
-  window.PomFolderSelect = { ...mountFolderCombo("folder-select-mount", "PomFolderSelect", "choose a folder", false, SUBCARD_LEVEL), onChange: null };
-  window.PomGithubFolderSelect = { ...mountFolderCombo("github-folder-select-mount", "PomGithubFolderSelect", "choose a folder", false, SUBCARD_LEVEL), onChange: null };
+  window.PomFolderSelect = { ...mountFolderCombo("folder-select-mount", "PomFolderSelect", "choose a folder", SUBCARD_LEVEL), onChange: null };
+  window.PomGithubFolderSelect = { ...mountFolderCombo("github-folder-select-mount", "PomGithubFolderSelect", "choose a folder", SUBCARD_LEVEL), onChange: null };
   window.PomImportFolderSelect = { ...mountFolderCombo("import-folder-select-mount", "PomImportFolderSelect", "choose a folder"), onChange: null };
   window.PomFolderNew = { ...mountFolderCombo("folder-new-mount", "PomFolderNew", "find or type a folder"), onChange: null };
   window.PomGithubFolderNew = { ...mountFolderCombo("github-folder-new-mount", "PomGithubFolderNew", "find or type a folder"), onChange: null };
@@ -56128,7 +56137,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '278d77e 17:33:48';
+    var CLOSURE_BUILD = 'e26a051 17:39:18';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
