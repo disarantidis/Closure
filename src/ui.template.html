@@ -7735,6 +7735,20 @@
       });
     };
     window.PomClearVariablesDialog.onConfirm = function() {
+      /*
+        AND THE LIST GOES WITH THEM.
+
+        The collections dialog is what the Delete-all button was pressed FROM,
+        and what it lists is exactly what is being deleted — so leaving it up
+        left a modal naming collections that no longer exist, then an empty one
+        with a Delete-all button and nothing to delete, floating over a screen
+        that had gone to skeletons behind it.
+
+        Closed on the confirmation rather than on the result, because that is
+        the moment the list stops being true. Waiting for the round trip would
+        only choose which wrong thing to show in the meantime.
+      */
+      window.PomCollectionsAccordion.close();
       setActionsLoading(true);
       parent.postMessage({ pluginMessage: { type: 'clearVariables' } }, '*');
     };

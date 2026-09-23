@@ -671,6 +671,7 @@ declare global {
       setSummary: (tokensLabel: string) => void;
       /* Opened from the Figma card's header button, which is its own root. */
       open: () => void;
+      close: () => void;
       /* The Delete-all control lives in this dialog now; the page owns what it
          does, the same way the level rows own their own toggles. */
       onClearVariables: (() => void) | null;
@@ -1340,92 +1341,60 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
   in step by chooseRepoFile() in ui.template.html rather than by sharing state
   here, because one React root cannot span two places in the document.
 */
+/*
+  IMPORTING IS READING, SO THE FILE IS A LIST AND NOT A BOX.
+
+  This was a Combobox, and it carried the whole apparatus of one: a query kept
+  apart from the selection so that typing could filter without choosing, a
+  substring match, an empty-message for a filter that hit nothing, and a clear
+  × beside it. All of that is machinery for naming something that is not on the
+  list yet — and there is no such thing here. You cannot import a file the
+  repository does not have; the only names that mean anything are the ones the
+  listing returned.
+
+  So it is a DropDownSelect, the same as Compare's own file picker, which
+  answers the same question about the same folder. A box you may type a dead
+  name into is offering a choice with no outcome at the end of it.
+*/
 function mountRepoFileCombo(mountId: string, bridgeKey: 'PomImportRepoFile') {
   const container = document.getElementById(mountId);
-  /*
-    THE TYPED TEXT AND THE CHOSEN FILE ARE TWO DIFFERENT THINGS.
-
-    They were one, and the control ate its own input: typing "brand" reported
-    a new selection, which moved the read address, which re-listed the repo,
-    which found no file called "brand" and helpfully picked a default —
-    overwriting the three characters that had just been typed. You could not
-    filter, because filtering looked exactly like choosing.
-
-    `query` is what is in the box and only ever filters. `selected` is the
-    file the comparison is against, and only a PICK changes it — or typing a
-    name that exactly matches one, which is the same act done by keyboard.
-  */
-  type S = { query: string; selected: string; all: string[] };
-  let state: S = { query: '', selected: '', all: [] };
+  type S = { selected: string; all: string[] };
+  let state: S = { selected: '', all: [] };
   let apply: ((s: S) => void) | null = null;
   const put = (next: Partial<S>, tell?: boolean) => {
     state = { ...state, ...next };
     apply?.(state);
     if (tell) window[bridgeKey].onChange?.(state.selected);
   };
-  const commit = (name: string) => put({ selected: name, query: name }, true);
   function View() {
     const [s, setS] = useState<S>(state);
     apply = setS;
-    /* THE CALLER FILTERS — Combobox's decision 4. Substring, not prefix: the
-       name you half-remember is as often the middle of it ("dtcg") as the
-       start. While the box still holds the selection, the whole list shows —
-       a list that collapses to the one thing already chosen is a list with
-       nothing to choose from. */
-    const q = s.query.trim().toLowerCase();
-    const options = (!q || s.query === s.selected)
-      ? s.all
-      : s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1);
     return (
-      <Combobox
+      <DropDownSelect
         label="File in the repo"
+        icon={IconFile(16)}
         size="small"
         block
-        placeholder="nothing pushed yet"
-        value={s.query}
-        onChange={(v: string) => {
-          /* Typing filters. It commits only when what was typed IS one of the
-             options — the keyboard way of picking. */
-          if (s.all.indexOf(v) !== -1) commit(v);
-          else put({ query: v });
-        }}
-        options={options}
-        getKey={(o: string) => o}
-        onPick={(o: string) => commit(o)}
-        renderOption={(o: string, st: { active: boolean }) => (
-          <span style={{ fontWeight: st.active ? 600 : 400 }}>{o}</span>
-        )}
-        emptyMessage={s.all.length
-          ? 'No JSON in this folder matches that'
-          : 'No JSON files in this folder yet'}
+        placeholder={s.all.length ? 'pick a file' : 'nothing pushed yet'}
+        value={s.selected}
+        options={s.all.length
+          ? s.all.map((o) => ({ value: o, label: o }))
+          : [{ value: '', label: 'No JSON files in this folder yet' }]}
+        onChange={(v: string) => { if (v) put({ selected: v }, true); }}
       />
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window[bridgeKey] = {
     get: () => state.selected,
-    /* A set from outside is the app choosing, not the user — it moves both,
-       silently, because the caller is already acting on the new value. The
-       one exception is while somebody is typing in the box: the selection
-       still moves, the text they are composing does not. Same rule, and the
-       same reason, as the folder combo's. */
-    set: (next: string) => put({
-      selected: next,
-      ...(container && container.contains(document.activeElement) ? null : { query: next }),
-    }),
+    /* A set from outside is the app choosing, not the user. There is no typed
+       text to protect any more — that was the combobox's problem, and it left
+       with it — so this is simply the selection moving. */
+    set: (next: string) => put({ selected: next }),
     setOptions: (names: string[]) => put({ all: names || [] }),
     onChange: null,
   };
 }
-/*
-  THE READ-ONLY ECHO IS GONE, and mountRepoFileDisplay with it.
-
-  It existed to complete the repo card's address — folder, then file — while
-  the editable name lived a card and a half away, and it was read-only so that
-  one name would not have two controls. The name field itself sits beside the
-  folder now, so the line completes with the real thing and the copy has
-  nothing left to say. It is also how the two could disagree.
-*/
 
 mountRepoFileCombo('import-repo-file-mount', 'PomImportRepoFile');
 
@@ -2152,6 +2121,9 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     },
     /* The header button opens it; the dialog owns whether it is open. */
     open: () => openDialog(true),
+    /* And clearing the variables closes it, because the list it is showing is
+       the thing being deleted — see the call in ui.template.html. */
+    close: () => openDialog(false),
     onClearVariables: null,
   };
 })();

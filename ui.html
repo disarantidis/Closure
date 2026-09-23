@@ -50026,51 +50026,39 @@ html[data-theme=dark] {
   })();
   function mountRepoFileCombo(mountId, bridgeKey) {
     const container = document.getElementById(mountId);
-    let state = { query: "", selected: "", all: [] };
+    let state = { selected: "", all: [] };
     let apply = null;
     const put = (next, tell) => {
       state = { ...state, ...next };
       apply?.(state);
       if (tell) window[bridgeKey].onChange?.(state.selected);
     };
-    const commit = (name) => put({ selected: name, query: name }, true);
     function View() {
       const [s, setS] = (0, import_react16.useState)(state);
       apply = setS;
-      const q = s.query.trim().toLowerCase();
-      const options = !q || s.query === s.selected ? s.all : s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1);
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
-        Combobox,
+        DropDownSelect,
         {
           label: "File in the repo",
+          icon: IconFile(16),
           size: "small",
           block: true,
-          placeholder: "nothing pushed yet",
-          value: s.query,
+          placeholder: s.all.length ? "pick a file" : "nothing pushed yet",
+          value: s.selected,
+          options: s.all.length ? s.all.map((o) => ({ value: o, label: o })) : [{ value: "", label: "No JSON files in this folder yet" }],
           onChange: (v) => {
-            if (s.all.indexOf(v) !== -1) commit(v);
-            else put({ query: v });
-          },
-          options,
-          getKey: (o) => o,
-          onPick: (o) => commit(o),
-          renderOption: (o, st) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontWeight: st.active ? 600 : 400 }, children: o }),
-          emptyMessage: s.all.length ? "No JSON in this folder matches that" : "No JSON files in this folder yet"
+            if (v) put({ selected: v }, true);
+          }
         }
       );
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
     window[bridgeKey] = {
       get: () => state.selected,
-      /* A set from outside is the app choosing, not the user — it moves both,
-         silently, because the caller is already acting on the new value. The
-         one exception is while somebody is typing in the box: the selection
-         still moves, the text they are composing does not. Same rule, and the
-         same reason, as the folder combo's. */
-      set: (next) => put({
-        selected: next,
-        ...container && container.contains(document.activeElement) ? null : { query: next }
-      }),
+      /* A set from outside is the app choosing, not the user. There is no typed
+         text to protect any more — that was the combobox's problem, and it left
+         with it — so this is simply the selection moving. */
+      set: (next) => put({ selected: next }),
       setOptions: (names) => put({ all: names || [] }),
       onChange: null
     };
@@ -50534,6 +50522,9 @@ html[data-theme=dark] {
       },
       /* The header button opens it; the dialog owns whether it is open. */
       open: () => openDialog(true),
+      /* And clearing the variables closes it, because the list it is showing is
+         the thing being deleted — see the call in ui.template.html. */
+      close: () => openDialog(false),
       onClearVariables: null
     };
   })();
@@ -56142,7 +56133,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '861e344 17:59:58';
+    var CLOSURE_BUILD = 'ee74882 18:05:29';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -60388,6 +60379,20 @@ function format(report, opts) {
       });
     };
     window.PomClearVariablesDialog.onConfirm = function() {
+      /*
+        AND THE LIST GOES WITH THEM.
+
+        The collections dialog is what the Delete-all button was pressed FROM,
+        and what it lists is exactly what is being deleted — so leaving it up
+        left a modal naming collections that no longer exist, then an empty one
+        with a Delete-all button and nothing to delete, floating over a screen
+        that had gone to skeletons behind it.
+
+        Closed on the confirmation rather than on the result, because that is
+        the moment the list stops being true. Waiting for the round trip would
+        only choose which wrong thing to show in the meantime.
+      */
+      window.PomCollectionsAccordion.close();
       setActionsLoading(true);
       parent.postMessage({ pluginMessage: { type: 'clearVariables' } }, '*');
     };
