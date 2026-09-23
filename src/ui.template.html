@@ -5243,15 +5243,21 @@
       */
       var nameDups = window.PomJsonDiff.findDuplicateNames(importState.doc, 'repo');
       if (nameDups.length) {
+        /* The count and what it costs, and no inventory — the same rule the
+           export side's own warning follows. Nothing is done about this here;
+           the pairs are read on the Compare page, beside the rows they
+           explain. */
+        var nameSplit = nameDups.filter(function (d) { return !d.sameValues; }).length;
         html += '<div class="import-fact is-warn"><b>' + nameDups.length + '</b><span>' +
                 (nameDups.length === 1 ? 'name is' : 'names are') +
                 ' spelled two ways in this file</span></div>';
-        html += '<div class="import-warn-note">' + nameDups.map(function (d) {
-          return d.names.join(' \u00b7 ') + ' in ' + d.root +
-                 (d.sameValues ? '' : ' — and they hold different values');
-        }).join('<br>') +
-        '<br>Each pair is one idea written as two groups: half the tokens point at one, ' +
-        'half at the other, and a later comparison reads every one of them as changed.</div>';
+        html += '<div class="import-warn-note">' +
+                (nameSplit
+                  ? (nameSplit === nameDups.length ? 'Each is' : nameSplit + ' of them are') +
+                    ' one idea written as two groups holding different values, so half the ' +
+                    'tokens point at one and half at the other.'
+                  : 'Each is one name written as two groups, holding the same values.') +
+                '</div>';
       }
       document.getElementById('import-facts').innerHTML = html;
       document.getElementById('import-summary').hidden = false;

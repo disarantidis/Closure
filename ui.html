@@ -50822,26 +50822,34 @@ html[data-theme=dark] {
       set = setS;
       if (!s.open || !s.items.length) return null;
       const n = s.items.length;
-      return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
-        Alert,
-        {
-          tone: "warning",
-          title: n === 1 ? "One name is spelled two ways" : n + " names are spelled two ways",
-          children: [
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("p", { className: "closure-warning-subtitle", children: [
+      const split = s.items.filter((d) => !d.sameValues).length;
+      return (
+        /*
+                THE HEADLINE AND NOTHING ELSE.
+        
+                It listed every pair, and on a real file that is seven of them with a
+                line of explanation each — an amber block taller than the export card
+                it was warning about, pushing Push and Download off the bottom of the
+                panel. The finding is worth interrupting for; the inventory is not,
+                because nothing here is done about it on this screen.
+        
+                The list lives on the Compare page, which is where the cost of it shows
+                up and where there is room to read it.
+              */
+        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+          Alert,
+          {
+            tone: "warning",
+            title: n === 1 ? "One name is spelled two ways" : n + " names are spelled two ways",
+            children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("p", { className: "closure-warning-subtitle", children: [
               s.where,
-              " Each pair below is one idea written as two groups, so half the tokens point at one and half at the other."
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("ul", { className: "closure-warning-list", children: s.items.map((d) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("li", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "closure-warning-missing", children: d.names.join("  \xB7  ") }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "closure-warning-froms", children: [
-                "in ",
-                d.root,
-                d.sameValues ? " \u2014 same values in both, so only the name is split" : " \u2014 and they hold different values"
-              ] })
-            ] }, d.root + "/" + d.names.join("/"))) })
-          ]
-        }
+              " ",
+              split > 0 ? (split === n ? n === 1 ? "It is" : "They are" : split + " of them are") + " one idea written as two groups holding different values, so half the tokens point at one and half at the other." : "Each is one name written as two groups, holding the same values.",
+              " ",
+              "Compare against a repository to see which."
+            ] })
+          }
+        )
       );
     }
     if (container) (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) }));
@@ -51093,6 +51101,42 @@ html[data-theme=dark] {
           ] })
         ] }, title);
       };
+      const spellings = (rows) => {
+        if (!rows.length) return null;
+        const title = "Names \u2014 one word, spelled two ways";
+        return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-header", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "json-download-title-group", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "json-download-title", children: title }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-side-detail", children: rows.length.toLocaleString() })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-table", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+            Table,
+            {
+              caption: title,
+              captionHidden: true,
+              size: "small",
+              rules: true,
+              columns: [
+                {
+                  key: "names",
+                  header: "The two spellings",
+                  cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-token", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: x.names.join("  \xB7  ") }) })
+                },
+                {
+                  key: "side",
+                  header: "In",
+                  cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-pattern-to", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { children: x.side === "repo" ? "the repo file" : "this Figma file" }),
+                    !x.sameValues && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "and they hold different values" })
+                  ] })
+                }
+              ],
+              rows,
+              rowKey: (x) => x.side + "/" + x.names.join("/")
+            }
+          ) })
+        ] }, title);
+      };
       const leaves = (title, rows, twoSided, flagOf) => {
         if (!rows.length) return null;
         const columns = [
@@ -51223,6 +51267,7 @@ html[data-theme=dark] {
           ] }, g.name)) })
         ] }),
         patterns(r.changedPatterns || []),
+        spellings(r.duplicateNames || []),
         (r.changedByType || []).length > 1 ? r.changedByType.map((t) => leaves("Values \u2014 " + t.type, r.changed.filter((c) => c.type === t.type), true)) : leaves("Values \u2014 changed", r.changed, true),
         leaves("Architecture \u2014 pointing somewhere new", r.repointed || [], true),
         leaves("Architecture \u2014 same value, aliased one side", r.aliased || [], true, rowFlag),
@@ -56636,7 +56681,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'ceee987 19:16:13';
+    var CLOSURE_BUILD = '156e633 19:20:59';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -58217,15 +58262,21 @@ function format(report, opts) {
       */
       var nameDups = window.PomJsonDiff.findDuplicateNames(importState.doc, 'repo');
       if (nameDups.length) {
+        /* The count and what it costs, and no inventory — the same rule the
+           export side's own warning follows. Nothing is done about this here;
+           the pairs are read on the Compare page, beside the rows they
+           explain. */
+        var nameSplit = nameDups.filter(function (d) { return !d.sameValues; }).length;
         html += '<div class="import-fact is-warn"><b>' + nameDups.length + '</b><span>' +
                 (nameDups.length === 1 ? 'name is' : 'names are') +
                 ' spelled two ways in this file</span></div>';
-        html += '<div class="import-warn-note">' + nameDups.map(function (d) {
-          return d.names.join(' \u00b7 ') + ' in ' + d.root +
-                 (d.sameValues ? '' : ' — and they hold different values');
-        }).join('<br>') +
-        '<br>Each pair is one idea written as two groups: half the tokens point at one, ' +
-        'half at the other, and a later comparison reads every one of them as changed.</div>';
+        html += '<div class="import-warn-note">' +
+                (nameSplit
+                  ? (nameSplit === nameDups.length ? 'Each is' : nameSplit + ' of them are') +
+                    ' one idea written as two groups holding different values, so half the ' +
+                    'tokens point at one and half at the other.'
+                  : 'Each is one name written as two groups, holding the same values.') +
+                '</div>';
       }
       document.getElementById('import-facts').innerHTML = html;
       document.getElementById('import-summary').hidden = false;

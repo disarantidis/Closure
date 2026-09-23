@@ -2351,31 +2351,36 @@ function useClipboard() {
     set = setS;
     if (!s.open || !s.items.length) return null;
     const n = s.items.length;
+    /* The pairs whose two halves DISAGREE are the ones that cost something —
+       the same token name resolves to two answers depending on which spelling
+       it went through. Worth the one number even in a headline. */
+    const split = s.items.filter((d) => !d.sameValues).length;
     return (
+      /*
+        THE HEADLINE AND NOTHING ELSE.
+
+        It listed every pair, and on a real file that is seven of them with a
+        line of explanation each — an amber block taller than the export card
+        it was warning about, pushing Push and Download off the bottom of the
+        panel. The finding is worth interrupting for; the inventory is not,
+        because nothing here is done about it on this screen.
+
+        The list lives on the Compare page, which is where the cost of it shows
+        up and where there is room to read it.
+      */
       <Alert
         tone="warning"
         title={n === 1 ? 'One name is spelled two ways' : n + ' names are spelled two ways'}
       >
         <p className="closure-warning-subtitle">
-          {s.where} Each pair below is one idea written as two groups, so half
-          the tokens point at one and half at the other.
+          {s.where}{' '}
+          {split > 0
+            ? (split === n ? (n === 1 ? 'It is' : 'They are') : split + ' of them are') +
+              ' one idea written as two groups holding different values, so half the tokens ' +
+              'point at one and half at the other.'
+            : 'Each is one name written as two groups, holding the same values.'}
+          {' '}Compare against a repository to see which.
         </p>
-        <ul className="closure-warning-list">
-          {s.items.map((d) => (
-            <li key={d.root + '/' + d.names.join('/')}>
-              <div className="closure-warning-missing">{d.names.join('  ·  ')}</div>
-              <div className="closure-warning-froms">
-                in {d.root}
-                {/* The pair that holds DIFFERENT values is the one that costs
-                    something: the same token name resolves to two answers
-                    depending on which spelling it went through. */}
-                {d.sameValues
-                  ? ' — same values in both, so only the name is split'
-                  : ' — and they hold different values'}
-              </div>
-            </li>
-          ))}
-        </ul>
       </Alert>
     );
   }
@@ -2827,6 +2832,56 @@ const COMPARE_SAMPLE = 40;
       );
     };
 
+    /*
+      NOT A DIFFERENCE BETWEEN THE TWO — a shape inside each, and the reason a
+      good many of the differences above exist at all.
+
+      It is reported on export and on import too, but only as a headline: those
+      screens interrupt to say it is there, and this is where it is read,
+      beside the rows it explains.
+    */
+    const spellings = (rows: any[]) => {
+      if (!rows.length) return null;
+      const title = 'Names \u2014 one word, spelled two ways';
+      return (
+        <div className="json-download-card" data-level={4} key={title}>
+          <div className="json-download-header">
+            <div className="json-download-title-group">
+              <p className="json-download-title">{title}</p>
+            </div>
+            <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
+          </div>
+          <div className="compare-table">
+            <Table
+              caption={title}
+              captionHidden
+              size="small"
+              rules
+              columns={[
+                { key: 'names', header: 'The two spellings',
+                  cell: (x: any) => (
+                    <span className="compare-token">
+                      <span className="compare-cell-path">{x.names.join('  \u00b7  ')}</span>
+                    </span>
+                  ) },
+                { key: 'side', header: 'In',
+                  cell: (x: any) => (
+                    <span className="compare-pattern-to">
+                      <span>{x.side === 'repo' ? 'the repo file' : 'this Figma file'}</span>
+                      {!x.sameValues && (
+                        <span className="compare-pattern-why">and they hold different values</span>
+                      )}
+                    </span>
+                  ) },
+              ]}
+              rows={rows}
+              rowKey={(x: any) => x.side + '/' + x.names.join('/')}
+            />
+          </div>
+        </div>
+      );
+    };
+
     const leaves = (title: string, rows: any[], twoSided: boolean,
                     flagOf?: (row: any) => ReactNode) => {
       if (!rows.length) return null;
@@ -3070,6 +3125,9 @@ const COMPARE_SAMPLE = 40;
         {/* Before the per-token tables, because it is the shorter answer to
             the same question and usually the whole of it. */}
         {patterns(r.changedPatterns || [])}
+        {/* Straight after the patterns, because for several of them this IS
+            the explanation. */}
+        {spellings(r.duplicateNames || [])}
         {(r.changedByType || []).length > 1
           ? r.changedByType.map((t: any) =>
               leaves('Values \u2014 ' + t.type, r.changed.filter((c: any) => c.type === t.type), true))
