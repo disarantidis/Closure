@@ -22481,9 +22481,7 @@ html[data-theme=dark] {
             already exists has nothing to add.
           -->
           <span id="folder-create-mount" hidden></span>
-          <!-- "File in the repo" used to sit here. The Json file card's own
-               name field is a combobox over this folder's JSONs now, so the
-               file was being named twice on one screen. -->
+          <span id="repo-file-mount" class="repo-file-half"></span>
         </div>
 
         <!-- Only meaningful once BOTH providers are actually added (see
@@ -49733,6 +49731,34 @@ html[data-theme=dark] {
       onChange: null
     };
   }
+  function mountRepoFileDisplay() {
+    const container = document.getElementById("repo-file-mount");
+    let apply = null;
+    let value = "";
+    function View() {
+      const [v, setV] = (0, import_react18.useState)(value);
+      apply = setV;
+      return /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
+        PomTextField,
+        {
+          id: "repo-file-display",
+          label: "File in the repo",
+          size: "small",
+          block: true,
+          readonly: true,
+          value: v,
+          placeholder: "nothing named yet",
+          title: "Where the push lands in this repository. The name is set on the Json file card."
+        }
+      );
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime25.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(View, {}) })));
+    window.PomRepoFile = { set: (next) => {
+      value = next;
+      apply?.(next);
+    } };
+  }
+  mountRepoFileDisplay();
   mountRepoFileCombo("import-repo-file-mount", "PomImportRepoFile");
   window.PomCommitMessage = mountLiveTextArea("commit-message-mount", { id: "commit-message", placeholder: "Enter commit message...", rows: 2 }, false, CARD_LEVEL);
   mountButton("add-repo-settings-btn-mount", { id: "add-repo-settings-btn", variant: "filled", size: "large", label: "Add Repo Settings", block: true }, CARD_LEVEL);
@@ -55726,7 +55752,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'b513798 14:17:21';
+    var CLOSURE_BUILD = 'fdfa5d2 14:33:16';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -57915,6 +57941,7 @@ function format(report, opts) {
     window.PomPrimaryFilename.onChange = function (name) {
       scheduleSettingsSave();
       if (window.PomImportRepoFile) window.PomImportRepoFile.set(name);
+      showRepoFile();
       refreshRepoReadRow();
     };
     /* Picking on the import page is the same act, and has to land the same
@@ -58729,10 +58756,31 @@ function format(report, opts) {
     function setRepoFileOptions(names) {
       if (window.PomPrimaryFilename) window.PomPrimaryFilename.setOptions(names);
       if (window.PomImportRepoFile) window.PomImportRepoFile.setOptions(names);
+      showRepoFile();
+    }
+
+    /*
+      THE REPO CARD'S OWN LINE: the folder, then the file that will land in it.
+
+      It shows the name the Json file card holds, whether or not the repository
+      has it yet — a name being invented is exactly the case somebody wants to
+      see the destination for, and blanking it there would answer "where does
+      this go" with silence.
+
+      JUST THE NAME. A "· new" suffix was tried and is wrong twice: it competes
+      with the name for a narrow field and loses (the real one truncated to
+      "brand-new.json · r"), and the push button one card down already carries
+      that fact in the only place it changes what happens — "Push to GitHub"
+      against "Push and Replace". One signal, in the place that acts on it.
+    */
+    function showRepoFile() {
+      if (!window.PomRepoFile) return;
+      window.PomRepoFile.set(primaryFilename());
     }
     function chooseRepoFile(name) {
       if (name && window.PomPrimaryFilename) window.PomPrimaryFilename.set(name);
       if (window.PomImportRepoFile) window.PomImportRepoFile.set(name);
+      showRepoFile();
     }
     function repoFilePath(which) {
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();

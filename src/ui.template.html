@@ -2599,9 +2599,7 @@
             already exists has nothing to add.
           -->
           <span id="folder-create-mount" hidden></span>
-          <!-- "File in the repo" used to sit here. The Json file card's own
-               name field is a combobox over this folder's JSONs now, so the
-               file was being named twice on one screen. -->
+          <span id="repo-file-mount" class="repo-file-half"></span>
         </div>
 
         <!-- Only meaningful once BOTH providers are actually added (see
@@ -5378,6 +5376,7 @@
     window.PomPrimaryFilename.onChange = function (name) {
       scheduleSettingsSave();
       if (window.PomImportRepoFile) window.PomImportRepoFile.set(name);
+      showRepoFile();
       refreshRepoReadRow();
     };
     /* Picking on the import page is the same act, and has to land the same
@@ -6192,10 +6191,31 @@
     function setRepoFileOptions(names) {
       if (window.PomPrimaryFilename) window.PomPrimaryFilename.setOptions(names);
       if (window.PomImportRepoFile) window.PomImportRepoFile.setOptions(names);
+      showRepoFile();
+    }
+
+    /*
+      THE REPO CARD'S OWN LINE: the folder, then the file that will land in it.
+
+      It shows the name the Json file card holds, whether or not the repository
+      has it yet — a name being invented is exactly the case somebody wants to
+      see the destination for, and blanking it there would answer "where does
+      this go" with silence.
+
+      JUST THE NAME. A "· new" suffix was tried and is wrong twice: it competes
+      with the name for a narrow field and loses (the real one truncated to
+      "brand-new.json · r"), and the push button one card down already carries
+      that fact in the only place it changes what happens — "Push to GitHub"
+      against "Push and Replace". One signal, in the place that acts on it.
+    */
+    function showRepoFile() {
+      if (!window.PomRepoFile) return;
+      window.PomRepoFile.set(primaryFilename());
     }
     function chooseRepoFile(name) {
       if (name && window.PomPrimaryFilename) window.PomPrimaryFilename.set(name);
       if (window.PomImportRepoFile) window.PomImportRepoFile.set(name);
+      showRepoFile();
     }
     function repoFilePath(which) {
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();

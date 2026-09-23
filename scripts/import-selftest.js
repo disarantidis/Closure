@@ -1821,7 +1821,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
         const names = ['repoFilePath', 'pushFilePath', 'repoSelectedFile', 'listRepoJsonFiles',
                        'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
                        'pushOverwriteNote', 'withRootOption', 'folderDisplay',
-                       'setRepoFileOptions', 'chooseRepoFile', 'repoIdentity',
+                       'setRepoFileOptions', 'chooseRepoFile', 'repoIdentity', 'showRepoFile',
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
                        'renderImportFolderSelect', 'listRepoFolders',
                        'refreshFolderImportOffer', 'addFolderPath', 'normFolder',
@@ -1855,6 +1855,10 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             get: () => picked, set: (v) => { picked = v; }, setOptions: () => {}, onChange: null,
           };
           ctx.primaryFilename = () => picked;
+          /* The repo card's read-only echo of that name. */
+          let shown = '';
+          ctx.PomRepoFile = { set: (v) => { shown = v; } };
+          ctx.repoListed = false;
           /* The import page's picker is a SECOND mount of the same combo over
              the same selection. Stubbed as its own object on purpose: if the
              two ever stop being written together, these see it. */
@@ -1915,6 +1919,26 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ok('repo file: one listing fills the name field and the import picker',
              importOptions && importOptions.join(',') === 'a.json,b.json',
              JSON.stringify(importOptions));
+
+          /*
+            THE REPO CARD SHOWS WHERE IT LANDS, including when that is somewhere
+            the repository does not have yet. A name being invented is exactly
+            the case somebody wants the destination for, so blanking it would
+            answer "where does this go" with silence.
+
+            The NAME and nothing else. A "· new" suffix was tried and truncated
+            in the real field, and the push button already carries that fact
+            where it changes what happens.
+          */
+          ctx.repoListed = true;
+          ctx.repoFileNames = ['a.json', 'b.json'];
+          ctx.chooseRepoFile('a.json');
+          ok('repo file: the repo card echoes a name the folder holds',
+             shown === 'a.json', shown);
+          ctx.chooseRepoFile('invented.json');
+          ok('repo file: and echoes one it does not, rather than going blank',
+             shown === 'invented.json', shown);
+          ctx.chooseRepoFile('themes.json');
           ok('repo file: the read address follows whatever was chosen',
              ctx.repoFilePath('github') === 'themes.json', ctx.repoFilePath('github'));
 

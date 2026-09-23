@@ -685,6 +685,9 @@ declare global {
       onChange: ((value: string) => void) | null;
     };
     PomImportRepoWhere: { set: (rows: { provider: string; name: string; branch: string }[]) => void };
+    /* A read-only view of the name the Json file card carries — see
+       mountRepoFileDisplay. It shows, it does not ask. */
+    PomRepoFile: { set: (value: string) => void };
     PomImportRepoFile: {
       get: () => string;
       set: (value: string) => void;
@@ -1222,9 +1225,43 @@ function mountRepoFileCombo(mountId: string, bridgeKey: 'PomImportRepoFile') {
     onChange: null,
   };
 }
-/* One mount, on the import page. The repo card's copy is gone: the Json file
-   card's own name field is a combobox over the same listing now, so choosing
-   there IS choosing the file in the repo. */
+/*
+  WHERE THE FILE LANDS, BESIDE THE FOLDER IT LANDS IN — and read-only, because
+  the answer is decided one card up.
+
+  The address reads left to right: folder, then file. This completes that line
+  without offering a second place to change it, which is what made the old
+  picker a problem — two controls for one name. readOnly is the kit's own
+  grammar for this and not a disabled control: the surface settles while the
+  VALUE keeps full contrast (SelectableCard.tsx says it plainly — "an answer
+  decided elsewhere, not a control asleep"). A disabled field would dim the
+  name, which is the one thing here worth reading.
+*/
+function mountRepoFileDisplay() {
+  const container = document.getElementById('repo-file-mount');
+  let apply: ((v: string) => void) | null = null;
+  let value = '';
+  function View() {
+    const [v, setV] = useState(value);
+    apply = setV;
+    return (
+      <PomTextField
+        id="repo-file-display"
+        label="File in the repo"
+        size="small"
+        block
+        readonly
+        value={v}
+        placeholder="nothing named yet"
+        title="Where the push lands in this repository. The name is set on the Json file card."
+      />
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomRepoFile = { set: (next: string) => { value = next; apply?.(next); } };
+}
+mountRepoFileDisplay();
+
 mountRepoFileCombo('import-repo-file-mount', 'PomImportRepoFile');
 
 window.PomCommitMessage = mountLiveTextArea('commit-message-mount', { id: 'commit-message', placeholder: 'Enter commit message...', rows: 2 }, false, CARD_LEVEL);
