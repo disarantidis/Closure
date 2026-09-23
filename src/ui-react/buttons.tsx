@@ -139,6 +139,9 @@ const IconSettings = svg(
 );
 const IconCheck = svg('M20 6L9 17l-5-5');
 const IconFolder = svg('M3 7a2 2 0 012-2h3.5l2 2H19a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z');
+/* Lucide's "file-text", the same document glyph the Json file card's own title
+   carries — one shape for "a file" everywhere in this UI. */
+const IconFile = svg('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8');
 const IconAdd = svg('M12 5v14M5 12h14');
 /* An arrow out of a tray — "send this up there". Distinct from IconSync's two
    arrows, which mean "go and read it again": one writes, the other does not. */
@@ -692,7 +695,7 @@ declare global {
     };
     PomFolderRemove: {
       open: (info: { provider: string; where: string; path: string;
-                     files: string[]; subfolders: number }) => void;
+                     files: string[]; dirs: string[] }) => void;
       close: () => void;
       fail: (message: string) => void;
       onConfirm: ((mode: string) => void) | null;
@@ -3160,10 +3163,10 @@ function mountFolderRemove() {
   const container = document.getElementById('folder-remove-dialog-mount');
   type S = {
     open: boolean; provider: string; where: string; path: string;
-    files: string[]; subfolders: number; busy: boolean; error: string; mode: string;
+    files: string[]; dirs: string[]; busy: boolean; error: string; mode: string;
   };
   const FRESH: S = { open: false, provider: 'github', where: '', path: '', files: [],
-                     subfolders: 0, busy: false, error: '', mode: 'list' };
+                     dirs: [], busy: false, error: '', mode: 'list' };
   let state: S = FRESH;
   let apply: ((s: S) => void) | null = null;
   const put = (next: Partial<S>) => { state = { ...state, ...next }; apply?.(state); };
@@ -3214,28 +3217,43 @@ function mountFolderRemove() {
           {s.provider === 'gitlab' ? IconGitlab(14) : IconGithub(14)}
           <span>{s.where}</span>
         </p>
-        <p className="folder-remove-path">{IconFolder(14)}<span>{s.path}</span></p>
-        {n > 0 && (
-          <div className="folder-remove-files">
-            <p className="folder-remove-files-title">
-              This folder holds {n} file{n === 1 ? '' : 's'}
-              {s.subfolders ? ' and ' + s.subfolders + ' subfolder' + (s.subfolders === 1 ? '' : 's') : ''}:
-            </p>
-            <ul>{s.files.slice(0, 12).map((f) => <li key={f}>{f}</li>)}</ul>
-            {n > 12 && <p className="folder-remove-more">…and {n - 12} more</p>}
-          </div>
-        )}
-        <div className="folder-remove-choices">
+        {/* The folder and what is in it as ONE thing, because that is what is
+            being removed. A separate list under a heading reads as two facts
+            that happen to be near each other; nested under the folder it reads
+            as its contents, which is the whole point of showing them. */}
+        <div className="folder-remove-tree">
+          <p className="folder-remove-path">{IconFolder(14)}<span>{s.path}</span></p>
+          {s.dirs.slice(0, 4).map((d) => (
+            <p className="folder-remove-child" key={'d-' + d}>{IconFolder(14)}<span>{d}/</span></p>
+          ))}
+          {s.files.slice(0, 12).map((f) => (
+            <p className="folder-remove-child" key={'f-' + f}>{IconFile(14)}<span>{f}</span></p>
+          ))}
+          {n > 12 && <p className="folder-remove-more">…and {n - 12} more files</p>}
+        </div>
+        {/*
+          A RADIOGROUP, WRITTEN HERE BECAUSE THE CARD CANNOT. SelectableCard's
+          own header says it: a card holds `selected` rather than a real input,
+          so it can write aria-checked and cannot write the SET — without this
+          wrapper a reader hears "radio" with no set to be one of.
+        */}
+        <div className="folder-remove-choices" role="radiogroup" aria-label="What to do with this folder">
           {options.map((o) => (
-            <label className={'folder-remove-choice' + (s.mode === o.value ? ' is-on' : '')} key={o.value}>
-              <input type="radio" name="folder-remove-mode" value={o.value}
-                checked={s.mode === o.value} disabled={s.busy}
-                onChange={() => put({ mode: o.value })} />
-              <span>
+            <SelectableCard
+              key={o.value}
+              label={o.label}
+              group="folder-remove-mode"
+              selected={s.mode === o.value}
+              disabled={s.busy}
+              size="small"
+              level={CARD_LEVEL}
+              onSelect={() => put({ mode: o.value })}
+            >
+              <span className="folder-remove-choice-body">
                 <b>{o.label}</b>
                 <em>{o.note}</em>
               </span>
-            </label>
+            </SelectableCard>
           ))}
         </div>
         {s.error ? <p className="folder-remove-error">{s.error}</p> : null}

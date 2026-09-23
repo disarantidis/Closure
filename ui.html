@@ -695,35 +695,41 @@
     }
     .folder-discovery-where svg { flex: none; opacity: 0.8; }
 
-    .folder-remove-path {
-      display: flex; align-items: center; gap: 8px;
-      margin: 0 0 12px; padding: 10px 12px;
+    /*
+      THE FOLDER AND WHAT IS IN IT, AS ONE SURFACE. They were two blocks — a
+      chip, then a list under a heading — which reads as two facts that happen
+      to sit near each other. Nested inside the same fill, under a guide line,
+      they read as the folder's contents, which is the only reason they are on
+      screen: this is the thing about to be removed, drawn as one thing.
+    */
+    .folder-remove-tree {
+      margin: 0 0 16px; padding: 10px 12px;
       border-radius: 12px; background: var(--nd-field-fill, rgba(255,255,255,0.04));
-      font-size: 12px; overflow-wrap: anywhere;
     }
-    .folder-remove-path svg { flex: none; opacity: 0.7; }
-    .folder-remove-files { margin: 0 0 12px; font-size: 11px; }
-    .folder-remove-files-title { margin: 0 0 6px; opacity: 0.75; }
-    .folder-remove-files ul {
-      margin: 0; padding: 0 0 0 16px;
+    .folder-remove-path,
+    .folder-remove-child {
+      display: flex; align-items: center; gap: 8px;
+      margin: 0; font-size: 12px; overflow-wrap: anywhere; min-width: 0;
+    }
+    .folder-remove-path svg,
+    .folder-remove-child svg { flex: none; opacity: 0.7; }
+    .folder-remove-path { font-weight: 600; }
+    /* Indented under the folder, with the guide that says so. */
+    .folder-remove-child {
+      margin-left: 7px; padding: 5px 0 0 15px;
+      border-left: 1px solid var(--app-border);
+      font-size: 11px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      overflow-wrap: anywhere;
+      opacity: 0.85;
     }
-    .folder-remove-files li { margin: 2px 0; }
-    .folder-remove-more { margin: 4px 0 0; opacity: 0.6; }
+    .folder-remove-more {
+      margin: 4px 0 0 22px; font-size: 11px; opacity: 0.6;
+    }
     .folder-remove-choices { display: flex; flex-direction: column; gap: 8px; }
-    /* The whole row is the target, not the 13px dot in the corner of it. */
-    .folder-remove-choice {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 10px 12px; border-radius: 12px; cursor: pointer;
-      border: 1px solid var(--app-border);
-    }
-    .folder-remove-choice.is-on { border-color: var(--app-text); }
-    .folder-remove-choice input { margin-top: 2px; flex: none; }
-    .folder-remove-choice b { display: block; font-size: 12px; font-weight: 600; }
-    .folder-remove-choice em {
-      display: block; margin-top: 2px;
-      font-size: 11px; font-style: normal; opacity: 0.7; line-height: 1.45;
+    .folder-remove-choice-body { display: flex; flex-direction: column; gap: 2px; }
+    .folder-remove-choice-body b { font-size: 12px; font-weight: 600; color: var(--app-text); }
+    .folder-remove-choice-body em {
+      font-size: 11px; font-style: normal; color: var(--app-text-muted); line-height: 1.45;
     }
     .folder-remove-error {
       margin: 12px 0 0; font-size: 11px; color: var(--app-danger); line-height: 1.5;
@@ -49096,6 +49102,7 @@ html[data-theme=dark] {
   );
   var IconCheck = svg("M20 6L9 17l-5-5");
   var IconFolder = svg("M3 7a2 2 0 012-2h3.5l2 2H19a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z");
+  var IconFile = svg("M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8");
   var IconAdd = svg("M12 5v14M5 12h14");
   var IconUpload = svg("M12 16V4 M7 9l5-5 5 5 M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2");
   var IconSync = svg("M21 12a9 9 0 0 1-9 9 9 9 0 0 1-7.5-4 M3 12a9 9 0 0 1 9-9 9 9 0 0 1 7.5 4 M20 4v5h-5 M4 20v-5h5");
@@ -50870,7 +50877,7 @@ html[data-theme=dark] {
       where: "",
       path: "",
       files: [],
-      subfolders: 0,
+      dirs: [],
       busy: false,
       error: "",
       mode: "list"
@@ -50952,43 +50959,45 @@ html[data-theme=dark] {
               s.provider === "gitlab" ? IconGitlab(14) : IconGithub(14),
               /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: s.where })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("p", { className: "folder-remove-path", children: [
-              IconFolder(14),
-              /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: s.path })
-            ] }),
-            n > 0 && /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "folder-remove-files", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("p", { className: "folder-remove-files-title", children: [
-                "This folder holds ",
-                n,
-                " file",
-                n === 1 ? "" : "s",
-                s.subfolders ? " and " + s.subfolders + " subfolder" + (s.subfolders === 1 ? "" : "s") : "",
-                ":"
+            /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "folder-remove-tree", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("p", { className: "folder-remove-path", children: [
+                IconFolder(14),
+                /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: s.path })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("ul", { children: s.files.slice(0, 12).map((f) => /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("li", { children: f }, f)) }),
+              s.dirs.slice(0, 4).map((d) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("p", { className: "folder-remove-child", children: [
+                IconFolder(14),
+                /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { children: [
+                  d,
+                  "/"
+                ] })
+              ] }, "d-" + d)),
+              s.files.slice(0, 12).map((f) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("p", { className: "folder-remove-child", children: [
+                IconFile(14),
+                /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: f })
+              ] }, "f-" + f)),
               n > 12 && /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("p", { className: "folder-remove-more", children: [
                 "\u2026and ",
                 n - 12,
-                " more"
+                " more files"
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "folder-remove-choices", children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("label", { className: "folder-remove-choice" + (s.mode === o.value ? " is-on" : ""), children: [
-              /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
-                "input",
-                {
-                  type: "radio",
-                  name: "folder-remove-mode",
-                  value: o.value,
-                  checked: s.mode === o.value,
-                  disabled: s.busy,
-                  onChange: () => put({ mode: o.value })
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("b", { children: o.label }),
-                /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("em", { children: o.note })
-              ] })
-            ] }, o.value)) }),
+            /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "folder-remove-choices", role: "radiogroup", "aria-label": "What to do with this folder", children: options.map((o) => /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
+              SelectableCard,
+              {
+                label: o.label,
+                group: "folder-remove-mode",
+                selected: s.mode === o.value,
+                disabled: s.busy,
+                size: "small",
+                level: CARD_LEVEL,
+                onSelect: () => put({ mode: o.value }),
+                children: /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { className: "folder-remove-choice-body", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("b", { children: o.label }),
+                  /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("em", { children: o.note })
+                ] })
+              },
+              o.value
+            )) }),
             s.error ? /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("p", { className: "folder-remove-error", children: s.error }) : null
           ]
         }
@@ -55568,7 +55577,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'cbd731d 13:36:42';
+    var CLOSURE_BUILD = '7dc7657 13:39:23';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -56001,14 +56010,14 @@ function format(report, opts) {
         window.PomFolderRemove.open({
           provider: which,
           where: (which === 'gitlab' ? c.project : c.repo) + ' · ' + c.branch,
-          path: folder, files: res.files, subfolders: res.subfolders,
+          path: folder, files: res.files, dirs: res.dirs,
         });
       }, function () {
         /* Could not look. Offer the local removal only — it is the one thing
            that is certainly safe when the repository will not answer. */
         window.PomFolderRemove.open({
           provider: which, where: (which === 'gitlab' ? c.project : c.repo) + ' · ' + c.branch,
-          path: folder, files: [], subfolders: 0,
+          path: folder, files: [], dirs: [],
         });
       });
     }
@@ -57428,7 +57437,8 @@ function format(report, opts) {
           return {
             files: (rows || []).filter(function (e) { return e.type === 'blob'; })
                                .map(function (e) { return e.name; }),
-            subfolders: (rows || []).filter(function (e) { return e.type === 'tree'; }).length,
+            dirs: (rows || []).filter(function (e) { return e.type === 'tree'; })
+                              .map(function (e) { return e.name; }),
           };
         });
       }
@@ -57445,10 +57455,10 @@ function format(report, opts) {
         if (!r.ok) throw { status: r.status, message: 'the repo answered ' + r.status };
         return r.json();
       }).then(function (rows) {
-        if (!Array.isArray(rows)) return { files: [], subfolders: 0 };
+        if (!Array.isArray(rows)) return { files: [], dirs: [] };
         return {
           files: rows.filter(function (e) { return e.type === 'file'; }).map(function (e) { return e.name; }),
-          subfolders: rows.filter(function (e) { return e.type === 'dir'; }).length,
+          dirs: rows.filter(function (e) { return e.type === 'dir'; }).map(function (e) { return e.name; }),
         };
       });
     }
