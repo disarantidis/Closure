@@ -376,10 +376,15 @@ function PomTextArea(props: any) {
 function PomButton(props: any) {
   const {
     id, variant, size, label, destructive, icon, leftIcon, buttonLeftIcon,
+    rightIcon, buttonRightIcon,
     disabled, loading, active, style, title, onClick, block, flex,
   } = props;
   const iconOnly = !!icon; // the icon-button bag carries `icon`; text buttons carry `label`
   const leading = iconOnly ? icon : (leftIcon ? buttonLeftIcon : undefined);
+  /* Button has had a `trailing` slot all along — this is the same leftIcon /
+     buttonLeftIcon pair on the other side, so a caller does not have to reach
+     past PomButton to put a mark after a label. */
+  const trailing = iconOnly ? undefined : (rightIcon ? buttonRightIcon : undefined);
   const extra: any = {};
   if (destructive) extra['data-scheme'] = 'error';
   extra.size = btnSize(size);
@@ -393,6 +398,7 @@ function PomButton(props: any) {
       loading={loading}
       active={active}
       leading={leading}
+      trailing={trailing}
       glass={iconOnly ? false : undefined}
       label={iconOnly ? (label ?? props['aria-label']) : undefined}
       title={title}
@@ -927,8 +933,13 @@ window.PomRepoReadBtn = mountLiveTitleButton(
   makes the old label plainly wrong is the common one: a file being imported
   into usually has no variables yet, so there is nothing to compare with.
 */
-mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'tonal', size: 'small', label: 'Import from GitLab' });
-mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'tonal', size: 'small', label: 'Import from GitHub' });
+/* The same button as "Choose a JSON file" above it — filled, large — because
+   they are the same act from two sources, and one of them being a small tonal
+   afterthought said the repo route was the lesser one. The provider's mark
+   trails the label: the label already says which service, and the mark is what
+   is recognised before the label is read. */
+mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'filled', size: 'large', label: 'Import from GitLab', rightIcon: true, buttonRightIcon: IconGitlab(18) });
+mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'filled', size: 'large', label: 'Import from GitHub', rightIcon: true, buttonRightIcon: IconGithub(18) });
 
 mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', leftIcon: true, buttonLeftIcon: IconImport(16) });
 

@@ -1483,28 +1483,35 @@
        the drop zone is the thing to try first on a file you already have. */
     .import-repo {
       margin-top: 12px;
-      padding: 14px 16px;
+      padding: 16px;
       border: 1px solid var(--app-border);
       border-radius: 16px;
-      text-align: center;
+      /* Left, not centred. Centring was right when the card was one line and a
+         small button; it holds two labelled pickers now, and a field whose
+         label is centred over it reads as a caption for the card rather than a
+         name for the control. The action stays centred, on its own row. */
+      text-align: left;
     }
-    .import-repo-title { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--app-text); }
     /* WHICH REPOSITORY, named the way the main screen names it: the service's
        own mark, then owner/repo, then the branch and folder. The page used to
        print a bare path here, which says which FILE without ever saying whose
        repository it is in — and on this page, where the next click writes into
        the open Figma document, that is the half that matters. */
-    .import-repo-where { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; }
+    .import-repo-where { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; }
+    /* The heading of this card, so it is sized like one. */
     .import-repo-where-row {
-      display: flex; align-items: center; justify-content: center;
-      gap: 6px; flex-wrap: wrap; font-size: 11px;
+      display: flex; align-items: center;
+      gap: 8px; flex-wrap: wrap; font-size: 13px;
     }
-    .import-repo-mark { flex: none; opacity: 0.8; }
-    .import-repo-name { font-weight: 600; color: var(--app-text); overflow-wrap: anywhere; }
+    .import-repo-mark { flex: none; opacity: 0.9; }
+    .import-repo-name {
+      font-size: 13px; font-weight: 600; color: var(--app-text); overflow-wrap: anywhere;
+    }
     /* Monospaced and dimmed for the same reason the repo card's status line is:
        most of it is a branch and a path, and a path is only checkable if it is
        rendered as one. */
     .import-repo-path {
+      font-size: 12px;
       opacity: 0.7;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       overflow-wrap: anywhere;
@@ -1513,14 +1520,17 @@
        way to say which of them to import — the page simply took the one whose
        name the plugin happens to push to. Same picker as the repo card, same
        selection behind it. */
-    .import-repo-file { margin: 0 0 12px; text-align: left; }
+    .import-repo-file { margin: 0; }
     .import-repo-pickers { display: flex; gap: 8px; }
     .import-repo-pickers > .repo-file-half { flex: 1 1 0; min-width: 0; }
     .import-repo-file-label {
-      display: block; margin: 0 0 4px;
-      font-size: 11px; opacity: 0.7; text-align: center;
+      display: block; margin: 0 0 6px;
+      font-size: 11px; opacity: 0.7;
     }
-    .import-repo-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .import-repo-actions {
+      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+      margin-top: 14px;
+    }
 
     .import-card {
       background: var(--background);
@@ -2679,7 +2689,10 @@
            compare against, and the usual state of a file somebody is
            importing into is that it has none. -->
       <div class="import-repo" id="import-repo" hidden>
-        <p class="import-repo-title">…or import from the repo</p>
+        <!-- No title. "…or import from the repo" labelled a card whose every
+             other line already says it: the repository is named at the top, the
+             folder and file are pickers, and the button reads "Import from
+             GitHub". The repository IS the heading now. -->
         <div class="import-repo-where" id="import-repo-where"></div>
         <!--
           THE PATH, AS TWO CONTROLS RATHER THAN A SENTENCE. The folder used to
@@ -4070,8 +4083,9 @@
         var mark = src.cloneNode(true);
         mark.removeAttribute('id');
         mark.setAttribute('class', 'import-repo-mark');
-        mark.setAttribute('width', '14');
-        mark.setAttribute('height', '14');
+        /* The card's heading mark, so it is heading-sized. */
+        mark.setAttribute('width', '18');
+        mark.setAttribute('height', '18');
         mark.style.display = '';        // the card hides the two it is not using
         row.appendChild(mark);
       }
