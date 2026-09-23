@@ -274,6 +274,11 @@
       --app-heading: var(--text);
       --app-accent: var(--accent);
       --app-danger: #E5675E;
+      /* Beside --app-danger and for the same reason: the kit's own tone
+         tokens live inside its components, and this file needs one it can put
+         on arbitrary text. Warning, not danger — an unbound token is worth
+         looking at, not an error. */
+      --app-warning: #D9A441;
     }
 
     html, body {
@@ -1189,6 +1194,24 @@
        part of the token, and a cell showing two of five sub-values without
        saying so reads as a token with two sub-values. */
     .compare-sub-same { font-size: 10px; opacity: 0.45; margin-top: 2px; }
+
+    /* The one mark on this page that means "look at this". Warning ink, and
+       the names it points at kept monospaced, because they are paths to go and
+       find rather than prose to read. */
+    .compare-flag {
+      display: flex;
+      align-items: flex-start;
+      gap: 4px;
+      margin-top: 4px;
+      font-size: 10px;
+      line-height: 1.35;
+      color: var(--app-warning);
+    }
+    .compare-flag-mark { flex-shrink: 0; display: flex; margin-top: 1px; }
+    .compare-flag-name {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+    }
 
     /* The key above the per-collection rows: which column is which kind.
        Same order as the sections above it, so the eye learns it once. */

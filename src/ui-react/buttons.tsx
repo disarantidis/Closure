@@ -233,6 +233,10 @@ const IconGitlab = svg('M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.
   actually contain (typography, shadow), because a token whose type has no
   glyph gets no column and the reader has to go and work out why.
 */
+/* tabler: alert-triangle — the one mark on this page that means "look at
+   this", as opposed to "this is what is there". */
+const IconWarning = svg('M12 9v4M12 17h.01M10.24 3.957l-8.422 14.06a1.989 1.989 0 0 0 1.7 2.983h16.845a1.989 1.989 0 0 0 1.7 -2.983l-8.422 -14.06a1.989 1.989 0 0 0 -3.4 0');
+
 const IconTypeColor = svg('M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25M7.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M11.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M15.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0');        /* tabler: palette */
 const IconTypeNumber = svg('M5 9l14 0M5 15l14 0M11 4l-4 16M17 4l-4 16');          /* tabler: hash */
 const IconTypeString = svg('M6 4l12 0M12 4l0 16');      /* tabler: letter-t */
@@ -2093,44 +2097,36 @@ const COMPARE_SAMPLE = 40;
       "here" with nothing under it would be a table drawn around an absence.
     */
     /*
-      WHAT IS WRONG RATHER THAN WHAT IS DIFFERENT.
+      THE FINDING, ON THE LINE THAT DEMONSTRATES IT.
 
-      An unbound token is a literal sitting where a variable was available to
-      point at: the link was lost, not declined. A duplicate name is one
-      concept spelled two ways, with half the file pointing at each. Neither
-      is a difference between the two documents — the duplicate is in BOTH —
-      and neither would ever appear in a diff of values.
+      This was a summary Alert above the tables, which is the right shape for
+      a count and the wrong one for acting on: a reader looking at one row had
+      to carry "252 tokens are unbound, and font-family and fontFamilies are
+      the same thing" in their head and work out whether THIS row was one of
+      them. The row knows. It names the variable it should have pointed at,
+      and the other spelling of that variable when there is one.
 
-      Warnings, not errors: inlining can be deliberate and two names can be a
-      migration in progress. What earns the alert is that the alternative is
-      right there and unused.
+      A warning rather than an error: inlining can be deliberate and two names
+      can be a migration half-done. What earns the mark is that the
+      alternative is sitting right there, unused.
     */
-    const warnings = (rep: any) => {
-      const unbound = rep.unbound || [];
-      const dupes = rep.duplicateNames || [];
-      if (!unbound.length && !dupes.length) return null;
-      /* Named, and counted, because "252 tokens" is a scale and
-         "font-family.teleneo-var" is somewhere to go. */
-      const targets = new Map<string, number>();
-      unbound.forEach((x: any) => targets.set(x.bindable, (targets.get(x.bindable) || 0) + 1));
+    const rowFlag = (x: any) => {
+      if (!x || !x.bindable) return null;
       return (
-        <Alert tone="warning" title="Worth fixing in the files themselves">
-          {unbound.length > 0 && (
-            <p className="closure-warning-subtitle">
-              {`${unbound.length.toLocaleString()} token${unbound.length === 1 ? '' : 's'} hold a ` +
-               `literal where the variable exists and is not pointed at — ` +
-               `${[...targets.entries()].map(([t, n]) => `${t} (${n})`).join(', ')}. ` +
-               `Change the variable and nothing follows.`}
-            </p>
-          )}
-          {dupes.map((d: any) => (
-            <p className="closure-warning-more" key={d.side + d.names.join()}>
-              {`${d.side === 'figma' ? 'Figma' : 'Repo'}: ${d.names.join(' and ')} are the same ` +
-               `${d.tokens === 1 ? 'token' : `${d.tokens} tokens`} under two names, in ` +
-               `${d.documents === 1 ? '1 document' : `all ${d.documents} documents`}.`}
-            </p>
-          ))}
-        </Alert>
+        <span className="compare-flag">
+          <span className="compare-flag-mark" aria-hidden="true">{IconWarning(11)}</span>
+          <span>
+            {'not bound — '}
+            <span className="compare-flag-name">{x.bindable}</span>
+            {' exists'}
+            {x.alsoSpelled && x.alsoSpelled.length ? (
+              <>
+                {', also spelled '}
+                <span className="compare-flag-name">{x.alsoSpelled.join(', ')}</span>
+              </>
+            ) : null}
+          </span>
+        </span>
       );
     };
 
@@ -2178,7 +2174,8 @@ const COMPARE_SAMPLE = 40;
       );
     };
 
-    const leaves = (title: string, rows: any[], twoSided: boolean) => {
+    const leaves = (title: string, rows: any[], twoSided: boolean,
+                    flagOf?: (row: any) => ReactNode) => {
       if (!rows.length) return null;
       const columns: any[] = [
         {
@@ -2223,13 +2220,25 @@ const COMPARE_SAMPLE = 40;
           header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
                          : s.sides.provider === 'github' ? IconGithub(12) : null, 'Repo'),
           width: w,
-          cell: (x: any) => valueCell(x.repo, x.figma),
+          cell: (x: any) => (
+            <>
+              {valueCell(x.repo, x.figma)}
+              {flagOf && x.unboundSide === 'repo' ? flagOf(x) : null}
+            </>
+          ),
         });
         columns.push({
           key: 'figma',
           header: headWith(IconFigma(12), 'Figma'),
           width: w,
-          cell: (x: any) => valueCell(x.figma, x.repo),
+          /* The flag goes under whichever side holds the literal — that is the
+             side that could have pointed and did not. */
+          cell: (x: any) => (
+            <>
+              {valueCell(x.figma, x.repo)}
+              {flagOf && x.unboundSide === 'figma' ? flagOf(x) : null}
+            </>
+          ),
         });
       } else {
         columns.push({ key: 'value', header: 'Value', width: '120px', cell: (x: any) => valueCell(x.value) });
@@ -2282,14 +2291,6 @@ const COMPARE_SAMPLE = 40;
             1,060 are the ones a person has to look at and agree with; the
             57,584 are what a rename did. Values go first and stand alone.
           */}
-          {/*
-            PROBLEMS, NOT DIFFERENCES — and they go first because they are the
-            only rows on this page that are somebody's to fix. Everything else
-            describes how two files differ; these describe something wrong
-            inside one, which a comparison happens to be well placed to see.
-          */}
-          {warnings(r)}
-
           <div className="compare-section">
             <div className="compare-section-head">
               <span className="compare-section-title">Values</span>
@@ -2424,7 +2425,7 @@ const COMPARE_SAMPLE = 40;
         {/* The value is the SAME on both sides — one file points at it, the
             other spells it out. Worth seeing (it says the two exports were
             made differently) and emphatically not a value change. */}
-        {leaves('Architecture \u2014 same value, aliased one side', r.aliased || [], true)}
+        {leaves('Architecture \u2014 same value, aliased one side', r.aliased || [], true, rowFlag)}
         {/* Both ends, because the rename is the finding — one column would be
             a list of paths with no way to see what became what. */}
         {movedTable(r.moved || [])}

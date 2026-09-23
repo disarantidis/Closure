@@ -876,6 +876,28 @@ function compare(figmaDoc, repoDoc) {
   });
   report.duplicateNames = Array.from(dupBy.values());
 
+  /*
+    CARRIED ONTO THE ROWS THAT SHOW IT.
+
+    The two spellings were a note above the table, which is the right summary
+    and the wrong place to act on: a reader looking at one row had to hold
+    "font-family and fontFamilies are the same thing" in their head and apply
+    it themselves. Every unbound row already names the variable it should have
+    pointed at, so it can carry the other spelling of that variable too, and
+    the finding lands on the line that demonstrates it.
+  */
+  var spellingOf = new Map();
+  report.duplicateNames.forEach(function (d) {
+    d.names.forEach(function (n) {
+      spellingOf.set(n, d.names.filter(function (o) { return o !== n; }));
+    });
+  });
+  report.unbound.forEach(function (row) {
+    var group = String(row.bindable).split('.')[0];
+    var others = spellingOf.get(group);
+    if (others && others.length) { row.alsoSpelled = others; row.bindableGroup = group; }
+  });
+
   var typeCount = new Map();
   report.changed.forEach(function (c) {
     typeCount.set(c.type, (typeCount.get(c.type) || 0) + 1);

@@ -274,6 +274,11 @@
       --app-heading: var(--text);
       --app-accent: var(--accent);
       --app-danger: #E5675E;
+      /* Beside --app-danger and for the same reason: the kit's own tone
+         tokens live inside its components, and this file needs one it can put
+         on arbitrary text. Warning, not danger — an unbound token is worth
+         looking at, not an error. */
+      --app-warning: #D9A441;
     }
 
     html, body {
@@ -1189,6 +1194,24 @@
        part of the token, and a cell showing two of five sub-values without
        saying so reads as a token with two sub-values. */
     .compare-sub-same { font-size: 10px; opacity: 0.45; margin-top: 2px; }
+
+    /* The one mark on this page that means "look at this". Warning ink, and
+       the names it points at kept monospaced, because they are paths to go and
+       find rather than prose to read. */
+    .compare-flag {
+      display: flex;
+      align-items: flex-start;
+      gap: 4px;
+      margin-top: 4px;
+      font-size: 10px;
+      line-height: 1.35;
+      color: var(--app-warning);
+    }
+    .compare-flag-mark { flex-shrink: 0; display: flex; margin-top: 1px; }
+    .compare-flag-name {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      overflow-wrap: anywhere;
+    }
 
     /* The key above the per-collection rows: which column is which kind.
        Same order as the sections above it, so the eye learns it once. */
@@ -48893,6 +48916,7 @@ html[data-theme=dark] {
   );
   var IconGithub = svg("M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z", { fill: true });
   var IconGitlab = svg("M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024", { fill: true });
+  var IconWarning = svg("M12 9v4M12 17h.01M10.24 3.957l-8.422 14.06a1.989 1.989 0 0 0 1.7 2.983h16.845a1.989 1.989 0 0 0 1.7 -2.983l-8.422 -14.06a1.989 1.989 0 0 0 -3.4 0");
   var IconTypeColor = svg("M12 21a9 9 0 0 1 0 -18c4.97 0 9 3.582 9 8c0 1.06 -.474 2.078 -1.318 2.828c-.844 .75 -1.989 1.172 -3.182 1.172h-2.5a2 2 0 0 0 -1 3.75a1.3 1.3 0 0 1 -1 2.25M7.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M11.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M15.5 10.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0");
   var IconTypeNumber = svg("M5 9l14 0M5 15l14 0M11 4l-4 16M17 4l-4 16");
   var IconTypeString = svg("M6 4l12 0M12 4l0 16");
@@ -49996,15 +50020,19 @@ html[data-theme=dark] {
           }
         ) });
       };
-      const warnings = (rep) => {
-        const unbound = rep.unbound || [];
-        const dupes = rep.duplicateNames || [];
-        if (!unbound.length && !dupes.length) return null;
-        const targets = /* @__PURE__ */ new Map();
-        unbound.forEach((x) => targets.set(x.bindable, (targets.get(x.bindable) || 0) + 1));
-        return /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(Alert, { tone: "warning", title: "Worth fixing in the files themselves", children: [
-          unbound.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("p", { className: "closure-warning-subtitle", children: `${unbound.length.toLocaleString()} token${unbound.length === 1 ? "" : "s"} hold a literal where the variable exists and is not pointed at \u2014 ${[...targets.entries()].map(([t, n]) => `${t} (${n})`).join(", ")}. Change the variable and nothing follows.` }),
-          dupes.map((d) => /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("p", { className: "closure-warning-more", children: `${d.side === "figma" ? "Figma" : "Repo"}: ${d.names.join(" and ")} are the same ${d.tokens === 1 ? "token" : `${d.tokens} tokens`} under two names, in ${d.documents === 1 ? "1 document" : `all ${d.documents} documents`}.` }, d.side + d.names.join()))
+      const rowFlag = (x) => {
+        if (!x || !x.bindable) return null;
+        return /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { className: "compare-flag", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "compare-flag-mark", "aria-hidden": "true", children: IconWarning(11) }),
+          /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { children: [
+            "not bound \u2014 ",
+            /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "compare-flag-name", children: x.bindable }),
+            " exists",
+            x.alsoSpelled && x.alsoSpelled.length ? /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(import_jsx_runtime25.Fragment, { children: [
+              ", also spelled ",
+              /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "compare-flag-name", children: x.alsoSpelled.join(", ") })
+            ] }) : null
+          ] })
         ] });
       };
       const movedTable = (rows) => {
@@ -50041,7 +50069,7 @@ html[data-theme=dark] {
           rows.length > COMPARE_SAMPLE && /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("p", { className: "compare-more", children: `\u2026 and ${(rows.length - COMPARE_SAMPLE).toLocaleString()} more \u2014 Copy all has every one` })
         ] }, title);
       };
-      const leaves = (title, rows, twoSided) => {
+      const leaves = (title, rows, twoSided, flagOf) => {
         if (!rows.length) return null;
         const columns = [
           {
@@ -50058,13 +50086,21 @@ html[data-theme=dark] {
             key: "repo",
             header: headWith(s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null, "Repo"),
             width: w,
-            cell: (x) => valueCell(x.repo, x.figma)
+            cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(import_jsx_runtime25.Fragment, { children: [
+              valueCell(x.repo, x.figma),
+              flagOf && x.unboundSide === "repo" ? flagOf(x) : null
+            ] })
           });
           columns.push({
             key: "figma",
             header: headWith(IconFigma(12), "Figma"),
             width: w,
-            cell: (x) => valueCell(x.figma, x.repo)
+            /* The flag goes under whichever side holds the literal — that is the
+               side that could have pointed and did not. */
+            cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(import_jsx_runtime25.Fragment, { children: [
+              valueCell(x.figma, x.repo),
+              flagOf && x.unboundSide === "figma" ? flagOf(x) : null
+            ] })
           });
         } else {
           columns.push({ key: "value", header: "Value", width: "120px", cell: (x) => valueCell(x.value) });
@@ -50092,7 +50128,6 @@ html[data-theme=dark] {
       return /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(import_jsx_runtime25.Fragment, { children: [
         sides,
         /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
-          warnings(r),
           /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "compare-section", children: [
             /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "compare-section-head", children: [
               /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "compare-section-title", children: "Values" }),
@@ -50165,7 +50200,7 @@ html[data-theme=dark] {
         ] }),
         (r.changedByType || []).length > 1 ? r.changedByType.map((t) => leaves("Values \u2014 " + t.type, r.changed.filter((c) => c.type === t.type), true)) : leaves("Values \u2014 changed", r.changed, true),
         leaves("Architecture \u2014 pointing somewhere new", r.repointed || [], true),
-        leaves("Architecture \u2014 same value, aliased one side", r.aliased || [], true),
+        leaves("Architecture \u2014 same value, aliased one side", r.aliased || [], true, rowFlag),
         movedTable(r.moved || []),
         leaves("Architecture \u2014 only here", r.onlyInFigma, false),
         leaves("Architecture \u2014 only in the repo", r.onlyInRepo, false),
@@ -54659,6 +54694,28 @@ function compare(figmaDoc, repoDoc) {
   });
   report.duplicateNames = Array.from(dupBy.values());
 
+  /*
+    CARRIED ONTO THE ROWS THAT SHOW IT.
+
+    The two spellings were a note above the table, which is the right summary
+    and the wrong place to act on: a reader looking at one row had to hold
+    "font-family and fontFamilies are the same thing" in their head and apply
+    it themselves. Every unbound row already names the variable it should have
+    pointed at, so it can carry the other spelling of that variable too, and
+    the finding lands on the line that demonstrates it.
+  */
+  var spellingOf = new Map();
+  report.duplicateNames.forEach(function (d) {
+    d.names.forEach(function (n) {
+      spellingOf.set(n, d.names.filter(function (o) { return o !== n; }));
+    });
+  });
+  report.unbound.forEach(function (row) {
+    var group = String(row.bindable).split('.')[0];
+    var others = spellingOf.get(group);
+    if (others && others.length) { row.alsoSpelled = others; row.bindableGroup = group; }
+  });
+
   var typeCount = new Map();
   report.changed.forEach(function (c) {
     typeCount.set(c.type, (typeCount.get(c.type) || 0) + 1);
@@ -54824,7 +54881,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '1404992 11:28:16';
+    var CLOSURE_BUILD = 'd42bb38 11:32:25';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
