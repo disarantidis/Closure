@@ -1857,50 +1857,88 @@ const COMPARE_SAMPLE = 40;
 
         <div className="json-download-card" data-level={4}>
           {/*
-            FOUR KINDS OF DIFFERENCE, AND "REFERENCE REPOINTED" IS ITS OWN.
+            TWO KINDS OF DIFFERENCE, AND THEY ARE NOT PEERS.
 
-            On two exports of one design system two months apart, 1,090 of the
-            1,392 differences were a single mechanical re-rooting of references
-            and 302 were values. Under one "changed" heading the 302 were
-            invisible. Identical runs full width underneath, because it is the
-            one number nobody is here to read.
+            A VALUE change is a decision somebody made: this colour is now that
+            colour. An ARCHITECTURE change is the shape of the system moving —
+            a token appearing, disappearing, or pointing somewhere new — and it
+            happens in thousands at a time, because renaming one collection
+            re-roots every reference through it.
+
+            Shown as four equal numbers they read as four comparable things,
+            and the small one drowns. Measured on two real exports of one
+            system: 1,060 values against 57,584 architectural differences. The
+            1,060 are the ones a person has to look at and agree with; the
+            57,584 are what a rename did. Values go first and stand alone.
           */}
+          <div className="compare-section">
+            <div className="compare-section-head">
+              <span className="compare-section-title">Values</span>
+              <span className="compare-section-note">someone chose differently</span>
+            </div>
+            <div className="compare-stats">
+              <div className="compare-stat is-wide">
+                <div className="compare-stat-n">{r.changed.length.toLocaleString()}</div>
+                <div className="compare-stat-label">a different colour, number or string</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="compare-section">
+            <div className="compare-section-head">
+              <span className="compare-section-title">Architecture</span>
+              <span className="compare-section-note">
+                {(r.onlyInFigma.length + r.onlyInRepo.length + (r.repointed || []).length).toLocaleString()}
+                {' in total'}
+              </span>
+            </div>
+            <div className="compare-stats">
+              <div className="compare-stat">
+                <div className="compare-stat-n">{r.onlyInFigma.length.toLocaleString()}</div>
+                <div className="compare-stat-label">only here</div>
+              </div>
+              <div className="compare-stat">
+                <div className="compare-stat-n">{r.onlyInRepo.length.toLocaleString()}</div>
+                <div className="compare-stat-label">only in the repo</div>
+              </div>
+              <div className="compare-stat is-wide">
+                <div className="compare-stat-n">{(r.repointed || []).length.toLocaleString()}</div>
+                <div className="compare-stat-label">pointing somewhere new</div>
+              </div>
+            </div>
+          </div>
+
           <div className="compare-stats">
-            <div className="compare-stat">
-              <div className="compare-stat-n">{r.onlyInFigma.length.toLocaleString()}</div>
-              <div className="compare-stat-label">only here</div>
-            </div>
-            <div className="compare-stat">
-              <div className="compare-stat-n">{r.onlyInRepo.length.toLocaleString()}</div>
-              <div className="compare-stat-label">only in the repo</div>
-            </div>
-            <div className="compare-stat">
-              <div className="compare-stat-n">{r.changed.length.toLocaleString()}</div>
-              <div className="compare-stat-label">value changed</div>
-            </div>
-            <div className="compare-stat">
-              <div className="compare-stat-n">{(r.repointed || []).length.toLocaleString()}</div>
-              <div className="compare-stat-label">reference repointed</div>
-            </div>
             <div className="compare-stat is-quiet is-wide">
               <div className="compare-stat-n">{r.sameCount.toLocaleString()}</div>
               <div className="compare-stat-label">identical</div>
             </div>
           </div>
 
+          {/* ~ is the values column; +, - and the arrow are architecture.
+              Same order as the sections above, so the eye learns it once. */}
+          <div className="compare-group compare-group-key">
+            <span className="compare-group-name">per collection</span>
+            <span className="compare-group-counts">
+              <span className="compare-count" title="value changed">~ values</span>
+              <span className="compare-count" title="only here">+</span>
+              <span className="compare-count" title="only in the repo">-</span>
+              <span className="compare-count" title="reference repointed">{'\u2192 architecture'}</span>
+            </span>
+          </div>
           <div className="compare-groups">
             {r.groups.map((g: any) => (
               <div className="compare-group" key={g.name}>
                 <span className="compare-group-name">{g.name}</span>
                 <span className="compare-group-counts">
+                  <span className={'compare-count is-value' + (g.changed ? '' : ' is-zero')} title="value changed">
+                    {'~' + g.changed}
+                  </span>
                   <span className={'compare-count' + (g.onlyInFigma ? '' : ' is-zero')} title="only here">
                     {'+' + g.onlyInFigma}
                   </span>
                   <span className={'compare-count' + (g.onlyInRepo ? '' : ' is-zero')} title="only in the repo">
                     {'-' + g.onlyInRepo}
-                  </span>
-                  <span className={'compare-count' + (g.changed ? '' : ' is-zero')} title="value changed">
-                    {'~' + g.changed}
                   </span>
                   {/* An arrow, because that is what a reference that moved
                       did — it still points, just somewhere else. */}
@@ -1913,7 +1951,7 @@ const COMPARE_SAMPLE = 40;
           </div>
         </div>
 
-        {leaves('Value changed', r.changed, (x: any) => (
+        {leaves('Values \u2014 changed', r.changed, (x: any) => (
           <div className="compare-leaf" key={'c' + x.path}>
             <div className="compare-leaf-path">{x.path}</div>
             <div className="compare-leaf-val">{'repo:  ' + x.repo}</div>
@@ -1923,20 +1961,20 @@ const COMPARE_SAMPLE = 40;
         {/* Last of the three lists on purpose: it is usually the longest and
             almost always the least interesting, because a re-rooting moves
             thousands of references without anyone having decided anything. */}
-        {leaves('Reference repointed', r.repointed || [], (x: any) => (
+        {leaves('Architecture \u2014 pointing somewhere new', r.repointed || [], (x: any) => (
           <div className="compare-leaf" key={'p' + x.path}>
             <div className="compare-leaf-path">{x.path}</div>
             <div className="compare-leaf-val">{'repo:  ' + x.repo}</div>
             <div className="compare-leaf-val">{'here:  ' + x.figma}</div>
           </div>
         ))}
-        {leaves('Only here', r.onlyInFigma, (x: any) => (
+        {leaves('Architecture \u2014 only here', r.onlyInFigma, (x: any) => (
           <div className="compare-leaf" key={'f' + x.path}>
             <div className="compare-leaf-path">{x.path}</div>
             <div className="compare-leaf-val">{x.value}</div>
           </div>
         ))}
-        {leaves('Only in the repo', r.onlyInRepo, (x: any) => (
+        {leaves('Architecture \u2014 only in the repo', r.onlyInRepo, (x: any) => (
           <div className="compare-leaf" key={'r' + x.path}>
             <div className="compare-leaf-path">{x.path}</div>
             <div className="compare-leaf-val">{x.value}</div>

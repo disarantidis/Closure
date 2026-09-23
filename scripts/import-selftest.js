@@ -2191,9 +2191,18 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          JD.compare({ a: { d: { value: { value: 4, unit: 'px' }, type: 'dimension' } } },
                     { a: { d: { value: { value: 8, unit: 'px' }, type: 'dimension' } } })
            .changed.length === 1);
-      ok('compare: the copied report lists the two under their own headings',
-         /VALUE CHANGED/.test(JD.format(moved, {})) && /REFERENCE REPOINTED/.test(JD.format(moved, {})),
-         JD.format(moved, {}).slice(0, 80));
+      /* The copy groups its findings the way the SCREEN groups them — values
+         first as decisions, architecture after as the shape moving. A report
+         that files them differently from the page it was copied off is a
+         second, disagreeing document. */
+      ok('compare: the copied report splits values from architecture, values first',
+         /VALUES — someone chose differently/.test(JD.format(moved, {})) &&
+         /ARCHITECTURE — what moved/.test(JD.format(moved, {})) &&
+         JD.format(moved, {}).indexOf('VALUES') < JD.format(moved, {}).indexOf('ARCHITECTURE'),
+         JD.format(moved, {}).slice(0, 120));
+      ok('compare: and a repoint is filed under architecture, not values',
+         JD.format(moved, {}).indexOf('pointing somewhere new') >
+         JD.format(moved, {}).indexOf('ARCHITECTURE'));
 
       /*
         THE LEADING DOT IS PART OF THE COLLECTION NAME, NOT A SEPARATOR.

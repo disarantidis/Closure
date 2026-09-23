@@ -1128,6 +1128,43 @@
        one — and five equal cells in a two-column grid leave a hole. */
     .compare-stat.is-wide { grid-column: 1 / -1; }
 
+    /*
+      TWO KINDS OF DIFFERENCE, EACH UNDER ITS OWN NAME.
+
+      A value change is a decision; an architecture change is the shape moving,
+      and it arrives in thousands because renaming one collection re-roots
+      every reference through it. Side by side as equal tiles the small number
+      drowns in the large one — 1,060 values beside 57,584 structural
+      differences, on two real exports of one system. Values get their own
+      heading and go first.
+    */
+    .compare-section { margin-bottom: 12px; }
+    .compare-section:last-of-type { margin-bottom: 0; }
+    .compare-section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 6px;
+    }
+    .compare-section-title { font-size: 12px; font-weight: 700; }
+    .compare-section-note { font-size: 11px; opacity: 0.6; }
+
+    /* The key above the per-collection rows: which column is which kind.
+       Same order as the sections above it, so the eye learns it once. */
+    .compare-group-key {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      opacity: 0.5;
+      border-bottom: 1px solid var(--app-border);
+    }
+    .compare-group-key .compare-group-name { font-family: inherit; }
+    /* The values column is the one worth reading; it keeps full ink while the
+       three architecture columns stay quiet. */
+    .compare-count.is-value { opacity: 1; font-weight: 600; }
+    .compare-count.is-value.is-zero { opacity: 0.25; font-weight: 400; }
+
     /* Per top-level group, because thirty thousand changed leaves is a wall
        and the group is the level someone actually reads at. */
     .compare-groups { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }

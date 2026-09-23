@@ -1128,6 +1128,43 @@
        one — and five equal cells in a two-column grid leave a hole. */
     .compare-stat.is-wide { grid-column: 1 / -1; }
 
+    /*
+      TWO KINDS OF DIFFERENCE, EACH UNDER ITS OWN NAME.
+
+      A value change is a decision; an architecture change is the shape moving,
+      and it arrives in thousands because renaming one collection re-roots
+      every reference through it. Side by side as equal tiles the small number
+      drowns in the large one — 1,060 values beside 57,584 structural
+      differences, on two real exports of one system. Values get their own
+      heading and go first.
+    */
+    .compare-section { margin-bottom: 12px; }
+    .compare-section:last-of-type { margin-bottom: 0; }
+    .compare-section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 6px;
+    }
+    .compare-section-title { font-size: 12px; font-weight: 700; }
+    .compare-section-note { font-size: 11px; opacity: 0.6; }
+
+    /* The key above the per-collection rows: which column is which kind.
+       Same order as the sections above it, so the eye learns it once. */
+    .compare-group-key {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      opacity: 0.5;
+      border-bottom: 1px solid var(--app-border);
+    }
+    .compare-group-key .compare-group-name { font-family: inherit; }
+    /* The values column is the one worth reading; it keeps full ink while the
+       three architecture columns stay quiet. */
+    .compare-count.is-value { opacity: 1; font-weight: 600; }
+    .compare-count.is-value.is-zero { opacity: 0.25; font-weight: 400; }
+
     /* Per top-level group, because thirty thousand changed leaves is a wall
        and the group is the level someone actually reads at. */
     .compare-groups { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
@@ -49677,53 +49714,77 @@ html[data-theme=dark] {
       return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(import_jsx_runtime24.Fragment, { children: [
         sides,
         /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stats", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stat", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-n", children: r.onlyInFigma.length.toLocaleString() }),
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-label", children: "only here" })
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-section", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-section-head", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-section-title", children: "Values" }),
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-section-note", children: "someone chose differently" })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stat", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-n", children: r.onlyInRepo.length.toLocaleString() }),
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-label", children: "only in the repo" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stat", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stats", children: /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stat is-wide", children: [
               /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-n", children: r.changed.length.toLocaleString() }),
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-label", children: "value changed" })
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-label", children: "a different colour, number or string" })
+            ] }) })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-section", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-section-head", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-section-title", children: "Architecture" }),
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("span", { className: "compare-section-note", children: [
+                (r.onlyInFigma.length + r.onlyInRepo.length + (r.repointed || []).length).toLocaleString(),
+                " in total"
+              ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stat", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-n", children: (r.repointed || []).length.toLocaleString() }),
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-label", children: "reference repointed" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stat is-quiet is-wide", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-n", children: r.sameCount.toLocaleString() }),
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-label", children: "identical" })
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stats", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stat", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-n", children: r.onlyInFigma.length.toLocaleString() }),
+                /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-label", children: "only here" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stat", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-n", children: r.onlyInRepo.length.toLocaleString() }),
+                /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-label", children: "only in the repo" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stat is-wide", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-n", children: (r.repointed || []).length.toLocaleString() }),
+                /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-label", children: "pointing somewhere new" })
+              ] })
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stats", children: /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-stat is-quiet is-wide", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-n", children: r.sameCount.toLocaleString() }),
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-stat-label", children: "identical" })
+          ] }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-group compare-group-key", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-group-name", children: "per collection" }),
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("span", { className: "compare-group-counts", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-count", title: "value changed", children: "~ values" }),
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-count", title: "only here", children: "+" }),
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-count", title: "only in the repo", children: "-" }),
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-count", title: "reference repointed", children: "\u2192 architecture" })
             ] })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-groups", children: r.groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-group", children: [
             /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-group-name", children: g.name }),
             /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("span", { className: "compare-group-counts", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-count is-value" + (g.changed ? "" : " is-zero"), title: "value changed", children: "~" + g.changed }),
               /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-count" + (g.onlyInFigma ? "" : " is-zero"), title: "only here", children: "+" + g.onlyInFigma }),
               /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-count" + (g.onlyInRepo ? "" : " is-zero"), title: "only in the repo", children: "-" + g.onlyInRepo }),
-              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-count" + (g.changed ? "" : " is-zero"), title: "value changed", children: "~" + g.changed }),
               /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-count" + (g.repointed ? "" : " is-zero"), title: "reference repointed", children: "\u2192" + (g.repointed || 0) })
             ] })
           ] }, g.name)) })
         ] }),
-        leaves("Value changed", r.changed, (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
+        leaves("Values \u2014 changed", r.changed, (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-path", children: x.path }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: "repo:  " + x.repo }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: "here:  " + x.figma })
         ] }, "c" + x.path)),
-        leaves("Reference repointed", r.repointed || [], (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
+        leaves("Architecture \u2014 pointing somewhere new", r.repointed || [], (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-path", children: x.path }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: "repo:  " + x.repo }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: "here:  " + x.figma })
         ] }, "p" + x.path)),
-        leaves("Only here", r.onlyInFigma, (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
+        leaves("Architecture \u2014 only here", r.onlyInFigma, (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-path", children: x.path }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: x.value })
         ] }, "f" + x.path)),
-        leaves("Only in the repo", r.onlyInRepo, (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
+        leaves("Architecture \u2014 only in the repo", r.onlyInRepo, (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-path", children: x.path }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: x.value })
         ] }, "r" + x.path)),
@@ -53787,13 +53848,27 @@ function format(report, opts) {
     out.push('');
   };
 
-  list('ONLY HERE — would be added to the repo', report.onlyInFigma,
-       function (r) { return r.path + '  =  ' + r.value; });
-  list('ONLY IN THE REPO — no longer in this file', report.onlyInRepo,
-       function (r) { return r.path + '  =  ' + r.value; });
+  /*
+    THE SAME TWO KINDS THE PAGE SHOWS, in the same order and under the same
+    names — a copied report that groups its findings differently from the
+    screen they were copied off is a second, disagreeing document.
+
+    Values first, because they are the decisions; architecture after, because
+    it is the shape moving and it arrives in thousands.
+  */
   var bothSides = function (r) { return r.path + '\n      repo:  ' + r.repo + '\n      here:  ' + r.figma; };
-  list('VALUE CHANGED', report.changed, bothSides);
-  list('REFERENCE REPOINTED — the same token, pointing somewhere else', report.repointed, bothSides);
+  var side = function (r) { return r.path + '  =  ' + r.value; };
+
+  out.push('VALUES — someone chose differently');
+  out.push('');
+  list('  changed', report.changed, bothSides);
+
+  out.push('ARCHITECTURE — what moved, was added, or was removed');
+  out.push('');
+  list('  only here — would be added to the repo', report.onlyInFigma, side);
+  list('  only in the repo — no longer in this file', report.onlyInRepo, side);
+  list('  pointing somewhere new — the same token, a different target',
+       report.repointed, bothSides);
 
   out.push(report.sameCount.toLocaleString() + ' identical');
   return out.join('\n');
@@ -53877,7 +53952,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '93e731e 10:14:27';
+    var CLOSURE_BUILD = '3a3c927 10:22:21';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

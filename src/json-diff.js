@@ -446,13 +446,27 @@ function format(report, opts) {
     out.push('');
   };
 
-  list('ONLY HERE — would be added to the repo', report.onlyInFigma,
-       function (r) { return r.path + '  =  ' + r.value; });
-  list('ONLY IN THE REPO — no longer in this file', report.onlyInRepo,
-       function (r) { return r.path + '  =  ' + r.value; });
+  /*
+    THE SAME TWO KINDS THE PAGE SHOWS, in the same order and under the same
+    names — a copied report that groups its findings differently from the
+    screen they were copied off is a second, disagreeing document.
+
+    Values first, because they are the decisions; architecture after, because
+    it is the shape moving and it arrives in thousands.
+  */
   var bothSides = function (r) { return r.path + '\n      repo:  ' + r.repo + '\n      here:  ' + r.figma; };
-  list('VALUE CHANGED', report.changed, bothSides);
-  list('REFERENCE REPOINTED — the same token, pointing somewhere else', report.repointed, bothSides);
+  var side = function (r) { return r.path + '  =  ' + r.value; };
+
+  out.push('VALUES — someone chose differently');
+  out.push('');
+  list('  changed', report.changed, bothSides);
+
+  out.push('ARCHITECTURE — what moved, was added, or was removed');
+  out.push('');
+  list('  only here — would be added to the repo', report.onlyInFigma, side);
+  list('  only in the repo — no longer in this file', report.onlyInRepo, side);
+  list('  pointing somewhere new — the same token, a different target',
+       report.repointed, bothSides);
 
   out.push(report.sameCount.toLocaleString() + ' identical');
   return out.join('\n');
