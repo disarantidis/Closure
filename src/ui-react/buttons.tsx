@@ -1640,10 +1640,12 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
     return (
       <SegmentedControl
         label="What to do with this repository"
-        /* medium and block, on a card of its own: it decides what the card
-           below it is for, and a decision that size is not a chip in a header. */
-        size="medium"
-        block
+        /* `small`, and not block: it shares a title row now rather than owning
+           a card, and it takes the width its two words need instead of every
+           pixel the header has. The title beside it is the other claim on that
+           row, and a switch that crowds the name of the service it switches is
+           the reason this was moved out in the first place. */
+        size="small"
         value={value}
         options={[
           { value: 'push', label: 'Push', leading: IconUpload(16) },

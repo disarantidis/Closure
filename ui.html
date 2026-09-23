@@ -2337,13 +2337,10 @@
       justify-content: center;
       margin: 0 0 16px;
     }
-    .mode-card {
-      background: var(--background);
-      border-radius: 24px;
-      padding: var(--spacing-component-3);
-      margin: 0 16px 16px;
-    }
-    .mode-card[hidden] { display: none; }
+    /* The Push/Compare switch, at the end of the repo card's title row. It
+       hides with the provider — see applyRepoMode — because there is nothing
+       to push to or read from until one is added. */
+    #repo-mode-mount[hidden] { display: none; }
 
     .compare-card {
       background: var(--background);
@@ -22592,17 +22589,17 @@ html[data-theme=dark] {
          elevated rung, giving the strongest contrast tokens.css offers
          without inventing a one-off colour. -->
     <!--
-      THE CHOICE IS ITS OWN CARD, above the card it governs.
+      THE CHOICE IS BACK IN THE CARD IT GOVERNS, at the end of its title row.
 
-      In that card's header it was a control tucked beside a title, competing
-      with it for the row and reading as a setting OF the header. It decides
-      what the whole card below is for, which is a bigger thing than a header
-      can hold — so it gets the width, the size and the place a decision
-      deserves: its own surface, immediately above what it changes.
+      It had a surface of its own here, on the argument that a decision about
+      what a whole card is for is bigger than a header can hold. Three cards
+      in a column to ask one question turned out to be the more expensive
+      thing: a switch that names its own card twice, and 58px of stack to say
+      "Push or Compare".
+
+      In the header it is next to the service it applies to, and there is no
+      doubt about what it governs, because it is standing in it.
     -->
-    <div class="mode-card" id="mode-card" data-level="4" hidden>
-      <span id="repo-mode-mount"></span>
-    </div>
 
     <!--
       THE COMPARE CARD IS GONE — it is this card's Compare mode now.
@@ -22666,6 +22663,10 @@ html[data-theme=dark] {
             -->
             <p class="json-download-title" id="repo-card-title">Repo settings</p>
           </div>
+          <!-- .json-download-header is space-between, so this takes the end of
+               the row on its own — the same place the Json file card's own
+               Download button sits, one card in. -->
+          <span id="repo-mode-mount"></span>
         </div>
         <!--
           WHEN THERE IS SOMETHING TO SAY.
@@ -50220,8 +50221,7 @@ html[data-theme=dark] {
         SegmentedControl,
         {
           label: "What to do with this repository",
-          size: "medium",
-          block: true,
+          size: "small",
           value,
           options: [
             { value: "push", label: "Push", leading: IconUpload(16) },
@@ -56142,7 +56142,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '7943e77 17:43:29';
+    var CLOSURE_BUILD = '1a93e86 17:47:13';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -59192,7 +59192,7 @@ function format(report, opts) {
       var el = function (id) { return document.getElementById(id); };
       /* The switch only means something once there is a repository to push to
          or read from — it comes and goes with the card it governs. */
-      if (el('mode-card')) el('mode-card').hidden = !activeRepoProvider();
+      if (el('repo-mode-mount')) el('repo-mode-mount').hidden = !activeRepoProvider();
       /* The commit message is a thing you write, and Compare writes nothing. */
       if (el('commit-wrap')) el('commit-wrap').hidden = comparing;
       /* One slot, one button: the two actions are alternatives, not a pair. */
