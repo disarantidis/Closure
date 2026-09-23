@@ -1531,6 +1531,9 @@
       display: block; margin: 0 0 6px;
       font-size: 11px; opacity: 0.7;
     }
+    /* Empty in the ordinary case — see refreshImportRepoFile — so it must not
+       leave its own margin behind when it has nothing to say. */
+    .import-repo-file-label:empty { display: none; }
     /*
       A BLOCK BUTTON IS ONLY AS WIDE AS WHAT HOLDS IT. Each button is mounted
       into a <span>, and a span in a centred flex row is a flex item sized to
@@ -4146,22 +4149,28 @@
          click that cannot go anywhere. */
       mount.hidden = !names.length;
       /*
-        WHOSE FOLDER, when there are two of them on screen. The listing comes
-        from one provider — whichever the repo card is currently showing — so
-        with both configured, "this folder" names one of two rows above and
-        does not say which. Unqualified it is not wrong so much as unanswerable,
-        which is the worse failure of the two.
+        THE COUNT IS GONE, AND THE EMPTY CASE IS NOT.
+
+        "The only JSON in this folder" and "4 JSON files in this folder" both
+        described the picker sitting directly underneath them: the one file is
+        in the box, and the other three are one click away in its list. A
+        caption that repeats the control it captions is a line to read and
+        nothing learned.
+
+        A folder with NO json in it is the opposite — the picker is hidden
+        because there is nothing to put in it, so without a line there is
+        nothing on screen at all, and an Import button under a blank space
+        reads as broken rather than as empty. That one sentence stays, and
+        names its provider when two are configured, because "this folder" is
+        otherwise one of two rows above and does not say which.
       */
-      var which = isGitLabReady() && isGitHubReady() ? activeRepoProvider() : null;
-      var whose = which ? (which === 'gitlab' ? 'GitLab · ' : 'GitHub · ') : '';
-      label.textContent = whose + (!names.length
-        ? 'no JSON files in this folder yet'
-        : names.length === 1
-          ? 'the only JSON in this folder'
-          : names.length + ' JSON files in this folder');
-      /* Sentence case when it stands alone, which is the ordinary case. */
-      if (!whose) label.textContent = label.textContent.charAt(0).toUpperCase() + label.textContent.slice(1);
-      if (!names.length) return;
+      if (!names.length) {
+        var which = isGitLabReady() && isGitHubReady() ? activeRepoProvider() : null;
+        var whose = which ? (which === 'gitlab' ? 'GitLab · ' : 'GitHub · ') : '';
+        label.textContent = whose + (whose ? 'no' : 'No') + ' JSON files in this folder yet';
+        return;
+      }
+      label.textContent = '';
       setRepoFileOptions(names);
       if (window.PomImportRepoFile) window.PomImportRepoFile.set(repoSelectedFile());
     }
