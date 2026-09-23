@@ -1641,8 +1641,20 @@
       border-radius: 18px;
       padding: var(--spacing-component-4);
     }
+    /*
+      THE SAME TITLE AS EVERY OTHER SUBCARD IN THE PLUGIN.
+
+      12px was the size of a label on a bordered section, chosen when this was
+      a rule down the side rather than a surface. A subcard with a name gets
+      the name treatment: the body-m rung .json-download-title uses for "Json
+      file" one card in on the main screen, so the two read as one family
+      rather than as a heading and a caption.
+    */
     .import-level-section > .import-level-title {
-      font-size: 12px;
+      font-family: var(--type-body-m-font-family);
+      font-size: var(--type-body-m-size);
+      line-height: var(--type-body-m-line-height);
+      letter-spacing: var(--type-body-m-letter-spacing);
       font-weight: 700;
       color: var(--app-text);
     }
@@ -56158,7 +56170,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '59627e2 18:14:36';
+    var CLOSURE_BUILD = 'ae74a0d 18:16:36';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
