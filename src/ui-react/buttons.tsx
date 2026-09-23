@@ -630,6 +630,7 @@ declare global {
     };
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
     PomRepoReadBtn: LiveTitleHandle;
+    PomCompareSides: { set: (next: { figma?: string; provider?: string; file?: string }) => void };
     PomGithubSyncBtn: LiveBusyHandle;
     PomGitlabSyncBtn: LiveBusyHandle;
     PomAddGitlabBtn: LiveToggleIconHandle;
@@ -912,6 +913,46 @@ window.PomGitlabSyncBtn = mountLiveBusyButton(
   'Check the connection and find the folders in this repository',
   CARD_LEVEL,
 );
+
+/*
+  THE TWO SIDES OF THE COMPARISON, NAMED.
+
+  Compare was a button on a wire between two cards, and it said what it would
+  do without saying what to. A comparison has two operands and they are both
+  knowable — this Figma file, and the file in the repository — so the card names
+  them, each behind its own mark, and the button underneath acts on exactly the
+  pair above it.
+
+  Tags rather than text: they are two values of the same kind, read side by
+  side, which is the shape a tag is for. Real ones, so they take their fill from
+  the level they stand on (Tag.tsx) instead of being a span wearing a border.
+*/
+function mountCompareSides() {
+  const container = document.getElementById('compare-sides-mount');
+  type S = { figma: string; provider: string; file: string };
+  let state: S = { figma: '', provider: 'github', file: '' };
+  let apply: ((s: S) => void) | null = null;
+  function View() {
+    const [s, setS] = useState<S>(state);
+    apply = setS;
+    return (
+      <span className="compare-card-sides">
+        <Tag variant="tonal" size="small" leading={IconFigma(12)}>
+          {s.figma || 'This Figma file'}
+        </Tag>
+        <Tag variant="tonal" size="small"
+          leading={s.provider === 'gitlab' ? IconGitlab(12) : IconGithub(12)}>
+          {s.file || 'nothing named yet'}
+        </Tag>
+      </span>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomCompareSides = {
+    set: (next) => { state = { ...state, ...next }; apply?.(state); },
+  };
+}
+mountCompareSides();
 
 window.PomRepoReadBtn = mountLiveTitleButton(
   'repo-read-btn-mount',

@@ -1822,6 +1822,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
                        'pushOverwriteNote', 'withRootOption', 'folderDisplay',
                        'setRepoFileOptions', 'chooseRepoFile', 'repoIdentity', 'showRepoFile',
+                       'showCompareSides',
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
                        'renderImportFolderSelect', 'listRepoFolders',
                        'refreshFolderImportOffer', 'addFolderPath', 'normFolder',
@@ -1858,6 +1859,11 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           /* The repo card's read-only echo of that name. */
           let shown = '';
           ctx.PomRepoFile = { set: (v) => { shown = v; } };
+          /* The compare card's two side tags, fed from the same place. */
+          let sides = {};
+          ctx.PomCompareSides = { set: (v) => { sides = { ...sides, ...v }; } };
+          ctx.__sides = () => sides;
+          ctx.lastFigmaFileName = 'Foundations';
           ctx.repoListed = false;
           /* The import page's picker is a SECOND mount of the same combo over
              the same selection. Stubbed as its own object on purpose: if the
@@ -1938,6 +1944,15 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ctx.chooseRepoFile('invented.json');
           ok('repo file: and echoes one it does not, rather than going blank',
              shown === 'invented.json', shown);
+          /*
+            THE COMPARE CARD NAMES BOTH OPERANDS. The button said what it would
+            do without saying what to, and both sides are knowable: this Figma
+            document, and the file in the repository.
+          */
+          ok('compare card: it names the Figma file and the repo file together',
+             ctx.__sides().figma === 'Foundations' &&
+             ctx.__sides().file === 'invented.json',
+             JSON.stringify(ctx.__sides()));
           ctx.chooseRepoFile('themes.json');
           ok('repo file: the read address follows whatever was chosen',
              ctx.repoFilePath('github') === 'themes.json', ctx.repoFilePath('github'));

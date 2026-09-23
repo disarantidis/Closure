@@ -2242,6 +2242,40 @@
       justify-content: center;
       margin: 0 0 16px;
     }
+    .compare-card {
+      background: var(--background);
+      border-radius: 24px;
+      padding: var(--spacing-component-6);
+      margin: 0 0 16px;
+      display: flex;
+      flex-direction: column;
+      /*
+        stretch, not center. Centring made every child a flex item shrunk to
+        its own content, so the row of tags was handed the width of its widest
+        tag — 140px of a 430px card — and wrapped two names that fit side by
+        side easily. The children take the full width and centre their own
+        contents, which is the same look and the right box.
+      */
+      align-items: stretch;
+      gap: 12px;
+    }
+    .compare-card > span { display: block; text-align: center; }
+    .compare-card[hidden] { display: none; }
+    /*
+      The two sides, side by side — which is the whole claim the card makes, so
+      they wrap rather than truncate: a file name cut in half names nothing.
+
+      NOT .compare-sides, WHICH ALREADY EXISTS. The Compare page's own results
+      layout owns that name and stacks its children (flex-direction: column),
+      and it won: two tags that fit easily on one line sat one above the other,
+      each centred, and every property I could read on them said row. Two
+      components, one class name, and the second one silently inherits whatever
+      the first decided.
+    */
+    .compare-card-sides {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; flex-wrap: wrap;
+    }
     .repo-file-half[hidden] { display: none; }
 
     /*
@@ -2496,7 +2530,14 @@
       no label to say what its two sides are — they are the cards it is
       between.
     -->
-    <div class="flow-action" id="compare-row" hidden>
+    <!--
+      A CARD, BECAUSE IT HAS TWO OPERANDS TO NAME. It was a button on the wire
+      between the Json file card and the repo card, which said what it would do
+      and not what to. data-level="4" — the same rung and the same surface as
+      the cards it sits between, since it is now one of them.
+    -->
+    <div class="compare-card" id="compare-row" data-level="4" hidden>
+      <span id="compare-sides-mount"></span>
       <span id="repo-read-btn-mount"></span>
     </div>
 
@@ -3456,6 +3497,7 @@
     function setFigmaFileName(fileName) {
       if (fileName) lastFigmaFileName = fileName;
       if (lastFigmaFileName) window.PomCollectionsAccordion.setTitle(lastFigmaFileName);
+      showCompareSides();
     }
 
     // Read the GitLab settings from the (persisted) inputs + folder list.
@@ -6208,9 +6250,24 @@
       that fact in the only place it changes what happens — "Push to GitHub"
       against "Push and Replace". One signal, in the place that acts on it.
     */
+    /*
+      THE PAIR THE BUTTON ACTS ON, named on the card that holds it: this Figma
+      document, and the file in the repository. Both move — the Figma name
+      arrives with the extract, the repo name with every keystroke in the name
+      field — so this is called from the one place that already runs on both.
+    */
+    function showCompareSides(which) {
+      if (!window.PomCompareSides) return;
+      window.PomCompareSides.set({
+        figma: lastFigmaFileName || '',
+        provider: which || activeRepoProvider() || 'github',
+        file: primaryFilename(),
+      });
+    }
+
     function showRepoFile() {
-      if (!window.PomRepoFile) return;
-      window.PomRepoFile.set(primaryFilename());
+      if (window.PomRepoFile) window.PomRepoFile.set(primaryFilename());
+      showCompareSides();
     }
     function chooseRepoFile(name) {
       if (name && window.PomPrimaryFilename) window.PomPrimaryFilename.set(name);
@@ -6451,11 +6508,13 @@
       if (!which) { repoCheckedFor = null; repoReadStatus(''); return; }
       /* The title names BOTH sides, because that is what makes it a
          comparison rather than a download: the file in the repo, and the
-         variables in this Figma document. */
+         variables in this Figma document. The card above it now says the same
+         thing where it can be read without hovering. */
       if (window.PomRepoReadBtn) {
         window.PomRepoReadBtn.setTitle('Compare this file with ' + repoFilePath(which) +
                                        ' in ' + (which === 'gitlab' ? 'GitLab' : 'GitHub'));
       }
+      showCompareSides(which);
       var key = repoAddressKey(which);
       if (key === repoCheckedFor) return;
       repoCheckedFor = key;
