@@ -307,6 +307,111 @@ function resolveRef(doc, root, ref, seen) {
 }
 
 /*
+  ONE CONCEPT, SPELLED TWICE.
+
+  Both of the files this was built against carry font-family.teleneo-var AND
+  fontFamilies.teleneo-var, holding the same string. The comparison never said
+  a word about it, and could not: it is identical on both sides, so it sits in
+  the 81,602 that match. It is still a defect — two names for one thing, and
+  half the file pointing at each — and a comparison that has both documents
+  open is in a position to notice.
+
+  TWO TESTS, AND BOTH ARE NEEDED. Identical content alone is far too loose:
+  letter-spacing, paragraph-spacing and paragraph-indents each hold a single
+  token called `none` worth 0, which makes them identical and says nothing —
+  they are three real concepts that happen to start at zero. So the names have
+  to be the same WORD as well, under a normalisation that sees past casing,
+  separators and plurals: font-family and fontFamilies both reduce to
+  fontfamily, while paragraphIndent and paragraphSpacing stay apart.
+*/
+function normaliseName(name) {
+  var n = String(name).toLowerCase().replace(/[^a-z]/g, '');
+  if (/ies$/.test(n)) return n.replace(/ies$/, 'y');
+  return n.replace(/s$/, '');
+}
+
+function findDuplicateNames(doc, side) {
+  var out = [];
+  if (!doc || typeof doc !== 'object') return out;
+  Object.keys(doc).forEach(function (rootName) {
+    if (rootName.charAt(0) === '$') return;
+    var root = doc[rootName];
+    if (!root || typeof root !== 'object') return;
+    /* Leaf groups only — a group whose children are all tokens. Anything
+       deeper is structure, and structure sharing a shape is not a duplicate
+       name, it is a system with a shape. */
+    var byContent = new Map();
+    Object.keys(root).forEach(function (groupName) {
+      if (groupName.charAt(0) === '$') return;
+      var group = root[groupName];
+      if (!group || typeof group !== 'object' || isToken(group)) return;
+      var parts = [];
+      var keys = Object.keys(group);
+      for (var i = 0; i < keys.length; i++) {
+        if (keys[i].charAt(0) === '$') continue;
+        var child = group[keys[i]];
+        if (!isToken(child)) return;                   // not a leaf group
+        parts.push(keys[i] + '=' + renderValue(tokenValue(child)));
+      }
+      if (!parts.length) return;
+      var sig = parts.sort().join('|');
+      if (!byContent.has(sig)) byContent.set(sig, []);
+      byContent.get(sig).push(groupName);
+    });
+    byContent.forEach(function (names, sig) {
+      if (names.length < 2) return;
+      /* Group the same-content names by what they NORMALISE to, and report
+         only the clusters that are one word written more than one way. */
+      var byWord = new Map();
+      names.forEach(function (n) {
+        var w = normaliseName(n);
+        if (!byWord.has(w)) byWord.set(w, []);
+        byWord.get(w).push(n);
+      });
+      byWord.forEach(function (spellings) {
+        if (spellings.length < 2) return;
+        out.push({ side: side, root: rootName, names: spellings.slice().sort(),
+                   tokens: sig.split('|').length });
+      });
+      void sig;
+    });
+  });
+  return out;
+}
+
+/*
+  COULD THE SIDE HOLDING A LITERAL HAVE POINTED INSTEAD?
+
+  This is what turns "aliased one side" from a curiosity into a finding. If
+  the token the other side references EXISTS in this document too, holding the
+  same value, then the literal is a copy of something that was available to
+  point at — the binding was lost rather than deliberately declined.
+
+  Measured on the pair this was built against: tokens_.json still contains
+  font-family.teleneo-var and not one token in the file references it, while
+  Spar.json references it 280 times. The file is not a flattened export
+  either — it carries 102,400 references overall, more than Spar's 90,870. So
+  it is that one variable that came unbound, and every typography style in the
+  file has the font name typed into it instead.
+
+  IT IS A WARNING, NOT AN ERROR. Inlining can be deliberate. What makes it
+  worth saying is the asymmetry: the variable is right there, unused.
+*/
+function bindableTarget(litDoc, root, ref, expected) {
+  var m = /^\{([^}]+)\}$/.exec(String(ref));
+  if (!m) return null;
+  var node = litDoc[root];
+  var segs = m[1].split('.');
+  for (var i = 0; i < segs.length && node; i++) node = node[segs[i]];
+  if (!node || !isToken(node)) return null;
+  var v = tokenValue(node);
+  /* The target may itself point somewhere; what matters is where it lands. */
+  if (isReference(v)) v = resolveRef(litDoc, root, v);
+  if (v === null || renderValue(v) !== expected) return null;
+  return m[1];
+}
+
+/*
   THE SAME TOKEN, SOMEWHERE ELSE.
 
   A path-keyed diff cannot see a rename: move a branch and every leaf under it
@@ -598,7 +703,7 @@ function compare(figmaDoc, repoDoc) {
       holds a literal — or started pointing when it did not before — has had
       its value changed in the way that matters, so it stays in `changed`.
     */
-    var bucket;
+    var bucket, aliasTarget = null, aliasSide = null;
     if (leaf.ref && other.ref) {
       /*
         A REFERENCE THAT MOVED AND LANDED ON A DIFFERENT VALUE IS A DECISION.
@@ -633,6 +738,13 @@ function compare(figmaDoc, repoDoc) {
         : resolveRef(repoDoc, root, rawOf(repoDoc, path));
       bucket = (resolved !== null && renderValue(resolved) === (leaf.ref ? other.value : leaf.value))
         ? 'aliased' : 'changed';
+      if (bucket === 'aliased') {
+        /* The side WITHOUT the reference is the one that could have had it. */
+        var litDoc = leaf.ref ? repoDoc : figmaDoc;
+        var theRef = leaf.ref ? rawOf(figmaDoc, path) : rawOf(repoDoc, path);
+        aliasTarget = bindableTarget(litDoc, rootOf(path), theRef, renderValue(resolved));
+        aliasSide = leaf.ref ? 'repo' : 'figma';
+      }
     } else {
       /*
         A COMPOSITE IS NOT A TYPE. IT IS A STYLE MADE OF TYPED PARTS.
@@ -686,7 +798,25 @@ function compare(figmaDoc, repoDoc) {
           }
         }
         if (sawOne && allRefs) bucket = 'repointed';
-        else if (sawOne && allAgree) bucket = 'aliased';
+        else if (sawOne && allAgree) {
+          bucket = 'aliased';
+          /* Any one sub-value that could have pointed and does not is enough
+             to call the token unbound — it is the same lost link, wearing a
+             composite. */
+          for (var kj = 0; kj < keys.length && !aliasTarget; kj++) {
+            var kk = keys[kj];
+            if (kk.charAt(0) === '$') continue;
+            var f2 = fRaw[kk], r2 = rRaw[kk];
+            if (renderValue(f2) === renderValue(r2)) continue;
+            if (isReference(f2) === isReference(r2)) continue;
+            var refv = isReference(f2) ? f2 : r2;
+            var litd = isReference(f2) ? repoDoc : figmaDoc;
+            var land = resolveRef(isReference(f2) ? figmaDoc : repoDoc, rt, refv);
+            if (land === null) continue;
+            aliasTarget = bindableTarget(litd, rt, refv, renderValue(land));
+            if (aliasTarget) aliasSide = isReference(f2) ? 'repo' : 'figma';
+          }
+        }
         else if (sawOne) {
           var names = Object.keys(partTypes);
           leaf = { value: leaf.value, ref: leaf.ref,
@@ -697,7 +827,9 @@ function compare(figmaDoc, repoDoc) {
     /* The type comes from THIS side. Where the two disagree the token's kind
        itself changed, which is a change worth seeing under the new kind
        rather than the old one. */
-    report[bucket].push({ path: path, figma: leaf.value, repo: other.value, type: leaf.type });
+    var row = { path: path, figma: leaf.value, repo: other.value, type: leaf.type };
+    if (aliasTarget) { row.bindable = aliasTarget; row.unboundSide = aliasSide; }
+    report[bucket].push(row);
     bump(path, bucket);
   });
   R.forEach(function (leaf, path) {
@@ -718,6 +850,31 @@ function compare(figmaDoc, repoDoc) {
     if (da !== db) return db - da;
     return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
   });
+
+  /*
+    The aliased rows where the variable was there to point at. Counted
+    separately because it is the difference between "written differently" and
+    "a link that used to exist and no longer does".
+  */
+  report.unbound = report.aliased.filter(function (x) { return !!x.bindable; });
+
+  /* Not a difference between the two — a defect inside each, which only a
+     reader with both files open would otherwise have to spot by eye. */
+  /*
+    COLLAPSED TO ONE FINDING PER SPELLING PAIR. A themes-shaped export is
+    dozens of self-contained documents and the same duplicate sits in every
+    one of them — 76 rows saying font-family and fontFamilies once each per
+    document is not 76 findings, it is one, repeated. The document count is
+    kept, because "in all 38" is part of what makes it worth fixing.
+  */
+  var dupRaw = findDuplicateNames(figmaDoc, 'figma').concat(findDuplicateNames(repoDoc, 'repo'));
+  var dupBy = new Map();
+  dupRaw.forEach(function (d) {
+    var k = d.side + '\u241f' + d.names.join('/');
+    if (!dupBy.has(k)) dupBy.set(k, { side: d.side, names: d.names, tokens: d.tokens, documents: 0 });
+    dupBy.get(k).documents++;
+  });
+  report.duplicateNames = Array.from(dupBy.values());
 
   var typeCount = new Map();
   report.changed.forEach(function (c) {

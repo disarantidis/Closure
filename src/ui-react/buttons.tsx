@@ -2093,6 +2093,48 @@ const COMPARE_SAMPLE = 40;
       "here" with nothing under it would be a table drawn around an absence.
     */
     /*
+      WHAT IS WRONG RATHER THAN WHAT IS DIFFERENT.
+
+      An unbound token is a literal sitting where a variable was available to
+      point at: the link was lost, not declined. A duplicate name is one
+      concept spelled two ways, with half the file pointing at each. Neither
+      is a difference between the two documents — the duplicate is in BOTH —
+      and neither would ever appear in a diff of values.
+
+      Warnings, not errors: inlining can be deliberate and two names can be a
+      migration in progress. What earns the alert is that the alternative is
+      right there and unused.
+    */
+    const warnings = (rep: any) => {
+      const unbound = rep.unbound || [];
+      const dupes = rep.duplicateNames || [];
+      if (!unbound.length && !dupes.length) return null;
+      /* Named, and counted, because "252 tokens" is a scale and
+         "font-family.teleneo-var" is somewhere to go. */
+      const targets = new Map<string, number>();
+      unbound.forEach((x: any) => targets.set(x.bindable, (targets.get(x.bindable) || 0) + 1));
+      return (
+        <Alert tone="warning" title="Worth fixing in the files themselves">
+          {unbound.length > 0 && (
+            <p className="closure-warning-subtitle">
+              {`${unbound.length.toLocaleString()} token${unbound.length === 1 ? '' : 's'} hold a ` +
+               `literal where the variable exists and is not pointed at — ` +
+               `${[...targets.entries()].map(([t, n]) => `${t} (${n})`).join(', ')}. ` +
+               `Change the variable and nothing follows.`}
+            </p>
+          )}
+          {dupes.map((d: any) => (
+            <p className="closure-warning-more" key={d.side + d.names.join()}>
+              {`${d.side === 'figma' ? 'Figma' : 'Repo'}: ${d.names.join(' and ')} are the same ` +
+               `${d.tokens === 1 ? 'token' : `${d.tokens} tokens`} under two names, in ` +
+               `${d.documents === 1 ? '1 document' : `all ${d.documents} documents`}.`}
+            </p>
+          ))}
+        </Alert>
+      );
+    };
+
+    /*
       A MOVE IS A PAIR OF PATHS, so its table is from/to rather than
       token/value: the value is the same on both sides — that is what makes it
       a move — and printing it twice would spend the width on the one thing
@@ -2240,6 +2282,14 @@ const COMPARE_SAMPLE = 40;
             1,060 are the ones a person has to look at and agree with; the
             57,584 are what a rename did. Values go first and stand alone.
           */}
+          {/*
+            PROBLEMS, NOT DIFFERENCES — and they go first because they are the
+            only rows on this page that are somebody's to fix. Everything else
+            describes how two files differ; these describe something wrong
+            inside one, which a comparison happens to be well placed to see.
+          */}
+          {warnings(r)}
+
           <div className="compare-section">
             <div className="compare-section-head">
               <span className="compare-section-title">Values</span>

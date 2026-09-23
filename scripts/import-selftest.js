@@ -2512,6 +2512,55 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       ok('moved: a relocation whose value also changed is not paired up',
          notPaired.moved.length === 0, JSON.stringify(notPaired.moved.length));
 
+      /*
+        A LITERAL WHERE THE VARIABLE WAS AVAILABLE. The link was lost, not
+        declined — and the asymmetry is what makes it worth saying: the
+        variable is right there, unused. On the pair this was built against,
+        tokens_.json still contains font-family.teleneo-var and not one token
+        in the file points at it, while the other file points at it 280 times.
+      */
+      const bindable = JD.compare(
+        { d: { font: { var: tok('TeleNeo') }, t: { family: tok('TeleNeo') } } },
+        { d: { font: { var: tok('TeleNeo') }, t: { family: tok('{font.var}') } } });
+      ok('unbound: a literal with the variable sitting unused beside it is flagged',
+         bindable.unbound.length === 1 && bindable.unbound[0].bindable === 'font.var',
+         JSON.stringify(bindable.unbound));
+      ok('unbound: and it names which side holds the literal',
+         bindable.unbound[0].unboundSide === 'figma', bindable.unbound[0].unboundSide);
+      /* No target on the literal side means nothing was lost — the two files
+         are simply built differently. */
+      const noTarget = JD.compare(
+        { d: { t: { family: tok('TeleNeo') } } },
+        { d: { font: { var: tok('TeleNeo') }, t: { family: tok('{font.var}') } } });
+      ok('unbound: a literal with no variable to point at is not flagged',
+         noTarget.aliased.length === 1 && noTarget.unbound.length === 0,
+         JSON.stringify(noTarget.unbound));
+
+      /*
+        ONE CONCEPT SPELLED TWICE. Identical on both sides, so it never
+        appears as a difference — and still a defect, with half the file
+        pointing at each name.
+
+        BOTH TESTS ARE NEEDED. Identical content alone is far too loose:
+        letter-spacing, paragraph-spacing and paragraph-indents each hold one
+        token called `none` worth 0, which makes them identical and says
+        nothing. The names have to be the same WORD as well.
+      */
+      const twoNames = { d: { 'font-family': { var: tok('TeleNeo') },
+                              fontFamilies: { var: tok('TeleNeo') } } };
+      const dupes = JD.compare(twoNames, twoNames);
+      ok('naming: one concept under two spellings is reported though both files agree',
+         dupes.duplicateNames.length === 2 &&
+         dupes.duplicateNames[0].names.join('/') === 'font-family/fontFamilies',
+         JSON.stringify(dupes.duplicateNames));
+      ok('naming: and it is reported once per side, not once per document',
+         dupes.duplicateNames.filter((d) => d.side === 'figma').length === 1);
+      const coincident = { d: { 'letter-spacing': { none: tok(0) },
+                                'paragraph-spacing': { none: tok(0) } } };
+      ok('naming: two real concepts that happen to hold the same token are not a duplicate',
+         JD.compare(coincident, coincident).duplicateNames.length === 0,
+         JSON.stringify(JD.compare(coincident, coincident).duplicateNames));
+
       /* The clipboard copy is the only place the full list exists — the page
          caps every list it draws. */
       const text = JD.format(r, { figmaLabel: 'my file', repoLabel: 'GitHub tokens.json' });
