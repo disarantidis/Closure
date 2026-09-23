@@ -1194,6 +1194,45 @@
     }
     .compare-leaf-path { opacity: 0.9; }
     .compare-leaf-val { opacity: 0.65; padding-left: 12px; }
+    /*
+      The two sides of one changed token, beside each other rather than
+      stacked — the comparison is the point, and stacking makes the eye travel
+      down and back to make it. Equal columns, each free to shrink below its
+      content (min-width: 0) so a long value wraps inside its own cell instead
+      of pushing the pair out of the card.
+    */
+    .compare-leaf-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 3px;
+    }
+    .compare-side-val {
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      min-width: 0;
+      opacity: 0.75;
+      overflow-wrap: anywhere;
+    }
+    .compare-side-tag {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      opacity: 0.55;
+      flex-shrink: 0;
+    }
+    .compare-side-text { min-width: 0; }
+    /* The colour itself, next to the hex that names it — the one comparison
+       nobody should have to do in their head. */
+    .compare-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+      align-self: center;
+      border: 1px solid var(--app-border);
+    }
     .compare-more { font-size: 11px; opacity: 0.6; margin: 2px 0 0; }
     .compare-copybox {
       width: 100%;

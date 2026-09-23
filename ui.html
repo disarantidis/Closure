@@ -1194,6 +1194,45 @@
     }
     .compare-leaf-path { opacity: 0.9; }
     .compare-leaf-val { opacity: 0.65; padding-left: 12px; }
+    /*
+      The two sides of one changed token, beside each other rather than
+      stacked — the comparison is the point, and stacking makes the eye travel
+      down and back to make it. Equal columns, each free to shrink below its
+      content (min-width: 0) so a long value wraps inside its own cell instead
+      of pushing the pair out of the card.
+    */
+    .compare-leaf-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 3px;
+    }
+    .compare-side-val {
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      min-width: 0;
+      opacity: 0.75;
+      overflow-wrap: anywhere;
+    }
+    .compare-side-tag {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      opacity: 0.55;
+      flex-shrink: 0;
+    }
+    .compare-side-text { min-width: 0; }
+    /* The colour itself, next to the hex that names it — the one comparison
+       nobody should have to do in their head. */
+    .compare-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+      align-self: center;
+      border: 1px solid var(--app-border);
+    }
     .compare-more { font-size: 11px; opacity: 0.6; margin: 2px 0 0; }
     .compare-copybox {
       width: 100%;
@@ -49700,6 +49739,25 @@ html[data-theme=dark] {
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(Alert, { tone: "success", title: "Identical", children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("p", { className: "closure-warning-subtitle", children: `All ${r.sameCount.toLocaleString()} token${r.sameCount === 1 ? "" : "s"} match${r.sameCount === 1 ? "es" : ""}. Pushing right now would change nothing.` }) })
         ] });
       }
+      const swatchOf = (v) => {
+        const m = /hex:(#[0-9a-f]{3,8})/i.exec(v) || /^(#[0-9a-f]{3,8})$/i.exec(v);
+        return m ? m[1] : null;
+      };
+      const sideCell = (label, v) => {
+        const sw = swatchOf(v);
+        return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-side-val", title: v, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-side-tag", children: label }),
+          sw && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-swatch", style: { background: sw } }),
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "compare-side-text", children: sw || v })
+        ] });
+      };
+      const pairRow = (keyPrefix) => (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-path", children: x.path }),
+        /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf-pair", children: [
+          sideCell("repo", x.repo),
+          sideCell("here", x.figma)
+        ] })
+      ] }, keyPrefix + x.path);
       const leaves = (title, rows, render) => {
         if (!rows.length) return null;
         return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
@@ -49770,16 +49828,8 @@ html[data-theme=dark] {
             ] })
           ] }, g.name)) })
         ] }),
-        leaves("Values \u2014 changed", r.changed, (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-path", children: x.path }),
-          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: "repo:  " + x.repo }),
-          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: "here:  " + x.figma })
-        ] }, "c" + x.path)),
-        leaves("Architecture \u2014 pointing somewhere new", r.repointed || [], (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-path", children: x.path }),
-          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: "repo:  " + x.repo }),
-          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: "here:  " + x.figma })
-        ] }, "p" + x.path)),
+        leaves("Values \u2014 changed", r.changed, pairRow("c")),
+        leaves("Architecture \u2014 pointing somewhere new", r.repointed || [], pairRow("p")),
         leaves("Architecture \u2014 only here", r.onlyInFigma, (x) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "compare-leaf", children: [
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-path", children: x.path }),
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "compare-leaf-val", children: x.value })
@@ -53952,7 +54002,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '3a3c927 10:22:21';
+    var CLOSURE_BUILD = '977b3dd 10:27:12';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

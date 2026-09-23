@@ -1828,6 +1828,44 @@ const COMPARE_SAMPLE = 40;
       );
     }
 
+    /*
+      TWO VALUES ARE COMPARED SIDE BY SIDE, NOT STACKED.
+
+      They were one above the other, which makes the eye travel down and back
+      to answer "what changed" — and with a colour written as
+      {alpha:1,colorSpace:srgb,components:[0.81569,0.98431,0.87451],hex:#d0fbdf}
+      the two lines are long enough that the difference is genuinely hard to
+      find. Beside each other the answer is where the question is.
+
+      THE HEX LEADS, AND THE REST IS NOT LOST. A DTCG colour carries its own
+      hex alongside the components; that is the part a person reads, so it is
+      what the cell shows, with a swatch beside it. The full value stays on
+      the cell's title, so nothing is hidden — it is ranked, not truncated.
+    */
+    const swatchOf = (v: string) => {
+      const m = /hex:(#[0-9a-f]{3,8})/i.exec(v) || /^(#[0-9a-f]{3,8})$/i.exec(v);
+      return m ? m[1] : null;
+    };
+    const sideCell = (label: string, v: string) => {
+      const sw = swatchOf(v);
+      return (
+        <div className="compare-side-val" title={v}>
+          <span className="compare-side-tag">{label}</span>
+          {sw && <span className="compare-swatch" style={{ background: sw }} />}
+          <span className="compare-side-text">{sw || v}</span>
+        </div>
+      );
+    };
+    const pairRow = (keyPrefix: string) => (x: any) => (
+      <div className="compare-leaf" key={keyPrefix + x.path}>
+        <div className="compare-leaf-path">{x.path}</div>
+        <div className="compare-leaf-pair">
+          {sideCell('repo', x.repo)}
+          {sideCell('here', x.figma)}
+        </div>
+      </div>
+    );
+
     /* A leaf list, capped. The count in the heading is the REAL one, not the
        length of what is shown — a heading that said 40 when there were 13,137
        would be the page quietly lying about the size of the difference. */
@@ -1951,23 +1989,11 @@ const COMPARE_SAMPLE = 40;
           </div>
         </div>
 
-        {leaves('Values \u2014 changed', r.changed, (x: any) => (
-          <div className="compare-leaf" key={'c' + x.path}>
-            <div className="compare-leaf-path">{x.path}</div>
-            <div className="compare-leaf-val">{'repo:  ' + x.repo}</div>
-            <div className="compare-leaf-val">{'here:  ' + x.figma}</div>
-          </div>
-        ))}
+        {leaves('Values \u2014 changed', r.changed, pairRow('c'))}
         {/* Last of the three lists on purpose: it is usually the longest and
             almost always the least interesting, because a re-rooting moves
             thousands of references without anyone having decided anything. */}
-        {leaves('Architecture \u2014 pointing somewhere new', r.repointed || [], (x: any) => (
-          <div className="compare-leaf" key={'p' + x.path}>
-            <div className="compare-leaf-path">{x.path}</div>
-            <div className="compare-leaf-val">{'repo:  ' + x.repo}</div>
-            <div className="compare-leaf-val">{'here:  ' + x.figma}</div>
-          </div>
-        ))}
+        {leaves('Architecture \u2014 pointing somewhere new', r.repointed || [], pairRow('p'))}
         {leaves('Architecture \u2014 only here', r.onlyInFigma, (x: any) => (
           <div className="compare-leaf" key={'f' + x.path}>
             <div className="compare-leaf-path">{x.path}</div>
