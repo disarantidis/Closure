@@ -2874,6 +2874,45 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       ok('round trip: the legacy shape carries the same hint as a plain key',
          plan.unresolved.length === 0, JSON.stringify(plan.unresolved.map((q) => q.id)));
 
+      /*
+        THE LAST QUESTION A REAL EXPORT ASKED, and it is not a duplicate.
+
+        breakpoint.breakpoint-string is a string that VARIES per breakpoint —
+        five values in the collection that owns it — while the collection
+        extending it shows the single value its own mode inherits. So the
+        candidates genuinely differ, sameEverywhere is false, and asking is
+        correct on the evidence in the file.
+
+        It is still not a decision anybody should be making, and two separate
+        halves of the export fix each remove it on their own: the alias says
+        which collection it meant, and the borrowed snapshot is not written out
+        in the first place. Both are pinned, because either one regressing
+        would put the question back while the other quietly covered for it.
+      */
+      const T = (v, extra) => Object.assign({ $type: 'text', $value: v }, extra || {});
+      const breakpoints = (hint) => ({
+        $metadata: { tokenSetOrder: ['.breakpoint/S', '.breakpoint/M', 'layout/columns', 'foundation/base'] },
+        '.breakpoint/S': { breakpoint: { 'breakpoint-string': T('S Mobile') } },
+        '.breakpoint/M': { breakpoint: { 'breakpoint-string': T('M Tablet') } },
+        'layout/columns': { breakpoint: { 'breakpoint-string': T('S Mobile') } },
+        'foundation/base': { variant: { breakpoint: T('{breakpoint.breakpoint-string}',
+          hint ? { $extensions: { 'com.closure.legacyJson': { aliasCollection: hint } } } : null) } },
+      });
+      let bp = deriveX(toIRx(breakpoints(null)), {});
+      ok('breakpoint: a variable seen through two mode axes really is ambiguous, and is asked',
+         bp.unresolved.length === 1 && bp.refDuplicates.length === 0,
+         bp.unresolved.length + ' asked');
+      bp = deriveX(toIRx(breakpoints('.breakpoint')), {});
+      ok('breakpoint: the alias naming its collection settles it',
+         bp.unresolved.length === 0 && bp.losses.unresolvedRefs.length === 0,
+         JSON.stringify(bp.unresolved.map((q) => q.id)));
+      const noSnapshot = breakpoints(null);
+      delete noSnapshot['layout/columns'].breakpoint;
+      bp = deriveX(toIRx(noSnapshot), {});
+      ok('breakpoint: and so does not writing the borrowed snapshot at all',
+         bp.unresolved.length === 0 && bp.losses.unresolvedRefs.length === 0,
+         JSON.stringify(bp.unresolved.map((q) => q.id)));
+
       /* Grouping: many paths, one situation, one question. */
       /* One name family, forty tokens in it — the shape that collapses. A path
          with no family of its own stays its own question, which is correct and
