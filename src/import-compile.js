@@ -40,6 +40,7 @@
     ? require('./import-derive.js')
     : global.PomImportDerive;
   var vkey = __dep.vkey;
+  var collectionOrder = __dep.collectionOrder;
 /*
   #rgb / #rrggbb / #rrggbbaa / rgb() / rgba() -> Figma's 0..1 RGBA.
 
@@ -288,46 +289,15 @@ function compile(ir, plan, opts) {
     import CREATES — one already in the file keeps its place, because apply()
     reuses it rather than making it again.
 
-    LAST HOP FIRST. A token file is a chain: primitives at the bottom, then
-    each layer aliasing the one beneath it, up to the semantic layer a designer
-    actually picks from. Reading order and dependency order are opposites —
-    nobody opens the panel looking for "core.dimension.4", they open it looking
-    for "foundation.colours.basic.text" — so the deepest CONSUMER is created
-    first and the primitives last.
-
-    Depth is the longest path down the alias graph, computed from the same
-    refTarget map phase 4 uses, so it describes the references that will
-    actually be written rather than the ones the file mentions. Cycles cannot
-    lengthen a path: a name already on the current descent contributes zero.
-    Ties keep the document's own order, so the result is stable.
+    The rule itself — LAST HOP FIRST, and why — lives beside collectionOrder in
+    import-derive.js, because the list the import page SHOWS is sorted by it
+    too. It was computed here and nowhere else, so the page sorted by variable
+    count instead and promised an order the import did not write.
   */
-  const dependsOn = new Map();
-  for (const spec of vars.values()) {
-    if (!keep.has(spec.col) || !nonEmpty.has(spec.col)) continue;
-    if (!dependsOn.has(spec.col)) dependsOn.set(spec.col, new Set());
-    for (const [, v] of spec.values) {
-      if (v.ref === undefined) continue;
-      const t = refTarget.get(v.ref);
-      if (t && t.col !== spec.col) dependsOn.get(spec.col).add(t.col);
-    }
-  }
-  const depthMemo = new Map();
-  const depthOf = (name, onPath) => {
-    if (depthMemo.has(name)) return depthMemo.get(name);
-    if (onPath.has(name)) return 0;                 // a cycle adds no length
-    onPath.add(name);
-    let d = 0;
-    for (const t of (dependsOn.get(name) || [])) d = Math.max(d, 1 + depthOf(t, new Set(onPath)));
-    onPath.delete(name);
-    depthMemo.set(name, d);
-    return d;
-  };
-  const creationOrder = [...modesOf.keys()];
-  const documentOrder = new Map(creationOrder.map((n, i) => [n, i]));
-  creationOrder.sort((a, b) => {
-    const d = depthOf(b, new Set()) - depthOf(a, new Set());
-    return d !== 0 ? d : documentOrder.get(a) - documentOrder.get(b);
-  });
+  const creationOrder = collectionOrder(
+    vars, modesOf, refTarget,
+    (col) => keep.has(col) && nonEmpty.has(col),
+  );
 
   /* ── phase 1: collections and modes ────────────────────────────────────── */
   for (const name of creationOrder) {

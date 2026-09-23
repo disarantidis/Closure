@@ -292,6 +292,62 @@ function rootOfPath(path) {
   return i === -1 ? path : path.slice(0, i);
 }
 
+/*
+  ── THE ORDER COLLECTIONS GO IN ──────────────────────────────────────────────
+
+  LAST HOP FIRST. A token file is a chain: primitives at the bottom, then each
+  layer aliasing the one beneath it, up to the semantic layer a designer
+  actually picks from. Reading order and dependency order are opposites —
+  nobody opens the panel looking for "core.dimension.4", they open it looking
+  for "foundation.colours.basic.text" — so the deepest CONSUMER comes first and
+  the primitives last.
+
+  SHARED, BECAUSE IT WAS TWO ANSWERS TO ONE QUESTION. compile() has ordered the
+  collections it CREATES this way all along — the only order Figma offers, since
+  the Plugin API cannot reorder a collection after the fact — while the list the
+  import page SHOWS was sorted by variable count, largest first. So the page
+  promised one order and the import wrote another, and a file whose semantic
+  layer is small showed it at the bottom and then created it at the top.
+
+  Depth is the longest path down the alias graph, computed from refTarget so it
+  describes the references that will actually be written rather than the ones
+  the file mentions. A cycle cannot lengthen a path: a name already on the
+  current descent contributes zero. Ties keep the document's own order, so the
+  result is stable and a file that declares no references at all comes out in
+  exactly the order it was written in.
+*/
+function collectionOrder(vars, modesOf, refTarget, isLive) {
+  const live = isLive || (() => true);
+  const dependsOn = new Map();
+  for (const spec of vars.values()) {
+    if (!live(spec.col)) continue;
+    if (!dependsOn.has(spec.col)) dependsOn.set(spec.col, new Set());
+    for (const [, v] of spec.values) {
+      if (v.ref === undefined) continue;
+      const t = refTarget.get(v.ref);
+      if (t && t.col !== spec.col) dependsOn.get(spec.col).add(t.col);
+    }
+  }
+  const memo = new Map();
+  const depthOf = (name, onPath) => {
+    if (memo.has(name)) return memo.get(name);
+    if (onPath.has(name)) return 0;
+    onPath.add(name);
+    let d = 0;
+    for (const t of (dependsOn.get(name) || [])) d = Math.max(d, 1 + depthOf(t, new Set(onPath)));
+    onPath.delete(name);
+    memo.set(name, d);
+    return d;
+  };
+  const order = [...modesOf.keys()];
+  const documentOrder = new Map(order.map((n, i) => [n, i]));
+  order.sort((a, b) => {
+    const d = depthOf(b, new Set()) - depthOf(a, new Set());
+    return d !== 0 ? d : documentOrder.get(a) - documentOrder.get(b);
+  });
+  return order;
+}
+
 function derive(ir, opts) {
   opts = opts || {};
   /*
@@ -789,7 +845,15 @@ function derive(ir, opts) {
     }
     plan.collections.push(entry);
   }
-  plan.collections.sort((a, b) => b.variables - a.variables);
+  /* The order they will be CREATED in, which is the order the panel will show
+     them in — so the list here is a preview of the result rather than a
+     different arrangement of the same names. It was sorted by variable count,
+     which answered a question nobody asked. */
+  const colOrder = collectionOrder(vars, modesOf, refTarget);
+  const colRank = new Map(colOrder.map((n, i) => [n, i]));
+  plan.collections.sort((a, b) =>
+    (colRank.has(a.name) ? colRank.get(a.name) : 1e9) -
+    (colRank.has(b.name) ? colRank.get(b.name) : 1e9));
 
   /* One axis per collection is Figma's rule, not a preference — a second
      promoted depth cannot be expressed at all, so it is refused rather than
@@ -870,6 +934,7 @@ function derive(ir, opts) {
 }
 
   var api = { derive, applyLevels, levelCandidates, roleOf, figmaType, isComposite, isDtcgScalar, vkey,
+              collectionOrder,
                    MODES_MIN, SEPARATE_MAX, FIGMA_TYPES, VARIABLE_CEILING,
                    FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
 

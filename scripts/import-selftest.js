@@ -3366,6 +3366,56 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       }
     }
 
+    /*
+      THE LIST THE PAGE SHOWS IS THE ORDER THE IMPORT WRITES.
+
+      compile() has ordered the collections it creates by dependency depth all
+      along — last hop first, primitives last, which is the only order Figma
+      offers because the Plugin API cannot move a collection afterwards. The
+      list the import page showed was sorted by variable count, so the page
+      promised one arrangement and the import made another.
+    */
+    {
+      const { toIR: toIRz } = require('../src/import-ir.js');
+      const { derive: deriveZ } = require('../src/import-derive.js');
+      const { compile: compileZ } = require('../src/import-compile.js');
+      const T = (v) => ({ $type: 'color', $value: v });
+      /* primitives, a layer on top of them, and a semantic layer on top of
+         that — declared in the WRONG order on purpose, smallest consumer last,
+         so neither document order nor size can produce the right answer by
+         accident. */
+      const doc = {
+        $metadata: { tokenSetOrder: ['prims/base', 'mid/base', 'top/base'] },
+        'prims/base': { red: T('#ff0000'), blue: T('#0000ff'), green: T('#00ff00') },
+        'mid/base': { brand: T('{red}'), accent: T('{blue}') },
+        'top/base': { button: T('{brand}') },
+      };
+      const planZ = deriveZ(toIRz(doc), {});
+      ok('collection order: the deepest consumer is first and the primitives last',
+         planZ.collections.map((c) => c.name).join(' > ') === 'top > mid > prims',
+         planZ.collections.map((c) => c.name + '(' + c.variables + ')').join(' > '));
+      /* And it is not size: top has one variable, prims has three. */
+      ok('collection order: which is not the same as largest first',
+         planZ.collections[0].variables < planZ.collections[2].variables,
+         JSON.stringify(planZ.collections.map((c) => c.variables)));
+      const progZ = compileZ(toIRz(doc), planZ, {});
+      const madeZ = (progZ.program.ops || []).filter((o) => o.op === 'createCollection')
+        .map((o) => o.name || o.collection);
+      ok('collection order: and the program creates them in exactly that order',
+         madeZ.join(' > ') === planZ.collections.map((c) => c.name).join(' > '),
+         madeZ.join(' > '));
+      /* A file with no references at all has no depth to sort by, so it keeps
+         the order it was written in rather than being rearranged by size. */
+      const flat = {
+        $metadata: { tokenSetOrder: ['one/base', 'two/base'] },
+        'one/base': { a: T('#111111') },
+        'two/base': { b: T('#222222'), c: T('#333333') },
+      };
+      ok('collection order: with nothing to depend on, the document decides',
+         deriveZ(toIRz(flat), {}).collections.map((c) => c.name).join(' > ') === 'one > two',
+         deriveZ(toIRz(flat), {}).collections.map((c) => c.name).join(' > '));
+    }
+
     console.log('');
     console.log(pass + '/' + (pass + fail) + ' passed');
     process.exit(fail ? 1 : 0);
