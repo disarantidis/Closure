@@ -49360,7 +49360,8 @@ html[data-theme=dark] {
       const [s, setS] = (0, import_react18.useState)(state);
       apply = setS;
       const q = s.query.trim().toLowerCase();
-      const matches = !q || s.query === s.selected ? s.all : s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1);
+      const hay = (n) => n === "" ? "repo root" : n.toLowerCase();
+      const matches = !q || s.query === s.selected ? s.all : s.all.filter((n) => hay(n).indexOf(q) !== -1);
       const LIMIT = 50;
       const options = matches.slice(0, LIMIT);
       const hidden = matches.length - options.length;
@@ -53897,7 +53898,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '5936619 09:45:27';
+    var CLOSURE_BUILD = '201d5b6 09:49:44';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -54270,11 +54271,31 @@ function format(report, opts) {
     // PomDropdownSelect has no native <select>/<option> DOM (it's a
     // floating-ui combobox) — re-render its `items` from glFolders instead
     // of building option elements.
-    function renderFolderSelect() {
-      var items = glFolders.map(function(path) {
-        return { label: path || '(repo root)', value: path };
+    /*
+      THE REPOSITORY ROOT IS ALWAYS ONE OF THE CHOICES.
+
+      It is where a push goes when no folder is set — composeFilePath with an
+      empty folder is just the file name — so the root is not the absence of
+      an option, it is an option, and it was the one you could not get back to.
+      Save two paths and the list held exactly those two: nothing offered the
+      root, and the only way out was to delete a saved path in Settings.
+
+      Prepended rather than stored: it is never added to the saved list, because
+      a list of folders containing an empty string is a list with a hole in it,
+      and chooseFolder already declines to save one.
+    */
+    var ROOT_FOLDER_LABEL = '(repo root)';
+    function withRootOption(folders) {
+      var items = [{ label: ROOT_FOLDER_LABEL, value: '' }];
+      folders.forEach(function (path) {
+        if (!path) return;                 // the root is already first
+        items.push({ label: path, value: path });
       });
-      window.PomFolderSelect.setItems(items, glActiveFolder);
+      return items;
+    }
+
+    function renderFolderSelect() {
+      window.PomFolderSelect.setItems(withRootOption(glFolders), glActiveFolder);
     }
 
     // GitHub's independent folder-path list — same shape/behavior as
@@ -54315,10 +54336,7 @@ function format(report, opts) {
     // Main screen: GitHub's own folder dropdown, shown only when relevant
     // to the current mainProviderTab (see updatePushTargetUI()).
     function renderGithubFolderSelect() {
-      var items = ghFolders.map(function(path) {
-        return { label: path || '(repo root)', value: path };
-      });
-      window.PomGithubFolderSelect.setItems(items, ghActiveFolder);
+      window.PomGithubFolderSelect.setItems(withRootOption(ghFolders), ghActiveFolder);
     }
 
     // Settings has no view/edit mode: every field is editable the moment

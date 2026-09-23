@@ -1820,7 +1820,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
         };
         const names = ['repoFilePath', 'pushFilePath', 'repoSelectedFile', 'listRepoJsonFiles',
                        'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
-                       'pushOverwriteNote'];
+                       'pushOverwriteNote', 'withRootOption'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1847,6 +1847,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ctx.PomRepoFile = { get: () => picked, set: (v) => { picked = v; }, setOptions: () => {}, onChange: null };
           ctx.repoFileNames = [];
           ctx.repoFileName = undefined;
+          /* withRootOption reads it; the label lives beside it in the template. */
+          ctx.ROOT_FOLDER_LABEL = '(repo root)';
           ctx.window = ctx;
           vmx.createContext(ctx);
           vmx.runInContext(lifted.join('\n'), ctx);
@@ -2046,6 +2048,31 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ok('repo probe: no provider means no claim either way',
              ctx.pushWouldReplace(null) === false);
           ctx.__gh_over = null; ctx.repoFileNames = [];
+
+          /*
+            THE REPOSITORY ROOT IS AN OPTION, NOT THE ABSENCE OF ONE.
+
+            A push with no folder set goes to the root — composeFilePath with
+            an empty folder is just the file name — so the root is somewhere
+            you can push to, and it was the one place you could not get back
+            to: save two paths and the picker offered exactly those two, with
+            no way home short of deleting one in Settings.
+          */
+          ok('folders: the root is offered even when two paths are saved',
+             JSON.stringify(ctx.withRootOption(['tokens/out', 'src/theme'])) ===
+             JSON.stringify([{ label: '(repo root)', value: '' },
+                             { label: 'tokens/out', value: '' + 'tokens/out' },
+                             { label: 'src/theme', value: 'src/theme' }]),
+             JSON.stringify(ctx.withRootOption(['tokens/out', 'src/theme'])));
+          ok('folders: and when none are',
+             JSON.stringify(ctx.withRootOption([])) ===
+             JSON.stringify([{ label: '(repo root)', value: '' }]));
+          /* Prepended, never stored: a saved list holding an empty string is a
+             list with a hole in it, and an already-saved '' would otherwise
+             produce the root twice. */
+          ok('folders: an empty saved path does not produce the root twice',
+             ctx.withRootOption(['', 'tokens/out']).length === 2,
+             JSON.stringify(ctx.withRootOption(['', 'tokens/out'])));
         }
       }
     }

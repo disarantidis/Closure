@@ -3180,11 +3180,31 @@
     // PomDropdownSelect has no native <select>/<option> DOM (it's a
     // floating-ui combobox) — re-render its `items` from glFolders instead
     // of building option elements.
-    function renderFolderSelect() {
-      var items = glFolders.map(function(path) {
-        return { label: path || '(repo root)', value: path };
+    /*
+      THE REPOSITORY ROOT IS ALWAYS ONE OF THE CHOICES.
+
+      It is where a push goes when no folder is set — composeFilePath with an
+      empty folder is just the file name — so the root is not the absence of
+      an option, it is an option, and it was the one you could not get back to.
+      Save two paths and the list held exactly those two: nothing offered the
+      root, and the only way out was to delete a saved path in Settings.
+
+      Prepended rather than stored: it is never added to the saved list, because
+      a list of folders containing an empty string is a list with a hole in it,
+      and chooseFolder already declines to save one.
+    */
+    var ROOT_FOLDER_LABEL = '(repo root)';
+    function withRootOption(folders) {
+      var items = [{ label: ROOT_FOLDER_LABEL, value: '' }];
+      folders.forEach(function (path) {
+        if (!path) return;                 // the root is already first
+        items.push({ label: path, value: path });
       });
-      window.PomFolderSelect.setItems(items, glActiveFolder);
+      return items;
+    }
+
+    function renderFolderSelect() {
+      window.PomFolderSelect.setItems(withRootOption(glFolders), glActiveFolder);
     }
 
     // GitHub's independent folder-path list — same shape/behavior as
@@ -3225,10 +3245,7 @@
     // Main screen: GitHub's own folder dropdown, shown only when relevant
     // to the current mainProviderTab (see updatePushTargetUI()).
     function renderGithubFolderSelect() {
-      var items = ghFolders.map(function(path) {
-        return { label: path || '(repo root)', value: path };
-      });
-      window.PomGithubFolderSelect.setItems(items, ghActiveFolder);
+      window.PomGithubFolderSelect.setItems(withRootOption(ghFolders), ghActiveFolder);
     }
 
     // Settings has no view/edit mode: every field is editable the moment

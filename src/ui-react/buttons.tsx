@@ -1260,9 +1260,14 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
     const [s, setS] = useState<S>(state);
     apply = setS;
     const q = s.query.trim().toLowerCase();
+    /* The repo root is the empty string, so it matches no query by its value
+       and would vanish the moment anyone typed. It is searched by the words it
+       is DRAWN with instead — "root" finds it, which is what someone typing
+       would expect and the only thing they could type. */
+    const hay = (n: string) => (n === '' ? 'repo root' : n.toLowerCase());
     const matches = (!q || s.query === s.selected)
       ? s.all
-      : s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1);
+      : s.all.filter((n) => hay(n).indexOf(q) !== -1);
     /* A CAP, because a real repo has thousands of directories and a listbox
        is not a scrollbar. The footer says how many were left out, which is
        also the nudge to type another character. */
