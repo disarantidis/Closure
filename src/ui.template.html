@@ -2343,6 +2343,41 @@
       display: flex; align-items: center; justify-content: space-between;
       gap: 12px;
     }
+    /*
+      IT KEEPS A READABLE WIDTH OR IT TAKES ITS OWN LINE.
+
+      Letting it have whatever was left looked right with "Untitled" beside it
+      and collapsed to a 70px input with a real file name there — a picker too
+      narrow to read the file it picks. A min-width is what makes the row wrap
+      instead of squeezing: on a short name everything fits on one line and the
+      card stays at 112; on a long one the picker drops to its own line and the
+      card grows by exactly the row it needed. The size is decided by what has
+      to be legible, not by what happens to be left over.
+    */
+    /*
+      IT KEEPS A READABLE WIDTH OR IT TAKES ITS OWN LINE, and at this panel's
+      width it always takes its own line — which is the honest answer rather
+      than a preference.
+
+      Three arrangements were measured. Beside the Figma tag with no floor, the
+      input collapsed to 70px against a real file name: a picker too narrow to
+      read the file it picks. In the title row beside the button, the numbers
+      almost worked and did not — the picker got its 186px and crushed "Compare"
+      to "C…" and the Figma tag to its mark alone. A title, a legible field and
+      a button do not fit across 366px, and no amount of arranging changes that.
+
+      So the picker sits under the tags, full width: 186px of value, nothing
+      clipped, and the card costs one row for it.
+    */
+    .compare-card-pick { flex: 1 1 100%; min-width: 170px; }
+    /*
+      THE TAG YIELDS FIRST. Of the two sides only one is a control, and only one
+      of them is the sole place its name appears — the Figma file is named on
+      the card above as well, so it is the half that can afford to be cut. The
+      picker was losing its last character to a tag that had a spare copy of
+      itself two inches up.
+    */
+    .compare-card-sides .nd-tag { max-width: 100%; }
     .compare-card-main {
       display: flex; flex-direction: column; min-width: 0;
       /* The tags belong to the title, so they sit close under it. 12px read as
@@ -2705,6 +2740,7 @@
             <p class="json-download-title">Compare</p>
           </div>
           <span id="compare-sides-mount"></span>
+          <span id="compare-pick-mount"></span>
         </div>
         <span id="repo-read-btn-mount"></span>
       </div>
@@ -6393,8 +6429,25 @@
       the folder below filters the list the field above offers, so the pair were
       always describing the same place anyway. The name field is the list now.
     */
+    /*
+      WHAT COMPARE READS — the pushed name, unless somebody has said otherwise.
+
+      The name field and the repo card's echo are one control for one file, and
+      that is right for the WRITE: there is only one file a push can go to. The
+      READ is not the same question. Comparing against something you are not
+      about to overwrite is a real thing to want — last week's export, the file
+      you are replacing, a colleague's — and the compare card is the only place
+      on this screen where that question is being asked, so it is the only place
+      that answers it.
+
+      Empty means "follow the name", which is the ordinary case and needs no
+      decision. A chosen file stays chosen until it is changed: resetting it
+      when the export is renamed would silently move the comparison somewhere
+      nobody asked for.
+    */
+    var compareFile = '';
     function repoSelectedFile() {
-      return primaryFilename();
+      return compareFile || primaryFilename();
     }
     /*
       TWO PICKERS, ONE ANSWER. The repo card asks which file to compare
@@ -6408,6 +6461,7 @@
     function setRepoFileOptions(names) {
       if (window.PomPrimaryFilename) window.PomPrimaryFilename.setOptions(names);
       if (window.PomImportRepoFile) window.PomImportRepoFile.setOptions(names);
+      if (window.PomCompareSides) window.PomCompareSides.setOptions(names);
       showRepoFile();
     }
 
@@ -6436,9 +6490,19 @@
       window.PomCompareSides.set({
         figma: lastFigmaFileName || '',
         provider: which || activeRepoProvider() || 'github',
-        file: primaryFilename(),
+        file: repoSelectedFile(),
       });
+      window.PomCompareSides.setOptions(repoFileNames);
     }
+
+    window.PomCompareSides.onPick = function (name) {
+      /* Picking the name the export already has is not an override, it is
+         agreement — so it goes back to following rather than pinning the same
+         string and pretending it was a decision. */
+      compareFile = (name === primaryFilename()) ? '' : name;
+      showCompareSides();
+      refreshRepoReadRow();
+    };
 
     function showRepoFile() {
       if (window.PomRepoFile) window.PomRepoFile.set(primaryFilename());

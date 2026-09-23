@@ -1861,10 +1861,14 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ctx.PomRepoFile = { set: (v) => { shown = v; } };
           /* The compare card's two side tags, fed from the same place. */
           let sides = {};
-          ctx.PomCompareSides = { set: (v) => { sides = { ...sides, ...v }; } };
+          ctx.PomCompareSides = {
+            set: (v) => { sides = { ...sides, ...v }; },
+            setOptions: () => {}, onPick: null,
+          };
           ctx.__sides = () => sides;
           ctx.lastFigmaFileName = 'Foundations';
           ctx.repoListed = false;
+          ctx.compareFile = '';
           /* The import page's picker is a SECOND mount of the same combo over
              the same selection. Stubbed as its own object on purpose: if the
              two ever stop being written together, these see it. */
@@ -2481,6 +2485,37 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           picked = 'something-else.json';
           ok('repo probe: and naming it back lands on the key it started from',
              ctx.repoAddressKey('github') === keyBefore, ctx.repoAddressKey('github'));
+
+          /*
+            COMPARE CAN LOOK SOMEWHERE ELSE, and only compare.
+
+            One name is right for the WRITE: there is one file a push can go to.
+            The READ is a different question — comparing against something you
+            are NOT about to overwrite is the ordinary reason to compare at all —
+            so the compare card carries its own target, defaulting to the pushed
+            name so that the simple case stays simple.
+          */
+          picked = 'odstokens.json';
+          ctx.compareFile = '';
+          ok('compare target: with nothing chosen, it follows the name being pushed',
+             ctx.repoFilePath('github') === 'tokens/odstokens.json' &&
+             ctx.pushFilePath('github') === 'tokens/odstokens.json',
+             ctx.repoFilePath('github') + ' / ' + ctx.pushFilePath('github'));
+          ctx.compareFile = 'last-week.json';
+          ok('compare target: a chosen file moves the read and leaves the write alone',
+             ctx.repoFilePath('github') === 'tokens/last-week.json' &&
+             ctx.pushFilePath('github') === 'tokens/odstokens.json',
+             ctx.repoFilePath('github') + ' / ' + ctx.pushFilePath('github'));
+          /* Renaming the export must not drag the comparison along with it —
+             a choice made on purpose outlives a change made for another
+             reason. */
+          picked = 'renamed.json';
+          ok('compare target: renaming the export leaves the comparison where it was',
+             ctx.repoFilePath('github') === 'tokens/last-week.json' &&
+             ctx.pushFilePath('github') === 'tokens/renamed.json',
+             ctx.repoFilePath('github') + ' / ' + ctx.pushFilePath('github'));
+          ctx.compareFile = '';
+          picked = 'odstokens.json';
 
           /*
             WRITING OVER A FILE IS NOT THE SAME ACT AS CREATING ONE, and the

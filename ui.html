@@ -2343,6 +2343,41 @@
       display: flex; align-items: center; justify-content: space-between;
       gap: 12px;
     }
+    /*
+      IT KEEPS A READABLE WIDTH OR IT TAKES ITS OWN LINE.
+
+      Letting it have whatever was left looked right with "Untitled" beside it
+      and collapsed to a 70px input with a real file name there — a picker too
+      narrow to read the file it picks. A min-width is what makes the row wrap
+      instead of squeezing: on a short name everything fits on one line and the
+      card stays at 112; on a long one the picker drops to its own line and the
+      card grows by exactly the row it needed. The size is decided by what has
+      to be legible, not by what happens to be left over.
+    */
+    /*
+      IT KEEPS A READABLE WIDTH OR IT TAKES ITS OWN LINE, and at this panel's
+      width it always takes its own line — which is the honest answer rather
+      than a preference.
+
+      Three arrangements were measured. Beside the Figma tag with no floor, the
+      input collapsed to 70px against a real file name: a picker too narrow to
+      read the file it picks. In the title row beside the button, the numbers
+      almost worked and did not — the picker got its 186px and crushed "Compare"
+      to "C…" and the Figma tag to its mark alone. A title, a legible field and
+      a button do not fit across 366px, and no amount of arranging changes that.
+
+      So the picker sits under the tags, full width: 186px of value, nothing
+      clipped, and the card costs one row for it.
+    */
+    .compare-card-pick { flex: 1 1 100%; min-width: 170px; }
+    /*
+      THE TAG YIELDS FIRST. Of the two sides only one is a control, and only one
+      of them is the sole place its name appears — the Figma file is named on
+      the card above as well, so it is the half that can afford to be cut. The
+      picker was losing its last character to a tag that had a spare copy of
+      itself two inches up.
+    */
+    .compare-card-sides .nd-tag { max-width: 100%; }
     .compare-card-main {
       display: flex; flex-direction: column; min-width: 0;
       /* The tags belong to the title, so they sit close under it. 12px read as
@@ -22587,6 +22622,7 @@ html[data-theme=dark] {
             <p class="json-download-title">Compare</p>
           </div>
           <span id="compare-sides-mount"></span>
+          <span id="compare-pick-mount"></span>
         </div>
         <span id="repo-read-btn-mount"></span>
       </div>
@@ -49702,35 +49738,68 @@ html[data-theme=dark] {
     "Check the connection and find the folders in this repository",
     CARD_LEVEL
   );
+  function q(s) {
+    const t = s.query.trim().toLowerCase();
+    return t && s.all.indexOf(s.query.trim()) === -1 ? s.all.filter((n) => n.toLowerCase().indexOf(t) !== -1) : s.all;
+  }
   function mountCompareSides() {
     const icon2 = document.getElementById("compare-card-icon-mount");
     if (icon2) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(icon2).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(import_jsx_runtime23.Fragment, { children: IconCompare(16) })));
     const container = document.getElementById("compare-sides-mount");
-    let state = { figma: "", provider: "github", file: "" };
+    let state = { figma: "", provider: "github", file: "", all: [], query: "" };
     let apply = null;
+    let applyPick = null;
+    const put = (next) => {
+      state = { ...state, ...next };
+      apply?.(state);
+      applyPick?.(state);
+    };
     function View() {
       const [s, setS] = (0, import_react16.useState)(state);
       apply = setS;
-      return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-card-sides", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Tag, { variant: "tonal", size: "small", leading: IconFigma(12), children: s.figma || "This Figma file" }),
-        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-vs", "aria-hidden": "true", children: IconCompare(14) }),
-        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
-          Tag,
-          {
-            variant: "tonal",
-            size: "small",
-            leading: s.provider === "gitlab" ? IconGitlab(12) : IconGithub(12),
-            children: s.file || "nothing named yet"
-          }
-        )
-      ] });
+      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-sides", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Tag, { variant: "tonal", size: "small", leading: IconFigma(12), children: s.figma || "This Figma file" }) });
+    }
+    function Pick() {
+      const [s, setS] = (0, import_react16.useState)(state);
+      applyPick = setS;
+      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-pick", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+        Combobox,
+        {
+          label: "File in the repo",
+          size: "small",
+          block: true,
+          placeholder: "nothing named yet",
+          value: s.query,
+          onChange: (v) => {
+            if (s.all.indexOf(v) !== -1) window.PomCompareSides.onPick?.(v);
+            else put({ query: v });
+          },
+          options: q(s),
+          getKey: (o) => o,
+          onPick: (o) => window.PomCompareSides.onPick?.(o),
+          renderOption: (o, st) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontWeight: st.active ? 600 : 400 }, children: o }),
+          emptyMessage: s.all.length ? "No JSON in this folder matches that" : "No JSON files in this folder yet"
+        }
+      ) });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
+    const pickEl = document.getElementById("compare-pick-mount");
+    if (pickEl) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(pickEl).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Pick, {}) })));
     window.PomCompareSides = {
       set: (next) => {
         state = { ...state, ...next };
+        if (next.file !== void 0 && !(container && container.contains(document.activeElement))) {
+          state.query = next.file;
+        }
         apply?.(state);
-      }
+        applyPick?.(state);
+      },
+      setOptions: (names) => {
+        state = { ...state, all: names || [] };
+        apply?.(state);
+        applyPick?.(state);
+      },
+      onPick: null
     };
   }
   mountCompareSides();
@@ -49828,8 +49897,8 @@ html[data-theme=dark] {
     function View() {
       const [s, setS] = (0, import_react16.useState)(state);
       apply = setS;
-      const q = s.query.trim().toLowerCase();
-      const options = q && s.all.indexOf(s.query.trim()) === -1 ? s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1) : s.all;
+      const q2 = s.query.trim().toLowerCase();
+      const options = q2 && s.all.indexOf(s.query.trim()) === -1 ? s.all.filter((n) => n.toLowerCase().indexOf(q2) !== -1) : s.all;
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
         Combobox,
         {
@@ -49871,8 +49940,8 @@ html[data-theme=dark] {
     function View() {
       const [s, setS] = (0, import_react16.useState)(state);
       apply = setS;
-      const q = s.query.trim().toLowerCase();
-      const options = !q || s.query === s.selected ? s.all : s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1);
+      const q2 = s.query.trim().toLowerCase();
+      const options = !q2 || s.query === s.selected ? s.all : s.all.filter((n) => n.toLowerCase().indexOf(q2) !== -1);
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
         Combobox,
         {
@@ -50162,9 +50231,9 @@ html[data-theme=dark] {
     function View() {
       const [s, setS] = (0, import_react16.useState)(state);
       apply = setS;
-      const q = s.query.trim().toLowerCase();
+      const q2 = s.query.trim().toLowerCase();
       const hay = (n) => n === "/" ? "/ repo root repository" : n.toLowerCase();
-      const matches = !q || s.query === s.selected ? s.all : s.all.filter((n) => hay(n).indexOf(q) !== -1);
+      const matches = !q2 || s.query === s.selected ? s.all : s.all.filter((n) => hay(n).indexOf(q2) !== -1);
       const LIMIT = 50;
       const options = matches.slice(0, LIMIT);
       const hidden = matches.length - options.length;
@@ -51106,30 +51175,30 @@ html[data-theme=dark] {
         setAnswers((a) => ({ ...a, [id]: value }));
         window.PomImportQuestions.onAnswer?.(id, value);
       };
-      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-5)" }, children: questions.map((q) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 6 }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontSize: 12, color: "var(--app-text)", lineHeight: 1.5 }, children: q.question }),
-        q.evidence && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontSize: 11, color: "var(--app-text-muted)", lineHeight: 1.5 }, children: q.evidence }),
-        q.options && q.options.length <= 3 ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-5)" }, children: questions.map((q2) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 6 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontSize: 12, color: "var(--app-text)", lineHeight: 1.5 }, children: q2.question }),
+        q2.evidence && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { fontSize: 11, color: "var(--app-text-muted)", lineHeight: 1.5 }, children: q2.evidence }),
+        q2.options && q2.options.length <= 3 ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
           SegmentedControl,
           {
-            label: q.question,
+            label: q2.question,
             size: "small",
-            value: answers[q.id] ?? "",
-            options: q.options.map((o) => ({ value: o, label: o })),
-            onChange: (v) => answer(q.id, v)
+            value: answers[q2.id] ?? "",
+            options: q2.options.map((o) => ({ value: o, label: o })),
+            onChange: (v) => answer(q2.id, v)
           }
-        ) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: 4 }, children: (q.options || []).map((o) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+        ) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: 4 }, children: (q2.options || []).map((o) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
           PomButton,
           {
-            variant: answers[q.id] === o ? "primary" : "tonal",
+            variant: answers[q2.id] === o ? "primary" : "tonal",
             size: "small",
             label: o,
             block: true,
-            onClick: () => answer(q.id, o)
+            onClick: () => answer(q2.id, o)
           },
           o
         )) })
-      ] }, q.id)) });
+      ] }, q2.id)) });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
     window.PomImportQuestions = { set: (qs) => set(qs), onAnswer: null };
@@ -51148,8 +51217,8 @@ html[data-theme=dark] {
       apply = setS;
       const isAdded = (p) => s.added.indexOf(p) !== -1;
       const label = (p) => p === "" ? "/" : p;
-      const q = s.query.trim().toLowerCase();
-      const shown = q ? s.paths.filter((p) => label(p).toLowerCase().indexOf(q) !== -1) : s.paths;
+      const q2 = s.query.trim().toLowerCase();
+      const shown = q2 ? s.paths.filter((p) => label(p).toLowerCase().indexOf(q2) !== -1) : s.paths;
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
         Dialog,
         {
@@ -55982,7 +56051,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'eebb70a 15:23:43';
+    var CLOSURE_BUILD = '3880ac6 15:32:28';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -58974,8 +59043,25 @@ function format(report, opts) {
       the folder below filters the list the field above offers, so the pair were
       always describing the same place anyway. The name field is the list now.
     */
+    /*
+      WHAT COMPARE READS — the pushed name, unless somebody has said otherwise.
+
+      The name field and the repo card's echo are one control for one file, and
+      that is right for the WRITE: there is only one file a push can go to. The
+      READ is not the same question. Comparing against something you are not
+      about to overwrite is a real thing to want — last week's export, the file
+      you are replacing, a colleague's — and the compare card is the only place
+      on this screen where that question is being asked, so it is the only place
+      that answers it.
+
+      Empty means "follow the name", which is the ordinary case and needs no
+      decision. A chosen file stays chosen until it is changed: resetting it
+      when the export is renamed would silently move the comparison somewhere
+      nobody asked for.
+    */
+    var compareFile = '';
     function repoSelectedFile() {
-      return primaryFilename();
+      return compareFile || primaryFilename();
     }
     /*
       TWO PICKERS, ONE ANSWER. The repo card asks which file to compare
@@ -58989,6 +59075,7 @@ function format(report, opts) {
     function setRepoFileOptions(names) {
       if (window.PomPrimaryFilename) window.PomPrimaryFilename.setOptions(names);
       if (window.PomImportRepoFile) window.PomImportRepoFile.setOptions(names);
+      if (window.PomCompareSides) window.PomCompareSides.setOptions(names);
       showRepoFile();
     }
 
@@ -59017,9 +59104,19 @@ function format(report, opts) {
       window.PomCompareSides.set({
         figma: lastFigmaFileName || '',
         provider: which || activeRepoProvider() || 'github',
-        file: primaryFilename(),
+        file: repoSelectedFile(),
       });
+      window.PomCompareSides.setOptions(repoFileNames);
     }
+
+    window.PomCompareSides.onPick = function (name) {
+      /* Picking the name the export already has is not an override, it is
+         agreement — so it goes back to following rather than pinning the same
+         string and pretending it was a decision. */
+      compareFile = (name === primaryFilename()) ? '' : name;
+      showCompareSides();
+      refreshRepoReadRow();
+    };
 
     function showRepoFile() {
       if (window.PomRepoFile) window.PomRepoFile.set(primaryFilename());

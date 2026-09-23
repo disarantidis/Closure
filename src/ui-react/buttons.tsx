@@ -630,7 +630,11 @@ declare global {
     };
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
     PomRepoReadBtn: LiveTitleHandle;
-    PomCompareSides: { set: (next: { figma?: string; provider?: string; file?: string }) => void };
+    PomCompareSides: {
+      set: (next: { figma?: string; provider?: string; file?: string }) => void;
+      setOptions: (names: string[]) => void;
+      onPick: ((name: string) => void) | null;
+    };
     PomGithubSyncBtn: LiveBusyHandle;
     PomGitlabSyncBtn: LiveBusyHandle;
     PomAddGitlabBtn: LiveToggleIconHandle;
@@ -930,13 +934,28 @@ window.PomGitlabSyncBtn = mountLiveBusyButton(
   side, which is the shape a tag is for. Real ones, so they take their fill from
   the level they stand on (Tag.tsx) instead of being a span wearing a border.
 */
+/* The caller filters, and an exact match is a choice rather than a filter — so
+   the whole list stays open once a name is complete. Same rule as every other
+   combo in this file. */
+function q(s: { query: string; all: string[] }) {
+  const t = s.query.trim().toLowerCase();
+  return (t && s.all.indexOf(s.query.trim()) === -1
+    ? s.all.filter((n) => n.toLowerCase().indexOf(t) !== -1)
+    : s.all);
+}
+
 function mountCompareSides() {
   const icon = document.getElementById('compare-card-icon-mount');
   if (icon) flushSync(() => createRoot(icon).render(<>{IconCompare(16)}</>));
   const container = document.getElementById('compare-sides-mount');
-  type S = { figma: string; provider: string; file: string };
-  let state: S = { figma: '', provider: 'github', file: '' };
+  type S = { figma: string; provider: string; file: string; all: string[]; query: string };
+  let state: S = { figma: '', provider: 'github', file: '', all: [], query: '' };
   let apply: ((s: S) => void) | null = null;
+  let applyPick: ((s: S) => void) | null = null;
+  const put = (next: Partial<S>) => {
+    state = { ...state, ...next };
+    apply?.(state); applyPick?.(state);
+  };
   function View() {
     const [s, setS] = useState<S>(state);
     apply = setS;
@@ -948,17 +967,71 @@ function mountCompareSides() {
         <Tag variant="tonal" size="small" leading={IconFigma(12)}>
           {s.figma || 'This Figma file'}
         </Tag>
-        <span className="compare-card-vs" aria-hidden="true">{IconCompare(14)}</span>
-        <Tag variant="tonal" size="small"
-          leading={s.provider === 'gitlab' ? IconGitlab(12) : IconGithub(12)}>
-          {s.file || 'nothing named yet'}
-        </Tag>
+      </span>
+    );
+  }
+
+  /*
+    THE ONE SIDE THAT IS A CHOICE. The Figma document is whichever file this is
+    running in — there is nothing to pick — but the repository holds however many
+    JSONs the folder holds, and comparing against one you are not about to push
+    to is a real thing to want: last week's export, a colleague's branch file,
+    the one you are replacing. It defaults to the pushed name, so the ordinary
+    case needs no decision at all.
+
+    IN THE ROW WITH THE BUTTON, not under the Figma tag. Beside the tag it had
+    whatever width was left — 70px against a real file name, a picker too narrow
+    to read the file it picks — and giving it a floor made the row wrap every
+    time, at 144px. The title row has the slack: a title, a field and an icon
+    button come to 342 of 366, so it keeps 178px of value and the card stays at
+    its shortest.
+  */
+  function Pick() {
+    const [s, setS] = useState<S>(state);
+    applyPick = setS;
+    return (
+      <span className="compare-card-pick">
+          <Combobox
+            label="File in the repo"
+            size="small"
+            block
+            placeholder="nothing named yet"
+            value={s.query}
+            onChange={(v: string) => {
+              if (s.all.indexOf(v) !== -1) window.PomCompareSides.onPick?.(v);
+              else put({ query: v });
+            }}
+            options={q(s)}
+            getKey={(o: string) => o}
+            onPick={(o: string) => window.PomCompareSides.onPick?.(o)}
+            renderOption={(o: string, st: { active: boolean }) => (
+              <span style={{ fontWeight: st.active ? 600 : 400 }}>{o}</span>
+            )}
+            emptyMessage={s.all.length
+              ? 'No JSON in this folder matches that'
+              : 'No JSON files in this folder yet'}
+          />
       </span>
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  const pickEl = document.getElementById('compare-pick-mount');
+  if (pickEl) flushSync(() => createRoot(pickEl).render(<LevelContext.Provider value={CARD_LEVEL}><Pick /></LevelContext.Provider>));
   window.PomCompareSides = {
-    set: (next) => { state = { ...state, ...next }; apply?.(state); },
+    set: (next) => {
+      state = { ...state, ...next };
+      /* The box follows the chosen file unless somebody is typing in it — the
+         same rule the folder and name combos use, and for the same reason. */
+      if (next.file !== undefined && !(container && container.contains(document.activeElement))) {
+        state.query = next.file;
+      }
+      apply?.(state); applyPick?.(state);
+    },
+    setOptions: (names) => {
+      state = { ...state, all: names || [] };
+      apply?.(state); applyPick?.(state);
+    },
+    onPick: null,
   };
 }
 mountCompareSides();
