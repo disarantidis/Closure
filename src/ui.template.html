@@ -2181,7 +2181,10 @@
        destination (primaryFilename() falls back gitlab-then-github on its
        own, independent of which one is actually being pushed to). */
     .push-download-row { display: flex; gap: 10px; align-items: center; }
-    #push-btn-mount, #add-repo-settings-btn-mount { flex: 1; min-width: 0; }
+    /* The three are alternatives in one slot — Push, its not-configured-yet
+       stand-in, and Compare — so they take the row the same way. */
+    #push-btn-mount, #add-repo-settings-btn-mount, #repo-read-btn-mount { flex: 1; min-width: 0; }
+    #repo-read-btn-mount[hidden] { display: none; }
 
     /* Same subtle-surface language as .export-panel right below it — one
        step of its own between the file-variables card and push settings:
@@ -2706,46 +2709,13 @@
          elevated rung, giving the strongest contrast tokens.css offers
          without inventing a one-off colour. -->
     <!--
-      COMPARE SITS BETWEEN THE TWO THINGS IT COMPARES.
+      THE COMPARE CARD IS GONE — it is this card's Compare mode now.
 
-      It was in the repo card's header, which made it look like one more thing
-      the repo card does. It is not: it is about the Json file card above and
-      the repo card below, in equal measure, and the wire running between them
-      is exactly the join it acts on. Put it on that wire and the button needs
-      no label to say what its two sides are — they are the cards it is
-      between.
+      It asked for a folder and a file in the repository, which is exactly what
+      the repo card below already asked for, so the two cards were two doors to
+      one address. The mode switch in that card's header is the door, and the
+      controls are shared because they were always the same controls.
     -->
-    <!--
-      A CARD, BECAUSE IT HAS TWO OPERANDS TO NAME. It was a button on the wire
-      between the Json file card and the repo card, which said what it would do
-      and not what to. data-level="4" — the same rung and the same surface as
-      the cards it sits between, since it is now one of them.
-    -->
-    <div class="compare-card" id="compare-row" data-level="4" hidden>
-      <!--
-        THE TITLE AND THE TAGS ARE ONE COLUMN, and the button stands beside the
-        whole of it.
-
-        They were a title row and then a tag row, which meant the title shared a
-        row with a 50px button and was stretched to its height — so the card was
-        50 for that row plus 24 for the tags plus the gap, and stood half again
-        as tall as the thing it contains. Stacked together they are 20 + 6 + 24:
-        exactly the button's 50, and the card is as tall as its tallest element
-        instead of as tall as two of them.
-      -->
-      <div class="compare-card-row">
-        <div class="compare-card-main">
-          <div class="json-download-title-group">
-            <span class="json-download-title-icon" id="compare-card-icon-mount"></span>
-            <p class="json-download-title">Compare</p>
-          </div>
-          <span id="compare-sides-mount"></span>
-          <span id="compare-pick-mount"></span>
-        </div>
-        <span id="repo-read-btn-mount"></span>
-      </div>
-    </div>
-
     <!-- Skeleton twin of the action area, shown while the list loads. -->
     <div class="actions actions-skeleton" id="actions-skeleton"></div>
 
@@ -2799,6 +2769,7 @@
             between the two cards it compares. What is left is the card saying
             which service it is about, which is all a card header owes anyone.
           -->
+          <span id="repo-mode-mount"></span>
         </div>
         <!--
           WHEN THERE IS SOMETHING TO SAY.
@@ -2845,7 +2816,11 @@
             already exists has nothing to add.
           -->
           <span id="folder-create-mount" hidden></span>
+          <!-- One cell, two controls: in Push it shows where the push lands and
+               is read-only; in Compare it is the picker for what to read. Same
+               place, because it is the same half of one address. -->
           <span id="repo-file-mount" class="repo-file-half"></span>
+          <span id="compare-pick-mount" class="repo-file-half"></span>
         </div>
 
         <!-- Only meaningful once BOTH providers are actually added (see
@@ -2886,6 +2861,7 @@
         </div>
         <div class="push-download-row">
           <div id="push-btn-mount"></div>
+          <span id="repo-read-btn-mount"></span>
           <!-- Replaces the Push button in this same slot whenever no
                active destination is workable yet (see updateActionUI()). -->
           <span id="add-repo-settings-btn-mount" hidden></span>
@@ -6250,6 +6226,14 @@
       document.getElementById('commit-wrap').hidden = showFallback;
       document.getElementById('push-btn-mount').hidden = showFallback;
       document.getElementById('add-repo-settings-btn-mount').hidden = !showFallback;
+      /*
+        THE MODE HAS THE LAST WORD on everything above that it owns. This runs
+        on every change to the card, and it was re-showing the commit box and
+        the Push button under a segment that said Compare — the readiness rules
+        are about whether a push is POSSIBLE, which is a different question from
+        whether a push is what the card is currently for.
+      */
+      applyRepoMode();
 
       // Pushing requires a commit message — no commit without one.
       var hasCommitMsg = !!(document.getElementById('commit-message').value.trim());
@@ -6446,8 +6430,46 @@
       nobody asked for.
     */
     var compareFile = '';
+
+    /*
+      PUSH OR COMPARE — one card, two things it can be for.
+
+      They were two cards asking for the same address: a folder and a file in
+      the repository, with one of them additionally wanting a commit message.
+      The address controls are shared here because they ARE shared, and only the
+      half that differs comes and goes — the message and the Push button for
+      writing, the file PICKER and the Compare button for reading.
+
+      Push is the default. It is the destructive one and the one this plugin is
+      for; opening on the reading action would make the writing action something
+      you have to go and find.
+    */
+    var repoMode = 'push';
+
+    function applyRepoMode() {
+      var comparing = repoMode === 'compare';
+      var el = function (id) { return document.getElementById(id); };
+      /* The commit message is a thing you write, and Compare writes nothing. */
+      if (el('commit-wrap')) el('commit-wrap').hidden = comparing;
+      /* One slot, one button: the two actions are alternatives, not a pair. */
+      if (el('push-btn-mount')) el('push-btn-mount').hidden = comparing;
+      if (el('repo-read-btn-mount')) el('repo-read-btn-mount').hidden = !comparing;
+      /* The same half of the address, read-only for a push (there is one file
+         it can go to) and a picker for a comparison (there are as many as the
+         folder holds). */
+      if (el('repo-file-mount')) el('repo-file-mount').hidden = comparing;
+      if (el('compare-pick-mount')) el('compare-pick-mount').hidden = !comparing;
+      showCompareSides();
+    }
+
+    window.PomRepoMode.onChange = function (mode) {
+      repoMode = mode;
+      /* updateActionUI ends in applyRepoMode, so one call does both. */
+      updateActionUI();
+      refreshRepoReadRow();
+    };
     function repoSelectedFile() {
-      return compareFile || primaryFilename();
+      return compareTargetName();
     }
     /*
       TWO PICKERS, ONE ANSWER. The repo card asks which file to compare
@@ -6493,6 +6515,13 @@
         file: repoSelectedFile(),
       });
       window.PomCompareSides.setOptions(repoFileNames);
+    }
+
+    /* Only Compare reads a file other than the one being pushed to — in Push
+       the address IS the push address, and a stale compare target left over
+       from a mode you are no longer in would quietly move it. */
+    function compareTargetName() {
+      return repoMode === 'compare' ? (compareFile || primaryFilename()) : primaryFilename();
     }
 
     window.PomCompareSides.onPick = function (name) {
@@ -6736,14 +6765,13 @@
       var mount = document.getElementById('repo-read-btn-mount');
       if (!mount) return;
       var which = activeRepoProvider();
-      mount.hidden = !which;
-      /* The row is on the wire between the cards, so it has to come and go
-         with the button rather than leave a gap in the line. */
-      var compareRow = document.getElementById('compare-row');
-      if (compareRow) compareRow.hidden = !which;
+      /* The mode decides whether this button is on screen at all; readiness
+         only decides whether the card it lives in is. */
+      mount.hidden = !which || repoMode !== 'compare';
       var fileRow = document.getElementById('repo-file-row');
       if (fileRow) fileRow.hidden = !which;
       refreshFolderCreate();
+      applyRepoMode();
       if (!which) { repoCheckedFor = null; repoReadStatus(''); return; }
       /* The title names BOTH sides, because that is what makes it a
          comparison rather than a download: the file in the repo, and the

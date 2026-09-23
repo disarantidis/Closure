@@ -1822,7 +1822,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
                        'pushOverwriteNote', 'withRootOption', 'folderDisplay',
                        'setRepoFileOptions', 'chooseRepoFile', 'repoIdentity', 'showRepoFile',
-                       'showCompareSides',
+                       'showCompareSides', 'compareTargetName',
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
                        'renderImportFolderSelect', 'listRepoFolders',
                        'refreshFolderImportOffer', 'addFolderPath', 'normFolder',
@@ -1869,6 +1869,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ctx.lastFigmaFileName = 'Foundations';
           ctx.repoListed = false;
           ctx.compareFile = '';
+          /* Push by default — the compare target only applies in Compare. */
+          ctx.repoMode = 'push';
           /* The import page's picker is a SECOND mount of the same combo over
              the same selection. Stubbed as its own object on purpose: if the
              two ever stop being written together, these see it. */
@@ -2497,6 +2499,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           */
           picked = 'odstokens.json';
           ctx.compareFile = '';
+          ctx.repoMode = 'compare';
           ok('compare target: with nothing chosen, it follows the name being pushed',
              ctx.repoFilePath('github') === 'tokens/odstokens.json' &&
              ctx.pushFilePath('github') === 'tokens/odstokens.json',
@@ -2514,7 +2517,14 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              ctx.repoFilePath('github') === 'tokens/last-week.json' &&
              ctx.pushFilePath('github') === 'tokens/renamed.json',
              ctx.repoFilePath('github') + ' / ' + ctx.pushFilePath('github'));
+          /* And in Push the card's address is the push address, whatever a
+             previous comparison was pointed at. */
+          ctx.repoMode = 'push';
+          ok('compare target: it applies to Compare only, never to the push address',
+             ctx.repoFilePath('github') === 'tokens/renamed.json',
+             ctx.repoFilePath('github'));
           ctx.compareFile = '';
+          ctx.repoMode = 'push';
           picked = 'odstokens.json';
 
           /*

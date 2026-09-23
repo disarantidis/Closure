@@ -729,6 +729,10 @@ declare global {
     };
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
+    PomRepoMode: {
+      onChange: ((value: 'push' | 'compare') => void) | null;
+      setValue: (value: 'push' | 'compare') => void;
+    };
     PomOutputFormat: { onChange: ((shape: string) => void) | null; setValue: (shape: string) => void; setHint: (hint: string) => void; setResolvedHint: (hint: string) => void };
     PomOnboardingDialog: { open: () => void; onConfirm: ((target: PushTarget) => void) | null };
   }
@@ -1051,7 +1055,8 @@ window.PomRepoReadBtn = mountLiveTitleButton(
     fuller sentence is the name, and it is the only name a button with no
     visible text has.
   */
-  { id: 'repo-read-btn', variant: 'filled', size: 'medium', icon: IconCompare(20) },
+  { id: 'repo-read-btn', variant: 'filled', size: 'large', block: true,
+    label: 'Compare', leftIcon: true, buttonLeftIcon: IconCompare(20) },
   'Compare this file with the one in the repo',
   CARD_LEVEL,
 );
@@ -1589,6 +1594,44 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
    (window.PomPushTarget, removed) that could disagree with whichever tab
    was selected here; now there's exactly one control for both "which
    folder path am I looking at" and "where does Push actually send tokens". */
+/*
+  WHAT THIS CARD IS FOR RIGHT NOW: pushing, or comparing.
+
+  They were two cards, and they asked for the same two things — a folder and a
+  file in the repository — with one of them additionally wanting a commit
+  message. A mode is the honest shape of that: the address controls are shared
+  because they ARE shared, and only the half that differs appears or disappears.
+
+  Push is the default because it is the destructive one and the one this plugin
+  is for; a mode switch that opens on the reading action would make the writing
+  action something you have to find.
+*/
+(function mountRepoModeControl() {
+  const container = document.getElementById('repo-mode-mount');
+  let set: (v: 'push' | 'compare') => void = () => {};
+  function View() {
+    const [value, setValue] = useState<'push' | 'compare'>('push');
+    set = setValue;
+    return (
+      <SegmentedControl
+        label="What to do with this repository"
+        size="small"
+        value={value}
+        options={[
+          { value: 'push', label: 'Push', leading: IconUpload(14) },
+          { value: 'compare', label: 'Compare', leading: IconCompare(14) },
+        ]}
+        onChange={(v: string) => {
+          setValue(v as 'push' | 'compare');
+          window.PomRepoMode.onChange?.(v as 'push' | 'compare');
+        }}
+      />
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomRepoMode = { onChange: null, setValue: (v) => set(v) };
+})();
+
 (function mountMainProviderTabControl() {
   const container = document.getElementById('main-provider-tab-mount');
   let set: (v: 'gitlab' | 'github') => void = () => {};
