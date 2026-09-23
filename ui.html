@@ -22812,14 +22812,10 @@ html[data-theme=dark] {
           </div>
           <div class="provider-subcard" id="gitlab-folder-subcard" data-level="3">
             <div class="folder-paths-heading">
-              <p class="folder-paths-title">Saved Folder Path</p>
+              <p class="folder-paths-title">Selected Folder Paths</p>
               <p class="folder-paths-subtitle">Choose on the main screen</p>
             </div>
             <div class="folder-list" id="folder-list"></div>
-            <!-- Always visible: adding a path no longer needs an edit mode. -->
-            <div class="folder-import-row" id="folder-import-row" hidden>
-              <span id="folder-import-mount"></span>
-            </div>
             <!--
               A SAVED PATH IS NOT YET A PATH IN THE REPOSITORY. One typed by
               hand exists only in this plugin until something is committed into
@@ -22836,6 +22832,16 @@ html[data-theme=dark] {
             <div class="folder-add" id="folder-add">
               <span id="folder-new-mount"></span>
               <span id="folder-add-btn-mount"></span>
+            </div>
+            <!--
+              LAST, BECAUSE IT IS THE OTHER WAY IN. Above it is the list of
+              paths chosen so far and the field for naming one by hand; this is
+              the same act done from what the repository already has. It sat
+              between the list and that field, which put a way of adding in the
+              middle of what had been added.
+            -->
+            <div class="folder-import-row" id="folder-import-row" hidden>
+              <span id="folder-import-mount"></span>
             </div>
           </div>
         </div>
@@ -22874,13 +22880,10 @@ html[data-theme=dark] {
           </div>
           <div class="provider-subcard" id="github-folder-subcard" data-level="3">
             <div class="folder-paths-heading">
-              <p class="folder-paths-title">Saved Folder Path</p>
+              <p class="folder-paths-title">Selected Folder Paths</p>
               <p class="folder-paths-subtitle">Choose on the main screen</p>
             </div>
             <div class="folder-list" id="github-folder-list"></div>
-            <div class="folder-import-row" id="github-folder-import-row" hidden>
-              <span id="github-folder-import-mount"></span>
-            </div>
             <!--
               A SAVED PATH IS NOT YET A PATH IN THE REPOSITORY. One typed by
               hand exists only in this plugin until something is committed into
@@ -22897,6 +22900,16 @@ html[data-theme=dark] {
             <div class="folder-add" id="github-folder-add">
               <span id="github-folder-new-mount"></span>
               <span id="github-folder-add-btn-mount"></span>
+            </div>
+            <!--
+              LAST, BECAUSE IT IS THE OTHER WAY IN. Above it is the list of
+              paths chosen so far and the field for naming one by hand; this is
+              the same act done from what the repository already has. It sat
+              between the list and that field, which put a way of adding in the
+              middle of what had been added.
+            -->
+            <div class="folder-import-row" id="github-folder-import-row" hidden>
+              <span id="github-folder-import-mount"></span>
             </div>
           </div>
         </div>
@@ -49440,8 +49453,8 @@ html[data-theme=dark] {
   function mountIconButton(mountId, props, level) {
     mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(PomButton, { ...props }), level);
   }
-  mountButton("folder-import-mount", { id: "folder-import-btn", variant: "tonal", size: "small", block: true, label: "Add existing folder paths from repo", leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
-  mountButton("github-folder-import-mount", { id: "github-folder-import-btn", variant: "tonal", size: "small", block: true, label: "Add existing folder paths from repo", leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
+  mountButton("folder-import-mount", { id: "folder-import-btn", variant: "tonal", size: "medium", block: true, label: "Add Paths from Repo", leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
+  mountButton("github-folder-import-mount", { id: "github-folder-import-btn", variant: "tonal", size: "medium", block: true, label: "Add Paths from Repo", leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
   mountIconButton("folder-add-btn-mount", { id: "folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
   mountIconButton("github-folder-add-btn-mount", { id: "github-folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
   mountIconButton("gl-clear-token-btn-mount", { id: "gl-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitLab token", "aria-label": "Clear GitLab token", icon: IconTrash(16) }, CARD_LEVEL);
@@ -55580,7 +55593,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '2a8b272 13:45:19';
+    var CLOSURE_BUILD = 'aa2b666 13:48:13';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -57401,14 +57414,24 @@ function format(report, opts) {
       them, has nothing to do — and a control that sometimes does nothing is
       worse than one that is sometimes absent.
     */
+    /*
+      THE OTHER WAY TO ADD ONE, at the foot of the section.
+
+      Shown from the moment a listing exists, and no longer only while
+      something is missing from it. The narrower rule was right when this was an
+      offer that appeared beside a list — "there is more, do you want it" — and
+      it is wrong for what it is now: a permanent second route in, next to the
+      field for typing a path by hand. A control that comes and goes as paths
+      are added and removed is one nobody can learn the position of.
+
+      Still absent before any sync. There is nothing to choose from, and a
+      dialog that opens on an empty list answers a question by not answering it.
+    */
     function refreshFolderImportOffer() {
-      [['gitlab', 'folder-import-row', glFolders], ['github', 'github-folder-import-row', ghFolders]]
+      [['gitlab', 'folder-import-row'], ['github', 'github-folder-import-row']]
         .forEach(function (row) {
-          var which = row[0], el = document.getElementById(row[1]), saved = row[2];
-          if (!el) return;
-          var found = lastDiscovered[which];
-          var missing = (found || []).filter(function (p) { return saved.indexOf(normFolder(p)) === -1; });
-          el.hidden = !saved.length || !missing.length;
+          var el = document.getElementById(row[1]);
+          if (el) el.hidden = !lastDiscovered[row[0]];
         });
       refreshFolderMissingOffer();
     }

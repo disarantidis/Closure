@@ -1973,14 +1973,18 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              !!refused && /token was refused/.test(refused.message), JSON.stringify(refused));
           ctx.__gh_over = null;
           /*
-            THE OFFER UNDER THE SAVED LIST — shown only while the repository
-            holds a path that is not on it.
+            "ADD PATHS FROM REPO" — a permanent second route in, at the foot of
+            the section, beside the field for typing a path by hand.
 
-            Both halves matter and neither is obvious. Nothing saved means Sync
-            opens the dialog instead, so an offer would be a second door to the
-            same room; nothing missing means the button has nothing to add, and
-            a control that sometimes does nothing is worse than one that is
-            sometimes absent.
+            It began as an offer that appeared beside the list — "there is more,
+            do you want it" — and was hidden unless something was missing. That
+            is wrong for what it became: a control that comes and goes as paths
+            are added and removed is one nobody can learn the position of. It
+            shows from the moment a listing exists.
+
+            Before any sync it is still absent. There is nothing to choose from
+            then, and a dialog opening on an empty list answers a question by
+            not answering it.
           */
           const offerRow = { hidden: null };
           ctx.document = {
@@ -1996,14 +2000,17 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
             ctx.refreshFolderImportOffer();
             return offerRow.hidden;
           };
-          ok('folder offer: hidden while nothing is saved — Sync opens the dialog instead',
-             offer([], ['Spar', 'tokens']) === true);
-          ok('folder offer: shown once something is saved and the repo has more',
+          ok('folder offer: absent until a sync has listed something to choose from',
+             offer([], null) === true);
+          ok('folder offer: shown once a listing exists, with nothing saved yet',
+             offer([], ['Spar', 'tokens']) === false);
+          ok('folder offer: and still shown when some are saved and more remain',
              offer(['Spar'], ['Spar', 'tokens']) === false);
-          ok('folder offer: hidden again once every discovered path is saved',
-             offer(['Spar', 'tokens'], ['Spar', 'tokens']) === true);
-          ok('folder offer: hidden when the repo has no folders at all',
-             offer(['Spar'], []) === true);
+          /* It does not vanish at the moment everything is added — the dialog
+             still answers "which of these am I tracking", and a button that
+             disappears as you finish using it cannot be gone back to. */
+          ok('folder offer: and still shown once every discovered path is saved',
+             offer(['Spar', 'tokens'], ['Spar', 'tokens']) === false);
 
           /*
             SAVED HERE IS NOT THE SAME AS PRESENT THERE.

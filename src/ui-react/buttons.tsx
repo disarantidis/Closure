@@ -767,8 +767,8 @@ function mountIconButton(mountId: string, props: any, level?: Level) { mountOnce
    are not on it — see refreshFolderImportOffer(). It reopens the same dialog
    Sync opens the first time, which is the point: the first sync and the tenth
    answer the same question and should not have two different doors. */
-mountButton('folder-import-mount', { id: 'folder-import-btn', variant: 'tonal', size: 'small', block: true, label: 'Add existing folder paths from repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
-mountButton('github-folder-import-mount', { id: 'github-folder-import-btn', variant: 'tonal', size: 'small', block: true, label: 'Add existing folder paths from repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
+mountButton('folder-import-mount', { id: 'folder-import-btn', variant: 'tonal', size: 'medium', block: true, label: 'Add Paths from Repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
+mountButton('github-folder-import-mount', { id: 'github-folder-import-btn', variant: 'tonal', size: 'medium', block: true, label: 'Add Paths from Repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
 
 mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
