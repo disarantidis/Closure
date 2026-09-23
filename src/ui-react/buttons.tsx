@@ -1606,6 +1606,15 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   is for; a mode switch that opens on the reading action would make the writing
   action something you have to find.
 */
+/* The repo card's header names both ends and the relation between them, and
+   two of the three marks already exist here — see the note in the markup. */
+(function mountRepoCardMarks() {
+  const f = document.getElementById('repo-card-figma-mount');
+  if (f) flushSync(() => createRoot(f).render(<>{IconFigma(14)}</>));
+  const b = document.getElementById('repo-card-between-mount');
+  if (b) flushSync(() => createRoot(b).render(<>{IconCompare(14)}</>));
+})();
+
 (function mountRepoModeControl() {
   const container = document.getElementById('repo-mode-mount');
   let set: (v: 'push' | 'compare') => void = () => {};
