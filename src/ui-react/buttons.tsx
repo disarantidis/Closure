@@ -618,6 +618,9 @@ type ImportFileState = { name: string; bytes?: number; busy?: boolean; error?: s
 declare global {
   interface Window {
     PomImportApplyBtn: any;
+    /* What the import would do, drawn as headings and tags rather than as a
+       column of counts — see mountImportChanges. */
+    PomImportChanges: { set: (d: any) => void };
     PomImportLevels: {
       set: (candidates: any[], applied: Record<string, Record<string, string>>, collections?: any[],
             groupCandidates?: any[], groupOrder?: string[]) => void;
@@ -3316,6 +3319,107 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
     onToggle: null,
     onGroupToggle: null,
   };
+})();
+
+/* ── what the import will do ─────────────────────────────────────────────────
+
+  A COUNT AND A SENTENCE IS NOT A REPORT OF WHAT IS BEING ADDED.
+
+  This was a column of fact rows — a right-aligned number, then a line of prose
+  — and the collections one ran their fourteen names together in that prose, in
+  the muted colour of an aside, wrapping to three lines. The single most useful
+  thing on the panel, and the panel's own layout was working against it: you
+  could not see at a glance how many there were, and you had to read a comma
+  list to find out whether the one you cared about was in it.
+
+  So the number leads its own heading, and the names are tags underneath it.
+  Fourteen tags read as fourteen things without being counted, and one of them
+  can be found by looking rather than by reading.
+*/
+(function mountImportChanges() {
+  const container = document.getElementById('import-changes-mount');
+  let set: (d: any) => void = () => {};
+  function View() {
+    const [d, setD] = useState<any>(null);
+    set = setD;
+    if (!d) return null;
+    const s = d.summary || {};
+    if (s.noop) {
+      return <p className="import-change-note is-lead">This file already matches the document — nothing would change.</p>;
+    }
+    const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+    return (
+      <span className="import-changes">
+        {s.willCreateCollections > 0 && (
+          <span className="import-change-group">
+            <span className="import-change-heading">
+              {s.willCreateCollections.toLocaleString()} new {plural(s.willCreateCollections, 'collection', 'collections')}
+            </span>
+            {/* The names, as things rather than as a sentence. */}
+            <span className="import-change-tags">
+              {(d.collections?.added || []).map((name: string) => (
+                <Tag key={name} variant="tonal" size="small">{name}</Tag>
+              ))}
+            </span>
+          </span>
+        )}
+
+        {s.willAddModes > 0 && (
+          <span className="import-change-group">
+            <span className="import-change-heading">
+              {s.willAddModes.toLocaleString()} new {plural(s.willAddModes, 'mode', 'modes')}
+            </span>
+            <span className="import-change-note">
+              on {plural(s.willAddModes, 'a collection', 'collections')} that already exists here
+            </span>
+          </span>
+        )}
+
+        {s.willCreateVariables > 0 && (
+          <span className="import-change-group">
+            <span className="import-change-heading">
+              {s.willCreateVariables.toLocaleString()} {plural(s.willCreateVariables, 'variable', 'variables')} created
+            </span>
+            {/*
+              THE PROMISE, STATED EVEN AT ZERO. "Never deletes" is what this
+              panel is really for, and a promise only shown when the number
+              happens to be interesting is not one.
+            */}
+            <span className="import-change-note">
+              {s.valuesLeftAlone.toLocaleString()} {plural(s.valuesLeftAlone, 'value', 'values')} this file
+              does not mention — left alone, never deleted
+            </span>
+          </span>
+        )}
+
+        {s.willChangeVariables > 0 && (
+          <span className="import-change-group">
+            {/* The one heading that is not an addition, so it is marked as
+                such rather than sitting in the same voice as the rest. */}
+            <span className="import-change-heading is-warn">
+              {s.willChangeVariables.toLocaleString()} existing {plural(s.willChangeVariables, 'variable', 'variables')} overwritten
+            </span>
+            {s.valuesUnchanged > 0 && (
+              <span className="import-change-note">
+                {s.valuesUnchanged.toLocaleString()} more already hold the same value
+              </span>
+            )}
+            {(d.changed || []).length > 0 && (
+              <span className="import-detail">
+                {d.changed.slice(0, 6).map((c: any, i: number) => {
+                  const p = c.key.split('|');
+                  return <span key={i}>{p[0] + ' / ' + p[1] + ' [' + p[2] + ']  ' + c.from + ' \u2192 ' + c.to}<br /></span>;
+                })}
+                {d.changed.length > 6 && <>… and {(d.changed.length - 6).toLocaleString()} more</>}
+              </span>
+            )}
+          </span>
+        )}
+      </span>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomImportChanges = { set: (d) => set(d) };
 })();
 
 /* ── the file that was chosen ───────────────────────────────────────────────

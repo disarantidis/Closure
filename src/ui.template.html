@@ -474,12 +474,14 @@
          of after the last card. Sized by content, the padding lands where
          it reads.
          Left/right/bottom replace what used to come from .settings-page's
-         own padding; top stays the extra 20px (vs the header's own 14px
-         bottom padding) that was already there. The same numbers now reach
-         the Import page, which is the point of the selector above. Bottom is larger than the
-         sides on purpose, so the last card has real run-out below it
-         rather than ending flush with the panel edge. */
-      padding: 20px 16px 40px;
+         own padding. Top was 20, on top of the header's own bottom padding,
+         which put 34px between a page title and the card under it — the two
+         together now come to 18, which still separates them without reading
+         as a section break. The same numbers reach the Import page, which is
+         the point of the selector above. Bottom stays larger than the sides on
+         purpose, so the last card has real run-out below it rather than ending
+         flush with the panel edge. */
+      padding: 10px 16px 40px;
     }
 
     #gitlab-fields, #github-connection-fields {
@@ -1000,10 +1002,14 @@
        same background/radius/padding as the main screen's) nested inside,
        so both pages' header containers land at the identical size/position
        when switching between them. */
+    /* 14/8 rather than 16/14. The page title and the first card were 34px
+       apart — this header's own 14 plus .settings-page-content's 20 — which
+       reads as a gap between two sections rather than as a heading over the
+       thing it heads. */
     .header-settings {
       display: flex;
       align-items: center;
-      padding: 16px 16px 14px;
+      padding: 14px 16px 8px;
       flex-shrink: 0;
     }
     
@@ -1601,6 +1607,30 @@
       line-height: 1.5;
       word-break: break-word;
     }
+    /*
+      WHAT THE IMPORT WOULD DO — a heading per thing that happens, not a column
+      of counts. See mountImportChanges for why the collections stopped being a
+      comma list in the middle of a sentence.
+    */
+    .import-changes { display: flex; flex-direction: column; gap: 12px; }
+    .import-change-group { display: flex; flex-direction: column; gap: 6px; }
+    /* The number leads, at the size of a thing worth reading rather than of a
+       figure in a table. */
+    .import-change-heading {
+      font-family: var(--type-body-m-font-family);
+      font-size: var(--type-body-m-size);
+      line-height: var(--type-body-m-line-height);
+      font-weight: 700;
+      color: var(--app-text);
+    }
+    .import-change-heading.is-warn { color: #d9a441; }
+    .import-change-note { font-size: 11px; line-height: 1.5; color: var(--app-text-muted); opacity: 0.8; }
+    .import-change-note.is-lead { opacity: 1; font-size: 12px; }
+    /* The names, wrapping. Fourteen of them read as fourteen things without
+       anybody counting, which a comma list cannot do. */
+    .import-change-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    .import-changes .import-detail { margin-left: 0; }
+
     .import-question { margin-bottom: 12px; font-size: 12px; color: var(--app-text-muted); line-height: 1.5; }
     .import-question:last-child { margin-bottom: 0; }
     .import-question code { color: var(--app-text); font-size: 11px; }
@@ -3116,8 +3146,13 @@
       <!-- Step 4. The answer to the only question that matters before
            writing: what is about to happen to this file. -->
       <div class="import-card" id="import-changes" data-level="4" hidden>
-        <p class="import-card-title">What would change</p>
-        <div id="import-changes-body"></div>
+        <!-- Named from the summary, not fixed in the markup: "what would
+             change" describes the panel's job and not its content, and the
+             content is overwhelmingly additions. renderImportChanges says
+             which it is, because a title reading "added" over a count of
+             overwrites would be wrong in the one case that matters. -->
+        <p class="import-card-title" id="import-changes-title">What will be added</p>
+        <span id="import-changes-mount"></span>
         <!-- Deliberately at the FOOT of this card and nowhere else: the only
              route to writing runs past the report of what writing would do. -->
         <div id="import-apply-btn-mount" class="import-apply"></div>
@@ -4957,7 +4992,10 @@
       return '<div class="import-fact' + (quiet ? ' is-quiet' : '') + '"><b>' +
              (typeof n === 'number' ? n.toLocaleString() : n) + '</b><span>' + label + '</span></div>';
     }
-    var esc = function(x) { return String(x).replace(/[&<>]/g, function(c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); };
+    /* The HTML-escaper that used to guard the changes panel's own strings is
+       gone with the innerHTML it guarded — React escapes what it renders, so
+       keeping a hand-rolled one here would be a second answer to a question
+       nothing asks any more. */
 
     function renderImportSummary(fileName, ir, plan, compiled) {
       /* The file's name is the FileUploadItem's job now (runImport sets it);
@@ -5150,26 +5188,19 @@
     });
 
     function renderImportChanges(d) {
-      var s = d.summary, html = '';
-      if (s.noop) {
-        html = '<div class="import-fact"><span>This file already matches the document — nothing would change.</span></div>';
-      } else {
-        if (s.willCreateCollections) html += fact(s.willCreateCollections, 'new collection' + (s.willCreateCollections === 1 ? '' : 's') + ': ' + esc(d.collections.added.join(', ')));
-        if (s.willAddModes) html += fact(s.willAddModes, 'new mode' + (s.willAddModes === 1 ? '' : 's') + ' on a collection that already exists');
-        if (s.willCreateVariables) html += fact(s.willCreateVariables, 'variables created');
-        if (s.willChangeVariables) html += fact(s.willChangeVariables, 'existing variables overwritten');
-        if (s.valuesUnchanged) html += fact(s.valuesUnchanged, 'values already identical', true);
-        /* Stated even when it is zero. "Never deletes" is the promise being
-           made, and a promise only shown sometimes is not one. */
-        html += fact(s.valuesLeftAlone, 'values this file does not mention — left alone, never deleted', true);
-        if (d.changed.length) {
-          html += '<div class="import-detail">' + d.changed.slice(0, 6).map(function(c) {
-            var p = c.key.split('|');
-            return esc(p[0] + ' / ' + p[1] + ' [' + p[2] + ']  ' + c.from + ' → ' + c.to);
-          }).join('<br>') + (d.changed.length > 6 ? '<br>… and ' + (d.changed.length - 6).toLocaleString() + ' more' : '') + '</div>';
-        }
-      }
-      document.getElementById('import-changes-body').innerHTML = html;
+      var s = d.summary;
+      /*
+        THE TITLE FOLLOWS THE CONTENT. Almost every import is additions and
+        nothing else, and "What would change" describes what the panel is FOR
+        rather than what it says — the reader wants to know what is arriving.
+        When something already here would be written over, the title says that
+        too, because it is the half nobody can be allowed to skim past.
+      */
+      document.getElementById('import-changes-title').textContent =
+        s.noop ? 'Nothing would change'
+        : s.willChangeVariables ? 'What will be added and overwritten'
+        : 'What will be added';
+      window.PomImportChanges.set(d);
       document.getElementById('import-changes').hidden = false;
     }
 
