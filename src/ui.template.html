@@ -2332,6 +2332,7 @@
     }
     .compare-card > span { display: block; text-align: center; }
     .compare-card[hidden] { display: none; }
+    #compare-card-icon-mount { display: flex; }
     /*
       The two sides, side by side — which is the whole claim the card makes, so
       they wrap rather than truncate: a file name cut in half names nothing.
@@ -2661,8 +2662,18 @@
       the cards it sits between, since it is now one of them.
     -->
     <div class="compare-card" id="compare-row" data-level="4" hidden>
+      <!-- The same title row the two cards above it use: what this card is on
+           the left, the thing it does flush right. The button loses its label
+           because the title is already the word — a card headed "Compare" with
+           a button reading "Compare" under it says it twice. -->
+      <div class="json-download-header">
+        <div class="json-download-title-group">
+          <span class="json-download-title-icon" id="compare-card-icon-mount"></span>
+          <p class="json-download-title">Compare</p>
+        </div>
+        <span id="repo-read-btn-mount"></span>
+      </div>
       <span id="compare-sides-mount"></span>
-      <span id="repo-read-btn-mount"></span>
     </div>
 
     <!-- Skeleton twin of the action area, shown while the list loads. -->

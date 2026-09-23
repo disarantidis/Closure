@@ -2332,6 +2332,7 @@
     }
     .compare-card > span { display: block; text-align: center; }
     .compare-card[hidden] { display: none; }
+    #compare-card-icon-mount { display: flex; }
     /*
       The two sides, side by side — which is the whole claim the card makes, so
       they wrap rather than truncate: a file name cut in half names nothing.
@@ -22543,8 +22544,18 @@ html[data-theme=dark] {
       the cards it sits between, since it is now one of them.
     -->
     <div class="compare-card" id="compare-row" data-level="4" hidden>
+      <!-- The same title row the two cards above it use: what this card is on
+           the left, the thing it does flush right. The button loses its label
+           because the title is already the word — a card headed "Compare" with
+           a button reading "Compare" under it says it twice. -->
+      <div class="json-download-header">
+        <div class="json-download-title-group">
+          <span class="json-download-title-icon" id="compare-card-icon-mount"></span>
+          <p class="json-download-title">Compare</p>
+        </div>
+        <span id="repo-read-btn-mount"></span>
+      </div>
       <span id="compare-sides-mount"></span>
-      <span id="repo-read-btn-mount"></span>
     </div>
 
     <!-- Skeleton twin of the action area, shown while the list loads. -->
@@ -49658,6 +49669,8 @@ html[data-theme=dark] {
     CARD_LEVEL
   );
   function mountCompareSides() {
+    const icon2 = document.getElementById("compare-card-icon-mount");
+    if (icon2) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(icon2).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(import_jsx_runtime23.Fragment, { children: IconCompare(16) })));
     const container = document.getElementById("compare-sides-mount");
     let state = { figma: "", provider: "github", file: "" };
     let apply = null;
@@ -49689,18 +49702,20 @@ html[data-theme=dark] {
   mountCompareSides();
   window.PomRepoReadBtn = mountLiveTitleButton(
     "repo-read-btn-mount",
-    /* The same button as Download one card up — filled, medium, a 24px glyph
-       beside the word. They are the two things this screen offers to DO with the
-       document it has built, and one of them being a small tonal button said the
-       comparison was the lesser of the pair. */
-    {
-      id: "repo-read-btn",
-      variant: "filled",
-      size: "medium",
-      label: "Compare",
-      leftIcon: true,
-      buttonLeftIcon: IconCompare(24)
-    },
+    /*
+        ICON ONLY, IN THE TITLE ROW. The card is headed "Compare" now, so a button
+        reading "Compare" underneath it said the word twice and took a row to do it.
+        `icon` rather than leftIcon + label is what tells PomButton this is an icon
+        button.
+    
+        AND NO `label`, deliberately. PomButton gives an icon button the accessible
+        name `label ?? aria-label`, so a label here WINS over the aria-label
+        mountLiveTitleButton writes — which is the live one naming both sides
+        ("Compare this file with tokens/x.json in GitHub"). With the label gone the
+        fuller sentence is the name, and it is the only name a button with no
+        visible text has.
+      */
+    { id: "repo-read-btn", variant: "filled", size: "medium", icon: IconCompare(20) },
     "Compare this file with the one in the repo",
     CARD_LEVEL
   );
@@ -55933,7 +55948,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '469ca79 15:05:39';
+    var CLOSURE_BUILD = '3701104 15:16:18';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

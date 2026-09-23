@@ -931,6 +931,8 @@ window.PomGitlabSyncBtn = mountLiveBusyButton(
   the level they stand on (Tag.tsx) instead of being a span wearing a border.
 */
 function mountCompareSides() {
+  const icon = document.getElementById('compare-card-icon-mount');
+  if (icon) flushSync(() => createRoot(icon).render(<>{IconCompare(16)}</>));
   const container = document.getElementById('compare-sides-mount');
   type S = { figma: string; provider: string; file: string };
   let state: S = { figma: '', provider: 'github', file: '' };
@@ -960,12 +962,20 @@ mountCompareSides();
 
 window.PomRepoReadBtn = mountLiveTitleButton(
   'repo-read-btn-mount',
-  /* The same button as Download one card up — filled, medium, a 24px glyph
-     beside the word. They are the two things this screen offers to DO with the
-     document it has built, and one of them being a small tonal button said the
-     comparison was the lesser of the pair. */
-  { id: 'repo-read-btn', variant: 'filled', size: 'medium',
-    label: 'Compare', leftIcon: true, buttonLeftIcon: IconCompare(24) },
+  /*
+    ICON ONLY, IN THE TITLE ROW. The card is headed "Compare" now, so a button
+    reading "Compare" underneath it said the word twice and took a row to do it.
+    `icon` rather than leftIcon + label is what tells PomButton this is an icon
+    button.
+
+    AND NO `label`, deliberately. PomButton gives an icon button the accessible
+    name `label ?? aria-label`, so a label here WINS over the aria-label
+    mountLiveTitleButton writes — which is the live one naming both sides
+    ("Compare this file with tokens/x.json in GitHub"). With the label gone the
+    fuller sentence is the name, and it is the only name a button with no
+    visible text has.
+  */
+  { id: 'repo-read-btn', variant: 'filled', size: 'medium', icon: IconCompare(20) },
   'Compare this file with the one in the repo',
   CARD_LEVEL,
 );
