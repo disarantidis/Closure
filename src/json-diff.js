@@ -281,29 +281,104 @@ function formatLabel(f) { return FORMAT_LABEL[f] || FORMAT_LABEL.unknown; }
   while both files define that alias as exactly "TeleNeo Var". Nobody changed
   anything; one export resolved its references and the other did not.
 
-  RESOLVED WITHIN ITS OWN TOP-LEVEL DOCUMENT, because that is the scope these
-  references have: a themes-shaped export is several self-contained documents
-  in one file, and {core.blue} inside one of them means that document's core,
-  not another's.
+  ITS OWN SET FIRST, THEN THE OTHERS. This used to look only inside the
+  reference's own top-level document, on the reasoning that a themes-shaped
+  export is several self-contained documents in one file. That was true of the
+  files it was written against, and it was true for a bad reason: the exporter
+  was writing every inherited variable into every collection, so every
+  reference happened to find its target at home. It cost 45% of a 40 MB file
+  and made the same file impossible to import, and the export no longer does
+  it — a variable is written where it lives, and a set now genuinely references
+  tokens defined in another set.
+
+  Which is how the layered formats always worked. Tokens Studio enables several
+  sets at once and resolves across them in tokenSetOrder, later sets winning;
+  the set order is right there in the document. So: the reference's own set
+  first, so nothing that resolved locally can change its answer, then the other
+  sets in reverse precedence so the one that would win is found first, then the
+  document root for a file with no sets at all.
 
   Depth-capped, because a reference can point at a reference and a file can be
   wrong: a cycle would otherwise be an infinite loop rather than an unresolved
   value, and an unresolved value is a perfectly good answer here — it just
   means the two sides are not known to agree.
 */
+/*
+  The bases a reference is looked up against, in precedence order, cached per
+  document. Cached because the fallback is no longer the exception: with the
+  export writing each variable once, cross-set references are the ordinary
+  case, and rebuilding this list per reference would be tens of thousands of
+  rebuilds on a file of this size.
+*/
+var SEARCH_CACHE = typeof WeakMap === 'function' ? new WeakMap() : null;
+function searchOrder(doc) {
+  if (SEARCH_CACHE && SEARCH_CACHE.has(doc)) return SEARCH_CACHE.get(doc);
+  var declared = (doc.$metadata && doc.$metadata.tokenSetOrder) ||
+                 (doc.$extensions && doc.$extensions['com.closure.legacyJson'] &&
+                  doc.$extensions['com.closure.legacyJson'].tokenSetOrder) || null;
+  var keys = Object.keys(doc).filter(function (k) {
+    return k.charAt(0) !== '$' && doc[k] && typeof doc[k] === 'object';
+  });
+  var order;
+  if (declared && declared.length) {
+    /* A declared order may name sets under a different spelling than the
+       top-level keys (".mode/light" vs "mode/light"), so it RANKS the keys the
+       document actually has rather than replacing them. Anything it does not
+       mention keeps its own position, after the ones it does. */
+    var rank = {};
+    for (var i = 0; i < declared.length; i++) {
+      rank[declared[i]] = i;
+      rank['.' + declared[i]] = i;
+    }
+    order = keys.slice().sort(function (a, b) {
+      var ra = rank[a] === undefined ? declared.length + keys.indexOf(a) : rank[a];
+      var rb = rank[b] === undefined ? declared.length + keys.indexOf(b) : rank[b];
+      return ra - rb;
+    });
+  } else {
+    order = keys;
+  }
+  order.reverse();                    // later wins, so look at the winner first
+  var bases = order.map(function (k) { return doc[k]; });
+  bases.push(doc);                    // a document with no sets at all
+  var out = { keys: order, bases: bases };
+  if (SEARCH_CACHE) SEARCH_CACHE.set(doc, out);
+  return out;
+}
+
+/* Walk a dotted reference path from one base. Null when it does not land on a
+   token there — which is the ordinary answer, not a failure. */
+function lookIn(base, segs) {
+  var node = base;
+  for (var i = 0; i < segs.length && node; i++) node = node[segs[i]];
+  if (!node || typeof node !== 'object' || !isToken(node)) return null;
+  return tokenValue(node);
+}
+
+/* Where a reference lands, and in WHICH set — the set matters because the next
+   hop of a chain resolves from there, not from where the chain started. */
+function findRef(doc, root, path) {
+  var segs = path.split('.');
+  var v = lookIn(doc[root], segs);
+  if (v !== null) return { value: v, root: root };
+  var order = searchOrder(doc);
+  for (var i = 0; i < order.bases.length; i++) {
+    if (order.keys[i] === root) continue;         // already tried, and it missed
+    v = lookIn(order.bases[i], segs);
+    if (v !== null) return { value: v, root: order.keys[i] === undefined ? root : order.keys[i] };
+  }
+  return null;
+}
+
 function resolveRef(doc, root, ref, seen) {
   var m = /^\{([^}]+)\}$/.exec(String(ref));
   if (!m) return ref;
   if (!seen) seen = {};
   if (seen[ref] || Object.keys(seen).length > 8) return null;
   seen[ref] = 1;
-  var node = doc[root];
-  var segs = m[1].split('.');
-  for (var i = 0; i < segs.length && node; i++) node = node[segs[i]];
-  if (!node || typeof node !== 'object') return null;
-  var v = isToken(node) ? tokenValue(node) : null;
-  if (v === null) return null;
-  return isReference(v) ? resolveRef(doc, root, v, seen) : v;
+  var hit = findRef(doc, root, m[1]);
+  if (!hit) return null;
+  return isReference(hit.value) ? resolveRef(doc, hit.root, hit.value, seen) : hit.value;
 }
 
 /*
@@ -400,13 +475,13 @@ function findDuplicateNames(doc, side) {
 function bindableTarget(litDoc, root, ref, expected) {
   var m = /^\{([^}]+)\}$/.exec(String(ref));
   if (!m) return null;
-  var node = litDoc[root];
-  var segs = m[1].split('.');
-  for (var i = 0; i < segs.length && node; i++) node = node[segs[i]];
-  if (!node || !isToken(node)) return null;
-  var v = tokenValue(node);
+  /* Across sets, on the same terms as resolveRef: the variable that is sitting
+     there unused is just as unused when it lives in another set. */
+  var hit = findRef(litDoc, root, m[1]);
+  if (!hit) return null;
+  var v = hit.value;
   /* The target may itself point somewhere; what matters is where it lands. */
-  if (isReference(v)) v = resolveRef(litDoc, root, v);
+  if (isReference(v)) v = resolveRef(litDoc, hit.root, v);
   if (v === null || renderValue(v) !== expected) return null;
   return m[1];
 }

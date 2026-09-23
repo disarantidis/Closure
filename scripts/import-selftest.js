@@ -1821,7 +1821,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
         const names = ['repoFilePath', 'pushFilePath', 'repoSelectedFile', 'listRepoJsonFiles',
                        'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
                        'pushOverwriteNote', 'withRootOption', 'folderDisplay',
-                       'setRepoFileOptions', 'chooseRepoFile', 'repoIdentityRow'];
+                       'setRepoFileOptions', 'chooseRepoFile', 'repoIdentityRow',
+                       'pushGitHubLarge'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1866,6 +1867,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ctx.repoFileName = undefined;
           /* withRootOption reads it; it lives beside it in the template. */
           ctx.ROOT_FOLDER_VALUE = '/';
+          ctx.CONTENTS_API_MAX = 1024 * 1024;
           ctx.window = ctx;
           vmx.createContext(ctx);
           vmx.runInContext(lifted.join('\n'), ctx);
@@ -1911,6 +1913,78 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
              address, and an address still pointing at themes.json makes the
              next test's filename change look like it did nothing. */
           ctx.chooseRepoFile('');
+
+          /*
+            A FILE TOO BIG FOR THE CONTENTS ENDPOINT.
+
+            GitHub refuses to WRITE more than about a megabyte there — 422,
+            "consider creating/updating the file in a local clone", which is not
+            advice a Figma plugin can take. A real export is 40 MB. So a big
+            push goes the way git goes, and these pin the sequence: the object
+            has to exist before anything can point at it, and the branch moves
+            last or a failure halfway leaves it pointing at a commit whose tree
+            was never written.
+          */
+          {
+            const seq = [];
+            const gh = {
+              token: 'GHT', repo: 'acme/tokens', branch: 'main',
+              folder: 'tokens', filename: 'big.json',
+            };
+            const headers = { Authorization: 'token GHT' };
+            const fail = (r, stage) => { throw { status: r.status, message: stage }; };
+            const reply = (body) => ({ ok: true, status: 200, json: () => Promise.resolve(body) });
+            ctx.fetch = (url, opts) => {
+              seq.push((opts && opts.method || 'GET') + ' ' + url.replace(
+                'https://api.github.com/repos/acme/tokens/git/', ''));
+              if (/\/blobs$/.test(url)) return Promise.resolve(reply({ sha: 'BLOB' }));
+              if (/\/ref\/heads\//.test(url)) return Promise.resolve(reply({ object: { sha: 'HEAD' } }));
+              if (/\/commits\/HEAD$/.test(url)) return Promise.resolve(reply({ tree: { sha: 'TREE0' } }));
+              if (/\/trees$/.test(url)) {
+                const b = JSON.parse(opts.body);
+                seq.push('  tree base=' + b.base_tree + ' path=' + b.tree[0].path +
+                         ' mode=' + b.tree[0].mode + ' sha=' + b.tree[0].sha);
+                return Promise.resolve(reply({ sha: 'TREE1' }));
+              }
+              if (/\/commits$/.test(url)) {
+                const b = JSON.parse(opts.body);
+                seq.push('  commit parents=' + JSON.stringify(b.parents) + ' tree=' + b.tree);
+                return Promise.resolve(reply({ sha: 'C1' }));
+              }
+              return Promise.resolve(reply({ ref: 'ok' }));
+            };
+            await ctx.pushGitHubLarge(['acme', 'tokens'], gh, 'tokens/big.json',
+                                      '{"a":1}', 'a message', headers, fail);
+            ok('big push: blob, then tree, then commit, then the branch — in that order',
+               seq.filter((x) => x.charAt(0) !== ' ').join(' | ') ===
+               'POST blobs | GET ref/heads/main | GET commits/HEAD | POST trees | POST commits | PATCH refs/heads/main',
+               seq.filter((x) => x.charAt(0) !== ' ').join(' | '));
+            ok('big push: the tree is built ON the branch, so nothing else is deleted',
+               seq.indexOf('  tree base=TREE0 path=tokens/big.json mode=100644 sha=BLOB') !== -1,
+               JSON.stringify(seq));
+            ok('big push: the commit has the old head as its parent',
+               seq.indexOf('  commit parents=["HEAD"] tree=TREE1') !== -1, JSON.stringify(seq));
+
+            /* An empty repo has no branch to build on. Neither a base tree nor
+               a parent exists, and the ref has to be CREATED, not moved. */
+            seq.length = 0;
+            const before = ctx.fetch;
+            ctx.fetch = (url, opts) => {
+              if (/\/ref\/heads\//.test(url)) {
+                seq.push('GET ref (404)');
+                return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
+              }
+              return before(url, opts);
+            };
+            await ctx.pushGitHubLarge(['acme', 'tokens'], gh, 'tokens/big.json',
+                                      '{"a":1}', 'first', headers, fail);
+            ok('big push: an empty repo gets a first commit with no parent and a created ref',
+               seq.indexOf('  commit parents=[] tree=TREE1') !== -1 &&
+               seq.filter((x) => /POST refs$/.test(x)).length === 1 &&
+               seq.filter((x) => /tree base=undefined/.test(x)).length === 1,
+               JSON.stringify(seq));
+            ctx.fetch = (url, opts) => { calls.push({ url, opts }); return Promise.resolve(ctx.__res); };
+          }
 
           /* The listing, and what it is allowed to conclude from each
              answer. A wrong URL fails exactly like an empty repo, which is
@@ -2430,6 +2504,55 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          alias.changed.length === 0 && alias.aliased.length === 1 &&
          alias.aliased[0].path === 'd.g.use',
          JSON.stringify({ changed: alias.changed, aliased: alias.aliased }));
+      /*
+        ACROSS SETS, WHICH IS NOW THE ORDINARY CASE.
+
+        The comment above is what this used to assume, and it held only because
+        the exporter wrote every inherited variable into every collection — so
+        every reference found its target at home. That duplication was 45% of a
+        40 MB file and is gone: a variable is written where it lives, and a set
+        genuinely points at a token defined in another set. Resolving only
+        locally would report every one of those as a value change.
+      */
+      const crossA = { '.core/base': { g: { base: tok('#ff0000') } },
+                       '.mode/light': { use: tok('{g.base}') } };
+      const crossB = { '.core/base': { g: { base: tok('#ff0000') } },
+                       '.mode/light': { use: tok('#ff0000') } };
+      const cross = JD.compare(crossB, crossA);
+      ok('alias: a reference into another set resolves, and is not a value change',
+         cross.changed.length === 0 && cross.aliased.length === 1,
+         JSON.stringify({ changed: cross.changed, aliased: cross.aliased }));
+      /* Local still wins, so nothing that resolved before can change answer. */
+      const shadowed = JD.compare(
+        { '.core/base': { g: { base: tok('#00ff00') } },
+          '.mode/light': { g: { base: tok('#ff0000') }, use: tok('#ff0000') } },
+        { '.core/base': { g: { base: tok('#00ff00') } },
+          '.mode/light': { g: { base: tok('#ff0000') }, use: tok('{g.base}') } });
+      ok('alias: a set that defines the path itself is still answered by its own copy',
+         shadowed.changed.length === 0 && shadowed.aliased.length === 1,
+         JSON.stringify({ changed: shadowed.changed, aliased: shadowed.aliased }));
+      /* Later sets win, the way the layered formats layer them — so a declared
+         tokenSetOrder decides which of two definitions a reference lands on. */
+      const layered = (order) => ({
+        $metadata: { tokenSetOrder: order },
+        'a/one': { g: { base: tok('#111111') } },
+        'b/two': { g: { base: tok('#222222') } },
+        'c/use': { use: tok('{g.base}') },
+      });
+      const wins = JD.compare(
+        Object.assign(layered(['a/one', 'b/two', 'c/use']), { 'c/use': { use: tok('#222222') } }),
+        layered(['a/one', 'b/two', 'c/use']));
+      ok('alias: the later set in tokenSetOrder is the one a reference lands on',
+         wins.changed.length === 0 && wins.aliased.length === 1,
+         JSON.stringify({ changed: wins.changed, aliased: wins.aliased }));
+      /* A reference with nowhere to land is still unresolved, not guessed. */
+      const nowhere = JD.compare(
+        { '.core/base': { use: tok('#ff0000') } },
+        { '.core/base': { use: tok('{nowhere.at.all}') } });
+      ok('alias: a reference nothing defines resolves to nothing, and stays a change',
+         nowhere.aliased.length === 0,
+         JSON.stringify(nowhere.aliased));
+
       /* The safe direction: a real difference must never be filed as a
          non-change, so a reference that resolves to something ELSE is still a
          value change. */

@@ -6022,6 +6022,89 @@
         });
     }
 
+    /*
+      ── PUSHING SOMETHING BIG TO GITHUB ──────────────────────────────────────
+
+      The contents endpoint will not WRITE a file over about a megabyte. It
+      answers 422 with "Sorry, the file is too large to be processed. Consider
+      creating/updating the file in a local clone and pushing it to GitHub",
+      which is true advice and useless from inside a Figma plugin. A real export
+      of a real system is 40 MB.
+
+      The note on fetchGitHubFile() below spotted the matching limit on the READ
+      side and concluded "this is also why pushing still works: the push only
+      reads the sha". That is right about the GET and wrong about the PUT — the
+      write carries the whole document in its body, and it is the write that is
+      refused.
+
+      So a big push goes the way git itself goes: a blob, a tree that points at
+      it, a commit that points at the tree, and the branch moved to the commit.
+      Four calls instead of two, and no size limit worth thinking about. Small
+      pushes keep the contents endpoint — it is one round trip, it is the
+      well-trodden path, and there is no reason to make every push pay for the
+      rare one.
+
+      The content goes up as utf-8 rather than base64: the blob endpoint takes
+      either, and base64 would mean holding a 53 MB copy of a 40 MB string in a
+      plugin iframe for nothing.
+    */
+    var CONTENTS_API_MAX = 1024 * 1024;
+
+    function pushGitHubLarge(parts, c, filePath, json, commitMsg, headers, readErr) {
+      var api = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
+                encodeURIComponent(parts[1]) + '/git/';
+      /* Two spellings of one branch: the URL wants it encoded, the create-a-ref
+         body wants it raw, and they are not the same string for a branch with
+         a slash in it. */
+      var refUrl = 'refs/heads/' + c.branch.split('/').map(encodeURIComponent).join('/');
+      var refName = 'refs/heads/' + c.branch;
+      var post = function (what, body) {
+        return fetch(api + what, { method: 'POST', headers: headers, body: JSON.stringify(body) })
+          .then(function (r) { return r.ok ? r.json() : readErr(r, what); });
+      };
+      var blobSha = null, parent = null, baseTree = null;
+      return post('blobs', { content: json, encoding: 'utf-8' })
+        .then(function (blob) {
+          blobSha = blob.sha;
+          /* An empty repo, or a branch that does not exist yet, has no ref —
+             which is not an error here, it is the first commit. */
+          return fetch(api + 'ref/' + refUrl.slice('refs/'.length),
+                       { method: 'GET', headers: headers });
+        })
+        .then(function (r) {
+          if (r.status === 404) return null;
+          if (!r.ok) return readErr(r, 'ref');
+          return r.json();
+        })
+        .then(function (ref) {
+          if (!ref || !ref.object) return null;
+          parent = ref.object.sha;
+          return fetch(api + 'commits/' + parent, { method: 'GET', headers: headers })
+            .then(function (r) { return r.ok ? r.json() : readErr(r, 'commit'); });
+        })
+        .then(function (commit) {
+          if (commit && commit.tree) baseTree = commit.tree.sha;
+          var tree = { tree: [{ path: filePath, mode: '100644', type: 'blob', sha: blobSha }] };
+          /* Without base_tree the commit would hold this file ALONE and delete
+             the rest of the branch. Absent only on a first commit, where there
+             is nothing to preserve. */
+          if (baseTree) tree.base_tree = baseTree;
+          return post('trees', tree);
+        })
+        .then(function (tree) {
+          return post('commits', { message: commitMsg, tree: tree.sha,
+                                   parents: parent ? [parent] : [] });
+        })
+        .then(function (commit) {
+          if (parent) {
+            return fetch(api + refUrl, {
+              method: 'PATCH', headers: headers, body: JSON.stringify({ sha: commit.sha }),
+            }).then(function (r) { return r.ok ? r.json() : readErr(r, 'move branch'); });
+          }
+          return post('refs', { ref: refName, sha: commit.sha });
+        });
+    }
+
     // Push to GitHub. Contents API uses PUT for both create and update —
     // whether the body includes `sha` is what decides which (a fetched
     // sha means the file already exists on this branch; 404 = create).
@@ -6036,7 +6119,7 @@
       var filePath = composeFilePath(c.folder, c.filename);
       var commitMsg = document.getElementById('commit-message').value.trim();
       if (!commitMsg) return Promise.reject({ message: 'Commit message is required' });
-      var content = encodeContent(tokens);
+      var json = JSON.stringify(tokens, null, 2);
       var apiUrl = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
                    encodeURIComponent(parts[1]) + '/contents/' + filePath.split('/').map(encodeURIComponent).join('/');
       var headers = { 'Authorization': 'token ' + c.token, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
@@ -6050,6 +6133,16 @@
           throw { status: r.status, message: 'Request failed' };
         });
       }
+
+      /* Measured in bytes, not characters — the limit is on what crosses the
+         wire, and a document full of non-ASCII is longer than it looks. */
+      var bytes = typeof TextEncoder === 'function'
+        ? new TextEncoder().encode(json).length
+        : unescape(encodeURIComponent(json)).length;
+      if (bytes > CONTENTS_API_MAX) {
+        return pushGitHubLarge(parts, c, filePath, json, commitMsg, headers, readErr);
+      }
+      var content = encodeContent(tokens);
 
       // Look up the file's current sha (needed to update it); 404 = doesn't
       // exist yet = create (no sha in the write body).
