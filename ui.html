@@ -735,6 +735,21 @@
       margin: 12px 0 0; font-size: 11px; color: var(--app-danger); line-height: 1.5;
     }
 
+    /* Both of these dialogs are about one provider card, so they stand as wide
+       as it does — set from the card's measured width (matchDialogToCard), with
+       the fallback only covering the moment before one has been measured. */
+    #folder-discovery-dialog-mount .nd-dialog,
+    #folder-remove-dialog-mount .nd-dialog {
+      --nd-dialog-width: var(--closure-dialog-width, 360px);
+      inline-size: min(92vw, var(--closure-dialog-width, 360px));
+    }
+
+    /* Only above FOLDER_SEARCH_MIN — see mountFolderDiscovery. */
+    .folder-discovery-search { margin: 0 0 10px; }
+    .folder-discovery-none {
+      margin: 0; padding: 10px 2px; font-size: 11px; opacity: 0.7;
+    }
+
     .folder-discovery-list { display: flex; flex-direction: column; gap: 8px; }
     .folder-discovery-row {
       display: flex; align-items: center; gap: 8px;
@@ -49117,6 +49132,7 @@ html[data-theme=dark] {
   var IconFolder = svg("M3 7a2 2 0 012-2h3.5l2 2H19a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z");
   var IconFile = svg("M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8");
   var IconAdd = svg("M12 5v14M5 12h14");
+  var IconSearch = svg("M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-4.5-4.5");
   var IconUpload = svg("M12 16V4 M7 9l5-5 5 5 M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2");
   var IconSync = svg("M21 12a9 9 0 0 1-9 9 9 9 0 0 1-7.5-4 M3 12a9 9 0 0 1 9-9 9 9 0 0 1 7.5 4 M20 4v5h-5 M4 20v-5h5");
   var IconTrash = svg("M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6 M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2 M10 11v6 M14 11v6");
@@ -49453,8 +49469,9 @@ html[data-theme=dark] {
   function mountIconButton(mountId, props, level) {
     mountOnce(mountId, /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(PomButton, { ...props }), level);
   }
-  mountButton("folder-import-mount", { id: "folder-import-btn", variant: "tonal", size: "medium", block: true, label: "Add Paths from Repo", leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
-  mountButton("github-folder-import-mount", { id: "github-folder-import-btn", variant: "tonal", size: "medium", block: true, label: "Add Paths from Repo", leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
+  var SUBCARD_LEVEL = 3;
+  mountButton("folder-import-mount", { id: "folder-import-btn", variant: "tonal", size: "medium", block: true, label: "Add Paths from Repo", leftIcon: true, buttonLeftIcon: IconFolder(16) }, SUBCARD_LEVEL);
+  mountButton("github-folder-import-mount", { id: "github-folder-import-btn", variant: "tonal", size: "medium", block: true, label: "Add Paths from Repo", leftIcon: true, buttonLeftIcon: IconFolder(16) }, SUBCARD_LEVEL);
   mountIconButton("folder-add-btn-mount", { id: "folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
   mountIconButton("github-folder-add-btn-mount", { id: "github-folder-add-btn", variant: "outline", size: "medium", title: "Add folder path", "aria-label": "Add folder path", icon: IconAdd(16) }, CARD_LEVEL);
   mountIconButton("gl-clear-token-btn-mount", { id: "gl-clear-token-btn", variant: "tonal", destructive: true, size: "medium", title: "Clear GitLab token", "aria-label": "Clear GitLab token", icon: IconTrash(16) }, CARD_LEVEL);
@@ -50799,9 +50816,10 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime25.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(View, {}) })));
     window.PomImportQuestions = { set: (qs) => set(qs), onAnswer: null };
   })();
+  var FOLDER_SEARCH_MIN = 8;
   function mountFolderDiscovery() {
     const container = document.getElementById("folder-discovery-dialog-mount");
-    let state = { open: false, provider: "github", where: "", paths: [], added: [] };
+    let state = { open: false, provider: "github", where: "", paths: [], added: [], query: "" };
     let apply = null;
     const put = (next) => {
       state = { ...state, ...next };
@@ -50812,6 +50830,8 @@ html[data-theme=dark] {
       apply = setS;
       const isAdded = (p) => s.added.indexOf(p) !== -1;
       const label = (p) => p === "" ? "/" : p;
+      const q = s.query.trim().toLowerCase();
+      const shown = q ? s.paths.filter((p) => label(p).toLowerCase().indexOf(q) !== -1) : s.paths;
       return /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(
         Dialog,
         {
@@ -50845,7 +50865,21 @@ html[data-theme=dark] {
               s.provider === "gitlab" ? IconGitlab(14) : IconGithub(14),
               /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: s.where || "this repository" })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "folder-discovery-list", children: !s.paths.length ? /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("p", { className: "folder-discovery-empty", children: "Nothing but the repository root, which is already where a push goes when no folder is chosen." }) : s.paths.map((p) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "folder-discovery-row", children: [
+            s.paths.length > FOLDER_SEARCH_MIN && /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "folder-discovery-search", children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
+              PomTextField,
+              {
+                id: "folder-discovery-search",
+                label: "Search paths",
+                icon: IconSearch(16),
+                defaultValue: "",
+                onInput: (v) => put({ query: v })
+              }
+            ) }),
+            /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "folder-discovery-list", children: !s.paths.length ? /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("p", { className: "folder-discovery-empty", children: "Nothing but the repository root, which is already where a push goes when no folder is chosen." }) : !shown.length ? /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("p", { className: "folder-discovery-none", children: [
+              "No path here matches \u201C",
+              s.query.trim(),
+              "\u201D."
+            ] }) : shown.map((p) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "folder-discovery-row", children: [
               /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { className: "folder-discovery-path", title: label(p), children: [
                 IconFolder(14),
                 /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: label(p) })
@@ -50880,7 +50914,9 @@ html[data-theme=dark] {
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime25.jsx)(LevelContext.Provider, { value: GROUND, children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(View, {}) })));
     window.PomFolderDiscovery = {
-      open: (provider, where, paths, added) => put({ open: true, provider, where, paths: paths || [], added: added || [] }),
+      /* query cleared on every open: a filter left over from the last time hides
+         rows that are on the list, which reads as a list that lost them. */
+      open: (provider, where, paths, added) => put({ open: true, provider, where, paths: paths || [], added: added || [], query: "" }),
       onAdd: null
     };
   }
@@ -55593,7 +55629,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'aa2b666 13:48:13';
+    var CLOSURE_BUILD = '3e79bae 13:53:12';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -56018,6 +56054,7 @@ function format(report, opts) {
       if (notThere || !known) { dropFolderPath(which, folder); return; }
 
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      matchDialogToCard(which);
       folderRemoveFor = { which: which, path: folder };
       /* Read what is in there BEFORE asking. A dialog that offers to delete a
          folder without saying what is in it is asking for consent to something
@@ -57386,7 +57423,25 @@ function format(report, opts) {
     */
     var lastDiscovered = { gitlab: null, github: null };
 
+    /*
+      THE DIALOG STANDS AS WIDE AS THE CARD IT CAME OUT OF.
+
+      .nd-dialog sets max-inline-size, which is a ceiling and not a size, so a
+      dialog holding four short paths shrank to 193px beside a 366px card and
+      read as a tooltip that had lost its way. Measured rather than guessed:
+      the card's own width is whatever the panel is minus its gutters, and the
+      panel is resizable, so any number written here would be right at one
+      width and wrong at every other.
+    */
+    function matchDialogToCard(which) {
+      var anchor = document.getElementById(which === 'gitlab' ? 'gl-sync-btn-mount' : 'gh-sync-btn-mount');
+      var card = anchor && anchor.closest ? anchor.closest('.provider-card') : null;
+      var w = card ? Math.round(card.getBoundingClientRect().width) : 0;
+      if (w > 0) document.documentElement.style.setProperty('--closure-dialog-width', w + 'px');
+    }
+
     function openFolderDiscovery(which) {
+      matchDialogToCard(which);
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
       var where = which === 'gitlab' ? c.project : c.repo;
       var saved = which === 'gitlab' ? glFolders : ghFolders;

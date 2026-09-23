@@ -735,6 +735,21 @@
       margin: 12px 0 0; font-size: 11px; color: var(--app-danger); line-height: 1.5;
     }
 
+    /* Both of these dialogs are about one provider card, so they stand as wide
+       as it does — set from the card's measured width (matchDialogToCard), with
+       the fallback only covering the moment before one has been measured. */
+    #folder-discovery-dialog-mount .nd-dialog,
+    #folder-remove-dialog-mount .nd-dialog {
+      --nd-dialog-width: var(--closure-dialog-width, 360px);
+      inline-size: min(92vw, var(--closure-dialog-width, 360px));
+    }
+
+    /* Only above FOLDER_SEARCH_MIN — see mountFolderDiscovery. */
+    .folder-discovery-search { margin: 0 0 10px; }
+    .folder-discovery-none {
+      margin: 0; padding: 10px 2px; font-size: 11px; opacity: 0.7;
+    }
+
     .folder-discovery-list { display: flex; flex-direction: column; gap: 8px; }
     .folder-discovery-row {
       display: flex; align-items: center; gap: 8px;
@@ -3568,6 +3583,7 @@
       if (notThere || !known) { dropFolderPath(which, folder); return; }
 
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      matchDialogToCard(which);
       folderRemoveFor = { which: which, path: folder };
       /* Read what is in there BEFORE asking. A dialog that offers to delete a
          folder without saying what is in it is asking for consent to something
@@ -4936,7 +4952,25 @@
     */
     var lastDiscovered = { gitlab: null, github: null };
 
+    /*
+      THE DIALOG STANDS AS WIDE AS THE CARD IT CAME OUT OF.
+
+      .nd-dialog sets max-inline-size, which is a ceiling and not a size, so a
+      dialog holding four short paths shrank to 193px beside a 366px card and
+      read as a tooltip that had lost its way. Measured rather than guessed:
+      the card's own width is whatever the panel is minus its gutters, and the
+      panel is resizable, so any number written here would be right at one
+      width and wrong at every other.
+    */
+    function matchDialogToCard(which) {
+      var anchor = document.getElementById(which === 'gitlab' ? 'gl-sync-btn-mount' : 'gh-sync-btn-mount');
+      var card = anchor && anchor.closest ? anchor.closest('.provider-card') : null;
+      var w = card ? Math.round(card.getBoundingClientRect().width) : 0;
+      if (w > 0) document.documentElement.style.setProperty('--closure-dialog-width', w + 'px');
+    }
+
     function openFolderDiscovery(which) {
+      matchDialogToCard(which);
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
       var where = which === 'gitlab' ? c.project : c.repo;
       var saved = which === 'gitlab' ? glFolders : ghFolders;

@@ -143,6 +143,7 @@ const IconFolder = svg('M3 7a2 2 0 012-2h3.5l2 2H19a2 2 0 012 2v8a2 2 0 01-2 2H5
    carries — one shape for "a file" everywhere in this UI. */
 const IconFile = svg('M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8');
 const IconAdd = svg('M12 5v14M5 12h14');
+const IconSearch = svg('M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-4.5-4.5');
 /* An arrow out of a tray — "send this up there". Distinct from IconSync's two
    arrows, which mean "go and read it again": one writes, the other does not. */
 const IconUpload = svg('M12 16V4 M7 9l5-5 5 5 M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2');
@@ -767,8 +768,19 @@ function mountIconButton(mountId: string, props: any, level?: Level) { mountOnce
    are not on it — see refreshFolderImportOffer(). It reopens the same dialog
    Sync opens the first time, which is the point: the first sync and the tenth
    answer the same question and should not have two different doors. */
-mountButton('folder-import-mount', { id: 'folder-import-btn', variant: 'tonal', size: 'medium', block: true, label: 'Add Paths from Repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
-mountButton('github-folder-import-mount', { id: 'github-folder-import-btn', variant: 'tonal', size: 'medium', block: true, label: 'Add Paths from Repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
+/*
+  MOUNTED ON THE SUB-CARD'S OWN RUNG, not the provider card's.
+
+  It passed CARD_LEVEL like everything else in the provider card, which means
+  "the ground is 2-or-4, so compute at 3" — and the .provider-subcard these two
+  actually sit in is level 3, so they painted rgb(37,37,37) onto a surface that
+  is rgb(37,37,37) and the tonal fill disappeared completely. It read as bare
+  text, which is what a ghost button looks like. Its ground is 3, so its fill
+  computes at 4 and is visible against the subcard it stands on.
+*/
+const SUBCARD_LEVEL: Level = 3;
+mountButton('folder-import-mount', { id: 'folder-import-btn', variant: 'tonal', size: 'medium', block: true, label: 'Add Paths from Repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, SUBCARD_LEVEL);
+mountButton('github-folder-import-mount', { id: 'github-folder-import-btn', variant: 'tonal', size: 'medium', block: true, label: 'Add Paths from Repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, SUBCARD_LEVEL);
 
 mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
@@ -3059,10 +3071,17 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
   this dialog answers — which of these am I tracking? — needs both halves of
   the answer visible at once.
 */
+/*
+  A SEARCH ONLY WHEN THERE IS SOMETHING TO SEARCH. Eight rows fit on screen and
+  are read faster than they are typed at; a field above them would be a control
+  that costs a look and saves nothing. Past that the list scrolls, and scrolling
+  to find a name you already know is the thing a search exists to stop.
+*/
+const FOLDER_SEARCH_MIN = 8;
 function mountFolderDiscovery() {
   const container = document.getElementById('folder-discovery-dialog-mount');
-  type S = { open: boolean; provider: string; where: string; paths: string[]; added: string[] };
-  let state: S = { open: false, provider: 'github', where: '', paths: [], added: [] };
+  type S = { open: boolean; provider: string; where: string; paths: string[]; added: string[]; query: string };
+  let state: S = { open: false, provider: 'github', where: '', paths: [], added: [], query: '' };
   let apply: ((s: S) => void) | null = null;
   const put = (next: Partial<S>) => { state = { ...state, ...next }; apply?.(state); };
   function View() {
@@ -3070,6 +3089,11 @@ function mountFolderDiscovery() {
     apply = setS;
     const isAdded = (p: string) => s.added.indexOf(p) !== -1;
     const label = (p: string) => (p === '' ? '/' : p);
+    /* Substring and case-insensitive, matching the folder combo's own rule:
+       the part of a path somebody remembers is as often the middle of it
+       ("design") as the start. */
+    const q = s.query.trim().toLowerCase();
+    const shown = q ? s.paths.filter((p) => label(p).toLowerCase().indexOf(q) !== -1) : s.paths;
     return (
       <Dialog
         open={s.open}
@@ -3097,13 +3121,26 @@ function mountFolderDiscovery() {
           {s.provider === 'gitlab' ? IconGitlab(14) : IconGithub(14)}
           <span>{s.where || 'this repository'}</span>
         </p>
+        {s.paths.length > FOLDER_SEARCH_MIN && (
+          <div className="folder-discovery-search">
+            <PomTextField
+              id="folder-discovery-search"
+              label="Search paths"
+              icon={IconSearch(16)}
+              defaultValue=""
+              onInput={(v: string) => put({ query: v })}
+            />
+          </div>
+        )}
         <div className="folder-discovery-list">
           {!s.paths.length ? (
             <p className="folder-discovery-empty">
               Nothing but the repository root, which is already where a push goes
               when no folder is chosen.
             </p>
-          ) : s.paths.map((p) => (
+          ) : !shown.length ? (
+            <p className="folder-discovery-none">No path here matches “{s.query.trim()}”.</p>
+          ) : shown.map((p) => (
             <div className="folder-discovery-row" key={p}>
               <span className="folder-discovery-path" title={label(p)}>
                 {IconFolder(14)}<span>{label(p)}</span>
@@ -3141,8 +3178,10 @@ function mountFolderDiscovery() {
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
   window.PomFolderDiscovery = {
+    /* query cleared on every open: a filter left over from the last time hides
+       rows that are on the list, which reads as a list that lost them. */
     open: (provider, where, paths, added) =>
-      put({ open: true, provider, where, paths: paths || [], added: added || [] }),
+      put({ open: true, provider, where, paths: paths || [], added: added || [], query: '' }),
     onAdd: null,
   };
 }
