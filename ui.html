@@ -2328,7 +2328,9 @@
         contents, which is the same look and the right box.
       */
       align-items: stretch;
-      gap: 12px;
+      /* The tags belong to the title, so they sit close under it. 12px read
+         as two stacked things rather than as one heading and its contents. */
+      gap: 6px;
     }
     /* Left, under the title. Centring was right when the card WAS the pair —
        a row of tags over a button, with nothing else to line up against. It has
@@ -49684,14 +49686,14 @@ html[data-theme=dark] {
       const [s, setS] = (0, import_react16.useState)(state);
       apply = setS;
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-card-sides", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Tag, { variant: "tonal", size: "medium", leading: IconFigma(14), children: s.figma || "This Figma file" }),
-        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-vs", "aria-hidden": "true", children: IconCompare(16) }),
+        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Tag, { variant: "tonal", size: "small", leading: IconFigma(12), children: s.figma || "This Figma file" }),
+        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-vs", "aria-hidden": "true", children: IconCompare(14) }),
         /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
           Tag,
           {
             variant: "tonal",
-            size: "medium",
-            leading: s.provider === "gitlab" ? IconGitlab(14) : IconGithub(14),
+            size: "small",
+            leading: s.provider === "gitlab" ? IconGitlab(12) : IconGithub(12),
             children: s.file || "nothing named yet"
           }
         )
@@ -55954,7 +55956,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '3c4c0f5 15:17:16';
+    var CLOSURE_BUILD = '3057e31 15:19:12';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

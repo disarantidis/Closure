@@ -2328,7 +2328,9 @@
         contents, which is the same look and the right box.
       */
       align-items: stretch;
-      gap: 12px;
+      /* The tags belong to the title, so they sit close under it. 12px read
+         as two stacked things rather than as one heading and its contents. */
+      gap: 6px;
     }
     /* Left, under the title. Centring was right when the card WAS the pair —
        a row of tags over a button, with nothing else to line up against. It has

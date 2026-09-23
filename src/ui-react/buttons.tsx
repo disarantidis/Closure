@@ -942,12 +942,15 @@ function mountCompareSides() {
     apply = setS;
     return (
       <span className="compare-card-sides">
-        <Tag variant="tonal" size="medium" leading={IconFigma(14)}>
+        {/* small: they are the card's operands, not its subject — the title
+            above them is that. Medium made two names read as loudly as the
+            heading they sit under. */}
+        <Tag variant="tonal" size="small" leading={IconFigma(12)}>
           {s.figma || 'This Figma file'}
         </Tag>
-        <span className="compare-card-vs" aria-hidden="true">{IconCompare(16)}</span>
-        <Tag variant="tonal" size="medium"
-          leading={s.provider === 'gitlab' ? IconGitlab(14) : IconGithub(14)}>
+        <span className="compare-card-vs" aria-hidden="true">{IconCompare(14)}</span>
+        <Tag variant="tonal" size="small"
+          leading={s.provider === 'gitlab' ? IconGitlab(12) : IconGithub(12)}>
           {s.file || 'nothing named yet'}
         </Tag>
       </span>
