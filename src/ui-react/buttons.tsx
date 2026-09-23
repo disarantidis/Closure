@@ -614,7 +614,7 @@ type FolderSelectBridge = { setItems: (items: any[], selectedValue: string) => v
 // still can: the onboarding dialog's "skip both" choice — Download alone is
 // a complete, supported workflow, not an unfinished state to route past.
 type PushTarget = 'gitlab' | 'github' | 'both' | 'none';
-type ImportFileState = { name: string; bytes?: number; busy?: boolean; error?: string };
+type ImportFileState = { name: string; bytes?: number; busy?: boolean; error?: string; inRepo?: boolean };
 declare global {
   interface Window {
     PomImportApplyBtn: any;
@@ -638,7 +638,7 @@ declare global {
       /* null clears the row; bytes is optional because the size is only known
          when a real File was picked, and FileUploadItem draws no subtitle
          rather than making a caller invent a number. */
-      set: (name: string | null, bytes?: number, opts?: { busy?: boolean; error?: string }) => void;
+      set: (name: string | null, bytes?: number, opts?: { busy?: boolean; error?: string; inRepo?: boolean }) => void;
       onRemove: (() => void) | null;
     };
     PomButtons: { push: LiveHandle; download: LiveIconHandle };
@@ -1137,6 +1137,17 @@ window.PomRepoReadBtn = mountLiveTitleButton(
    is recognised before the label is read. */
 mountButton('import-pull-gitlab-mount', { id: 'import-pull-gitlab-btn', variant: 'filled', size: 'large', block: true, label: 'Import from GitLab', rightIcon: true, buttonRightIcon: IconGitlab(18) });
 mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant: 'filled', size: 'large', block: true, label: 'Import from GitHub', rightIcon: true, buttonRightIcon: IconGithub(18) });
+/*
+  THE SAME SLOT, ONCE THE FILE IS IN. The repo card's job is over the moment it
+  has handed a document over — there is nothing left to import from it — so the
+  button that did that is replaced by the one thing still worth doing to the
+  file it produced.
+
+  `outline`, not the `filled` it replaces: the page's own primary action by
+  then is "Import into this file" further down, and two filled full-width
+  buttons on one screen is two of them claiming to be the thing to press.
+*/
+mountButton('import-remove-mount', { id: 'import-remove-btn', variant: 'outline', size: 'large', block: true, label: 'Remove JSON', leftIcon: true, buttonLeftIcon: IconTrash(18) });
 
 /*
   WHICH REPOSITORY, AS COMPONENTS RATHER THAN AS MARKUP.
@@ -3484,24 +3495,34 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
         size="medium"
         error={file.error}
         leading={leading}
-        /* Handing it a remover is what gives it a ✕ — see the prop's own note.
-           The row names the button after the file, so it announces as
-           "Remove sarantidis-foundations.json" rather than a bare dismiss.
+        /*
+          HANDING IT A REMOVER IS WHAT GIVES IT A ✕ — see the prop's own note.
+          The row names the button after the file, so it announces as "Remove
+          sarantidis-foundations.json" rather than a bare dismiss.
 
-           Its variant is ghost and cannot be anything else: FileUploadItem
-           writes variant="ghost" into its own render and exposes no prop that
-           reaches it. Right for a row in a list on the page background, loud
-           enough to be wrong for a row alone on a raised card — which is what
-           this is. Raised as disarantidis/pomegranate#92; overriding it from
-           here would mean selecting into Button's internals. */
-        onRemove={() => window.PomImportFile.onRemove?.()}
+          AND IT ONLY GETS ONE WHEN IT IS THE ONLY WAY OUT. Inside the repo
+          card the row sits directly above a full-width "Remove JSON" button
+          that does exactly this; a ✕ as well would be two controls for one
+          act, in a card six centimetres tall. Standing on its own — a file
+          dropped on the page — it is the only remover there is, so it keeps
+          it. Which one is on screen is the one the reader can use, and never
+          both.
+
+          Its variant is ghost and cannot be anything else: FileUploadItem
+          writes variant="ghost" into its own render and exposes no prop that
+          reaches it. Right for a row in a list on the page background, loud
+          enough to be wrong for a row alone on a raised card. Raised as
+          disarantidis/pomegranate#92; overriding it from here would mean
+          selecting into Button's internals.
+        */
+        onRemove={file.inRepo ? undefined : () => window.PomImportFile.onRemove?.()}
       />
     );
   }
 
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomImportFile = {
-    set: (name, bytes, opts) => set(name ? { name, bytes, busy: !!(opts && opts.busy), error: opts && opts.error } : null),
+    set: (name, bytes, opts) => set(name ? { name, bytes, busy: !!(opts && opts.busy), error: opts && opts.error, inRepo: !!(opts && opts.inRepo) } : null),
     onRemove: null,
   };
 })();

@@ -1631,6 +1631,17 @@
     .import-change-tags { display: flex; flex-wrap: wrap; gap: 4px; }
     .import-changes .import-detail { margin-left: 0; }
 
+    /* The file's card, once it has moved inside the repo card. No margin — the
+       card around it supplies the inset — and a tighter radius so the two
+       corners are concentric, which is the pair .json-download-card.is-sub
+       uses for the same relationship on the main screen. */
+    .import-card.is-sub {
+      margin-top: 0;
+      border-radius: 18px;
+      padding: var(--spacing-component-4);
+    }
+    .import-repo-loaded[hidden] { display: none; }
+
     .import-question { margin-bottom: 12px; font-size: 12px; color: var(--app-text-muted); line-height: 1.5; }
     .import-question:last-child { margin-bottom: 0; }
     .import-question code { color: var(--app-text); font-size: 11px; }
@@ -3098,9 +3109,22 @@
             <span id="import-repo-file-mount" class="repo-file-half"></span>
           </div>
         </div>
+        <!--
+          WHERE THE FILE LANDS ONCE IT HAS BEEN READ.
+
+          #import-file-card is MOVED in here by applyImportRepoMode rather than
+          copied: one FileUploadItem, one React root, one piece of state. A
+          second mount fed from the same place would be a second thing that can
+          be out of date, and the row carries a spinner — so the two could
+          disagree visibly, mid-read.
+        -->
+        <div class="import-repo-loaded" id="import-repo-loaded" hidden></div>
         <div class="import-repo-actions">
           <span id="import-pull-gitlab-mount"></span>
           <span id="import-pull-github-mount"></span>
+          <!-- Replaces both of the above once there is a file: see
+               applyImportRepoMode. -->
+          <span id="import-remove-mount" hidden></span>
         </div>
       </div>
 
@@ -4447,6 +4471,55 @@
       between two visits to this page and a button pointing at a repo that is
       no longer configured is worse than no button.
     */
+    /*
+      THE REPO CARD HAS TWO STATES, AND THE SECOND ONE IS THE ANSWER TO THE
+      FIRST.
+
+      Before: a repository, a folder, a file and a button that fetches them.
+      After: the same repository, the document it produced, and the one thing
+      left to do with it. The pickers go because the choice has been made —
+      leaving them up offers to choose a file that has already been read, and
+      the card would be asking a question it is displaying the answer to.
+
+      The file's own card MOVES in rather than being redrawn here. It is the
+      same node, so the React root inside it, the spinner it may be running and
+      the state behind it all come with it; only its parent changes. Moving
+      back is exact because .settings-page-content puts it immediately before
+      #import-summary, which is where it goes.
+    */
+    function applyImportRepoMode() {
+      var row = document.getElementById('import-repo');
+      var slot = document.getElementById('import-repo-loaded');
+      var card = document.getElementById('import-file-card');
+      if (!row || !slot || !card) return;
+      var inRepo = !!(importState.fromRepo && importState.fileName) && !row.hidden;
+      slot.hidden = !inRepo;
+      document.getElementById('import-remove-mount').hidden = !inRepo;
+      if (inRepo) {
+        document.getElementById('import-pull-gitlab-mount').hidden = true;
+        document.getElementById('import-pull-github-mount').hidden = true;
+        document.getElementById('import-repo-file').hidden = true;
+        /* A subcard now, so it stands one rung in from the card around it —
+           the same relationship, and the same pair of radii, the Json file
+           card has to the repo card on the main screen. */
+        card.classList.add('is-sub');
+        card.setAttribute('data-level', '3');
+        if (card.parentElement !== slot) slot.appendChild(card);
+      } else {
+        /* Restored from readiness, not left where the loaded state put them:
+           this branch runs on the way back out, and a card that had reported a
+           file would otherwise offer no way to fetch another. */
+        document.getElementById('import-pull-gitlab-mount').hidden = !isGitLabReady();
+        document.getElementById('import-pull-github-mount').hidden = !isGitHubReady();
+        card.classList.remove('is-sub');
+        card.setAttribute('data-level', '4');
+        var home = document.getElementById('import-summary');
+        if (home && card.parentElement !== home.parentElement) {
+          home.parentElement.insertBefore(card, home);
+        }
+      }
+    }
+
     function refreshImportRepoRow() {
       var row = document.getElementById('import-repo');
       if (!row) return;
@@ -4454,7 +4527,7 @@
       document.getElementById('import-pull-gitlab-mount').hidden = !gl;
       document.getElementById('import-pull-github-mount').hidden = !gh;
       row.hidden = !gl && !gh;
-      if (row.hidden) return;
+      if (row.hidden) { applyImportRepoMode(); return; }
       /* SAY WHOSE REPOSITORY THIS IS, not just which path inside it. The line
          here used to be a bare folder/file, which is checkable about the file
          and silent about everything that makes the file consequential: the
@@ -4470,6 +4543,9 @@
          so arriving here does not re-ask for something already known. */
       refreshRepoReadRow();
       refreshImportRepoFile();
+      /* Last, so it has the final word over the pickers and the two pull
+         buttons the lines above have just decided about. */
+      applyImportRepoMode();
     }
 
     /*
@@ -4580,6 +4656,9 @@
       (which === 'gitlab' ? fetchGitLabFile() : fetchGitHubFile()).then(function (res) {
         importState.fileName = res.where;
         importState.fileBytes = res.text.length;
+        /* Which door it came through, and the only thing that decides whether
+           the repo card reports the file or goes on offering to fetch one. */
+        importState.fromRepo = true;
         showImportFile({ busy: true });
         importDrop.hidden = true;
         /* The same yield a dropped file needs: everything below this is
@@ -4805,7 +4884,12 @@
        that follows from letting each do its own half. */
     function showImportFile(opts) {
       document.getElementById('import-file-card').hidden = false;
-      window.PomImportFile.set(importState.fileName, importState.fileBytes, opts || {});
+      var o = opts || {};
+      /* The row drops its own ✕ while it is inside the repo card, because the
+         Remove JSON button under it is the same act — see mountImportFile. */
+      o.inRepo = !!(importState.fromRepo && !document.getElementById('import-repo').hidden);
+      window.PomImportFile.set(importState.fileName, importState.fileBytes, o);
+      applyImportRepoMode();
     }
 
     /*
@@ -4830,10 +4914,21 @@
         if (el) el.hidden = true;
       });
       window.PomImportFile.set(null);
+      /* The repo card goes back to asking rather than reporting, and the file's
+         own card goes back to standing on the page — see applyImportRepoMode.
+         refreshImportRepoRow after it, because that is what decides which pull
+         buttons come back, and it can only do so once fromRepo is false. */
+      importState.fromRepo = false;
+      applyImportRepoMode();
+      refreshImportRepoRow();
       importFileInput.value = '';
       importDrop.hidden = false;
     }
     window.PomImportFile.onRemove = clearImportFile;
+    /* The repo card's own remover, which is the same act — the ✕ on the row is
+       withheld while this button is on screen so there is never a pair of
+       them. */
+    document.getElementById('import-remove-btn').addEventListener('click', clearImportFile);
 
     document.getElementById('import-choose-btn').addEventListener('click', function() {
       importFileInput.click();
@@ -4886,6 +4981,9 @@
 
     function readImportFile(file) {
       importState.fileName = file.name;
+      /* A file off the disk is nobody's repository, so the repo card keeps
+         offering its own — this one reports itself, on its own card. */
+      importState.fromRepo = false;
       /* Only known when a real File was picked — re-running after a decision
          goes through runImport(), which never sees one. Kept on the state so
          the row keeps its subtitle across those re-runs. */
