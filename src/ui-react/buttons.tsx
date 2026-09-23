@@ -682,6 +682,10 @@ declare global {
     };
     PomCommitMessage: DisabledHandle;
     PomVersionTag: { setLabel: (label: string) => void };
+    PomFolderDiscovery: {
+      open: (where: string, paths: string[], added: string[]) => void;
+      onAdd: ((path: string) => void) | null;
+    };
     PomRemoveGithubDialog: { open: () => void; onConfirm: (() => void) | null };
     PomRemoveGitlabDialog: { open: () => void; onConfirm: (() => void) | null };
     PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
@@ -739,6 +743,13 @@ function mountIconButton(mountId: string, props: any, level?: Level) { mountOnce
    ROW-RULES "medium IS a small field's box"), not beside another button —
    so they take Button's `medium` rung to band-match the field, not `small`
    (band 32), which is the row-mixing-bands defect ROW-RULES.md calls out. */
+/* Offered under the saved list, and only while the repository holds paths that
+   are not on it — see refreshFolderImportOffer(). It reopens the same dialog
+   Sync opens the first time, which is the point: the first sync and the tenth
+   answer the same question and should not have two different doors. */
+mountButton('folder-import-mount', { id: 'folder-import-btn', variant: 'tonal', size: 'small', block: true, label: 'Add existing folder paths from repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
+mountButton('github-folder-import-mount', { id: 'github-folder-import-btn', variant: 'tonal', size: 'small', block: true, label: 'Add existing folder paths from repo', leftIcon: true, buttonLeftIcon: IconFolder(16) }, CARD_LEVEL);
+
 mountIconButton('folder-add-btn-mount', { id: 'folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountIconButton('github-folder-add-btn-mount', { id: 'github-folder-add-btn', variant: 'outline', size: 'medium', title: 'Add folder path', 'aria-label': 'Add folder path', icon: IconAdd(16) }, CARD_LEVEL);
 mountIconButton('gl-clear-token-btn-mount', { id: 'gl-clear-token-btn', variant: 'tonal', destructive: true, size: 'medium', title: 'Clear GitLab token', 'aria-label': 'Clear GitLab token', icon: IconTrash(16) }, CARD_LEVEL);
@@ -2996,6 +3007,91 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomImportQuestions = { set: (qs) => set(qs), onAnswer: null };
 })();
+
+/*
+  WHAT THE REPOSITORY ACTUALLY HAS, offered one row at a time.
+
+  Sync used to answer in a line of text under the heading — "3 folder paths
+  found" — which tells you a number and leaves you to type the paths back in
+  from memory. The paths are the answer, so the paths are what it shows, each
+  one on the same [field][+] row the Settings card already uses to add one by
+  hand. Adding is per path and not all-or-nothing: a repo has folders that have
+  nothing to do with tokens, and "found" is not "wanted".
+
+  A row that has been added stays on the list, marked, rather than vanishing.
+  A list that shrinks as it is used cannot be checked against, and the question
+  this dialog answers — which of these am I tracking? — needs both halves of
+  the answer visible at once.
+*/
+function mountFolderDiscovery() {
+  const container = document.getElementById('folder-discovery-dialog-mount');
+  type S = { open: boolean; where: string; paths: string[]; added: string[] };
+  let state: S = { open: false, where: '', paths: [], added: [] };
+  let apply: ((s: S) => void) | null = null;
+  const put = (next: Partial<S>) => { state = { ...state, ...next }; apply?.(state); };
+  function View() {
+    const [s, setS] = useState<S>(state);
+    apply = setS;
+    const isAdded = (p: string) => s.added.indexOf(p) !== -1;
+    const label = (p: string) => (p === '' ? '/' : p);
+    return (
+      <Dialog
+        open={s.open}
+        onClose={() => put({ open: false })}
+        title={'Folder paths in ' + (s.where || 'this repository')}
+        size="large"
+        actions={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+            <PomButton id="folder-discovery-done" variant="primary" size="small"
+              label="Okay, complete" onClick={() => put({ open: false })} />
+          </div>
+        }
+      >
+        <div className="folder-discovery-list">
+          {!s.paths.length ? (
+            <p className="folder-discovery-empty">
+              Nothing but the repository root, which is already where a push goes
+              when no folder is chosen.
+            </p>
+          ) : s.paths.map((p) => (
+            <div className="folder-discovery-row" key={p}>
+              <span className="folder-discovery-path" title={label(p)}>
+                {IconFolder(14)}<span>{label(p)}</span>
+              </span>
+              {isAdded(p) ? (
+                /* Not a disabled +. Disabled says "you may not", and the answer
+                   here is "you already have", which is a different sentence. */
+                <span className="folder-discovery-added">{IconCheck(14)} Added</span>
+              ) : (
+                <PomButton
+                  variant="outline" size="small" iconOnly icon={IconAdd(16)}
+                  title={'Track ' + label(p)} aria-label={'Track ' + label(p)}
+                  onClick={() => {
+                    /* `state`, not the render's `s`. Two rows added in quick
+                       succession both read the same pre-update snapshot, so the
+                       second overwrote the first and only one of the two ever
+                       showed as added — while both had in fact been saved,
+                       which is the worst version of the bug: the list and the
+                       thing it describes disagreeing. */
+                    if (state.added.indexOf(p) !== -1) return;
+                    put({ added: state.added.concat([p]) });
+                    window.PomFolderDiscovery.onAdd?.(p);
+                  }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </Dialog>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  window.PomFolderDiscovery = {
+    open: (where, paths, added) => put({ open: true, where, paths: paths || [], added: added || [] }),
+    onAdd: null,
+  };
+}
+mountFolderDiscovery();
 
 window.PomRemoveGithubDialog = { open: () => {}, onConfirm: null };
 confirmDialog('remove-github-dialog-mount',

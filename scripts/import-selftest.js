@@ -1823,7 +1823,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'pushOverwriteNote', 'withRootOption', 'folderDisplay',
                        'setRepoFileOptions', 'chooseRepoFile', 'repoIdentityRow',
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
-                       'renderImportFolderSelect', 'listRepoFolders'];
+                       'renderImportFolderSelect', 'listRepoFolders',
+                       'refreshFolderImportOffer'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1872,6 +1873,10 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ctx.repoFolderCache = null;      // listRepoFolders keeps its answer here
           ctx.BLOB_API_MAX = 40 * 1000 * 1000;
           ctx.glFolders = []; ctx.ghFolders = [];
+          ctx.normFolder = (v) => String(v || '').replace(/^\/+|\/+$/g, '');
+          const lastDiscovered = { gitlab: null, github: null };
+          ctx.lastDiscovered = lastDiscovered;
+          ctx.__lastDiscovered = () => lastDiscovered;
           ctx.glActiveFolder = ''; ctx.ghActiveFolder = '';
           let folderFeed = null;
           ctx.PomImportFolderSelect = {
@@ -1967,6 +1972,38 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           ok('sync: a refused token says so, so the fix is the field above it',
              !!refused && /token was refused/.test(refused.message), JSON.stringify(refused));
           ctx.__gh_over = null;
+          /*
+            THE OFFER UNDER THE SAVED LIST — shown only while the repository
+            holds a path that is not on it.
+
+            Both halves matter and neither is obvious. Nothing saved means Sync
+            opens the dialog instead, so an offer would be a second door to the
+            same room; nothing missing means the button has nothing to add, and
+            a control that sometimes does nothing is worse than one that is
+            sometimes absent.
+          */
+          const offerRow = { hidden: null };
+          ctx.document = {
+            createElement: el,
+            getElementById: (id) => (id === 'github-folder-import-row' ? offerRow : null),
+          };
+          const offer = (saved, found) => {
+            ctx.ghFolders = saved;
+            ctx.__lastDiscovered().github = found;
+            ctx.refreshFolderImportOffer();
+            return offerRow.hidden;
+          };
+          ok('folder offer: hidden while nothing is saved — Sync opens the dialog instead',
+             offer([], ['Spar', 'tokens']) === true);
+          ok('folder offer: shown once something is saved and the repo has more',
+             offer(['Spar'], ['Spar', 'tokens']) === false);
+          ok('folder offer: hidden again once every discovered path is saved',
+             offer(['Spar', 'tokens'], ['Spar', 'tokens']) === true);
+          ok('folder offer: hidden when the repo has no folders at all',
+             offer(['Spar'], []) === true);
+          ctx.ghFolders = [];
+          ctx.__lastDiscovered().github = null;
+
           /* Leave the stub as it was found — what follows reads calls[0]. */
           ctx.repoFolderCache = null;
           calls.length = 0;

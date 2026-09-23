@@ -672,6 +672,33 @@
     .provider-sync-status:empty { display: none; }
     .provider-sync-status.is-error { color: var(--app-danger); opacity: 1; }
     .provider-sync-status.is-ok { color: var(--app-text); }
+
+    /* One row per folder the repository has: the path, and a + to track it.
+       Same shape as the .folder-add row this card already uses to type one in
+       by hand, because it is the same act with the typing done for you. */
+    .folder-discovery-list { display: flex; flex-direction: column; gap: 8px; }
+    .folder-discovery-row {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .folder-discovery-path {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--nd-field-fill, rgba(255,255,255,0.04));
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .folder-discovery-path svg { flex: none; opacity: 0.7; }
+    .folder-discovery-added {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; opacity: 0.7; white-space: nowrap; padding-right: 4px;
+    }
+    .folder-discovery-empty { margin: 0; font-size: 12px; opacity: 0.75; line-height: 1.5; }
+    /* Under the saved list, and only while the repo holds paths that are not on
+       it — a button offering to add what is already added has nothing to do. */
+    .folder-import-row { margin-top: 8px; }
+    .folder-import-row[hidden] { display: none; }
     /* The provider name + its logo badge, side by side (was plain text). */
     .provider-section-heading .folder-paths-title {
       display: flex;
@@ -2837,6 +2864,9 @@
             </div>
             <div class="folder-list" id="folder-list"></div>
             <!-- Always visible: adding a path no longer needs an edit mode. -->
+            <div class="folder-import-row" id="folder-import-row" hidden>
+              <span id="folder-import-mount"></span>
+            </div>
             <div class="folder-add" id="folder-add">
               <span id="folder-new-mount"></span>
               <span id="folder-add-btn-mount"></span>
@@ -2882,6 +2912,9 @@
               <p class="folder-paths-subtitle">Choose on the main screen</p>
             </div>
             <div class="folder-list" id="github-folder-list"></div>
+            <div class="folder-import-row" id="github-folder-import-row" hidden>
+              <span id="github-folder-import-mount"></span>
+            </div>
             <div class="folder-add" id="github-folder-add">
               <span id="github-folder-new-mount"></span>
               <span id="github-folder-add-btn-mount"></span>
@@ -2898,6 +2931,7 @@
        silently a no-op — document.getElementById returned null, so the
        dialog's own setOpenExternal closure never got reassigned off its
        default no-op) until this round added the GitLab one and caught it. -->
+  <div id="folder-discovery-dialog-mount"></div>
   <div id="remove-github-dialog-mount"></div>
   <div id="remove-gitlab-dialog-mount"></div>
   <!-- First-run nudge — opened from the GIT_SETTINGS_LOADED handler
@@ -3329,6 +3363,9 @@
     // letting React diff/reuse them by index — otherwise, after a middle row
     // is removed, the shifted-index rows would keep their stale uncontrolled
     // value instead of picking up the new path at that index.
+    /* Both list renderers end by re-asking whether the offer still applies:
+       they are what runs on every add and every remove, so hanging it here
+       means no caller has to remember to. */
     function renderFolderList() {
       if (glActiveFolder && glFolders.indexOf(glActiveFolder) === -1) glActiveFolder = glFolders[0] || '';
       var subcard = document.getElementById('gitlab-folder-subcard');
@@ -3343,6 +3380,7 @@
       });
       window.PomFolderList.render(rows);
       renderFolderSelect();
+      refreshFolderImportOffer();
       // Folder count can go to/from zero here (add/remove) — keep the main
       // screen's empty-state message in sync immediately, not just after
       // the next Save/Cancel.
@@ -3431,6 +3469,7 @@
       });
       window.PomGithubFolderList.render(rows);
       renderGithubFolderSelect();
+      refreshFolderImportOffer();
       updatePushTargetUI();
     }
 
@@ -4550,6 +4589,11 @@
         if (!ready) { combo.setOptions([]); return; }
         listRepoFolders(which).then(function (res) {
           combo.setOptions(res.folders);
+          /* The discovery that has always run here now has somewhere to go:
+             the offer below the saved list, which can be true on arriving at
+             this page and not only after pressing Sync. */
+          lastDiscovered[which] = res.folders.slice();
+          refreshFolderImportOffer();
           /* Said once, and only when it is true: a repo big enough for GitHub
              to cap the response would otherwise look like it has fewer
              folders than it has, and the missing one would be hunted for in
@@ -4598,18 +4642,24 @@
         btn.setLoading(false);
         var combo = which === 'gitlab' ? window.PomFolderNew : window.PomGithubFolderNew;
         combo.setOptions(res.folders);
-        var n = res.folders.length;
+        lastDiscovered[which] = res.folders.slice();
         /*
-          NO FOLDERS IS AN ANSWER, NOT A FAILURE. A repo whose JSON sits at the
-          root has none, and so does one nothing has been pushed to yet — both
-          are ordinary, and both used to look like the button had done nothing.
+          THE PATHS ARE THE ANSWER, SO THE PATHS ARE WHAT IT SHOWS. A count in
+          a line of text tells you a number and leaves you to type the paths in
+          from memory — which you have just proved you do not have, or you would
+          not have pressed Sync.
+
+          Only while nothing is tracked yet, though. Once a path is saved, this
+          button's job is to go and re-read the repo, and a dialog every time
+          would be a dialog in the way. What is newly there is offered under the
+          saved list instead, where it can be taken or ignored.
         */
-        syncStatus(which, n
-          ? where + ' on ' + c.branch + ' — ' + n.toLocaleString() + ' folder path' +
-            (n === 1 ? '' : 's') + ' found' +
-            (res.truncated ? ', and more than this list can hold — type a path if it is missing' : '')
-          : where + ' on ' + c.branch + ' — connected, and the root is the only path in it',
+        var saved = which === 'gitlab' ? glFolders : ghFolders;
+        syncStatus(which, where + ' on ' + c.branch + ' — connected' +
+          (res.truncated ? ', and it holds more folders than this can list — type a path if one is missing' : ''),
           'ok');
+        refreshFolderImportOffer();
+        if (!saved.length) openFolderDiscovery(which);
       }, function (err) {
         btn.setLoading(false);
         /* Name the thing that was refused. "Could not connect" sends somebody
@@ -4619,8 +4669,57 @@
           ((err && err.message) || 'the request failed'), 'error');
       });
     }
+    /*
+      What the last sync saw, per provider. Kept so the dialog and the offer
+      below the saved list both describe the same reading — re-listing for each
+      would be the largest request this plugin makes, run twice to say one
+      thing, and the two answers could disagree.
+    */
+    var lastDiscovered = { gitlab: null, github: null };
+
+    function openFolderDiscovery(which) {
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      var where = which === 'gitlab' ? c.project : c.repo;
+      var saved = which === 'gitlab' ? glFolders : ghFolders;
+      folderDiscoveryFor = which;
+      window.PomFolderDiscovery.open(where, lastDiscovered[which] || [], saved.slice());
+    }
+
+    /* Which provider's dialog is open — the bridge is one control shown for
+       one provider at a time, so an added path has to know whose list it joins. */
+    var folderDiscoveryFor = null;
+    window.PomFolderDiscovery.onAdd = function (path) {
+      if (!folderDiscoveryFor) return;
+      var val = normFolder(path);
+      var list = folderDiscoveryFor === 'github' ? ghFolders : glFolders;
+      if (list.indexOf(val) === -1) list.push(val);
+      if (folderDiscoveryFor === 'github') renderGithubFolderList(); else renderFolderList();
+      renderImportFolderSelect();
+      persistSettings();
+      refreshFolderImportOffer();
+    };
+
+    /*
+      OFFERED ONLY WHILE THERE IS SOMETHING TO OFFER. A button proposing to add
+      folder paths from the repo, beneath a list that already holds every one of
+      them, has nothing to do — and a control that sometimes does nothing is
+      worse than one that is sometimes absent.
+    */
+    function refreshFolderImportOffer() {
+      [['gitlab', 'folder-import-row', glFolders], ['github', 'github-folder-import-row', ghFolders]]
+        .forEach(function (row) {
+          var which = row[0], el = document.getElementById(row[1]), saved = row[2];
+          if (!el) return;
+          var found = lastDiscovered[which];
+          var missing = (found || []).filter(function (p) { return saved.indexOf(normFolder(p)) === -1; });
+          el.hidden = !saved.length || !missing.length;
+        });
+    }
+
     document.getElementById('gh-sync-btn').addEventListener('click', function () { syncRepo('github'); });
     document.getElementById('gl-sync-btn').addEventListener('click', function () { syncRepo('gitlab'); });
+    document.getElementById('folder-import-btn').addEventListener('click', function () { openFolderDiscovery('gitlab'); });
+    document.getElementById('github-folder-import-btn').addEventListener('click', function () { openFolderDiscovery('github'); });
 
     document.getElementById('settings-btn').addEventListener('click', function() {
       document.getElementById('main-page').classList.add('hidden');
