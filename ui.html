@@ -48832,6 +48832,7 @@ html[data-theme=dark] {
           loading: s.loading,
           onClick: base.onClick,
           style: base.style,
+          title: s.title || void 0,
           ...extra,
           children: s.label ?? base.label
         }
@@ -48840,6 +48841,7 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime24.jsx)(LevelContext.Provider, { value: level, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(LiveButton, {}) })));
     return {
       setDisabled: (disabled) => set((s) => ({ ...s, disabled })),
+      setTitle: (title) => set((s) => ({ ...s, title })),
       setLoading: (loading) => set((s) => ({ ...s, loading })),
       setSuccess: (success) => set((s) => ({ ...s, success })),
       setLabel: (label) => set((s) => ({ ...s, label }))
@@ -53839,7 +53841,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'caf6c1b 09:20:21';
+    var CLOSURE_BUILD = 'a008f91 09:24:40';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -54051,9 +54053,48 @@ function format(report, opts) {
       reason someone finds out afterwards.
     */
     var repoFileNames = [];
+
+    /*
+      "PUSH AND REPLACE" IS ABOUT THE TWO NAMES ON SCREEN.
+
+      It first said Replace whenever the pushed name existed anywhere in the
+      folder, which was factually right and read as a mistake: with
+      tokens_dtcg.json on the Json file card and legacy-backup.json picked on
+      this one, the button claimed a replacement the screen gave no evidence
+      for. The evidence was real — tokens_dtcg.json was up there too — but a
+      claim nobody can check from what is in front of them is indistinguishable
+      from a wrong one, and the reader is right to distrust it.
+
+      So the loud version is the checkable one: the file this pushes to IS the
+      file named above it. Both names are on screen, and the word on the button
+      follows them.
+    */
     function pushWouldReplace(which) {
       if (!which) return false;
-      return repoFileNames.indexOf(pushFilePath(which).split('/').pop()) !== -1;
+      var name = pushFilePath(which).split('/').pop();
+      return !!repoSelectedFile() && repoSelectedFile() === name &&
+             repoFileNames.indexOf(name) !== -1;
+    }
+
+    /*
+      THE OTHER OVERWRITE, the one the label no longer shouts about: pushing a
+      name that IS in the repo while this card is pointing at a different file.
+      It still overwrites, and going quiet about it would trade a confusing
+      warning for a missing one — which is the worse of the two, because this
+      is the direction that loses somebody's work.
+
+      So it moves to the button's hover text, where it costs nothing to carry
+      and names the file, rather than to a label that cannot be checked
+      against anything on screen.
+    */
+    function pushOverwriteNote(which) {
+      if (!which) return '';
+      var name = pushFilePath(which).split('/').pop();
+      if (repoFileNames.indexOf(name) === -1) return '';
+      return repoSelectedFile() === name
+        ? 'Overwrites ' + pushFilePath(which) + ', which is the file shown above'
+        : 'Overwrites ' + pushFilePath(which) + ', which is already in this folder — ' +
+          'not the file shown above (' + repoSelectedFile() + ')';
     }
 
     function normFolder(p) {
@@ -55782,6 +55823,7 @@ function format(report, opts) {
           blockedByCommitMsg ? 'Add commit message'
           : pushWouldReplace(r.effectiveTarget) ? 'Push and Replace'
           : PUSH_TARGET_LABELS[r.effectiveTarget]);
+        window.PomButtons.push.setTitle(pushOverwriteNote(r.effectiveTarget));
       }
       window.PomButtons.download.setDisabled(!exportReady);
     }

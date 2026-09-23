@@ -290,6 +290,10 @@ function PomButton(props: any) {
 type LiveHandle = {
   setDisabled: (v: boolean) => void; setLoading: (v: boolean) => void;
   setSuccess: (v: boolean) => void; setLabel: (v: string | null) => void;
+  /* A hover string the LABEL cannot carry. Push needs one for the case where
+     what it is about to overwrite is not the file named on screen — see
+     pushWouldReplace() in ui.template.html. */
+  setTitle: (v: string) => void;
 };
 function mountLiveButton(mountId: string, base: any, initial: any, level: Level = GROUND): LiveHandle {
   const container = document.getElementById(mountId);
@@ -308,6 +312,7 @@ function mountLiveButton(mountId: string, base: any, initial: any, level: Level 
         loading={s.loading}
         onClick={base.onClick}
         style={base.style}
+        title={s.title || undefined}
         {...extra}
       >
         {s.label ?? base.label}
@@ -317,6 +322,7 @@ function mountLiveButton(mountId: string, base: any, initial: any, level: Level 
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><LiveButton /></LevelContext.Provider>));
   return {
     setDisabled: (disabled) => set((s) => ({ ...s, disabled })),
+    setTitle: (title) => set((s) => ({ ...s, title })),
     setLoading: (loading) => set((s) => ({ ...s, loading })),
     setSuccess: (success) => set((s) => ({ ...s, success })),
     setLabel: (label) => set((s) => ({ ...s, label })),

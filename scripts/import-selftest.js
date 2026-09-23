@@ -1819,7 +1819,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           return null;
         };
         const names = ['repoFilePath', 'pushFilePath', 'repoSelectedFile', 'listRepoJsonFiles',
-                       'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace'];
+                       'activeRepoProvider', 'repoAddressKey', 'pushWouldReplace',
+                       'pushOverwriteNote'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1996,14 +1997,45 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           */
           ctx.__gh_over = null; ctx.PomRepoFile.set('');
           ctx.repoFileNames = [];
+          ctx.PomRepoFile.set('tokens_dtcg.json');
           ok('repo probe: with no listing read yet, a push is not claimed to replace',
              ctx.pushWouldReplace('github') === false);
           ctx.repoFileNames = ['brand.json', 'other.json'];
           ok('repo probe: a name the repo does not hold is a plain push',
              ctx.pushWouldReplace('github') === false);
           ctx.repoFileNames = ['brand.json', 'tokens_dtcg.json'];
-          ok('repo probe: a name the repo already holds is a replace',
+          ok('repo probe: the pushed name being the file shown above is a replace',
              ctx.pushWouldReplace('github') === true);
+
+          /*
+            THE LOUD CLAIM HAS TO BE CHECKABLE FROM THE SCREEN.
+
+            It first said Replace whenever the pushed name existed anywhere in
+            the folder — true, and read as a mistake: with tokens_dtcg.json on
+            the Json file card and legacy-backup.json picked on the repo card,
+            the button claimed a replacement nothing on screen supported. A
+            claim the reader cannot check is indistinguishable from a wrong
+            one.
+          */
+          ctx.PomRepoFile.set('legacy-backup.json');
+          ctx.repoFileNames = ['legacy-backup.json', 'tokens_dtcg.json'];
+          ok('repo probe: a different file shown above is NOT labelled a replace',
+             ctx.pushWouldReplace('github') === false);
+          /* But it still overwrites, and going quiet about that would trade a
+             confusing warning for a missing one — the direction that loses
+             work. It moves to the hover text, naming the file. */
+          ok('repo probe: the overwrite it no longer shouts about is still said, and named',
+             /tokens_dtcg\.json/.test(ctx.pushOverwriteNote('github')) &&
+             /not the file shown above/.test(ctx.pushOverwriteNote('github')),
+             ctx.pushOverwriteNote('github'));
+          ctx.PomRepoFile.set('tokens_dtcg.json');
+          ok('repo probe: when the two names agree the note says so plainly',
+             /is the file shown above/.test(ctx.pushOverwriteNote('github')),
+             ctx.pushOverwriteNote('github'));
+          ctx.repoFileNames = ['brand.json'];
+          ok('repo probe: nothing to overwrite means no note at all',
+             ctx.pushOverwriteNote('github') === '');
+          ctx.repoFileNames = ['brand.json', 'tokens_dtcg.json'];
           /* The listing and the push path share one folder, so the comparison
              is on the file name within it. A folder change moves the address,
              which clears the listing before re-reading it (see checkRepo) —
