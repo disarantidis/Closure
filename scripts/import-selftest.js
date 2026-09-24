@@ -3253,6 +3253,22 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          halfSplit.duplicateNames.length === 1 &&
          halfSplit.duplicateNames[0].differsIn.join(',') === 'figma',
          JSON.stringify(halfSplit.duplicateNames));
+      /*
+        WHICH FILE SPELLS IT WHICH WAY — asked of BOTH documents, including the
+        one that has no collision of its own. That asymmetric case is the whole
+        point: one file holding both names and the other holding one of them is
+        what makes every token through the odd one out read as changed, and a
+        report that only named the file with the collision left the other one
+        unmentioned.
+      */
+      const lopsided = JD.compare(
+        { d: { 'font-family': { var: tok('TeleNeo') }, fontFamilies: { var: tok('Other') } } },
+        { d: { fontFamilies: { var: tok('Other') } } });
+      const lop = lopsided.duplicateNames[0];
+      ok('naming: each file is asked which of the two spellings it actually holds',
+         lop.has.figma.join(',') === 'font-family,fontFamilies' &&
+         lop.has.repo.join(',') === 'fontFamilies',
+         JSON.stringify(lop));
       const coincident = { d: { 'letter-spacing': { none: tok(0) },
                                 'paragraph-spacing': { none: tok(0) } } };
       ok('naming: two real concepts that happen to hold the same token are not a duplicate',

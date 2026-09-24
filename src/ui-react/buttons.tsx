@@ -2853,33 +2853,45 @@ const COMPARE_SAMPLE = 40;
                     </span>
                   ) },
                 /*
-                  ONE ROW PER PAIR, and this column says where. Keyed by side it
-                  printed `font-sizes / fontSize` twice in a row, once per file,
-                  with the same sentence under each — thirteen rows for seven
-                  findings, and the repetition meant nothing until the reader
-                  noticed the two names above were the same two names.
+                  WHICH FILE SPELLS IT WHICH WAY, one line per file, in that
+                  file's own mark.
 
-                  `differsIn` is asked separately from `sides` because the two
-                  questions come apart: a pair can be harmless in one document
-                  and hold different values in the other, and the row says which
-                  rather than averaging them into a boolean.
+                  It said "both files", which answers where the split is and not
+                  what the reader asked — which name is in which document. The
+                  row that matters most proves the difference: `letter-spacing`
+                  and `letterSpacing` are both in the Figma file and only
+                  `letterSpacing` is in the repo, and "this Figma file" left the
+                  repo unmentioned as though it had nothing to do with it. That
+                  asymmetry IS the hundred-token change on this page.
+
+                  A file holding both names is the defect; a file holding one is
+                  the other end of it, so both lines are drawn either way.
                 */
                 { key: 'side', header: 'In',
                   cell: (x: any) => {
-                    const both = x.sides.length > 1;
-                    const name = (side: string) => (side === 'repo' ? 'the repo file' : 'this Figma file');
-                    const where = both ? 'both files' : name(x.sides[0]);
-                    const d = x.differsIn || [];
+                    const mark = s.sides.provider === 'gitlab' ? IconGitlab(11) : IconGithub(11);
+                    const line = (side: string, icon: ReactNode) => {
+                      const held: string[] = (x.has && x.has[side]) || [];
+                      if (!held.length) return null;
+                      return (
+                        <span className="compare-spelling-line">
+                          <span className="compare-spelling-mark" aria-hidden>{icon}</span>
+                          <span className="compare-spelling-names">
+                            {held.join(', ')}
+                            {/* The amber goes on the SIDE that has the problem,
+                                not on the row: a pair can be harmless in one
+                                document and hold two answers in the other. */}
+                            {held.length > 1 && (x.differsIn || []).indexOf(side) !== -1 && (
+                              <span className="compare-pattern-why">different values</span>
+                            )}
+                          </span>
+                        </span>
+                      );
+                    };
                     return (
                       <span className="compare-pattern-to">
-                        <span>{where}</span>
-                        {d.length > 0 && (
-                          <span className="compare-pattern-why">
-                            {d.length === x.sides.length
-                              ? 'and they hold different values'
-                              : 'and they hold different values in ' + name(d[0])}
-                          </span>
-                        )}
+                        {line('figma', IconFigma(11))}
+                        {line('repo', mark)}
                       </span>
                     );
                   } },

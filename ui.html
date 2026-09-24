@@ -1704,6 +1704,13 @@
       flex-shrink: 0;
     }
     .compare-pattern-to { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    /* One line per file: the file's mark, then the spellings that file holds. */
+    .compare-spelling-line { display: flex; align-items: flex-start; gap: 5px; min-width: 0; }
+    .compare-spelling-mark { display: flex; flex-shrink: 0; margin-top: 2px; opacity: 0.7; }
+    .compare-spelling-names {
+      display: flex; flex-direction: column; gap: 1px; min-width: 0;
+      overflow-wrap: anywhere;
+    }
     .compare-pattern-why {
       font-size: 10px;
       line-height: 1.4;
@@ -51152,28 +51159,39 @@ html[data-theme=dark] {
                   cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-token", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: x.names.join("  \xB7  ") }) })
                 },
                 /*
-                                  ONE ROW PER PAIR, and this column says where. Keyed by side it
-                                  printed `font-sizes / fontSize` twice in a row, once per file,
-                                  with the same sentence under each — thirteen rows for seven
-                                  findings, and the repetition meant nothing until the reader
-                                  noticed the two names above were the same two names.
+                                  WHICH FILE SPELLS IT WHICH WAY, one line per file, in that
+                                  file's own mark.
                 
-                                  `differsIn` is asked separately from `sides` because the two
-                                  questions come apart: a pair can be harmless in one document
-                                  and hold different values in the other, and the row says which
-                                  rather than averaging them into a boolean.
+                                  It said "both files", which answers where the split is and not
+                                  what the reader asked — which name is in which document. The
+                                  row that matters most proves the difference: `letter-spacing`
+                                  and `letterSpacing` are both in the Figma file and only
+                                  `letterSpacing` is in the repo, and "this Figma file" left the
+                                  repo unmentioned as though it had nothing to do with it. That
+                                  asymmetry IS the hundred-token change on this page.
+                
+                                  A file holding both names is the defect; a file holding one is
+                                  the other end of it, so both lines are drawn either way.
                                 */
                 {
                   key: "side",
                   header: "In",
                   cell: (x) => {
-                    const both = x.sides.length > 1;
-                    const name = (side) => side === "repo" ? "the repo file" : "this Figma file";
-                    const where = both ? "both files" : name(x.sides[0]);
-                    const d = x.differsIn || [];
+                    const mark = s.sides.provider === "gitlab" ? IconGitlab(11) : IconGithub(11);
+                    const line = (side, icon2) => {
+                      const held = x.has && x.has[side] || [];
+                      if (!held.length) return null;
+                      return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-line", children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-mark", "aria-hidden": true, children: icon2 }),
+                        /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-names", children: [
+                          held.join(", "),
+                          held.length > 1 && (x.differsIn || []).indexOf(side) !== -1 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "different values" })
+                        ] })
+                      ] });
+                    };
                     return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-pattern-to", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { children: where }),
-                      d.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: d.length === x.sides.length ? "and they hold different values" : "and they hold different values in " + name(d[0]) })
+                      line("figma", IconFigma(11)),
+                      line("repo", mark)
                     ] });
                   }
                 }
@@ -55949,6 +55967,15 @@ function sameWordDifferentSpelling(a, b) {
   return true;
 }
 
+/* Is `name` a group — not a token — under `root` in this document? The
+   question findDuplicateNames answers for one document, asked of the other. */
+function hasGroup(doc, root, name) {
+  var r = doc && doc[root];
+  if (!r || typeof r !== 'object') return false;
+  var g = r[name];
+  return !!g && typeof g === 'object' && !isToken(g);
+}
+
 function findDuplicateNames(doc, side) {
   var out = [];
   if (!doc || typeof doc !== 'object') return out;
@@ -56529,15 +56556,38 @@ function compare(figmaDoc, repoDoc) {
   var dupRaw = findDuplicateNames(figmaDoc, 'figma').concat(findDuplicateNames(repoDoc, 'repo'));
   var dupBy = new Map();
   dupRaw.forEach(function (d) {
-    var k = d.names.join('/');
+    var k = d.root + '\u241f' + d.names.join('/');
     if (!dupBy.has(k)) {
-      dupBy.set(k, { names: d.names, tokens: d.tokens, sides: [], differsIn: [], documents: 0 });
+      dupBy.set(k, { root: d.root, names: d.names, tokens: d.tokens,
+                     sides: [], differsIn: [], has: {}, documents: 0 });
     }
     var e = dupBy.get(k);
     if (e.sides.indexOf(d.side) === -1) e.sides.push(d.side);
     if (!d.sameValues && e.differsIn.indexOf(d.side) === -1) e.differsIn.push(d.side);
     e.tokens = Math.max(e.tokens, d.tokens);
     e.documents++;
+  });
+  /*
+    WHICH FILE SPELLS IT WHICH WAY.
+
+    `sides` says where the SPLIT is — where one document holds both names at
+    once — and that is not the same question as which name each document uses.
+    The row that matters most here proves it: `letter-spacing` and
+    `letterSpacing` are both in the Figma file and only `letterSpacing` is in
+    the repo, which is the entire reason a hundred tokens read as changed. A
+    `sides` list saying "this Figma file" cannot say that; it leaves the repo
+    unmentioned, as though it had nothing to do with it.
+
+    So each finding is asked of BOTH documents, for BOTH names, whether or not
+    that document had a collision of its own. One of them almost always holds
+    exactly one of the two, and that is the half of the sentence that was
+    missing.
+  */
+  Array.from(dupBy.values()).forEach(function (e) {
+    e.has = {
+      figma: e.names.filter(function (n) { return hasGroup(figmaDoc, e.root, n); }),
+      repo: e.names.filter(function (n) { return hasGroup(repoDoc, e.root, n); }),
+    };
   });
   report.duplicateNames = Array.from(dupBy.values());
 
@@ -56765,7 +56815,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '4bfb311 10:38:54';
+    var CLOSURE_BUILD = '205336e 10:41:58';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

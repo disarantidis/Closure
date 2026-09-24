@@ -441,6 +441,15 @@ function sameWordDifferentSpelling(a, b) {
   return true;
 }
 
+/* Is `name` a group — not a token — under `root` in this document? The
+   question findDuplicateNames answers for one document, asked of the other. */
+function hasGroup(doc, root, name) {
+  var r = doc && doc[root];
+  if (!r || typeof r !== 'object') return false;
+  var g = r[name];
+  return !!g && typeof g === 'object' && !isToken(g);
+}
+
 function findDuplicateNames(doc, side) {
   var out = [];
   if (!doc || typeof doc !== 'object') return out;
@@ -1021,15 +1030,38 @@ function compare(figmaDoc, repoDoc) {
   var dupRaw = findDuplicateNames(figmaDoc, 'figma').concat(findDuplicateNames(repoDoc, 'repo'));
   var dupBy = new Map();
   dupRaw.forEach(function (d) {
-    var k = d.names.join('/');
+    var k = d.root + '\u241f' + d.names.join('/');
     if (!dupBy.has(k)) {
-      dupBy.set(k, { names: d.names, tokens: d.tokens, sides: [], differsIn: [], documents: 0 });
+      dupBy.set(k, { root: d.root, names: d.names, tokens: d.tokens,
+                     sides: [], differsIn: [], has: {}, documents: 0 });
     }
     var e = dupBy.get(k);
     if (e.sides.indexOf(d.side) === -1) e.sides.push(d.side);
     if (!d.sameValues && e.differsIn.indexOf(d.side) === -1) e.differsIn.push(d.side);
     e.tokens = Math.max(e.tokens, d.tokens);
     e.documents++;
+  });
+  /*
+    WHICH FILE SPELLS IT WHICH WAY.
+
+    `sides` says where the SPLIT is — where one document holds both names at
+    once — and that is not the same question as which name each document uses.
+    The row that matters most here proves it: `letter-spacing` and
+    `letterSpacing` are both in the Figma file and only `letterSpacing` is in
+    the repo, which is the entire reason a hundred tokens read as changed. A
+    `sides` list saying "this Figma file" cannot say that; it leaves the repo
+    unmentioned, as though it had nothing to do with it.
+
+    So each finding is asked of BOTH documents, for BOTH names, whether or not
+    that document had a collision of its own. One of them almost always holds
+    exactly one of the two, and that is the half of the sentence that was
+    missing.
+  */
+  Array.from(dupBy.values()).forEach(function (e) {
+    e.has = {
+      figma: e.names.filter(function (n) { return hasGroup(figmaDoc, e.root, n); }),
+      repo: e.names.filter(function (n) { return hasGroup(repoDoc, e.root, n); }),
+    };
   });
   report.duplicateNames = Array.from(dupBy.values());
 

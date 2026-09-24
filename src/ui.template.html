@@ -1704,6 +1704,13 @@
       flex-shrink: 0;
     }
     .compare-pattern-to { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    /* One line per file: the file's mark, then the spellings that file holds. */
+    .compare-spelling-line { display: flex; align-items: flex-start; gap: 5px; min-width: 0; }
+    .compare-spelling-mark { display: flex; flex-shrink: 0; margin-top: 2px; opacity: 0.7; }
+    .compare-spelling-names {
+      display: flex; flex-direction: column; gap: 1px; min-width: 0;
+      overflow-wrap: anywhere;
+    }
     .compare-pattern-why {
       font-size: 10px;
       line-height: 1.4;
