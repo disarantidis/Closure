@@ -13,6 +13,7 @@ const { buildManifest, bindManifest, bindThemes } = require('../src/import-manif
 const { materialise, fromRawGraph, compare, fingerprint } = require('../src/import-verify.js');
 const { apply, preflight } = require('../src/import-apply.js');
 const { diff, format } = require('../src/import-diff.js');
+const { filter, reduce } = require('../src/import-filter.js');
 
 /* A Figma stand-in with the same surface apply() uses, recording what it was
    told to do. Enough to assert the call sequence and to read the result back
@@ -3999,4 +4000,125 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
     console.log(pass + '/' + (pass + fail) + ' passed');
     process.exit(fail ? 1 : 0);
   })();
+}
+
+/* ── filter(): the same program, cut down to what actually moves ─────────── */
+{
+  const programOf = (doc) => { const ir = toIR(doc); return compile(ir, derive(ir, {}), {}).program; };
+  const docWith = (program) => { const F = mockFigma(); apply(program, F, {}); return F; };
+
+  /* The document and the file already agree. Nothing to write, and nothing
+     kept to write it with — a filtered noop is an empty program, not a
+     program of no-ops. */
+  {
+    const doc = { $metadata: { tokenSetOrder: ['core'] },
+                  core: { red: tok('#ff0000'), blue: tok('#0000ff') } };
+    const p = programOf(doc);
+    const F = docWith(p);
+    const cut = reduce(p, F.toRawGraph());
+    ok('filter: a document that already matches the file keeps no ops at all',
+       cut.program.ops.length === 0 && cut.report.summary.noop === true,
+       JSON.stringify(cut.stats));
+  }
+
+  /* One value moved. What survives is that value and the scaffolding it
+     needs, in the program's own order — and nothing else. */
+  {
+    const before = { $metadata: { tokenSetOrder: ['core'] },
+                     core: { red: tok('#ff0000'), blue: tok('#0000ff'), green: tok('#00ff00') } };
+    const after = { $metadata: { tokenSetOrder: ['core'] },
+                    core: { red: tok('#ff0000'), blue: tok('#000099'), green: tok('#00ff00') } };
+    const F = docWith(programOf(before));
+    const full = programOf(after);
+    const cut = reduce(full, F.toRawGraph());
+    const ops = cut.program.ops.map((o) => o.op + ':' + (o.name || o.collection));
+    ok('filter: one changed value keeps one value op',
+       cut.stats.values === 1 && cut.report.summary.valuesChanged === 1,
+       JSON.stringify(cut.stats));
+    ok('filter: and the collection and variable it needs, in that order',
+       ops.join(' ') === 'createCollection:core createVariable:blue setValue:blue',
+       ops.join(' '));
+    ok('filter: and it is a real reduction of the whole program',
+       full.ops.length === 7 && cut.program.ops.length === 3,
+       full.ops.length + ' -> ' + cut.program.ops.length);
+  }
+
+  /*
+    AN ALIAS NEEDS ITS TARGET TO EXIST, and the target's own value may be
+    exactly what it was. apply() resolves an alias through its own variable
+    table, so dropping the target's createVariable because nothing about the
+    target moved would set an alias into nothing.
+  */
+  {
+    const before = { $metadata: { tokenSetOrder: ['core', 'sem'] },
+                     core: { red: tok('#ff0000') }, sem: { bg: tok('#111111') } };
+    const after = { $metadata: { tokenSetOrder: ['core', 'sem'] },
+                    core: { red: tok('#ff0000') }, sem: { bg: tok('{red}') } };
+    const F = docWith(programOf(before));
+    const cut = reduce(programOf(after), F.toRawGraph());
+    const made = cut.program.ops.filter((o) => o.op === 'createVariable').map((o) => o.collection + '/' + o.name);
+    ok('filter: an alias keeps the variable it points at, though nothing about it moved',
+       made.indexOf('core/red') !== -1 && made.indexOf('sem/bg') !== -1,
+       JSON.stringify(made));
+  }
+
+  /* A mode the document has not got. The addMode survives, and so does the
+     collection that has to exist for it to be added to. */
+  {
+    const before = { $metadata: { tokenSetOrder: ['mode/light'] }, 'mode/light': { bg: tok('#ffffff') } };
+    const after = { $metadata: { tokenSetOrder: ['mode/light', 'mode/dark'] },
+                    'mode/light': { bg: tok('#ffffff') }, 'mode/dark': { bg: tok('#000000') } };
+    const F = docWith(programOf(before));
+    const cut = reduce(programOf(after), F.toRawGraph());
+    ok('filter: a mode the document has not got keeps its addMode',
+       cut.program.ops.some((o) => o.op === 'addMode' && o.mode === 'dark') &&
+       cut.program.ops.some((o) => o.op === 'createCollection'),
+       cut.program.ops.map((o) => o.op).join(','));
+  }
+
+  /*
+    THE CLAIM THE WHOLE THING RESTS ON. A filtered run and a full run leave the
+    same document. Not a smaller change to it — the same one, written with
+    fewer calls.
+  */
+  {
+    const before = { $metadata: { tokenSetOrder: ['core', 'sem'] },
+      core: { red: tok('#ff0000'), blue: tok('#0000ff'), grey: tok('#888888') },
+      sem: { bg: tok('{red}'), fg: tok('{blue}'), line: tok('#cccccc') } };
+    const after = { $metadata: { tokenSetOrder: ['core', 'sem'] },
+      core: { red: tok('#ff0000'), blue: tok('#000099'), grey: tok('#888888'), gold: tok('#ffcc00') },
+      sem: { bg: tok('{gold}'), fg: tok('{blue}'), line: tok('#cccccc') } };
+    const full = programOf(after);
+
+    const A = docWith(programOf(before));
+    const B = docWith(programOf(before));
+    ok('filter: the two documents start identical',
+       fingerprint(fromRawGraph(A.toRawGraph())) === fingerprint(fromRawGraph(B.toRawGraph())));
+
+    apply(full, A, { existing: snapshotOf(A) });
+    const cut = reduce(full, B.toRawGraph());
+    apply(cut.program, B, { existing: snapshotOf(B) });
+
+    ok('filter: a filtered run leaves the same document as the whole program',
+       fingerprint(fromRawGraph(A.toRawGraph())) === fingerprint(fromRawGraph(B.toRawGraph())),
+       JSON.stringify(cut.stats));
+    ok('filter: and it wrote fewer values to get there',
+       cut.stats.values < full.ops.filter((o) => o.op === 'setValue' || o.op === 'setAlias').length,
+       cut.stats.values + ' of ' +
+         full.ops.filter((o) => o.op === 'setValue' || o.op === 'setAlias').length);
+    ok('filter: and it never removed anything',
+       B.collections.every((c) => c.vars.length >= 3));
+  }
+
+  /* Whatever else compile() put on the program travels with it — a caller
+     reading program.ok off the short version must not get undefined. */
+  {
+    const doc = { $metadata: { tokenSetOrder: ['core'] }, core: { red: tok('#ff0000') } };
+    const ir = toIR(doc);
+    const c = compile(ir, derive(ir, {}), {});
+    const cut = filter(c.program, { added: [], changed: [] });
+    ok('filter: the program keeps the fields that are not ops',
+       Object.keys(c.program).every((k) => k === 'ops' || cut.program[k] !== undefined),
+       Object.keys(c.program).join(','));
+  }
 }
