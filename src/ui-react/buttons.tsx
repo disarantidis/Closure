@@ -2934,20 +2934,16 @@ const SPELLING_NAMES = 6;
       the change is has to compare each line against the one above it to
       discover that it never does.
 
-      So a pair repeated from the row above is drawn as the mark that has
-      meant exactly this in printed tables for centuries. It says "the same"
-      in one character, and the moment it stops appearing is the moment
-      something else began — which is the thing worth seeing, and was
-      invisible while every row shouted.
+      So a pair repeated from the row above is not drawn at all. A ditto mark
+      was tried first and is the traditional answer, and it was still a column
+      of marks to read past: something in every cell, saying nothing, forty
+      times. Empty says it without being read.
 
-      The full value stays on the title, and a screen reader is given the
-      words rather than the glyph.
+      What is left is one statement with the tokens that followed it listed
+      underneath, and a value appearing again is the only event in the column
+      — which is exactly the thing worth seeing, and was invisible while every
+      row shouted.
     */
-    const ditto = (v: string) => (
-      <span className="compare-ditto" title={v} aria-label={'same as above: ' + v}>
-        <span aria-hidden="true">{'\u3003'}</span>
-      </span>
-    );
 
     /* A leaf list, capped. The count in the heading is the REAL one, not the
        length of what is shown — a heading that said 40 when there were 13,137
@@ -3489,7 +3485,7 @@ const SPELLING_NAMES = 6;
              side that could have pointed and did not. */
           cell: (x: any) => (
             <>
-              {x._repeat ? ditto(String(x.figma)) : valueCell(x.figma, x.repo)}
+              {x._repeat ? null : valueCell(x.figma, x.repo)}
               {flagOf && x.unboundSide === 'figma' ? flagOf(x) : null}
             </>
           ),
@@ -3500,7 +3496,7 @@ const SPELLING_NAMES = 6;
           width: w,
           cell: (x: any) => (
             <>
-              {x._repeat ? ditto(String(x.repo)) : valueCell(x.repo, x.figma)}
+              {x._repeat ? null : valueCell(x.repo, x.figma)}
               {flagOf && x.unboundSide === 'repo' ? flagOf(x) : null}
             </>
           ),

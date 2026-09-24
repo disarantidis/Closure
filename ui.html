@@ -1512,16 +1512,6 @@
       -webkit-box-decoration-break: clone;
       box-decoration-break: clone;
     }
-    /* The ditto mark: this row's value is the row above's. Quiet, because it
-       is the absence of news, and the width it leaves empty is the point —
-       a column of these reads as one statement with a list under it. */
-    .compare-ditto {
-      display: inline-block;
-      opacity: 0.35;
-      font-size: 13px;
-      line-height: 1.2;
-      padding-inline-start: 2px;
-    }
     /* A value too long to be a pill — a reference, mostly. Same treatment as
        the path, one step quieter. */
     .compare-cell-text {
@@ -51401,7 +51391,6 @@ html[data-theme=dark] {
           }
         ) });
       };
-      const ditto = (v) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-ditto", title: v, "aria-label": "same as above: " + v, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { "aria-hidden": "true", children: "\u3003" }) });
       const rowFlag = (x) => {
         if (!x || !x.bindable) return null;
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-flag", children: [
@@ -51696,7 +51685,7 @@ html[data-theme=dark] {
             /* The flag goes under whichever side holds the literal — that is the
                side that could have pointed and did not. */
             cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
-              x._repeat ? ditto(String(x.figma)) : valueCell(x.figma, x.repo),
+              x._repeat ? null : valueCell(x.figma, x.repo),
               flagOf && x.unboundSide === "figma" ? flagOf(x) : null
             ] })
           });
@@ -51705,7 +51694,7 @@ html[data-theme=dark] {
             header: repoHead(),
             width: w,
             cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
-              x._repeat ? ditto(String(x.repo)) : valueCell(x.repo, x.figma),
+              x._repeat ? null : valueCell(x.repo, x.figma),
               flagOf && x.unboundSide === "repo" ? flagOf(x) : null
             ] })
           });
@@ -57741,7 +57730,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '496f5ff 17:50:02';
+    var CLOSURE_BUILD = 'd712f26 17:51:52';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
