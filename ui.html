@@ -51248,6 +51248,13 @@ html[data-theme=dark] {
         icon2 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-col-icon", "aria-hidden": "true", children: icon2 }),
         label
       ] });
+      const repoName = s.sides.provider === "gitlab" ? "GitLab" : s.sides.provider === "github" ? "GitHub" : "Repo";
+      const repoWhere = s.sides.provider === "gitlab" || s.sides.provider === "github" ? repoName : "the repo";
+      const repoHead = () => headWith(
+        s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null,
+        repoName
+      );
+      const figmaHead = () => headWith(IconFigma(12), "Figma");
       const compositePairs = (v) => {
         if (v.charAt(0) !== "{" || v.charAt(v.length - 1) !== "}") return null;
         const body = v.slice(1, -1);
@@ -51383,14 +51390,14 @@ html[data-theme=dark] {
               rules: true,
               columns: [
                 {
-                  key: "from",
-                  header: headWith(s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null, "Was"),
-                  cell: (x) => pathCell(x.from, x.type, x.path)
+                  key: "path",
+                  header: figmaHead(),
+                  cell: (x) => pathCell(x.path, x.type, x.from)
                 },
                 {
-                  key: "path",
-                  header: headWith(IconFigma(12), "Now"),
-                  cell: (x) => pathCell(x.path, x.type, x.from)
+                  key: "from",
+                  header: repoHead(),
+                  cell: (x) => pathCell(x.from, x.type, x.path)
                 }
               ],
               rows: rows.slice(0, COMPARE_SAMPLE),
@@ -51438,12 +51445,12 @@ html[data-theme=dark] {
                 },
                 {
                   key: "figma",
-                  header: headWith(IconFigma(12), "Was"),
+                  header: figmaHead(),
                   cell: (x) => pathCell(String(x.figma), x.type, String(x.repo))
                 },
                 {
                   key: "repo",
-                  header: headWith(s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null, "Now"),
+                  header: repoHead(),
                   cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-pattern-to", children: [
                     pathCell(String(x.repo), x.type, String(x.figma)),
                     x.sameNameDifferentSpelling && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "one name, spelled two ways" })
@@ -51543,12 +51550,12 @@ html[data-theme=dark] {
               columns: [
                 {
                   key: "was",
-                  header: headWith(IconFigma(12), "Was"),
+                  header: figmaHead(),
                   cell: (x) => pathCell(x.was, void 0, x.now)
                 },
                 {
                   key: "now",
-                  header: headWith(s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null, "Now"),
+                  header: repoHead(),
                   cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-pattern-to", children: [
                     pathCell(x.now, void 0, x.was),
                     x.note && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: x.note })
@@ -51580,23 +51587,23 @@ html[data-theme=dark] {
           const longest = sample.reduce((n, x) => Math.max(n, shownLen(x.repo, x.figma), shownLen(x.figma, x.repo)), 0);
           const w = wide ? "36%" : Math.min(116, Math.max(92, Math.round(longest * 7.23 + 12))) + "px";
           columns.push({
-            key: "repo",
-            header: headWith(s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null, "Repo"),
-            width: w,
-            cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
-              valueCell(x.repo, x.figma),
-              flagOf && x.unboundSide === "repo" ? flagOf(x) : null
-            ] })
-          });
-          columns.push({
             key: "figma",
-            header: headWith(IconFigma(12), "Figma"),
+            header: figmaHead(),
             width: w,
             /* The flag goes under whichever side holds the literal — that is the
                side that could have pointed and did not. */
             cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
               valueCell(x.figma, x.repo),
               flagOf && x.unboundSide === "figma" ? flagOf(x) : null
+            ] })
+          });
+          columns.push({
+            key: "repo",
+            header: repoHead(),
+            width: w,
+            cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
+              valueCell(x.repo, x.figma),
+              flagOf && x.unboundSide === "repo" ? flagOf(x) : null
             ] })
           });
         } else {
@@ -51745,8 +51752,8 @@ html[data-theme=dark] {
         leaves("Architecture \u2014 pointing somewhere new", r.repointed || [], true),
         leaves("Architecture \u2014 same value, aliased one side", r.aliased || [], true, rowFlag),
         movedTable(r.moved || []),
-        leaves("Architecture \u2014 only here", r.onlyInFigma, false),
-        leaves("Architecture \u2014 only in the repo", r.onlyInRepo, false),
+        leaves("Architecture \u2014 only in Figma", r.onlyInFigma, false),
+        leaves("Architecture \u2014 only in " + repoWhere, r.onlyInRepo, false),
         /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
             PomButton,
@@ -57335,7 +57342,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '44fbccd 15:02:19';
+    var CLOSURE_BUILD = 'd181f30 15:07:33';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

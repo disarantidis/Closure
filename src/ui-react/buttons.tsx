@@ -2663,6 +2663,37 @@ const COMPARE_SAMPLE = 40;
     );
 
     /*
+      THE COLUMNS ARE THE TWO SIDES, NAMED.
+
+      They used to be Was and Now, which is a claim about order: that the
+      Figma file came first and the repo is the edit. Half the tables on this
+      page make the opposite claim — a moved token was in the repo and is now
+      here — so the same two words pointed in two directions three cards
+      apart, and neither was ever a thing the comparison knows. It has two
+      files. It does not know which one anybody changed.
+
+      So each column is its own side, by name and by mark. The repo's name is
+      the service it actually is, because "Repo" is what we call it and
+      GitHub is what the reader opened; "Repo" survives only for a provider
+      we cannot name.
+
+      And in one order everywhere, Figma first, the order the two cards at the
+      top of the page already put them in. Direction words could sit in two
+      orders and still read; side names cannot — two cards apart with GitHub
+      on opposite sides is a misreading waiting to happen.
+    */
+    const repoName = s.sides.provider === 'gitlab' ? 'GitLab'
+                   : s.sides.provider === 'github' ? 'GitHub' : 'Repo';
+    /* The same name in running text, where the unnamed case needs an article
+       a column header does not: "only in Repo" is not a sentence. */
+    const repoWhere = s.sides.provider === 'gitlab' || s.sides.provider === 'github'
+                    ? repoName : 'the repo';
+    const repoHead = () => headWith(
+      s.sides.provider === 'gitlab' ? IconGitlab(12)
+      : s.sides.provider === 'github' ? IconGithub(12) : null, repoName);
+    const figmaHead = () => headWith(IconFigma(12), 'Figma');
+
+    /*
       A COMPOSITE IS A BAG OF SUB-VALUES, AND ONLY SOME OF THEM MOVED.
 
       A typography token renders as {fontFamily:...,fontSize:...,fontWeight:
@@ -2923,12 +2954,10 @@ const COMPARE_SAMPLE = 40;
               size="small"
               rules
               columns={[
-                { key: 'from',
-                  header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
-                                 : s.sides.provider === 'github' ? IconGithub(12) : null, 'Was'),
-                  cell: (x: any) => pathCell(x.from, x.type, x.path) },
-                { key: 'path', header: headWith(IconFigma(12), 'Now'),
+                { key: 'path', header: figmaHead(),
                   cell: (x: any) => pathCell(x.path, x.type, x.from) },
+                { key: 'from', header: repoHead(),
+                  cell: (x: any) => pathCell(x.from, x.type, x.path) },
               ]}
               rows={rows.slice(0, COMPARE_SAMPLE)}
               rowKey={(x: any) => x.path}
@@ -2991,11 +3020,9 @@ const COMPARE_SAMPLE = 40;
                 */
                 { key: 'count', header: 'Tokens', width: '58px',
                   cell: (x: any) => <span className="compare-pattern-count">{x.count.toLocaleString()}</span> },
-                { key: 'figma', header: headWith(IconFigma(12), 'Was'),
+                { key: 'figma', header: figmaHead(),
                   cell: (x: any) => pathCell(String(x.figma), x.type, String(x.repo)) },
-                { key: 'repo',
-                  header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
-                                 : s.sides.provider === 'github' ? IconGithub(12) : null, 'Now'),
+                { key: 'repo', header: repoHead(),
                   cell: (x: any) => (
                     <span className="compare-pattern-to">
                       {pathCell(String(x.repo), x.type, String(x.figma))}
@@ -3125,12 +3152,9 @@ const COMPARE_SAMPLE = 40;
               size="small"
               rules
               columns={[
-                { key: 'was',
-                  header: headWith(IconFigma(12), 'Was'),
+                { key: 'was', header: figmaHead(),
                   cell: (x: any) => pathCell(x.was, undefined, x.now) },
-                { key: 'now',
-                  header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
-                                 : s.sides.provider === 'github' ? IconGithub(12) : null, 'Now'),
+                { key: 'now', header: repoHead(),
                   cell: (x: any) => (
                     <span className="compare-pattern-to">
                       {pathCell(x.now, undefined, x.was)}
@@ -3215,20 +3239,8 @@ const COMPARE_SAMPLE = 40;
         const w = wide ? '36%'
                 : Math.min(116, Math.max(92, Math.round(longest * 7.23 + 12))) + 'px';
         columns.push({
-          key: 'repo',
-          header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
-                         : s.sides.provider === 'github' ? IconGithub(12) : null, 'Repo'),
-          width: w,
-          cell: (x: any) => (
-            <>
-              {valueCell(x.repo, x.figma)}
-              {flagOf && x.unboundSide === 'repo' ? flagOf(x) : null}
-            </>
-          ),
-        });
-        columns.push({
           key: 'figma',
-          header: headWith(IconFigma(12), 'Figma'),
+          header: figmaHead(),
           width: w,
           /* The flag goes under whichever side holds the literal — that is the
              side that could have pointed and did not. */
@@ -3236,6 +3248,17 @@ const COMPARE_SAMPLE = 40;
             <>
               {valueCell(x.figma, x.repo)}
               {flagOf && x.unboundSide === 'figma' ? flagOf(x) : null}
+            </>
+          ),
+        });
+        columns.push({
+          key: 'repo',
+          header: repoHead(),
+          width: w,
+          cell: (x: any) => (
+            <>
+              {valueCell(x.repo, x.figma)}
+              {flagOf && x.unboundSide === 'repo' ? flagOf(x) : null}
             </>
           ),
         });
@@ -3555,8 +3578,11 @@ const COMPARE_SAMPLE = 40;
         {/* Both ends, because the rename is the finding — one column would be
             a list of paths with no way to see what became what. */}
         {movedTable(r.moved || [])}
-        {leaves('Architecture \u2014 only here', r.onlyInFigma, false)}
-        {leaves('Architecture \u2014 only in the repo', r.onlyInRepo, false)}
+        {/* Named sides here too: these two have no column to name them, and
+            "only here" beside a table headed Figma is the same word the
+            headers were changed to stop using. */}
+        {leaves('Architecture \u2014 only in Figma', r.onlyInFigma, false)}
+        {leaves('Architecture \u2014 only in ' + repoWhere, r.onlyInRepo, false)}
 
         <div className="json-download-card" data-level={4}>
           <PomButton
