@@ -796,7 +796,9 @@ window.PomButtons = {
     'download-btn-mount',
     { id: 'download-btn', variant: 'filled', size: 'small', leftIcon: true, buttonLeftIcon: IconDownload(16), label: 'Download JSON', title: 'Download JSON' },
     true,
-    SUBCARD_LEVEL,
+    /* CARD_LEVEL: it stood on a level-3 subcard inside the repo card and stands
+       on .json-file-card now, a card of its own at level 4. */
+    CARD_LEVEL,
   ),
 };
 
@@ -1051,9 +1053,9 @@ function mountCompareSides() {
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   const pickEl = document.getElementById('compare-pick-mount');
-  /* SUBCARD_LEVEL for the picker, CARD_LEVEL for the Figma tag above: they are
-     mounted into two different cards and only one of them moved. */
-  if (pickEl) flushSync(() => createRoot(pickEl).render(<LevelContext.Provider value={SUBCARD_LEVEL}><Pick /></LevelContext.Provider>));
+  /* Both at CARD_LEVEL: the Figma tag stands on the compare card and the picker
+     on .export-panel, and both of those are level 4. */
+  if (pickEl) flushSync(() => createRoot(pickEl).render(<LevelContext.Provider value={CARD_LEVEL}><Pick /></LevelContext.Provider>));
   window.PomCompareSides = {
     set: (next) => {
       state = { ...state, ...next };
@@ -1090,7 +1092,7 @@ window.PomCompareFolder = mountLiveDropdown(
   'compare-folder-mount',
   { label: 'Folder path', icon: IconFolder(16) },
   (v: string) => window.PomCompareFolder?.onChange?.(v),
-  SUBCARD_LEVEL,
+  CARD_LEVEL,
 ) as any;
 window.PomCompareFolder.onChange = null;
 
@@ -1311,9 +1313,9 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
       />
     );
   }
-  /* SUBCARD_LEVEL — it stands on .json-download-card.is-sub now; see the note
-     above PomFolderSelect on what mounting it a rung low did. */
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={SUBCARD_LEVEL}><View /></LevelContext.Provider>));
+  /* CARD_LEVEL — the address row is back on .export-panel; see the note above
+     PomFolderSelect for where it has been. */
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomPrimaryFilename = {
     get: () => state.value,
     /* A set from outside is the app choosing, not the person — it moves the
@@ -1883,7 +1885,7 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
   };
 }
 
-mountIconButton('folder-create-mount', { id: 'folder-create-btn', variant: 'outline', size: 'medium', title: 'Use this folder path — created on the first push', 'aria-label': 'Use this folder path', icon: IconAdd(16) }, SUBCARD_LEVEL);
+mountIconButton('folder-create-mount', { id: 'folder-create-btn', variant: 'outline', size: 'medium', title: 'Use this folder path — created on the first push', 'aria-label': 'Use this folder path', icon: IconAdd(16) }, CARD_LEVEL);
 /*
   THE GROUND MOVED UNDER THESE FOUR, and a field that does not follow it
   disappears.
@@ -1898,8 +1900,19 @@ mountIconButton('folder-create-mount', { id: 'folder-create-btn', variant: 'outl
   Ground 3 lifts to 4. Same mistake, same fix, as the Add-Paths button in
   Settings — see SUBCARD_LEVEL's own note.
 */
-window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', 'choose a folder', SUBCARD_LEVEL), onChange: null };
-window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', 'choose a folder', SUBCARD_LEVEL), onChange: null };
+/*
+  THE GROUND HAS MOVED UNDER THE ADDRESS ROW TWICE, so it is worth saying where
+  it is rather than which way it went. The row is a direct child of
+  .export-panel, which is level 4, and CARD_LEVEL is the name for "the ground
+  is 2-or-4, so compute at 3" — a visible field against a level-4 card.
+
+  It spent a while inside a level-3 subcard, where that same CARD_LEVEL
+  computed rung 3 standing ON rung 3 and Compare's file dropdown painted
+  rgb(37,37,37) onto rgb(37,37,37): measured, invisible. That subcard is gone —
+  its header became .json-file-card and its fields came back out here.
+*/
+window.PomFolderSelect = { ...mountFolderCombo('folder-select-mount', 'PomFolderSelect', 'choose a folder', CARD_LEVEL), onChange: null };
+window.PomGithubFolderSelect = { ...mountFolderCombo('github-folder-select-mount', 'PomGithubFolderSelect', 'choose a folder', CARD_LEVEL), onChange: null };
 /*
   THE IMPORT PAGE'S FOLDER IS A LIST TOO, for the reason the file beside it is.
 
@@ -2172,13 +2185,12 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     THE LEVEL OF THE SURFACE IT ACTUALLY STANDS ON, which stopped being the
     same thing when this card became a subcard.
 
-    A Tag lifts one rung off its ground (fieldLevel, Tag.tsx). Mounted at
-    CARD_LEVEL it computed rung 3 — correct while the Json file card was a
-    top-level card, and wrong once it moved inside the Figma card, because the
-    card itself is now rung 3: the tag painted the same colour as the thing
-    behind it and the pill disappeared. Its ground is 3, so it lifts to 4.
+    A Tag lifts one rung off its ground (fieldLevel, Tag.tsx), so it has
+    followed this card everywhere it has been: rung 3 as a top-level card, rung
+    4 as a subcard inside another, and back to 3 now that it is
+    .json-file-card — a card of its own at level 4 again.
   */
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={SUBCARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomJsonFileCard = { setSize: (size) => set(size) };
 })();
 

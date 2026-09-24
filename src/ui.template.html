@@ -2716,6 +2716,17 @@
       is the half that can afford to: it sits in a dropdown that shows the
       whole path, and it is not the name being typed.
     */
+    /* The file and the one button that saves it. A card of its own between the
+       Figma card and the repo card — see the markup's note on why downloading
+       and pushing stopped sharing one. */
+    .json-file-card {
+      background: var(--background);
+      border-radius: 24px;
+      padding: var(--spacing-component-4);
+      margin: 0 16px 16px;
+    }
+    .json-file-card[hidden] { display: none; }
+
     .json-download-fields { display: flex; align-items: center; gap: 8px; }
     /* Each may still be narrower than its content — min-width: 0 is what lets
        a flex item shrink below its intrinsic size and truncate inside the card
@@ -2947,6 +2958,62 @@
       one address. The mode switch in that card's header is the door, and the
       controls are shared because they were always the same controls.
     -->
+    <!--
+      THE FILE ITSELF, BETWEEN THE DOCUMENT IT CAME FROM AND THE PLACE IT GOES.
+
+      Downloading and pushing are two acts and they were sharing one card. The
+      address below — a folder and a name — is the PUSH's: it says where in the
+      repository this lands and what it is called when it gets there. A download
+      has no such address; it goes wherever the browser puts it, under whatever
+      name the save dialog is given, and the name can be changed there anyway.
+
+      Reading them as one card made the name field look like it governed both,
+      which is the question this split answers: the file and its size and the
+      one button that saves it live here, and everything about the repository
+      stays in the repository's card.
+    -->
+    <div class="json-file-card" id="json-file-card" data-level="4" hidden>
+        <div class="json-download-header">
+          <div class="json-download-title-group">
+            <!-- Plain inline SVG, not React-mounted — same reasoning as the
+                 GitLab/GitHub marks on this card's own title above: these
+                 title rows are static markup, not React roots. Lucide's
+                 "file-text" glyph — a document, reading as "this is the
+                 file" the way the collections card's braces icon reads as
+                 "these are the variables". -->
+            <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <path d="M14 2v6h6"/>
+              <path d="M16 13H8"/>
+              <path d="M16 17H8"/>
+              <path d="M10 9H8"/>
+            </svg>
+            <p class="json-download-title">Json file</p>
+          </div>
+          <!-- The file-size tag that used to sit on the collections card
+               (beside its token count) — it describes this JSON file, so it
+               reads better here, at the right of this card's own title. -->
+          <span id="json-file-size-mount"></span>
+          <!--
+            DOWNLOAD SITS IN THE HEADER, NOT IN THE ROW BELOW IT — and this
+            is the measurement that put it here.
+
+            Measured when the window was 420px, which left this row 312 to
+            spend; a Combobox costs about 90 of it on chrome before it shows
+            a character — a clear ×, a rule, a chevron and the padding around
+            them. Two of them plus a 50px button left the folder 18px of text
+            and the file 70: "ODS" clipped mid-letter and "tokens.json"
+            reading "tokens". The panel is 483 now and the button is still
+            better off out of the row.
+
+            In the header it costs the row nothing, and it is a better fit
+            for what it is: the one thing this card DOES, at the card's own
+            level, rather than a third control in an address.
+          -->
+          <div id="download-btn-mount"></div>
+        </div>
+    </div>
+
     <!-- Skeleton twin of the action area, shown while the list loads. -->
     <div class="actions actions-skeleton" id="actions-skeleton"></div>
 
@@ -3032,92 +3099,51 @@
           only it can say: which document this came out of, and how much of it
           there is.
         -->
-        <div class="json-download-card is-sub" id="json-download-card" data-level="3">
-          <div class="json-download-header">
-            <div class="json-download-title-group">
-              <!-- Plain inline SVG, not React-mounted — same reasoning as the
-                   GitLab/GitHub marks on this card's own title above: these
-                   title rows are static markup, not React roots. Lucide's
-                   "file-text" glyph — a document, reading as "this is the
-                   file" the way the collections card's braces icon reads as
-                   "these are the variables". -->
-              <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <path d="M14 2v6h6"/>
-                <path d="M16 13H8"/>
-                <path d="M16 17H8"/>
-                <path d="M10 9H8"/>
-              </svg>
-              <p class="json-download-title">Json file</p>
-            </div>
-            <!-- The file-size tag that used to sit on the collections card
-                 (beside its token count) — it describes this JSON file, so it
-                 reads better here, at the right of this card's own title. -->
-            <span id="json-file-size-mount"></span>
+        <div class="json-download-fields">
+          <!--
+            THE FOLDER HALF HIDES ON ITS OWN, and that is why it still has a
+            wrapper of its own after the file name moved in beside it.
+
+            It is the only part of this row that needs a repository. The name
+            and Download do not: downloading with nothing configured is a
+            whole supported workflow, not a half-finished one (see
+            pushTarget()'s noPushDestination), so hiding the row would take
+            away the two controls that still work.
+
+            Only one provider's picker is ever shown; updateTargetRow decides
+            which. Both live here rather than in a provider block so that the
+            folder and the file share one line instead of being separated by
+            a block boundary.
+          -->
+          <span class="repo-file-row" id="repo-file-row" hidden>
+            <!-- The push side: a combobox, because the folder you are about
+                 to push into may not exist yet, and the + beside it is how
+                 it gets made. One wrapper so the mode can take all three
+                 away at once without fighting updateTargetRow over which
+                 provider's picker is the visible one. -->
+            <span class="folder-push-cell" id="folder-push-cell">
+            <span id="folder-select-mount" class="repo-file-half"></span>
+            <span id="github-folder-select-mount" class="repo-file-half"></span>
             <!--
-              DOWNLOAD SITS IN THE HEADER, NOT IN THE ROW BELOW IT — and this
-              is the measurement that put it here.
-
-              Measured when the window was 420px, which left this row 312 to
-              spend; a Combobox costs about 90 of it on chrome before it shows
-              a character — a clear ×, a rule, a chevron and the padding around
-              them. Two of them plus a 50px button left the folder 18px of text
-              and the file 70: "ODS" clipped mid-letter and "tokens.json"
-              reading "tokens". The panel is 483 now and the button is still
-              better off out of the row.
-
-              In the header it costs the row nothing, and it is a better fit
-              for what it is: the one thing this card DOES, at the card's own
-              level, rather than a third control in an address.
+              CREATE THE PATH THAT IS IN THE BOX. Sits with the folder picker
+              because it belongs to it: a folder you type is not on any list,
+              so picking cannot commit it and something has to. Hidden unless
+              what is typed is actually new — an Add button beside a folder
+              that already exists has nothing to add.
             -->
-            <div id="download-btn-mount"></div>
-          </div>
-          <div class="json-download-fields">
-            <!--
-              THE FOLDER HALF HIDES ON ITS OWN, and that is why it still has a
-              wrapper of its own after the file name moved in beside it.
-
-              It is the only part of this row that needs a repository. The name
-              and Download do not: downloading with nothing configured is a
-              whole supported workflow, not a half-finished one (see
-              pushTarget()'s noPushDestination), so hiding the row would take
-              away the two controls that still work.
-
-              Only one provider's picker is ever shown; updateTargetRow decides
-              which. Both live here rather than in a provider block so that the
-              folder and the file share one line instead of being separated by
-              a block boundary.
-            -->
-            <span class="repo-file-row" id="repo-file-row" hidden>
-              <!-- The push side: a combobox, because the folder you are about
-                   to push into may not exist yet, and the + beside it is how
-                   it gets made. One wrapper so the mode can take all three
-                   away at once without fighting updateTargetRow over which
-                   provider's picker is the visible one. -->
-              <span class="folder-push-cell" id="folder-push-cell">
-              <span id="folder-select-mount" class="repo-file-half"></span>
-              <span id="github-folder-select-mount" class="repo-file-half"></span>
-              <!--
-                CREATE THE PATH THAT IS IN THE BOX. Sits with the folder picker
-                because it belongs to it: a folder you type is not on any list,
-                so picking cannot commit it and something has to. Hidden unless
-                what is typed is actually new — an Add button beside a folder
-                that already exists has nothing to add.
-              -->
-              <span id="folder-create-mount" hidden></span>
-              </span>
-              <!-- The read side: a closed list of the saved paths. There is
-                   nothing to invent when you are reading — see the comment on
-                   PomCompareFolder — so it does not take typing. -->
-              <span id="compare-folder-mount" class="repo-file-half" hidden></span>
+            <span id="folder-create-mount" hidden></span>
             </span>
-            <!-- One cell, two controls: in Push it is the name being written,
-                 editable here and nowhere else now; in Compare it is the picker
-                 for what to read instead. Same place, because it is the same
-                 half of one address. -->
-            <span id="primary-filename-mount" class="repo-file-half"></span>
-            <span id="compare-pick-mount" class="repo-file-half"></span>
-          </div>
+            <!-- The read side: a closed list of the saved paths. There is
+                 nothing to invent when you are reading — see the comment on
+                 PomCompareFolder — so it does not take typing. -->
+            <span id="compare-folder-mount" class="repo-file-half" hidden></span>
+          </span>
+          <!-- One cell, two controls: in Push it is the name being written,
+               editable here and nowhere else now; in Compare it is the picker
+               for what to read instead. Same place, because it is the same
+               half of one address. -->
+          <span id="primary-filename-mount" class="repo-file-half"></span>
+          <span id="compare-pick-mount" class="repo-file-half"></span>
         </div>
 
         <!-- Only meaningful once BOTH providers are actually added (see
@@ -6570,6 +6596,10 @@
       var skel = document.getElementById('actions-skeleton');
       if (real) real.hidden = loading;
       if (skel) skel.hidden = !loading;
+      /* The Json file card is part of the same reveal — it is a sibling of
+         #actions rather than a child, so it does not come for free. */
+      var file = document.getElementById('json-file-card');
+      if (file) file.hidden = loading;
       updateFlowWireVisibility();
     }
 
