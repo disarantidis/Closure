@@ -92,7 +92,7 @@
        on this dialog only. Two DIFFERENT tokens control that second gap
        depending on the panel's current height at render time:
        PomDialogContent's own `stickyButton` prop defaults true, so at this
-       plugin's normal 420×740 panel it's `--PomDialog-SlotContainer3-padding--stickyButton`
+       plugin's own panel it's `--PomDialog-SlotContainer3-padding--stickyButton`
        (confirmed via the real DOM: the action row's padded ancestor is
        `.PomDialog-SlotContainer3--stickyButton`, not SlotContainer2) — but
        stickyButton turns itself off below a 600px-tall viewport
@@ -2529,7 +2529,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      flex: none;
+      flex: 2 1 0;
       min-width: 0;
     }
     .repo-file-row[hidden] { display: none; }
@@ -2696,24 +2696,32 @@
     /*
       ONE PER LINE, AND THE ARITHMETIC IS WHY.
 
-      This window is 420px and is never opened at any other width. Inside the
-      repo card and inside this subcard a row has 312px, and each of these
-      fields spends about 105 of it on chrome before it shows a character: a
-      leading glyph, a clear ×, a rule and a chevron. Side by side that left
-      roughly 100px for two values — measured, the folder got 18, where "ODS"
-      alone needs 35 and "brand/core" needs 82.
+      SIDE BY SIDE AGAIN, AND TWO TO THREE RATHER THAN EVENLY.
 
-      Stacked, each gets 209. Every folder and every file name this plugin
-      deals with is then readable without hovering, which is worth the 58px of
-      height it costs. Side by side they were only ever legible while the name
-      field had no glyph and the folder had given its own up.
+      These were stacked because the panel was 420px: a row here had 312, each
+      field spends about 105 of it on chrome before showing a character — a
+      leading glyph, a clear ×, a rule, a chevron — and side by side that left
+      the folder 18px of text where "ODS" alone needs 35. The panel is 483 now
+      and the row is 375, which is the difference between not fitting and
+      fitting.
+
+      The split is not even, because the two names are not the same length. A
+      folder here is "spar" or "ODS"; a file is "odstokens.json". Measured at
+      two to three: the folder gets 43px of value against the 35 "ODS" needs,
+      and the file gets 117 against the 113 "odstokens.json" needs. Evenly it
+      would be 78 each and the file name — the one anybody reads — would lose
+      its last four characters.
+
+      A folder deeper than one segment ("brand/core", 82) still truncates. That
+      is the half that can afford to: it sits in a dropdown that shows the
+      whole path, and it is not the name being typed.
     */
-    .json-download-fields { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+    .json-download-fields { display: flex; align-items: center; gap: 8px; }
     /* Each may still be narrower than its content — min-width: 0 is what lets
        a flex item shrink below its intrinsic size and truncate inside the card
        rather than overflowing it. */
     #primary-filename-mount,
-    #compare-pick-mount { flex: none; min-width: 0; }
+    #compare-pick-mount { flex: 3 1 0; min-width: 0; }
     #primary-filename-mount[hidden], #compare-pick-mount[hidden] { display: none; }
     
     .commit-input-wrap {
@@ -22938,12 +22946,13 @@ html[data-theme=dark] {
               DOWNLOAD SITS IN THE HEADER, NOT IN THE ROW BELOW IT — and this
               is the measurement that put it here.
 
-              The plugin's window is 420px. Inside the repo card and inside
-              this subcard, the field row has 312px to spend, and a Combobox
-              costs about 90px of chrome before it shows a character: a clear
-              ×, a rule, a chevron, and the padding around them. Two of them
-              plus a 50px button left the folder 18px of text and the file 70
-              — "ODS" clipped mid-letter and "tokens.json" reading "tokens".
+              Measured when the window was 420px, which left this row 312 to
+              spend; a Combobox costs about 90 of it on chrome before it shows
+              a character — a clear ×, a rule, a chevron and the padding around
+              them. Two of them plus a 50px button left the folder 18px of text
+              and the file 70: "ODS" clipped mid-letter and "tokens.json"
+              reading "tokens". The panel is 483 now and the button is still
+              better off out of the row.
 
               In the header it costs the row nothing, and it is a better fit
               for what it is: the one thing this card DOES, at the card's own
@@ -49978,21 +49987,21 @@ html[data-theme=dark] {
       CARD_LEVEL
     ),
     /*
-        A GLYPH, BECAUSE THE ROW IT STANDS IN NOW HOLDS TWO FIELDS.
+        LABELLED AGAIN, BECAUSE THE HEADER HAS THE ROOM THE FIELD ROW DID NOT.
     
-        It was a labeled button, matching Push, while it had a row to itself and
-        one field beside it. Sharing that row with the folder path as well, the
-        word "Download" cost 112px the two fields needed more — see
-        .json-download-fields' own note on the arithmetic. `icon` rather than
-        leftIcon/buttonLeftIcon is what tells PomButton this IS an icon button and
-        collapses it to shape="square"; the accessible name comes from aria-label,
-        which is the only name it has left.
+        It was a glyph for as long as it shared a line with two fields in a 420px
+        panel — the word cost 112px the fields needed more. It has not shared that
+        line since it moved into the card's header, and the panel is 483 now, so
+        the header carries a title, a size tag and this with room left: the reason
+        for the glyph expired twice over and the label is the clearer control.
     
-        Still `filled`: it is the one thing this card DOES, and demoting it to
-        tonal at the same time as dropping its label would leave it reading as a
-        hint. `small`, not the `medium` that band-matches a small FIELD: it stands
-        in a header beside a small Tag now, and the rule is to match the band of
-        the row you are actually in.
+        leftIcon/buttonLeftIcon rather than `icon`, which is what tells PomButton
+        this is NOT an icon button and stops it collapsing to shape="square" — the
+        mark leads and the words follow.
+    
+        Still `filled`: it is the one thing this card DOES. `small`, not the
+        `medium` that band-matches a small FIELD: it stands in a header beside a
+        small Tag, and the rule is to match the band of the row you are in.
     
         It is in BOTH modes. Hiding it while comparing read the button as belonging
         to the repository; it does not — it saves the JSON just made out of the
@@ -50000,7 +50009,7 @@ html[data-theme=dark] {
       */
     download: mountLiveIconButton(
       "download-btn-mount",
-      { id: "download-btn", variant: "filled", size: "small", icon: IconDownload(16), "aria-label": "Download", title: "Download" },
+      { id: "download-btn", variant: "filled", size: "small", leftIcon: true, buttonLeftIcon: IconDownload(16), label: "Download JSON", title: "Download JSON" },
       true,
       SUBCARD_LEVEL
     )
@@ -56832,7 +56841,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'f733b88 12:05:02';
+    var CLOSURE_BUILD = '3aef6a9 12:24:52';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

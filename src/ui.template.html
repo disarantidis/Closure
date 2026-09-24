@@ -92,7 +92,7 @@
        on this dialog only. Two DIFFERENT tokens control that second gap
        depending on the panel's current height at render time:
        PomDialogContent's own `stickyButton` prop defaults true, so at this
-       plugin's normal 420×740 panel it's `--PomDialog-SlotContainer3-padding--stickyButton`
+       plugin's own panel it's `--PomDialog-SlotContainer3-padding--stickyButton`
        (confirmed via the real DOM: the action row's padded ancestor is
        `.PomDialog-SlotContainer3--stickyButton`, not SlotContainer2) — but
        stickyButton turns itself off below a 600px-tall viewport
@@ -2529,7 +2529,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      flex: none;
+      flex: 2 1 0;
       min-width: 0;
     }
     .repo-file-row[hidden] { display: none; }
@@ -2696,24 +2696,32 @@
     /*
       ONE PER LINE, AND THE ARITHMETIC IS WHY.
 
-      This window is 420px and is never opened at any other width. Inside the
-      repo card and inside this subcard a row has 312px, and each of these
-      fields spends about 105 of it on chrome before it shows a character: a
-      leading glyph, a clear ×, a rule and a chevron. Side by side that left
-      roughly 100px for two values — measured, the folder got 18, where "ODS"
-      alone needs 35 and "brand/core" needs 82.
+      SIDE BY SIDE AGAIN, AND TWO TO THREE RATHER THAN EVENLY.
 
-      Stacked, each gets 209. Every folder and every file name this plugin
-      deals with is then readable without hovering, which is worth the 58px of
-      height it costs. Side by side they were only ever legible while the name
-      field had no glyph and the folder had given its own up.
+      These were stacked because the panel was 420px: a row here had 312, each
+      field spends about 105 of it on chrome before showing a character — a
+      leading glyph, a clear ×, a rule, a chevron — and side by side that left
+      the folder 18px of text where "ODS" alone needs 35. The panel is 483 now
+      and the row is 375, which is the difference between not fitting and
+      fitting.
+
+      The split is not even, because the two names are not the same length. A
+      folder here is "spar" or "ODS"; a file is "odstokens.json". Measured at
+      two to three: the folder gets 43px of value against the 35 "ODS" needs,
+      and the file gets 117 against the 113 "odstokens.json" needs. Evenly it
+      would be 78 each and the file name — the one anybody reads — would lose
+      its last four characters.
+
+      A folder deeper than one segment ("brand/core", 82) still truncates. That
+      is the half that can afford to: it sits in a dropdown that shows the
+      whole path, and it is not the name being typed.
     */
-    .json-download-fields { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+    .json-download-fields { display: flex; align-items: center; gap: 8px; }
     /* Each may still be narrower than its content — min-width: 0 is what lets
        a flex item shrink below its intrinsic size and truncate inside the card
        rather than overflowing it. */
     #primary-filename-mount,
-    #compare-pick-mount { flex: none; min-width: 0; }
+    #compare-pick-mount { flex: 3 1 0; min-width: 0; }
     #primary-filename-mount[hidden], #compare-pick-mount[hidden] { display: none; }
     
     .commit-input-wrap {
@@ -3050,12 +3058,13 @@
               DOWNLOAD SITS IN THE HEADER, NOT IN THE ROW BELOW IT — and this
               is the measurement that put it here.
 
-              The plugin's window is 420px. Inside the repo card and inside
-              this subcard, the field row has 312px to spend, and a Combobox
-              costs about 90px of chrome before it shows a character: a clear
-              ×, a rule, a chevron, and the padding around them. Two of them
-              plus a 50px button left the folder 18px of text and the file 70
-              — "ODS" clipped mid-letter and "tokens.json" reading "tokens".
+              Measured when the window was 420px, which left this row 312 to
+              spend; a Combobox costs about 90 of it on chrome before it shows
+              a character — a clear ×, a rule, a chevron and the padding around
+              them. Two of them plus a 50px button left the folder 18px of text
+              and the file 70: "ODS" clipped mid-letter and "tokens.json"
+              reading "tokens". The panel is 483 now and the button is still
+              better off out of the row.
 
               In the header it costs the row nothing, and it is a better fit
               for what it is: the one thing this card DOES, at the card's own

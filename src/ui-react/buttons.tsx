@@ -772,21 +772,21 @@ window.PomButtons = {
     CARD_LEVEL,
   ),
   /*
-    A GLYPH, BECAUSE THE ROW IT STANDS IN NOW HOLDS TWO FIELDS.
+    LABELLED AGAIN, BECAUSE THE HEADER HAS THE ROOM THE FIELD ROW DID NOT.
 
-    It was a labeled button, matching Push, while it had a row to itself and
-    one field beside it. Sharing that row with the folder path as well, the
-    word "Download" cost 112px the two fields needed more — see
-    .json-download-fields' own note on the arithmetic. `icon` rather than
-    leftIcon/buttonLeftIcon is what tells PomButton this IS an icon button and
-    collapses it to shape="square"; the accessible name comes from aria-label,
-    which is the only name it has left.
+    It was a glyph for as long as it shared a line with two fields in a 420px
+    panel — the word cost 112px the fields needed more. It has not shared that
+    line since it moved into the card's header, and the panel is 483 now, so
+    the header carries a title, a size tag and this with room left: the reason
+    for the glyph expired twice over and the label is the clearer control.
 
-    Still `filled`: it is the one thing this card DOES, and demoting it to
-    tonal at the same time as dropping its label would leave it reading as a
-    hint. `small`, not the `medium` that band-matches a small FIELD: it stands
-    in a header beside a small Tag now, and the rule is to match the band of
-    the row you are actually in.
+    leftIcon/buttonLeftIcon rather than `icon`, which is what tells PomButton
+    this is NOT an icon button and stops it collapsing to shape="square" — the
+    mark leads and the words follow.
+
+    Still `filled`: it is the one thing this card DOES. `small`, not the
+    `medium` that band-matches a small FIELD: it stands in a header beside a
+    small Tag, and the rule is to match the band of the row you are in.
 
     It is in BOTH modes. Hiding it while comparing read the button as belonging
     to the repository; it does not — it saves the JSON just made out of the
@@ -794,7 +794,7 @@ window.PomButtons = {
   */
   download: mountLiveIconButton(
     'download-btn-mount',
-    { id: 'download-btn', variant: 'filled', size: 'small', icon: IconDownload(16), 'aria-label': 'Download', title: 'Download' },
+    { id: 'download-btn', variant: 'filled', size: 'small', leftIcon: true, buttonLeftIcon: IconDownload(16), label: 'Download JSON', title: 'Download JSON' },
     true,
     SUBCARD_LEVEL,
   ),
@@ -1021,7 +1021,7 @@ function mountCompareSides() {
 
     It costs nothing to read, either: a Combobox spends about 90px on a clear
     ×, a rule and a chevron before it shows a character, which is most of what
-    a 420px window has to give two fields.
+    the panel has to give two fields.
   */
   function Pick() {
     const [s, setS] = useState<S>(state);

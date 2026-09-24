@@ -1,5 +1,11 @@
 // Closure — Figma plugin (design-token JSON export)
-figma.showUI(__html__, { width: 420, height: 740, themeColors: true });
+/*
+  THE PANEL'S WIDTH, IN ONE PLACE. The resize handler below has to agree with
+  it — Figma's resize takes an absolute width, so a number written twice is a
+  panel that changes width the first time the UI asks to grow.
+*/
+var PANEL_WIDTH = 483;                 // 420 + 15%
+figma.showUI(__html__, { width: PANEL_WIDTH, height: 740, themeColors: true });
 
 function normalizeVariableName(name, collectionName) {
   if (!name) return '';
@@ -3179,7 +3185,7 @@ function buildResolvedDocument(rawData, options) {
 
 figma.ui.onmessage = function(msg) {
   if (msg.type === 'resize') {
-    figma.ui.resize(420, msg.height);
+    figma.ui.resize(PANEL_WIDTH, msg.height);
     return;
   }
 
