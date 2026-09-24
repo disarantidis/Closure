@@ -1739,8 +1739,12 @@
          away"; this throws the document out and starts the page over, and the
          two should not look the same.
 
-      Raised as disarantidis/pomegranate#92 — when FileUploadItem takes an icon
-      for its remover, both of these blocks come out.
+      HALF OF THIS IS ALREADY OVER. disarantidis/pomegranate#92 asked for both
+      the variant and the icon; the variant landed as `removeVariant`, which the
+      caller passes now, so nothing here touches it any more. The icon is still
+      pinned, and this block is still the only route to it — which is exactly
+      the fragility that prop's own note warns about for a vendored kit, so it
+      is worth asking for `removeIcon` rather than living here indefinitely.
     */
     #import-file-item-mount .nd-item-trailing { margin-inline-end: 0; }
     #import-file-item-mount .nd-item-trailing .nd-btn-slot > svg { display: none; }

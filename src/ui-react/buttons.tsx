@@ -3774,12 +3774,20 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
           act on a row that names what is being removed; reading what arrived
           is the reason the card exists.
 
-          Its glyph is the kit's ✕ and its variant is ghost, and neither can be
-          anything else: FileUploadItem writes both into its own render and
-          exposes no prop that reaches either. A trash would say "remove" more
-          plainly than a dismiss does. Raised as disarantidis/pomegranate#92;
-          overriding from here would mean selecting into Button's internals.
+          ITS VARIANT IS A PROP NOW. `ghost` was pinned into FileUploadItem's
+          own render with nothing that reached it, which is half of
+          disarantidis/pomegranate#92 and is answered upstream by
+          `removeVariant`. `tonal` is the case that prop was added for, in its
+          own words: a row that is the only content of a raised card, where a
+          ghost control has no ground of its own and sits at the same value as
+          the surface behind it.
+
+          Its GLYPH is still the kit's ✕ and still has no prop, so the trash is
+          painted over it from this app's stylesheet — see the
+          #import-file-item-mount block in ui.template.html. A dismiss means
+          "put this away"; this throws the document out. The other half of #92.
         */
+        removeVariant="tonal"
         onRemove={() => window.PomImportFile.onRemove?.()}
       />
     );

@@ -1739,8 +1739,12 @@
          away"; this throws the document out and starts the page over, and the
          two should not look the same.
 
-      Raised as disarantidis/pomegranate#92 — when FileUploadItem takes an icon
-      for its remover, both of these blocks come out.
+      HALF OF THIS IS ALREADY OVER. disarantidis/pomegranate#92 asked for both
+      the variant and the icon; the variant landed as `removeVariant`, which the
+      caller passes now, so nothing here touches it any more. The icon is still
+      pinned, and this block is still the only route to it — which is exactly
+      the fragility that prop's own note warns about for a vendored kit, so it
+      is worth asking for `removeIcon` rather than living here indefinitely.
     */
     #import-file-item-mount .nd-item-trailing { margin-inline-end: 0; }
     #import-file-item-mount .nd-item-trailing .nd-btn-slot > svg { display: none; }
@@ -19638,6 +19642,12 @@
 .nd-toast-clock .nd-progress-track {
   background-image: none;
   background-color: transparent;
+}
+.nd-toast-clock .nd-progress-track::-webkit-progress-bar {
+  background-image: none;
+  background-color: transparent;
+  backdrop-filter: none;
+  border-radius: 0;
 }
 .nd-toast.p-top {
   inset-block-start: 0;
@@ -49121,9 +49131,18 @@ html[data-theme=dark] {
       setMs(readingTime(el?.textContent ?? title));
     }, [open, duration, title, children]);
     const remaining = (0, import_react11.useRef)(null);
+    const clockFor = (0, import_react11.useRef)(null);
     (0, import_react11.useEffect)(() => {
-      if (!open || ms == null) return;
-      if (remaining.current == null) remaining.current = ms;
+      if (!open || ms == null) {
+        clockFor.current = null;
+        return;
+      }
+      const message = `${title}\0${ms}`;
+      if (clockFor.current !== message) {
+        clockFor.current = message;
+        remaining.current = ms;
+        setLeft(1);
+      }
       let raf = 0;
       let since = performance.now();
       const tick2 = (now) => {
@@ -49135,16 +49154,12 @@ html[data-theme=dark] {
           }
         }
         since = now;
-        setLeft(Math.max(0, (remaining.current ?? 0) / ms));
+        setLeft(Math.max(0, (remaining.current ?? ms) / ms));
         raf = requestAnimationFrame(tick2);
       };
       raf = requestAnimationFrame(tick2);
       return () => cancelAnimationFrame(raf);
     }, [open, ms, held, title, onClose]);
-    (0, import_react11.useEffect)(() => {
-      remaining.current = null;
-      setLeft(1);
-    }, [open, title, ms]);
     const hold = (0, import_react11.useCallback)(() => setHeld(true), []);
     const release = (0, import_react11.useCallback)(() => setHeld(false), []);
     (0, import_react11.useEffect)(() => {
@@ -49538,6 +49553,7 @@ html[data-theme=dark] {
     error,
     size = "small",
     onRemove,
+    removeVariant = "ghost",
     leading,
     style
   }) {
@@ -49557,7 +49573,7 @@ html[data-theme=dark] {
           trailing: onRemove && /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
             Button,
             {
-              variant: "ghost",
+              variant: removeVariant,
               kind: "icon-button",
               size: "small",
               glass: false,
@@ -51732,6 +51748,7 @@ html[data-theme=dark] {
           size: "medium",
           error: file.error,
           leading,
+          removeVariant: "tonal",
           onRemove: () => window.PomImportFile.onRemove?.()
         }
       );
@@ -56815,7 +56832,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '205336e 10:41:58';
+    var CLOSURE_BUILD = '09f7127 11:57:12';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

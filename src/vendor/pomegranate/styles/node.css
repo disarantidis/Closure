@@ -7458,6 +7458,27 @@
   background-image: none;
   background-color: transparent;
 }
+/*
+  AND IT HAS TO DISAPPEAR ON BOTH AXES, WHICH THIS RESET ORIGINALLY DID NOT. The rule above reaches
+  the `<progress>` ELEMENT, which is where Gecko paints its track — so Firefox was right all along
+  and Chromium was not. Chromium paints the track on `::-webkit-progress-bar`, which kept its own
+  `--background` (near-black at this level), its groove gradient, its frost AND its `--radius-full`.
+  On the alert that read as a dark band across the bottom of the surface with its two corners
+  clipped into a pill, over the alert's own 12px radius — and the alert's `border-bottom` showing
+  through the gap it left. Reported from a Chromium WebView as a "crop"; it was a second box.
+
+  The split is not news here — the file states it where the two axes are first written, and
+  `is-done`/`is-failed` already override both. This reset is the one that only did half.
+
+  The radius goes to zero rather than inheriting: the bar rides INSIDE the alert's corner (see
+  above), so it has to meet that corner rather than round away from it a second time.
+*/
+.nd-toast-clock .nd-progress-track::-webkit-progress-bar {
+  background-image: none;
+  background-color: transparent;
+  backdrop-filter: none;
+  border-radius: 0;
+}
 .nd-toast.p-top {
   inset-block-start: 0;
   inset-inline: 0;
