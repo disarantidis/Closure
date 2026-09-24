@@ -3388,7 +3388,8 @@ const SPELLING_NAMES = 6;
     };
 
     const leaves = (title: string, rows: any[], twoSided: boolean,
-                    flagOf?: (row: any) => ReactNode) => {
+                    flagOf?: (row: any) => ReactNode,
+                    side?: 'figma' | 'repo') => {
       if (!rows.length) return null;
       const columns: any[] = [
         {
@@ -3480,7 +3481,22 @@ const SPELLING_NAMES = 6;
           ),
         });
       } else {
-        columns.push({ key: 'value', header: 'Value', width: '120px', cell: (x: any) => valueCell(x.value) });
+        /*
+          A ONE-SIDED TABLE STILL HAS A SIDE, AND THE COLUMN SAYS WHICH.
+
+          "Value" is the only header on this page that does not name the file
+          it came from. It reads as neutral, and nothing here is: these rows
+          are the tokens one file has and the other does not, so the value
+          beside them is that file's value and no one else's. The same name
+          and the same mark as the two-column tables, because it is the same
+          thing — a column standing where its twin would be if there were one.
+        */
+        columns.push({
+          key: 'value',
+          header: side === 'figma' ? figmaHead() : side === 'repo' ? repoHead() : 'Value',
+          width: '120px',
+          cell: (x: any) => valueCell(x.value),
+        });
       }
       return (
         <div className="json-download-card" data-level={4} key={title}>
@@ -3798,8 +3814,8 @@ const SPELLING_NAMES = 6;
         {/* Named sides here too: these two have no column to name them, and
             "only here" beside a table headed Figma is the same word the
             headers were changed to stop using. */}
-        {leaves('Architecture \u2014 only in Figma', r.onlyInFigma, false)}
-        {leaves('Architecture \u2014 only in ' + repoWhere, r.onlyInRepo, false)}
+        {leaves('Architecture \u2014 only in Figma', r.onlyInFigma, false, undefined, 'figma')}
+        {leaves('Architecture \u2014 only in ' + repoWhere, r.onlyInRepo, false, undefined, 'repo')}
 
         <div className="json-download-card" data-level={4}>
           <PomButton

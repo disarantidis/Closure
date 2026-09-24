@@ -51660,7 +51660,7 @@ html[data-theme=dark] {
           ) })
         ] }, title);
       };
-      const leaves = (title, rows, twoSided, flagOf) => {
+      const leaves = (title, rows, twoSided, flagOf, side) => {
         if (!rows.length) return null;
         const columns = [
           {
@@ -51699,7 +51699,12 @@ html[data-theme=dark] {
             ] })
           });
         } else {
-          columns.push({ key: "value", header: "Value", width: "120px", cell: (x) => valueCell(x.value) });
+          columns.push({
+            key: "value",
+            header: side === "figma" ? figmaHead() : side === "repo" ? repoHead() : "Value",
+            width: "120px",
+            cell: (x) => valueCell(x.value)
+          });
         }
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-header", children: [
@@ -51844,8 +51849,8 @@ html[data-theme=dark] {
         leaves("Architecture \u2014 pointing somewhere new", r.repointed || [], true),
         leaves("Architecture \u2014 same value, aliased one side", r.aliased || [], true, rowFlag),
         movedTable(r.moved || []),
-        leaves("Architecture \u2014 only in Figma", r.onlyInFigma, false),
-        leaves("Architecture \u2014 only in " + repoWhere, r.onlyInRepo, false),
+        leaves("Architecture \u2014 only in Figma", r.onlyInFigma, false, void 0, "figma"),
+        leaves("Architecture \u2014 only in " + repoWhere, r.onlyInRepo, false, void 0, "repo"),
         /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
             PomButton,
@@ -57717,7 +57722,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '361de56 17:17:04';
+    var CLOSURE_BUILD = '8c0a39e 17:32:58';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
