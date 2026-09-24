@@ -94,6 +94,9 @@ async function main() {
     'src/import-compile.js',
     'src/import-verify.js',
     'src/import-diff.js',
+    /* After import-diff.js, which it reads: it turns a compiled program and
+       that diff into the shorter program that writes only what moved. */
+    'src/import-filter.js',
     /* Not part of the import pipeline at all — it is the Compare page's
        engine, and it rides in here because this is the list of modules the
        UI gets. It answers a different question from import-diff.js (document

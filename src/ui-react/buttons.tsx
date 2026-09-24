@@ -707,6 +707,11 @@ declare global {
       setProblem: (title: string, message: string, fix?: string, actionLabel?: string) => void;
       setReport: (report: any, copyText: string) => void;
       onAction: (() => void) | null;
+      /* The other direction. Set by the page that ran the comparison, and null
+         when there is nothing to bring over — an identical pair has no repo
+         change to apply, and a button for it would be a promise of work that
+         does not exist. */
+      onApply: (() => void) | null;
     };
     /* The name the plugin writes AND the file it reads back — one combobox over
        whatever the chosen folder holds. It was a plain field beside a separate
@@ -2439,6 +2444,16 @@ const GROUP_MATES = 12;
     set = setS;
     const r = s.report;
 
+    /* The repo's name, by the service it actually is. Declared here rather
+       than beside the column headers that mostly use it, because the button
+       under the sides card is the first thing on the page to need it. */
+    const repoName = s.sides.provider === 'gitlab' ? 'GitLab'
+                   : s.sides.provider === 'github' ? 'GitHub' : 'Repo';
+    /* The same name in running text, where the unnamed case needs an article
+       a column header does not: "only in Repo" is not a sentence. */
+    const repoWhere = s.sides.provider === 'gitlab' || s.sides.provider === 'github'
+                    ? repoName : 'the repo';
+
     const sides = (
       /*
         NO CARD AROUND THEM, AND NO HEADING OVER THEM.
@@ -2482,6 +2497,37 @@ const GROUP_MATES = 12;
         </span>
       </span>
     );
+
+    /*
+      THE OTHER DIRECTION, WHERE THE DIRECTION IS ESTABLISHED.
+
+      Under the two sides, because that is the one place on this page that
+      names both files and which is which — a button saying "update Figma
+      from GitHub" anywhere else is a claim the reader has to go and check.
+      Not at the foot of the page either: an action nobody finds until they
+      have scrolled five hundred rows is an action nobody finds.
+
+      It is a hand-off, not a write. What it opens is the import page, with
+      the document this comparison just read already in it, because that page
+      is where the projection is decided and where derive's questions get
+      asked. The label says the direction out loud in the repo's own name,
+      since Push — the same act, the other way — is one screen behind this
+      one and the two must never be read for each other.
+    */
+    const applyRow = s.report && !s.busy && !s.problem && window.PomCompare?.onApply ? (
+      <div className="compare-apply">
+        <PomButton
+          id="compare-apply-btn"
+          variant="tonal"
+          size="medium"
+          block
+          label={'Update Figma from ' + repoName}
+          leftIcon
+          buttonLeftIcon={IconArrowLeft(16)}
+          onClick={() => window.PomCompare.onApply?.()}
+        />
+      </div>
+    ) : null;
 
     if (s.busy) {
       return (
@@ -2696,7 +2742,9 @@ const GROUP_MATES = 12;
     );
 
     /*
-      THE COLUMNS ARE THE TWO SIDES, NAMED.
+      THE COLUMNS ARE THE TWO SIDES, NAMED. (repoName and repoWhere are
+      declared at the top of this component, because the hand-off button under
+      the sides card needs the name before the columns do.)
 
       They used to be Was and Now, which is a claim about order: that the
       Figma file came first and the repo is the edit. Half the tables on this
@@ -2715,12 +2763,6 @@ const GROUP_MATES = 12;
       orders and still read; side names cannot — two cards apart with GitHub
       on opposite sides is a misreading waiting to happen.
     */
-    const repoName = s.sides.provider === 'gitlab' ? 'GitLab'
-                   : s.sides.provider === 'github' ? 'GitHub' : 'Repo';
-    /* The same name in running text, where the unnamed case needs an article
-       a column header does not: "only in Repo" is not a sentence. */
-    const repoWhere = s.sides.provider === 'gitlab' || s.sides.provider === 'github'
-                    ? repoName : 'the repo';
     const repoHead = () => headWith(
       s.sides.provider === 'gitlab' ? IconGitlab(12)
       : s.sides.provider === 'github' ? IconGithub(12) : null, repoName);
@@ -3748,6 +3790,7 @@ const GROUP_MATES = 12;
     return (
       <>
         {sides}
+        {applyRow}
 
         <div className="json-download-card" data-level={4}>
           {/*
@@ -4071,6 +4114,7 @@ const GROUP_MATES = 12;
     setReport: (report, copyText) =>
       set((s) => ({ ...s, busy: '', problem: null, report, copyText })),
     onAction: null,
+    onApply: null,
   };
 })();
 

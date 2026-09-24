@@ -1232,6 +1232,10 @@
        the same kind of screen and there is no reason for the two to differ. */
     /* Same scrolling treatment as the import page — they are siblings and
        switching between them should not change how the page scrolls. */
+    /* The hand-off, under the two sides and before the evidence. Its own
+       inset because it stands on the page like the sides do, not inside a
+       card. */
+    .compare-apply { margin: 0 16px 16px; }
     .compare-page { overflow-y: auto; overflow-x: hidden; }
     .compare-page::-webkit-scrollbar { width: 8px; }
     .compare-page::-webkit-scrollbar-track { background: transparent; }
@@ -5057,49 +5061,76 @@
       screen's Compare button shares this fetch and does something else
       entirely with it, and for a while both were labelled the same way.
     */
+    /*
+      A REPO DOCUMENT, WHATEVER DOOR IT CAME THROUGH.
+
+      Two routes reach this now — the import page's own fetch, and the compare
+      page handing over the file it has just finished reading — and they must
+      set up identically or the second one is a subtly different import. So
+      the state, the refusal and the run live here once, and each route's job
+      is only to produce a document and say where it came from.
+    */
+    function startImportFromRepo(doc, where, bytes) {
+      importState.fileName = where;
+      importState.fileBytes = bytes;
+      /* Which door it came through, and the only thing that decides whether
+         the repo card reports the file or goes on offering to fetch one. */
+      importState.fromRepo = true;
+      showImportFile({ busy: true });
+      importDrop.hidden = true;
+      /* The same yield a dropped file needs: everything below this is
+         synchronous and the spinner would never turn without it. */
+      requestAnimationFrame(function () { setTimeout(function () {
+        if (refuseResolved(doc)) return;
+        importState.decisions = {}; importState.levels = {};
+        runImport(doc, where);
+      }, 0); });
+    }
+
     function pullFromRepo(which) {
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
       showToast('Reading from ' + label + '…');
       (which === 'gitlab' ? fetchGitLabFile() : fetchGitHubFile()).then(function (res) {
-        importState.fileName = res.where;
-        importState.fileBytes = res.text.length;
-        /* Which door it came through, and the only thing that decides whether
-           the repo card reports the file or goes on offering to fetch one. */
-        importState.fromRepo = true;
-        showImportFile({ busy: true });
-        importDrop.hidden = true;
-        /* The same yield a dropped file needs: everything below this is
-           synchronous and the spinner would never turn without it. */
-        requestAnimationFrame(function () { setTimeout(function () {
-          var doc;
-          try { doc = JSON.parse(res.text); }
-          catch (err) { importProblem('Not valid JSON', String(err.message || err)); return; }
-          /*
-            A RESOLVED EXPORT CANNOT BE COMPARED, and saying so is the only
-            honest answer. It is a materialised cross-product: the aliases that
-            carried the architecture were evaluated away, so reading it back
-            reconstructs a DIFFERENT shape — one real file came back as 2
-            collections where the document has 14. Diffing that would report a
-            near-total rewrite of a file nobody has touched, which is not a
-            difference, it is an artefact of the format.
-
-            The export says which it is, so this is a fact rather than a guess.
-          */
-          var ext = doc && doc.$extensions && doc.$extensions['com.closure'];
-          if (ext && ext.format === 'resolved') {
-            importProblem('That is a resolved export',
-              'A resolved document has had its references evaluated away, so the collections and ' +
-              'modes it came from cannot be read back out of it — comparing it would report a ' +
-              'rewrite of everything rather than what actually differs. Push the legacy or DTCG ' +
-              'shape to the repo and read that instead.');
-            return;
-          }
-          importState.decisions = {}; importState.levels = {};
-          runImport(doc, res.where);
-        }, 0); });
+        var doc;
+        try { doc = JSON.parse(res.text); }
+        catch (err) {
+          importState.fileName = res.where;
+          importState.fromRepo = true;
+          showImportFile({ busy: false });
+          importDrop.hidden = true;
+          importProblem('Not valid JSON', String(err.message || err));
+          return;
+        }
+        startImportFromRepo(doc, res.where, res.text.length);
       }, function (err) {
         showToast((err && err.message) || ('Could not read from ' + label), true);
       });
+    }
+
+    /*
+      A RESOLVED EXPORT CANNOT BE IMPORTED, and saying so is the only honest
+      answer. It is a materialised cross-product: the aliases that carried the
+      architecture were evaluated away, so reading it back reconstructs a
+      DIFFERENT shape — one real file came back as 2 collections where the
+      document has 14. Applying that would rewrite a file nobody has touched,
+      which is not a change, it is an artefact of the format.
+
+      The export says which it is, so this is a fact rather than a guess.
+
+      True means refused, and the caller stops. Both repo routes ask, because
+      a refusal that lived on one of them would be a hole in the other.
+    */
+    function refuseResolved(doc) {
+      var ext = doc && doc.$extensions && doc.$extensions['com.closure'];
+      if (ext && ext.format === 'resolved') {
+        importProblem('That is a resolved export',
+          'A resolved document has had its references evaluated away, so the collections and ' +
+          'modes it came from cannot be read back out of it — importing it would rewrite ' +
+          'everything rather than what actually differs. Push the legacy or DTCG ' +
+          'shape to the repo and read that instead.');
+        return true;
+      }
+      return false;
     }
     document.getElementById('import-pull-gitlab-btn').addEventListener('click', function () { pullFromRepo('gitlab'); });
     document.getElementById('import-pull-github-btn').addEventListener('click', function () { pullFromRepo('github'); });
@@ -5267,6 +5298,29 @@
             lastFigmaFileName || 'This Figma file', figmaWhere,
             label, repoWhere, which,
             tokensLabel(report.figmaTokens), tokensLabel(report.repoTokens));
+          /*
+            THE OTHER DIRECTION, HANDED OVER RATHER THAN REBUILT.
+
+            This page reads leaf against leaf, with nothing inferred, because
+            both files came out of the same exporter. Writing the repo's file
+            INTO Figma is a different question and a harder one: it needs the
+            projection — which sets become collections, which become modes,
+            what a reference meant — and derive() has questions about it that
+            only a person can answer. The import page is where those are
+            asked. A second copy of that here would be a screen free to
+            disagree with the screen it copied.
+
+            So the button hands over the document THIS page just read, not the
+            name of a file to fetch again. The two pages have their own file
+            pickers and they are allowed to differ; re-fetching would compare
+            one file and import another, which is the kind of bug nobody sees
+            until it has happened.
+          */
+          window.PomCompare.onApply = report.identical ? null : function () {
+            closeCompare();
+            openImport();
+            startImportFromRepo(got.doc, got.where, got.bytes);
+          };
           window.PomCompare.setReport(report, window.PomJsonDiff.format(report, {
             figmaLabel: (lastFigmaFileName || 'this Figma file') + ' (' + figmaWhere + ')',
             repoLabel: label + ' ' + repoWhere,
@@ -5647,9 +5701,41 @@
       if (!importState.compiled || !importState.compiled.ok) return;
       window.PomImportApplyBtn.setDisabled(true);
       window.PomImportApplyBtn.setLoading(true);
+      /*
+        THE PROGRAM, CUT DOWN TO WHAT THE PANEL SAID WOULD MOVE.
+
+        apply() is an upsert either way, so running the whole program is
+        correct and writes the whole file to be so — every value already
+        right, written again with what it already held. On a document of
+        thirty thousand that is thirty thousand round trips through an API
+        with no transaction and no hurry.
+
+        THE SAME REPORT, NOT A SECOND ONE. importState.changes is what the
+        person read a moment ago; passing it rather than recomputing is what
+        makes "it did what the panel said" true by construction instead of by
+        coincidence. Recomputed here it could differ — and a run that differs
+        from the panel that authorised it is the one outcome this must not
+        have.
+
+        IT IS STILL AN UPSERT AND STILL NEVER DELETES. A filtered run is a
+        smaller version of the same promise: what it drops are writes the
+        document did not need, never a removal.
+
+        The diff was taken against the last extract. If Figma has moved since,
+        a value that changed there can look settled here and be left alone —
+        a miss, never a corruption, and re-running after a fresh read of the
+        file fixes it.
+      */
+      var toRun = importState.compiled.program;
+      if (importState.changes && window.PomImportFilter) {
+        var cut = window.PomImportFilter.filter(toRun, importState.changes);
+        console.log('[Import] ' + cut.stats.kept + ' ops to run, ' +
+          cut.stats.dropped + ' dropped as already right');
+        toRun = cut.program;
+      }
       parent.postMessage({ pluginMessage: {
         type: 'applyImport',
-        program: importState.compiled.program,
+        program: toRun,
       } }, '*');
     });
 

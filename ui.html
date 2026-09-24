@@ -1232,6 +1232,10 @@
        the same kind of screen and there is no reason for the two to differ. */
     /* Same scrolling treatment as the import page — they are siblings and
        switching between them should not change how the page scrolls. */
+    /* The hand-off, under the two sides and before the evidence. Its own
+       inset because it stands on the page like the sides do, not inside a
+       card. */
+    .compare-apply { margin: 0 16px 16px; }
     .compare-page { overflow-y: auto; overflow-x: hidden; }
     .compare-page::-webkit-scrollbar { width: 8px; }
     .compare-page::-webkit-scrollbar-track { background: transparent; }
@@ -51188,6 +51192,8 @@ html[data-theme=dark] {
       const clip = useClipboard();
       set = setS;
       const r = s.report;
+      const repoName = s.sides.provider === "gitlab" ? "GitLab" : s.sides.provider === "github" ? "GitHub" : "Repo";
+      const repoWhere = s.sides.provider === "gitlab" || s.sides.provider === "github" ? repoName : "the repo";
       const sides = (
         /*
                 NO CARD AROUND THEM, AND NO HEADING OVER THEM.
@@ -51216,6 +51222,19 @@ html[data-theme=dark] {
           ] }) })
         ] })
       );
+      const applyRow = s.report && !s.busy && !s.problem && window.PomCompare?.onApply ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-apply", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+        PomButton,
+        {
+          id: "compare-apply-btn",
+          variant: "tonal",
+          size: "medium",
+          block: true,
+          label: "Update Figma from " + repoName,
+          leftIcon: true,
+          buttonLeftIcon: IconArrowLeft(16),
+          onClick: () => window.PomCompare.onApply?.()
+        }
+      ) }) : null;
       if (s.busy) {
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
           sides,
@@ -51309,8 +51328,6 @@ html[data-theme=dark] {
         icon2 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-col-icon", "aria-hidden": "true", children: icon2 }),
         label
       ] });
-      const repoName = s.sides.provider === "gitlab" ? "GitLab" : s.sides.provider === "github" ? "GitHub" : "Repo";
-      const repoWhere = s.sides.provider === "gitlab" || s.sides.provider === "github" ? repoName : "the repo";
       const repoHead = () => headWith(
         s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null,
         repoName
@@ -51859,6 +51876,7 @@ html[data-theme=dark] {
       };
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
         sides,
+        applyRow,
         /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-section", children: r.changed.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stats", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat is-wide", "data-level": SUBCARD_LEVEL, children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: r.changed.length.toLocaleString() }),
@@ -52016,7 +52034,8 @@ html[data-theme=dark] {
       setSides: (figma, figmaDetail, repo, repoDetail, provider, figmaCount, repoCount) => set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail, provider, figmaCount, repoCount } })),
       setProblem: (title, message, fix, actionLabel) => set((s) => ({ ...s, busy: "", report: null, problem: { title, message, fix, actionLabel } })),
       setReport: (report, copyText) => set((s) => ({ ...s, busy: "", problem: null, report, copyText })),
-      onAction: null
+      onAction: null,
+      onApply: null
     };
   })();
   mountIconButton("compare-back-btn-mount", { id: "compare-back-btn", variant: "tonal", size: "large", title: "Back", "aria-label": "Back", icon: IconArrowLeft(24) });
@@ -56151,6 +56170,165 @@ function format(report, limit) {
   if (global) global.PomImportDiff = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
 
+// ===== src/import-filter.js =====
+/*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
+  FILTER — the same program, cut down to the ops that change something.
+
+  WHY THIS EXISTS. apply() is already an upsert: run the whole program against
+  a populated document and every name resolves to what is already there, every
+  value is written, and the ones that were already right are written again with
+  what they already held. The result is correct and the cost is the whole file
+  — thirty-five thousand setValueForMode calls to move five hundred values, on
+  an API that is neither fast nor transactional.
+
+  diff() already knows exactly which of them move: it interprets the same
+  program with no side effects and reports every value that is new or
+  different, keyed `collection|variable|mode`. So the reduction is not a new
+  comparison. It is a filter over ops that were already decided, driven by a
+  report that was already computed, and it cannot disagree with the panel the
+  person read before pressing the button — because it is the same report.
+
+  WHAT IT KEEPS, and the order is the point:
+
+    1. the value ops whose key diff() called added or changed;
+    2. the createVariable for every variable one of those writes to, and for
+       every variable a kept alias POINTS AT — apply resolves an alias through
+       its own variable table, so a target that is neither already in the
+       document nor created by this run is an alias into nothing;
+    3. the addMode for every (collection, mode) a kept op writes in;
+    4. the createCollection for every collection the above mention.
+
+  WHAT IT DROPS is every op that would write a value the document already
+  holds, and the scaffolding that exists only for those.
+
+  WHAT IT DOES NOT DO is decide anything. A value diff() did not name is not
+  examined here, an op is never rewritten, and the ops that survive keep the
+  program's own order — which apply() depends on, because every createVariable
+  must run before any setValue that names it.
+
+  IT IS NOT A DELETE. Nothing in a filtered program removes anything, for the
+  same reason nothing in an unfiltered one does: the document's own variables
+  that this file does not mention are not mentioned here either. A filtered run
+  is a smaller version of the same promise, never a different one.
+*/
+
+var __dep = (typeof require !== 'undefined')
+  ? require('./import-diff.js')
+  : global.PomImportDiff;
+var diff = __dep.diff;
+
+var VALUE_OPS = { setValue: 1, setAlias: 1 };
+
+function keyOf(op) {
+  return op.collection + '|' + op.name + '|' + op.mode;
+}
+
+/*
+  filter(program, report) -> { program, dropped, kept }
+
+  `report` is what diff() returned for this program against this document. The
+  caller passes it rather than this recomputing it, because the whole claim
+  being made is that the run does what the panel said, and two calls to diff()
+  is two chances to differ.
+*/
+function filter(program, report) {
+  var out = { ops: [] };
+  var stats = { kept: 0, dropped: 0, values: 0, variables: 0, collections: 0, modes: 0 };
+  if (!program || !program.ops) return { program: out, stats: stats };
+
+  /* The keys diff() named. A Set of strings, not of objects, so an op can ask
+     about itself without either side knowing how the other was built. */
+  var wanted = Object.create(null);
+  ((report && report.added) || []).forEach(function (x) { wanted[x.key] = 1; });
+  ((report && report.changed) || []).forEach(function (x) { wanted[x.key] = 1; });
+
+  /* One pass to learn what is needed, one to emit in the program's own order.
+     Learning and emitting in a single pass would drop a createVariable that
+     comes before the setValue that justifies it — which is every one of them,
+     because that ordering is exactly what compile() guarantees. */
+  var needVar = Object.create(null);         // "collection|name"
+  var needMode = Object.create(null);        // "collection|mode"
+  var needCol = Object.create(null);         // "collection"
+  var keepOp = new Array(program.ops.length);
+
+  program.ops.forEach(function (op, i) {
+    if (!VALUE_OPS[op.op]) return;
+    if (!wanted[keyOf(op)]) return;
+    keepOp[i] = true;
+    needVar[op.collection + '|' + op.name] = 1;
+    needMode[op.collection + '|' + op.mode] = 1;
+    needCol[op.collection] = 1;
+    if (op.op === 'setAlias' && op.target) {
+      /* The target may live in a collection this run otherwise never touches,
+         and it still has to exist by the time the alias is set. */
+      needVar[op.target.collection + '|' + op.target.name] = 1;
+      needCol[op.target.collection] = 1;
+    }
+  });
+
+  program.ops.forEach(function (op, i) {
+    if (keepOp[i]) return;
+    if (op.op === 'createVariable' && needVar[op.collection + '|' + op.name]) {
+      keepOp[i] = true;
+      needCol[op.collection] = 1;
+    } else if (op.op === 'addMode' && needMode[op.collection + '|' + op.mode]) {
+      keepOp[i] = true;
+      needCol[op.collection] = 1;
+    }
+  });
+
+  program.ops.forEach(function (op, i) {
+    if (keepOp[i]) return;
+    /* A collection's first mode arrives with it, so createCollection is what
+       carries it — a kept op writing in that mode needs this even when no
+       addMode names it. */
+    if (op.op === 'createCollection' && needCol[op.collection]) keepOp[i] = true;
+  });
+
+  program.ops.forEach(function (op, i) {
+    if (!keepOp[i]) { stats.dropped++; return; }
+    out.ops.push(op);
+    stats.kept++;
+    if (VALUE_OPS[op.op]) stats.values++;
+    else if (op.op === 'createVariable') stats.variables++;
+    else if (op.op === 'createCollection') stats.collections++;
+    else if (op.op === 'addMode') stats.modes++;
+  });
+
+  /* Everything else compile() put on the program travels with it: a caller
+     reads program.ok, program.questions and the rest off whichever version it
+     is holding, and a filtered one that quietly lost them would be a trap. */
+  Object.keys(program).forEach(function (k) {
+    if (k !== 'ops' && !Object.prototype.hasOwnProperty.call(out, k)) out[k] = program[k];
+  });
+
+  return { program: out, stats: stats };
+}
+
+/*
+  The whole step in one call, for a caller that has a document and a program
+  and wants the short version of the program. Returns the diff too, because
+  the panel and the run must be reading the same one.
+*/
+function reduce(program, existingRawGraph) {
+  var report = diff(existingRawGraph, program);
+  var cut = filter(program, report);
+  return { program: cut.program, stats: cut.stats, report: report };
+}
+
+  var api = { filter, reduce };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportFilter = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
+
 // ===== src/json-diff.js =====
 /*
   Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
@@ -57853,7 +58031,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '1eb633c 18:05:39';
+    var CLOSURE_BUILD = 'c69ae9d 18:39:15';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -58923,49 +59101,76 @@ function format(report, opts) {
       screen's Compare button shares this fetch and does something else
       entirely with it, and for a while both were labelled the same way.
     */
+    /*
+      A REPO DOCUMENT, WHATEVER DOOR IT CAME THROUGH.
+
+      Two routes reach this now — the import page's own fetch, and the compare
+      page handing over the file it has just finished reading — and they must
+      set up identically or the second one is a subtly different import. So
+      the state, the refusal and the run live here once, and each route's job
+      is only to produce a document and say where it came from.
+    */
+    function startImportFromRepo(doc, where, bytes) {
+      importState.fileName = where;
+      importState.fileBytes = bytes;
+      /* Which door it came through, and the only thing that decides whether
+         the repo card reports the file or goes on offering to fetch one. */
+      importState.fromRepo = true;
+      showImportFile({ busy: true });
+      importDrop.hidden = true;
+      /* The same yield a dropped file needs: everything below this is
+         synchronous and the spinner would never turn without it. */
+      requestAnimationFrame(function () { setTimeout(function () {
+        if (refuseResolved(doc)) return;
+        importState.decisions = {}; importState.levels = {};
+        runImport(doc, where);
+      }, 0); });
+    }
+
     function pullFromRepo(which) {
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
       showToast('Reading from ' + label + '…');
       (which === 'gitlab' ? fetchGitLabFile() : fetchGitHubFile()).then(function (res) {
-        importState.fileName = res.where;
-        importState.fileBytes = res.text.length;
-        /* Which door it came through, and the only thing that decides whether
-           the repo card reports the file or goes on offering to fetch one. */
-        importState.fromRepo = true;
-        showImportFile({ busy: true });
-        importDrop.hidden = true;
-        /* The same yield a dropped file needs: everything below this is
-           synchronous and the spinner would never turn without it. */
-        requestAnimationFrame(function () { setTimeout(function () {
-          var doc;
-          try { doc = JSON.parse(res.text); }
-          catch (err) { importProblem('Not valid JSON', String(err.message || err)); return; }
-          /*
-            A RESOLVED EXPORT CANNOT BE COMPARED, and saying so is the only
-            honest answer. It is a materialised cross-product: the aliases that
-            carried the architecture were evaluated away, so reading it back
-            reconstructs a DIFFERENT shape — one real file came back as 2
-            collections where the document has 14. Diffing that would report a
-            near-total rewrite of a file nobody has touched, which is not a
-            difference, it is an artefact of the format.
-
-            The export says which it is, so this is a fact rather than a guess.
-          */
-          var ext = doc && doc.$extensions && doc.$extensions['com.closure'];
-          if (ext && ext.format === 'resolved') {
-            importProblem('That is a resolved export',
-              'A resolved document has had its references evaluated away, so the collections and ' +
-              'modes it came from cannot be read back out of it — comparing it would report a ' +
-              'rewrite of everything rather than what actually differs. Push the legacy or DTCG ' +
-              'shape to the repo and read that instead.');
-            return;
-          }
-          importState.decisions = {}; importState.levels = {};
-          runImport(doc, res.where);
-        }, 0); });
+        var doc;
+        try { doc = JSON.parse(res.text); }
+        catch (err) {
+          importState.fileName = res.where;
+          importState.fromRepo = true;
+          showImportFile({ busy: false });
+          importDrop.hidden = true;
+          importProblem('Not valid JSON', String(err.message || err));
+          return;
+        }
+        startImportFromRepo(doc, res.where, res.text.length);
       }, function (err) {
         showToast((err && err.message) || ('Could not read from ' + label), true);
       });
+    }
+
+    /*
+      A RESOLVED EXPORT CANNOT BE IMPORTED, and saying so is the only honest
+      answer. It is a materialised cross-product: the aliases that carried the
+      architecture were evaluated away, so reading it back reconstructs a
+      DIFFERENT shape — one real file came back as 2 collections where the
+      document has 14. Applying that would rewrite a file nobody has touched,
+      which is not a change, it is an artefact of the format.
+
+      The export says which it is, so this is a fact rather than a guess.
+
+      True means refused, and the caller stops. Both repo routes ask, because
+      a refusal that lived on one of them would be a hole in the other.
+    */
+    function refuseResolved(doc) {
+      var ext = doc && doc.$extensions && doc.$extensions['com.closure'];
+      if (ext && ext.format === 'resolved') {
+        importProblem('That is a resolved export',
+          'A resolved document has had its references evaluated away, so the collections and ' +
+          'modes it came from cannot be read back out of it — importing it would rewrite ' +
+          'everything rather than what actually differs. Push the legacy or DTCG ' +
+          'shape to the repo and read that instead.');
+        return true;
+      }
+      return false;
     }
     document.getElementById('import-pull-gitlab-btn').addEventListener('click', function () { pullFromRepo('gitlab'); });
     document.getElementById('import-pull-github-btn').addEventListener('click', function () { pullFromRepo('github'); });
@@ -59133,6 +59338,29 @@ function format(report, opts) {
             lastFigmaFileName || 'This Figma file', figmaWhere,
             label, repoWhere, which,
             tokensLabel(report.figmaTokens), tokensLabel(report.repoTokens));
+          /*
+            THE OTHER DIRECTION, HANDED OVER RATHER THAN REBUILT.
+
+            This page reads leaf against leaf, with nothing inferred, because
+            both files came out of the same exporter. Writing the repo's file
+            INTO Figma is a different question and a harder one: it needs the
+            projection — which sets become collections, which become modes,
+            what a reference meant — and derive() has questions about it that
+            only a person can answer. The import page is where those are
+            asked. A second copy of that here would be a screen free to
+            disagree with the screen it copied.
+
+            So the button hands over the document THIS page just read, not the
+            name of a file to fetch again. The two pages have their own file
+            pickers and they are allowed to differ; re-fetching would compare
+            one file and import another, which is the kind of bug nobody sees
+            until it has happened.
+          */
+          window.PomCompare.onApply = report.identical ? null : function () {
+            closeCompare();
+            openImport();
+            startImportFromRepo(got.doc, got.where, got.bytes);
+          };
           window.PomCompare.setReport(report, window.PomJsonDiff.format(report, {
             figmaLabel: (lastFigmaFileName || 'this Figma file') + ' (' + figmaWhere + ')',
             repoLabel: label + ' ' + repoWhere,
@@ -59513,9 +59741,41 @@ function format(report, opts) {
       if (!importState.compiled || !importState.compiled.ok) return;
       window.PomImportApplyBtn.setDisabled(true);
       window.PomImportApplyBtn.setLoading(true);
+      /*
+        THE PROGRAM, CUT DOWN TO WHAT THE PANEL SAID WOULD MOVE.
+
+        apply() is an upsert either way, so running the whole program is
+        correct and writes the whole file to be so — every value already
+        right, written again with what it already held. On a document of
+        thirty thousand that is thirty thousand round trips through an API
+        with no transaction and no hurry.
+
+        THE SAME REPORT, NOT A SECOND ONE. importState.changes is what the
+        person read a moment ago; passing it rather than recomputing is what
+        makes "it did what the panel said" true by construction instead of by
+        coincidence. Recomputed here it could differ — and a run that differs
+        from the panel that authorised it is the one outcome this must not
+        have.
+
+        IT IS STILL AN UPSERT AND STILL NEVER DELETES. A filtered run is a
+        smaller version of the same promise: what it drops are writes the
+        document did not need, never a removal.
+
+        The diff was taken against the last extract. If Figma has moved since,
+        a value that changed there can look settled here and be left alone —
+        a miss, never a corruption, and re-running after a fresh read of the
+        file fixes it.
+      */
+      var toRun = importState.compiled.program;
+      if (importState.changes && window.PomImportFilter) {
+        var cut = window.PomImportFilter.filter(toRun, importState.changes);
+        console.log('[Import] ' + cut.stats.kept + ' ops to run, ' +
+          cut.stats.dropped + ' dropped as already right');
+        toRun = cut.program;
+      }
       parent.postMessage({ pluginMessage: {
         type: 'applyImport',
-        program: importState.compiled.program,
+        program: toRun,
       } }, '*');
     });
 
