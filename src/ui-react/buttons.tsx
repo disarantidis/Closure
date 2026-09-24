@@ -3190,18 +3190,21 @@ const COMPARE_SAMPLE = 40;
                 empty boxes to reach the two that were not.
               */
               const oneSide = r.onlyInFigma.length + r.onlyInRepo.length;
+              /* None of these takes the full row any more: the grid is three
+                 across and these are the three-across kind. Only the values
+                 total and "identical" span, and both are elsewhere. */
               const stats = [
-                { n: oneSide, wide: true,
+                { n: oneSide,
                   label: 'on one side only \u2014 ' + r.onlyInFigma.length.toLocaleString() +
                          ' here, ' + r.onlyInRepo.length.toLocaleString() + ' in the repo' },
                 { n: (r.repointed || []).length, label: 'pointing somewhere new' },
                 { n: (r.aliased || []).length, label: 'aliased one side, inlined the other' },
                 { n: (r.moved || []).length, label: 'the same token, somewhere else' },
-                { n: (r.renamed || []).length, wide: true,
+                { n: (r.renamed || []).length,
                   label: (r.renamed || []).length === 1
                     ? 'group renamed \u2014 its tokens are not gone'
                     : 'groups renamed \u2014 their tokens are not gone' },
-                { n: (r.swapped || []).length, wide: true,
+                { n: (r.swapped || []).length,
                   label: (r.swapped || []).length === 1
                     ? 'group swapped what it holds'
                     : 'groups swapped what they hold' },
@@ -3210,7 +3213,7 @@ const COMPARE_SAMPLE = 40;
               return (
                 <div className="compare-stats">
                   {stats.map((x) => (
-                    <div className={'compare-stat' + (x.wide ? ' is-wide' : '')} key={x.label}>
+                    <div className="compare-stat" key={x.label}>
                       <div className="compare-stat-n">{x.n.toLocaleString()}</div>
                       <div className="compare-stat-label">{x.label}</div>
                     </div>
@@ -3220,12 +3223,11 @@ const COMPARE_SAMPLE = 40;
             })()}
           </div>
 
-          <div className="compare-stats">
-            <div className="compare-stat is-quiet is-wide">
-              <div className="compare-stat-n">{r.sameCount.toLocaleString()}</div>
-              <div className="compare-stat-label">identical</div>
-            </div>
-          </div>
+          {/* "34,529 identical" is the answer to a question this page is not
+              asked. Everything here is what DIFFERS; the count of what does
+              not is the remainder, and a card holding a remainder is a card
+              nobody reads twice. It is still in the clipboard report, where a
+              total is worth having. */}
 
           {(() => {
             /*

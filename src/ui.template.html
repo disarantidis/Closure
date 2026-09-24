@@ -1261,7 +1261,14 @@
        width — which made "identical" look like the headline rather than the
        quietest of the four. A grid keeps them equal whatever the panel is
        doing. */
-    .compare-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    /*
+      THREE ACROSS, AND THREE IS THE CEILING. Two columns made a short list of
+      findings into a tall one — and since the zero cards went, the list IS
+      short: two or three on a real comparison. Three fits the panel and gives
+      each card a readable share; a fourth would be 90px, which is a number and
+      a word broken over three lines.
+    */
+    .compare-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .compare-stat {
       border-radius: 12px;
       padding: 10px 12px;
@@ -1270,9 +1277,9 @@
     .compare-stat-n { font-size: 18px; font-weight: 700; line-height: 1.2; }
     .compare-stat-label { font-size: 11px; opacity: 0.7; margin-top: 2px; }
     .compare-stat.is-quiet .compare-stat-n { opacity: 0.55; font-weight: 600; }
-    /* The four kinds of difference sit 2x2; "identical" runs the full width
-       under them, because it is a footnote to the four rather than a fifth
-       one — and five equal cells in a two-column grid leave a hole. */
+    /* Full width, for the two that are not one of the three: the values total,
+       which carries the type tags inside it, and "identical", which is a
+       footnote to the rest rather than another of them. */
     .compare-stat.is-wide { grid-column: 1 / -1; }
 
     /*
