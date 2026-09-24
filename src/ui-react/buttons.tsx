@@ -2773,7 +2773,21 @@ const COMPARE_SAMPLE = 40;
               size="small"
               rules
               columns={[
-                { key: 'count', header: 'Tokens',
+                /*
+                  THE COUNT TAKES WHAT A COUNT NEEDS, and the two value columns
+                  split the rest.
+
+                  With no width on any column the kit leaves the table in `auto`
+                  layout, where the browser sizes by content — and the content
+                  here is two alias paths of forty characters against a
+                  three-digit number, which it resolved by giving the number a
+                  fifth of the table and breaking `{letterSpacing.0}` across
+                  four lines. Declaring one width puts the table in `fixed`
+                  (see Table's own note), and the columns that declare none
+                  share what is left, evenly, which is exactly right for two
+                  columns holding the same kind of thing.
+                */
+                { key: 'count', header: 'Tokens', width: '58px',
                   cell: (x: any) => <span className="compare-pattern-count">{x.count.toLocaleString()}</span> },
                 { key: 'figma', header: headWith(IconFigma(12), 'Was'),
                   cell: (x: any) => pathCell(String(x.figma), x.type) },

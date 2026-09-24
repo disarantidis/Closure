@@ -1688,6 +1688,20 @@
       font-weight: 700;
       font-variant-numeric: tabular-nums;
       color: var(--app-text);
+      white-space: nowrap;
+    }
+    /*
+      A CARD HEADER'S TRAILING FIGURE IS A FIGURE, NOT A PATH.
+
+      .compare-side-detail carries `overflow-wrap: anywhere` because in the
+      sides card it holds `spar/tokens.json @ main`, which has to be allowed to
+      break. The same class names the row count in every table header on this
+      page, where the rule turned "46" into a 4 above a 6.
+    */
+    .json-download-header .compare-side-detail {
+      white-space: nowrap;
+      overflow-wrap: normal;
+      flex-shrink: 0;
     }
     .compare-pattern-to { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .compare-pattern-why {
