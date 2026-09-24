@@ -2683,7 +2683,13 @@
     .compare-card-sides {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
-      align-items: center;
+      /*
+        STRETCH, so the two cards are the same height whatever their names are
+        doing. One side's file wraps to two lines and the other's does not, and
+        two cards of different heights beside each other read as two unequal
+        things rather than as two readings of the same thing.
+      */
+      align-items: stretch;
     }
     /*
       AND THEY WRAP RATHER THAN TRUNCATE. Two full addresses with their counts
@@ -2711,6 +2717,15 @@
       border-radius: 18px;
       padding: var(--spacing-component-4);
     }
+    /*
+      THE SIZE SITS ON THE FLOOR OF ITS CARD. With the cards stretched to one
+      height, a tag that followed its title floated at whatever height that
+      title happened to end — so the two sizes, which are the pair a reader
+      compares, sat at different heights and had to be hunted for. An auto top
+      margin takes the slack instead: the title stays at the top, the tag stays
+      at the bottom, and the two tags line up with each other.
+    */
+    .compare-card-side > .nd-tag { margin-top: auto; }
     /* The file, which is what the card is about. Smaller than the document's
        name above it and heavier than the tag below — it sits between them in
        the hierarchy and should read that way. */
@@ -2744,7 +2759,9 @@
     /* Between the two, because that is what it is between. The button below
        says the verb; this says the relation, and a reader gets the shape of
        the sentence before reading either name. */
-    .compare-card-vs { display: flex; opacity: 0.55; flex: none; }
+    /* The mark keeps its own alignment: the cards stretch, and a relation
+       drawn between them belongs halfway up, not stretched to their height. */
+    .compare-card-vs { display: flex; opacity: 0.55; flex: none; align-self: center; }
     /* The Figma document's own name, under the card's title and over the two
        files. Smaller than the title and larger than a tag: it is the subject of
        the sentence the tags finish. */
@@ -57000,7 +57017,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'cbf9a40 13:28:24';
+    var CLOSURE_BUILD = 'fd7ce39 13:29:51';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
