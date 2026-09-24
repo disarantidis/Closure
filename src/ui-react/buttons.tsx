@@ -2790,12 +2790,22 @@ const SPELLING_NAMES = 6;
       const a = v.slice(1, -1);
       const b = other.slice(1, -1);
       if (a.indexOf(':') >= 0 || b.indexOf(':') >= 0) return null;
+      /*
+        COMPACTION IS A PROPERTY OF THE PAIR, NOT OF ONE SIDE.
+
+        One side can have nothing of its own while the other does — a path that
+        is entirely the head and tail of the longer one, {white.elevation.FAB}
+        against {section.white.elevation.FAB}. Asked only about itself, the
+        short side returned nothing and printed in full beside a neighbour
+        compacted to five characters, and the row looked like a rendering
+        fault rather than a comparison. So both sides are asked, and if either
+        has nothing to show alone, both stay whole.
+      */
       const changed = changedSegments(a, b);
-      if (!changed) return null;
+      const mirror = changedSegments(b, a);
+      if (!changed || !mirror) return null;
       const idx = Object.keys(changed).map(Number);
-      /* One side simply gained a segment the other never had: nothing of this
-         side's own changed, so there is nothing to show in isolation. */
-      if (!idx.length) return null;
+      if (!idx.length || !Object.keys(mirror).length) return null;
       const parts = a.split('.');
       const first = Math.min.apply(null, idx);
       const last = Math.max.apply(null, idx);
