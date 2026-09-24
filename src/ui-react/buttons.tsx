@@ -697,12 +697,7 @@ declare global {
          column header can wear its mark. Optional: a comparison can be shown
          without one, and then the column is just "Repo". */
       setSides: (figma: string, figmaDetail: string, repo: string, repoDetail: string,
-                 provider?: 'github' | 'gitlab' | null,
-                 /* How many tokens each side holds, as one line — it used to
-                    ride on the two tags and pushed the branch out of the repo's
-                    address. Optional: the busy state names the sides before it
-                    has counted anything. */
-                 totals?: string) => void;
+                 provider?: 'github' | 'gitlab' | null) => void;
       /* `actionLabel` puts a button in the warning. A refusal that names the
          fix and then makes you go and do it somewhere else is a worse version
          of one that just does it. */
@@ -2408,7 +2403,7 @@ const COMPARE_SAMPLE = 40;
 (function mountCompare() {
   const container = document.getElementById('compare-mount');
   type Sides = { figma: string; figmaDetail: string; repo: string; repoDetail: string;
-                 provider?: 'github' | 'gitlab' | null; totals?: string };
+                 provider?: 'github' | 'gitlab' | null };
   type S = {
     busy: string;
     sides: Sides;
@@ -2429,23 +2424,23 @@ const COMPARE_SAMPLE = 40;
     const sides = (
       <div className="json-download-card" data-level={4}>
         {/*
-          THE CARD SAYS WHAT IT IS, THEN WHICH FILE, THEN WHICH TWO.
+          THE DOCUMENT, THEN THE TWO FILES IT IS BEING READ AGAINST.
 
           It was two stacked blocks with "compared with" between them, which
           spends three lines and a preposition on a relation a single mark
-          states — and left the card itself unnamed, so the page opened on a
-          block of file paths with no heading over them.
+          states.
 
-          Three rows now, narrowing as they go: the act, the Figma document the
-          left-hand side comes out of, and the two files themselves as tags with
-          the relation drawn between them.
+          Two rows now: the Figma document the left-hand side comes out of, and
+          the two files themselves as tags in three columns — one each and the
+          mark between them, so the pair is symmetric whatever the names are
+          doing. Each tag carries its own token count, because the whole
+          question on this page is how far apart the two are and that starts
+          with how much is in each.
         */}
-        <div className="json-download-header">
-          <div className="json-download-title-group">
-            <span className="json-download-title-icon" aria-hidden>{IconCompare(16)}</span>
-            <p className="json-download-title">Compare</p>
-          </div>
-        </div>
+        {/* No title. The page's own header says "Compare" three inches above
+            this, and a card repeating its page is a heading that tells nobody
+            anything. The mark between the two sides is what says the relation
+            here, which is where the relation actually is. */}
         <span className="compare-card-main">
           {/* The document, not the export: the left-hand tag names the file
               this would write, and this names where it comes from. */}
@@ -2470,10 +2465,7 @@ const COMPARE_SAMPLE = 40;
               <span title={s.sides.repoDetail}>{s.sides.repoDetail}</span>
             </Tag>
           </span>
-          {/* How much is on each side, under the two things it is about — a
-              whole line for two numbers, rather than a tail on each tag that
-              was pushing the branch out of the address. */}
-          {s.sides.totals && <span className="compare-side-detail">{s.sides.totals}</span>}
+
         </span>
       </div>
     );
@@ -3306,8 +3298,8 @@ const COMPARE_SAMPLE = 40;
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomCompare = {
     setBusy: (label) => set((s) => ({ ...s, busy: label, problem: null, report: null })),
-    setSides: (figma, figmaDetail, repo, repoDetail, provider, totals) =>
-      set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail, provider, totals } })),
+    setSides: (figma, figmaDetail, repo, repoDetail, provider) =>
+      set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail, provider } })),
     setProblem: (title, message, fix, actionLabel) =>
       set((s) => ({ ...s, busy: '', report: null, problem: { title, message, fix, actionLabel } })),
     setReport: (report, copyText) =>

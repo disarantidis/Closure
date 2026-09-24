@@ -2671,24 +2671,41 @@
       /* No inset of its own: the card's padding is what both this and the
          header sit inside, so they line up by having nothing between them. */
     }
-    .compare-card-sides .nd-tag {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    /*
+      THREE COLUMNS: one each and the mark between them.
+
+      Flex sized the tags by their content, so the pair leaned — the repo's
+      name is a folder, a file, a branch and a count, and it took two thirds of
+      the row while the Figma side sat in a third of it. A comparison drawn
+      lopsided reads as one side mattering more. Equal columns make the pair
+      symmetric whatever the names are doing, which is the claim the card makes.
+    */
+    .compare-card-sides {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
     }
     /*
-      THE REPO SIDE GIVES UP THE ROOM, because it is the side that has room to
-      give. Equal shrink factors take from both in proportion to their width, so
-      the Figma tag — "tokens.json · 35k tokens", and the shorter of the two by
-      some margin — was losing its tail to buy space for a name that is longer
-      by construction: the repo's is a folder, a file, a branch and a count.
-
-      Four to one, so the deficit comes almost entirely out of the half that can
-      afford it. Both keep their full text in a title.
+      AND THEY WRAP RATHER THAN TRUNCATE. Two full addresses with their counts
+      are wider than this row at any split, so something gives — and what a tag
+      gives up first is its tail, which is the branch on one side and the count
+      on both. Two lines inside a tag costs a few pixels of height; a name cut
+      short names nothing.
     */
-    .compare-card-sides .nd-tag:first-of-type { flex-shrink: 1; }
-    .compare-card-sides .nd-tag:last-of-type { flex-shrink: 4; }
+    .compare-card-sides .nd-tag { min-width: 0; height: auto; }
+    /*
+      THE ELLIPSIS LIVES ON .nd-tag-label, NOT ON THE TAG — which is why setting
+      white-space on the tag changed nothing. The kit pins the label to one line
+      and cuts it, which is right for a tag that sits in a row of them and wrong
+      for a tag that IS one of two things being compared: what it cuts is the
+      tail, and the tail is the branch on one side and the count on both.
+    */
+    .compare-card-sides .nd-tag-label {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      text-align: start;
+    }
     /* Between the two, because that is what it is between. The button below
        says the verb; this says the relation, and a reader gets the shape of
        the sentence before reading either name. */
@@ -5084,23 +5101,22 @@
           /* The counts are worth saying on the sides themselves: two numbers
              side by side is how "the repo is behind" reads at a glance. */
           /*
-            THE TAGS CARRY ADDRESSES, NOT COUNTS. They sit side by side in a
-            375px card, and the two full strings with their token totals came to
-            more than that — so both truncated, and what a tag gives up first is
-            its tail: "spar/tokens.json @ m…" lost the branch, which is part of
-            the address and the one thing on that side a reader cannot infer.
+            EACH TAG CARRIES ITS OWN COUNT, because the question this page
+            answers starts with how much is on each side.
 
-            The totals go to the line under them, where there is a whole row for
-            two numbers and nothing competing for it.
+            The two strings together are wider than the row, so the tags wrap
+            rather than truncate — a name cut short names nothing, and of the
+            two things a tag holds the ADDRESS is the one that cannot be
+            inferred. Two lines in a tag is cheaper than a branch nobody can
+            read. See .compare-card-sides for the column grid that keeps the
+            pair symmetric while they do it.
           */
           window.PomCompare.setSides(
             lastFigmaFileName || 'This Figma file',
-            figmaWhere,
+            figmaWhere + '  ·  ' + tokensLabel(report.figmaTokens),
             label,
-            repoWhere,
-            which,
-            tokensLabel(report.figmaTokens) + ' here, ' +
-              tokensLabel(report.repoTokens) + ' in the repo');
+            repoWhere + '  ·  ' + tokensLabel(report.repoTokens),
+            which);
           window.PomCompare.setReport(report, window.PomJsonDiff.format(report, {
             figmaLabel: (lastFigmaFileName || 'this Figma file') + ' (' + figmaWhere + ')',
             repoLabel: label + ' ' + repoWhere,
