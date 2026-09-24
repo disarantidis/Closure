@@ -1449,20 +1449,27 @@ function compare(figmaDoc, repoDoc) {
     a fragment of it when the exact thing is what happened.
 
     Nothing is inferred to build it. Two references with nothing in common are
-    not a shape, and neither is a pair where one side is entirely the other's
-    head and tail — there is no remainder to name.
+    not a shape.
+
+    EACH SIDE KEEPS A SEGMENT. Matching greedily from both ends can consume
+    one side entirely: {white.elevation.FAB.standard.y} is every segment of
+    {section.white.elevation.FAB.standard.y} except the first, so the shorter
+    side had no remainder at all and the pair was refused — which threw away
+    the commonest re-rooting of the lot, a group nested one level deeper on
+    one side. Stopping one segment short of empty leaves `section.white`
+    against `white`: where it said white it now says section.white, which is
+    the edit, said in the shortest true way.
   */
   var refShape = function (a, b) {
     if (!/^\{[^{}]+\}$/.test(a) || !/^\{[^{}]+\}$/.test(b)) return null;
     var A = a.slice(1, -1).split('.'), B = b.slice(1, -1).split('.');
+    var most = Math.min(A.length, B.length) - 1;
     var head = 0;
-    while (head < A.length && head < B.length && A[head] === B[head]) head++;
+    while (head < most && A[head] === B[head]) head++;
     var tail = 0;
-    while (tail < A.length - head && tail < B.length - head &&
-           A[A.length - 1 - tail] === B[B.length - 1 - tail]) tail++;
+    while (tail < most - head && A[A.length - 1 - tail] === B[B.length - 1 - tail]) tail++;
     if (!head && !tail) return null;
     var midA = A.slice(head, A.length - tail), midB = B.slice(head, B.length - tail);
-    if (!midA.length || !midB.length) return null;
     return { head: head > 0, tail: tail > 0,
              figma: midA.join('.'), repo: midB.join('.'),
              key: head + '\u241f' + midA.join('.') + '\u241f' + midB.join('.') };

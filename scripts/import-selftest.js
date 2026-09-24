@@ -2926,6 +2926,28 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
            !!shaped && shaped.figma === '{section\u2026}' && shaped.repo === '{white\u2026}' &&
            shaped.shape.head === false && shaped.shape.tail === true,
            JSON.stringify(shaped));
+        /*
+          AND THE SHAPE THAT MATCHING GREEDILY THREW AWAY: one side is every
+          segment of the other but the first, so it had no remainder and the
+          pair was refused. Each side keeps a segment now, which says the edit
+          in the shortest true way — where it said white it now says
+          section.white.
+        */
+        const deeper = (root) => ({
+          white: { elevation: { FAB: { standard: { y: mkv(1), blur: mkv(2), spread: mkv(3) } } } },
+          wrap: { section: { white: { elevation: { FAB: { standard:
+                  { y: mkv(9), blur: mkv(8), spread: mkv(7) } } } } } },
+          sem: { fab: { y: mk(root + '.elevation.FAB.standard.y'),
+                        blur: mk(root + '.elevation.FAB.standard.blur'),
+                        spread: mk(root + '.elevation.FAB.standard.spread') } },
+        });
+        const nested = JD.compare(deeper('wrap.section.white'), deeper('white'));
+        const oneDeeper = (nested.changedPatterns || [])[0];
+        ok('compare: a group nested one level deeper is one pattern, not one row per token',
+           !!oneDeeper && oneDeeper.count === 3 &&
+           oneDeeper.figma === '{wrap.section.white\u2026}' && oneDeeper.repo === '{white\u2026}',
+           JSON.stringify(nested.changedPatterns));
+
         /* Two references with nothing in common are not a shape — there is no
            head and no tail to match off, so the pair stands on its own. */
         const unrelated = JD.compare(

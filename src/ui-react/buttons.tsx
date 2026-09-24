@@ -2589,16 +2589,24 @@ const SPELLING_NAMES = 6;
       claim the same segment twice ({a.b} against {a.b.b}). Identical paths
       mark nothing: the table has a column for values that changed while the
       reference did not.
+
+      AND EACH SIDE KEEPS A SEGMENT. Matching greedily from both ends can
+      consume one path entirely — {white.elevation.FAB.standard.y} is every
+      segment of {section.white.elevation.FAB.standard.y} except the first —
+      and a side with nothing of its own marked nothing while its neighbour
+      lit up, which reads as a fault rather than a comparison. Stopping one
+      segment short of empty marks `section.white` against `white`: where it
+      said white it now says section.white.
     */
     const changedSegments = (path: string, other?: string) => {
       if (!other || other === path) return null;
       const a = path.split('.');
       const b = other.split('.');
+      const most = Math.min(a.length, b.length) - 1;
       let head = 0;
-      while (head < a.length && head < b.length && a[head] === b[head]) head++;
+      while (head < most && a[head] === b[head]) head++;
       let tail = 0;
-      while (tail < a.length - head && tail < b.length - head
-             && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+      while (tail < most - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
       /*
         NOTHING IN COMMON IS NOT A DIFFERENCE WORTH DRAWING. If the two share
         no head and no tail then every segment is new, and a band over the
@@ -2609,6 +2617,22 @@ const SPELLING_NAMES = 6;
       const marked: { [i: number]: true } = {};
       for (let i = head; i < a.length - tail; i++) marked[i] = true;
       return marked;
+    };
+
+    /*
+      THE BREAKS A DOTTED PATH HAS. A browser has none inside
+      foundation.core-colours.brand — a dot is not a break opportunity — so a
+      path rendered without these is one unbreakable word, and a flex item as
+      wide as its longest word overflows its column into the next one. Every
+      place this file prints a path goes through here.
+    */
+    const dotted = (text: string): ReactNode[] => {
+      const out: ReactNode[] = [];
+      text.split('.').forEach((seg, i) => {
+        if (i) { out.push(<wbr key={'w' + i} />); out.push('.'); }
+        out.push(seg);
+      });
+      return out;
     };
 
     const pathRuns = (path: string, other?: string) => {
@@ -2634,16 +2658,11 @@ const SPELLING_NAMES = 6;
         if (i) push('.', c && !!(changed && changed[i - 1]));
         push(seg, c);
       });
-      const nodes: ReactNode[] = runs.map((run, i) => {
-        const kids: ReactNode[] = [];
-        run.text.split('.').forEach((seg, j) => {
-          if (j) { kids.push(<wbr key={'w' + j} />); kids.push('.'); }
-          kids.push(seg);
-        });
-        return run.changed
-          ? <mark className="compare-diff" key={'m' + i}>{kids}</mark>
-          : <span key={'s' + i}>{kids}</span>;
-      });
+      const nodes: ReactNode[] = runs.map((run, i) => (
+        run.changed
+          ? <mark className="compare-diff" key={'m' + i}>{dotted(run.text)}</mark>
+          : <span key={'s' + i}>{dotted(run.text)}</span>
+      ));
       return { nodes: nodes, diffed: !!changed };
     };
 
@@ -2791,15 +2810,11 @@ const SPELLING_NAMES = 6;
       const b = other.slice(1, -1);
       if (a.indexOf(':') >= 0 || b.indexOf(':') >= 0) return null;
       /*
-        COMPACTION IS A PROPERTY OF THE PAIR, NOT OF ONE SIDE.
-
-        One side can have nothing of its own while the other does — a path that
-        is entirely the head and tail of the longer one, {white.elevation.FAB}
-        against {section.white.elevation.FAB}. Asked only about itself, the
-        short side returned nothing and printed in full beside a neighbour
-        compacted to five characters, and the row looked like a rendering
-        fault rather than a comparison. So both sides are asked, and if either
-        has nothing to show alone, both stay whole.
+        COMPACTION IS A PROPERTY OF THE PAIR, NOT OF ONE SIDE — and asking both
+        is what keeps it one. changedSegments now leaves every side a segment,
+        so neither can come back empty while the other does not; both are still
+        asked, because a rule that holds by construction somewhere else is a
+        rule this can stop relying on the day that changes.
       */
       const changed = changedSegments(a, b);
       const mirror = changedSegments(b, a);
@@ -2817,11 +2832,7 @@ const SPELLING_NAMES = 6;
          came out as "{… / neutral.lig / ht…}": three lines, one of them a
          word cut in half, for seventeen characters. With them it is
          "{…neutral / .light…}". */
-      const kids: ReactNode[] = [];
-      mid.forEach((seg, i) => {
-        if (i) { kids.push(<wbr key={'w' + i} />); kids.push('.'); }
-        kids.push(seg);
-      });
+      const kids = dotted(mid.join('.'));
       return {
         text: open + mid.join('.') + close,
         nodes: (
@@ -3041,7 +3052,7 @@ const SPELLING_NAMES = 6;
           {icon && <span className="compare-token-icon" aria-hidden="true">{icon(13)}</span>}
           <span className="compare-cell-path is-diffed">
             <span className="compare-elide">{'{' + (x.shape.head ? '\u2026' : '')}</span>
-            <mark className="compare-diff">{part}</mark>
+            <mark className="compare-diff">{dotted(part)}</mark>
             <span className="compare-elide">{(x.shape.tail ? '\u2026' : '') + '}'}</span>
           </span>
         </span>

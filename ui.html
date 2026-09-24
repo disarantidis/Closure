@@ -51236,14 +51236,26 @@ html[data-theme=dark] {
         if (!other || other === path) return null;
         const a = path.split(".");
         const b = other.split(".");
+        const most = Math.min(a.length, b.length) - 1;
         let head = 0;
-        while (head < a.length && head < b.length && a[head] === b[head]) head++;
+        while (head < most && a[head] === b[head]) head++;
         let tail = 0;
-        while (tail < a.length - head && tail < b.length - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+        while (tail < most - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
         if (!head && !tail) return null;
         const marked = {};
         for (let i = head; i < a.length - tail; i++) marked[i] = true;
         return marked;
+      };
+      const dotted = (text) => {
+        const out = [];
+        text.split(".").forEach((seg, i) => {
+          if (i) {
+            out.push(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)("wbr", {}, "w" + i));
+            out.push(".");
+          }
+          out.push(seg);
+        });
+        return out;
       };
       const pathRuns = (path, other) => {
         const parts = path.split(".");
@@ -51259,17 +51271,7 @@ html[data-theme=dark] {
           if (i) push(".", c && !!(changed && changed[i - 1]));
           push(seg, c);
         });
-        const nodes = runs.map((run, i) => {
-          const kids = [];
-          run.text.split(".").forEach((seg, j) => {
-            if (j) {
-              kids.push(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)("wbr", {}, "w" + j));
-              kids.push(".");
-            }
-            kids.push(seg);
-          });
-          return run.changed ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("mark", { className: "compare-diff", children: kids }, "m" + i) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { children: kids }, "s" + i);
-        });
+        const nodes = runs.map((run, i) => run.changed ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("mark", { className: "compare-diff", children: dotted(run.text) }, "m" + i) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { children: dotted(run.text) }, "s" + i));
         return { nodes, diffed: !!changed };
       };
       const pathCell = (path, type, other) => {
@@ -51340,14 +51342,7 @@ html[data-theme=dark] {
         const mid = parts.slice(first, last + 1);
         const open = "{" + (first > 0 ? "\u2026" : "");
         const close = (last < parts.length - 1 ? "\u2026" : "") + "}";
-        const kids = [];
-        mid.forEach((seg, i) => {
-          if (i) {
-            kids.push(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)("wbr", {}, "w" + i));
-            kids.push(".");
-          }
-          kids.push(seg);
-        });
+        const kids = dotted(mid.join("."));
         return {
           text: open + mid.join(".") + close,
           nodes: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
@@ -51457,7 +51452,7 @@ html[data-theme=dark] {
           icon2 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-token-icon", "aria-hidden": "true", children: icon2(13) }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-cell-path is-diffed", children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-elide", children: "{" + (x.shape.head ? "\u2026" : "") }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("mark", { className: "compare-diff", children: part }),
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("mark", { className: "compare-diff", children: dotted(part) }),
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-elide", children: (x.shape.tail ? "\u2026" : "") + "}" })
           ] })
         ] });
@@ -57472,20 +57467,27 @@ function compare(figmaDoc, repoDoc) {
     a fragment of it when the exact thing is what happened.
 
     Nothing is inferred to build it. Two references with nothing in common are
-    not a shape, and neither is a pair where one side is entirely the other's
-    head and tail — there is no remainder to name.
+    not a shape.
+
+    EACH SIDE KEEPS A SEGMENT. Matching greedily from both ends can consume
+    one side entirely: {white.elevation.FAB.standard.y} is every segment of
+    {section.white.elevation.FAB.standard.y} except the first, so the shorter
+    side had no remainder at all and the pair was refused — which threw away
+    the commonest re-rooting of the lot, a group nested one level deeper on
+    one side. Stopping one segment short of empty leaves `section.white`
+    against `white`: where it said white it now says section.white, which is
+    the edit, said in the shortest true way.
   */
   var refShape = function (a, b) {
     if (!/^\{[^{}]+\}$/.test(a) || !/^\{[^{}]+\}$/.test(b)) return null;
     var A = a.slice(1, -1).split('.'), B = b.slice(1, -1).split('.');
+    var most = Math.min(A.length, B.length) - 1;
     var head = 0;
-    while (head < A.length && head < B.length && A[head] === B[head]) head++;
+    while (head < most && A[head] === B[head]) head++;
     var tail = 0;
-    while (tail < A.length - head && tail < B.length - head &&
-           A[A.length - 1 - tail] === B[B.length - 1 - tail]) tail++;
+    while (tail < most - head && A[A.length - 1 - tail] === B[B.length - 1 - tail]) tail++;
     if (!head && !tail) return null;
     var midA = A.slice(head, A.length - tail), midB = B.slice(head, B.length - tail);
-    if (!midA.length || !midB.length) return null;
     return { head: head > 0, tail: tail > 0,
              figma: midA.join('.'), repo: midB.join('.'),
              key: head + '\u241f' + midA.join('.') + '\u241f' + midB.join('.') };
@@ -57697,7 +57699,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '0170837 16:31:11';
+    var CLOSURE_BUILD = '2510f26 16:45:37';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
