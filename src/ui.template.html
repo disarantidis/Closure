@@ -2692,9 +2692,41 @@
       on both. Two lines inside a tag costs a few pixels of height; a name cut
       short names nothing.
     */
-    /* One side's own tags: the address, then how much is in it. They wrap
-       between themselves rather than inside either one. */
-    .compare-card-side { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+    /*
+      ONE SIDE, AS A CARD. A heading and a tag under it, at the rung below the
+      card holding both — the same relationship, and the same pair of radii, a
+      subcard has anywhere else in this plugin.
+
+      align-items: flex-start so the tag takes its own width rather than the
+      card's: a size is a small fact and a full-width pill would read as a
+      second heading.
+    */
+    .compare-card-side {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      min-width: 0;
+      background: var(--background);
+      border-radius: 18px;
+      padding: var(--spacing-component-4);
+    }
+    /* The file, which is what the card is about. Smaller than the document's
+       name above it and heavier than the tag below — it sits between them in
+       the hierarchy and should read that way. */
+    .compare-side-title {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-family: var(--type-body-s-font-family);
+      font-size: var(--type-body-s-size);
+      line-height: var(--type-body-s-line-height);
+      font-weight: 600;
+      color: var(--app-text);
+    }
+    .compare-side-title .compare-side-mark { margin-top: 2px; }
     .compare-card-sides .nd-tag { min-width: 0; height: auto; }
     /*
       THE ELLIPSIS LIVES ON .nd-tag-label, NOT ON THE TAG — which is why setting

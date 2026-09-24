@@ -2456,37 +2456,48 @@ const COMPARE_SAMPLE = 40;
             name is.
           */}
           {/*
-            THE ADDRESS AND THE SIZE ARE TWO TAGS, not one string with a
-            separator in it. They are different kinds of fact — where the file
-            is, and how much is in it — and run together they made one long
-            label that had to wrap mid-name to fit its column. Two short tags
-            wrap between themselves instead, and each stays whole.
+            EACH SIDE IS A CARD, and inside it the file is a TITLE with the size
+            as a tag under it.
+
+            Two tags of equal weight said the address and the count were the
+            same kind of fact. They are not — one names the thing and the other
+            measures it — and a heading with a tag under it says which is which
+            by shape rather than by reading order. It also gives each side an
+            edge, so the two read as two objects held up against each other
+            instead of four chips in a row with a mark somewhere among them.
           */}
           <span className="compare-card-sides">
-            <span className="compare-card-side">
-              <Tag variant="tonal" size="small" leading={IconFigma(12)}
-                   style={{ minWidth: 0 }} label={s.sides.figmaDetail}>
-                <span title={s.sides.figmaDetail}>{s.sides.figmaDetail}</span>
-              </Tag>
-              {s.sides.figmaCount && (
-                <Tag variant="tonal" size="small">{s.sides.figmaCount}</Tag>
-              )}
+            <span className="compare-card-side" data-level={SUBCARD_LEVEL}>
+              {/* The tag inside lifts off THIS card, not the one outside it —
+                  a subcard is rung 3 and a Tag mounted against rung 4 would
+                  paint the colour of the surface it sits on. */}
+              <LevelContext.Provider value={SUBCARD_LEVEL}>
+                <span className="compare-side-title" title={s.sides.figmaDetail}>
+                  <span className="compare-side-mark" aria-hidden>{IconFigma(13)}</span>
+                  {s.sides.figmaDetail}
+                </span>
+                {s.sides.figmaCount && (
+                  <Tag variant="tonal" size="small">{s.sides.figmaCount}</Tag>
+                )}
+              </LevelContext.Provider>
             </span>
             {/* Between the two, because that is what it is between: the
                 relation, drawn, where "compared with" used to be written. */}
             <span className="compare-card-vs" aria-hidden>{IconCompare(14)}</span>
-            <span className="compare-card-side">
-              <Tag variant="tonal" size="small"
-                   leading={s.sides.provider === 'gitlab' ? IconGitlab(12) : IconGithub(12)}
-                   style={{ minWidth: 0 }} label={s.sides.repoDetail}>
-                <span title={s.sides.repoDetail}>{s.sides.repoDetail}</span>
-              </Tag>
-              {s.sides.repoCount && (
-                <Tag variant="tonal" size="small">{s.sides.repoCount}</Tag>
-              )}
+            <span className="compare-card-side" data-level={SUBCARD_LEVEL}>
+              <LevelContext.Provider value={SUBCARD_LEVEL}>
+                <span className="compare-side-title" title={s.sides.repoDetail}>
+                  <span className="compare-side-mark" aria-hidden>
+                    {s.sides.provider === 'gitlab' ? IconGitlab(13) : IconGithub(13)}
+                  </span>
+                  {s.sides.repoDetail}
+                </span>
+                {s.sides.repoCount && (
+                  <Tag variant="tonal" size="small">{s.sides.repoCount}</Tag>
+                )}
+              </LevelContext.Provider>
             </span>
           </span>
-
         </span>
       </div>
     );
