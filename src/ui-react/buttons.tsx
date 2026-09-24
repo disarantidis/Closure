@@ -2788,6 +2788,59 @@ const GROUP_MATES = 12;
     const TAGGABLE = 22;
 
     /*
+      A COMPOSITE'S DIFFERING SUB-VALUES, GROUPED BY THE DIFFERENCE.
+
+      KEYED BY WHAT IS DRAWN, NOT BY WHAT IS HELD. blur and spread differ from
+      each other in their last segment and not at all in the one that moved,
+      so the raw pairs never match and four identical lines print four times.
+      The elided pair is what the reader compares, and it is what decides they
+      are one line.
+
+      Both columns reach the same grouping from the same two documents — the
+      mirror is taken so the key does not depend on which side is asking — so
+      the two cells stay line for line.
+
+      Returned rather than rendered, because the column that has to be wide
+      enough for this needs to know what it will say before it is said.
+    */
+    const compositeRuns = (v: string, other: string) => {
+      const mine = compositePairs(v), theirs = compositePairs(other);
+      if (!mine || !theirs) return null;
+      const keys = changedKeys(mine, theirs);
+      const map = new Map(mine), theirMap = new Map(theirs);
+      const same = mine.length - keys.filter((k) => map.has(k)).length;
+      const runs: { keys: string[]; mine?: string; brief: any }[] = [];
+      const byPair = new Map<string, any>();
+      keys.forEach((k) => {
+        const mv = map.get(k), tv = theirMap.get(k);
+        const brief = mv !== undefined && tv !== undefined ? compactRef(mv, tv) : null;
+        const mirror = mv !== undefined && tv !== undefined ? compactRef(tv, mv) : null;
+        const pk = brief && mirror
+          ? 'c\u241f' + brief.text + '\u241f' + mirror.text
+          : String(mv) + '\u241f' + String(tv);
+        if (!byPair.has(pk)) {
+          const run = { keys: [] as string[], mine: mv, brief: brief };
+          byPair.set(pk, run);
+          runs.push(run);
+        }
+        byPair.get(pk).keys.push(k);
+      });
+      return { runs, same };
+    };
+
+    /* The widest line a composite cell will draw: a key list over its value,
+       so the column needs whichever of the two is longer. */
+    const compositeWidth = (v: string, other: string) => {
+      const parts = compositeRuns(v, other);
+      if (!parts) return null;
+      return parts.runs.reduce((n, run) => Math.max(
+        n,
+        run.keys.join(', ').length,
+        run.brief ? run.brief.text.length : (run.mine || '').length,
+      ), 0);
+    };
+
+    /*
       THE FIRST COLUMN NAMES THE TOKEN; THESE TWO SAY WHAT MOVED.
 
       A repointed row read
@@ -2873,22 +2926,38 @@ const GROUP_MATES = 12;
           </span>
         );
       }
-      /* Both sides composite: show only the sub-values that moved, and say how
-         many did not, so "the rest is the same" is stated rather than implied
-         by absence. */
+      /*
+        Both sides composite: show only the sub-values that moved, and say how
+        many did not, so "the rest is the same" is stated rather than implied
+        by absence.
+
+        AND A SUB-VALUE IS A VALUE. Every one of these is a reference against
+        a reference, the same shape as the cell next door, and it was the one
+        place left on the page printing both in full: four lines of
+        {section.white.elevation.level-5.blur} against
+        {white.elevation.level-5.blur} inside a row whose neighbours read
+        {section.white…} and {white…}. Same elision, same mark.
+
+        AND THE SUB-VALUES THAT MOVED THE SAME WAY MOVED ONCE. A shadow
+        re-rooted takes its blur, spread, x and y with it — one edit, printed
+        four times, inside a row that is itself one of a hundred. Keys sharing
+        a pair are listed together, in the order they were first seen, and
+        both columns derive the same grouping from the same two documents, so
+        the two sides stay line for line.
+      */
       if (other !== undefined) {
-        const mine = compositePairs(v), theirs = compositePairs(other);
-        if (mine && theirs) {
-          const keys = changedKeys(mine, theirs);
-          const map = new Map(mine);
-          const same = mine.length - keys.filter((k) => map.has(k)).length;
+        const parts = compositeRuns(v, other);
+        if (parts) {
+          const { runs, same } = parts;
           return (
             <span className="compare-sub" title={v}>
-              {keys.map((k) => (
-                <span className="compare-sub-row" key={k}>
-                  <span className="compare-sub-key">{k}</span>
-                  <span className="compare-sub-val">{map.has(k) ? map.get(k) : '—'}</span>
-                </span>
+              {runs.map((run) => (
+                  <span className="compare-sub-row" key={run.keys.join(',')}>
+                    <span className="compare-sub-key">{run.keys.join(', ')}</span>
+                    <span className="compare-sub-val">
+                      {run.mine === undefined ? '—' : run.brief ? run.brief.nodes : run.mine}
+                    </span>
+                  </span>
               ))}
               {same > 0 && <span className="compare-sub-same">{`+${same} unchanged`}</span>}
             </span>
@@ -3538,7 +3607,14 @@ const GROUP_MATES = 12;
            it, which is the one that needed it. */
         const shownLen = (mine: string, theirs: string) => {
           const brief = compactRef(mine, theirs);
-          return brief ? brief.text.length : (swatchOf(mine) || mine).length;
+          if (brief) return brief.text.length;
+          /* A composite is not one value, it is a stack of them, and the
+             stack is now as short as the scalars beside it. Measuring the
+             string it came from asked for 36% of the table for four elided
+             references that fit in a hundred pixels. */
+          const composite = compositeWidth(mine, theirs);
+          if (composite !== null) return composite;
+          return (swatchOf(mine) || mine).length;
         };
         const wide = sample.some((x: any) =>
           shownLen(x.repo, x.figma) > TAGGABLE ||
