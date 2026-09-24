@@ -2684,7 +2684,10 @@
       /* It stands on the page now rather than inside a card, so it takes the
          same gutter and the same gap below as the cards it sits above. */
       margin: 0 16px 16px;
-      gap: 0;
+      /* The mark needs air on both sides or it reads as attached to whichever
+         card it is nearer. It sits in its own column, so one gap buys both
+         sides of it. */
+      gap: 12px;
     }
     /*
       AND THEY WRAP RATHER THAN TRUNCATE. Two full addresses with their counts
@@ -57011,7 +57014,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '3a226ca 13:35:32';
+    var CLOSURE_BUILD = '3b26053 13:37:03';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
