@@ -51152,6 +51152,7 @@ html[data-theme=dark] {
   ];
   var COMPARE_SAMPLE = 40;
   var SPELLING_KEYS = 3;
+  var SPELLING_NAMES = 6;
   (function mountCompare() {
     const container = document.getElementById("compare-mount");
     let set = () => {
@@ -51524,14 +51525,27 @@ html[data-theme=dark] {
               /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: n }),
               !!used[n] && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-uses", children: "\xD7" + used[n].toLocaleString() })
             ] }),
-            evidence && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-vals", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-key", children: shape.counts[n].toLocaleString() + (shape.counts[n] === 1 ? " token" : " tokens") }),
-              keys.slice(0, SPELLING_KEYS).map((k) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-val", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-key", children: k }),
-                (vals[n] || {})[k]
-              ] }, k)),
-              keys.length > SPELLING_KEYS && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-key", children: "+" + (keys.length - SPELLING_KEYS) })
-            ] })
+            evidence && (() => {
+              const mine = Object.keys(vals[n] || {});
+              const show = noneShared ? mine.slice(0, SPELLING_NAMES) : [];
+              return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
+                "span",
+                {
+                  className: "compare-spelling-vals",
+                  title: x.root + "." + n + "  \u2014  " + mine.join(", "),
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-key", children: shape.counts[n].toLocaleString() + (shape.counts[n] === 1 ? " token" : " tokens") }),
+                    show.map((k) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-val", children: k }, k)),
+                    show.length > 0 && mine.length > show.length && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-key", children: "+" + (mine.length - show.length) }),
+                    keys.slice(0, SPELLING_KEYS).map((k) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-val", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-key", children: k }),
+                      (vals[n] || {})[k]
+                    ] }, k)),
+                    keys.length > SPELLING_KEYS && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-key", children: "+" + (keys.length - SPELLING_KEYS) })
+                  ]
+                }
+              );
+            })()
           ] }, n)),
           noneShared && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "no tokens in common" }),
           otherTokens && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "one holds tokens the other does not" }),
@@ -51540,7 +51554,8 @@ html[data-theme=dark] {
           side === "repo" && x.consumedDiffers && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "each file points at a different spelling" })
         ] });
       };
-      const spellings = (rows) => {
+      const spellings = (all) => {
+        const rows = all.filter((x) => x.live);
         if (!rows.length) return null;
         const title = "Names \u2014 one word, spelled two ways";
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
@@ -57283,10 +57298,41 @@ function compare(figmaDoc, repoDoc) {
     typography token drawing fontSize and lineHeight from the same group is
     one consumer, not two. A group's own members are not its consumers.
   */
-  var referenceCounts = function (flat) {
+  /*
+    A REFERENCE IS RELATIVE TO ITS SET, NOT ABSOLUTE.
+
+    {font-family.teleneo-var} is not a path from the root of the document — it
+    is a path from the token set the referring token lives in, and findRef
+    resolves it by trying that set first and every other set after. Counting
+    consumers by string prefix against `core.font-family` therefore matched
+    nothing at all: every count came out zero and every pair in a real file
+    was drawn as an orphan.
+
+    So a reference is resolved the way the rest of this file resolves one —
+    landed, not guessed — and the group it landed in is the set it resolved in
+    plus the first segment of the path. The absolute spelling is tried last,
+    because a document is also its own base and `core.font-family.x` read as a
+    relative path would otherwise land through the document itself and be
+    attributed to the referring set.
+  */
+  var landedGroup = function (doc, fromRoot, path) {
+    var segs = path.split('.');
+    if (lookIn(doc[fromRoot], segs) !== null) return fromRoot + '.' + segs[0];
+    var order = searchOrder(doc);
+    for (var i = 0; i < order.keys.length; i++) {
+      if (order.keys[i] === fromRoot) continue;
+      if (lookIn(order.bases[i], segs) !== null) return order.keys[i] + '.' + segs[0];
+    }
+    if (segs.length > 2 && lookIn(doc[segs[0]], segs.slice(1)) !== null) {
+      return segs[0] + '.' + segs[1];
+    }
+    return null;
+  };
+  var referenceCounts = function (doc, flat) {
     var by = new Map();
     flat.forEach(function (leaf, path) {
       if (!leaf.ref) return;
+      var fromRoot = rootOf(path);
       var from = groupPathOf(path);
       var hit = null;
       var re = /\{([^{}]+)\}/g, m;
@@ -57296,7 +57342,7 @@ function compare(figmaDoc, repoDoc) {
            back through this regex as well. A reference is a path: no colons,
            no commas. */
         if (target.indexOf(':') !== -1 || target.indexOf(',') !== -1) continue;
-        var group = groupPathOf(target);
+        var group = landedGroup(doc, fromRoot, target);
         if (!group || group === from) continue;
         if (!hit) hit = {};
         hit[group] = true;
@@ -57306,7 +57352,7 @@ function compare(figmaDoc, repoDoc) {
     });
     return by;
   };
-  var figmaRefs = referenceCounts(F), repoRefs = referenceCounts(R);
+  var figmaRefs = referenceCounts(figmaDoc, F), repoRefs = referenceCounts(repoDoc, R);
   Array.from(dupBy.values()).forEach(function (e) {
     var countFor = function (refs, side) {
       var out = {};
@@ -57580,7 +57626,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'ae92fe3 15:44:22';
+    var CLOSURE_BUILD = '4ccadf7 15:53:07';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

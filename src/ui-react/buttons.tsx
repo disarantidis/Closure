@@ -2406,6 +2406,10 @@ const COMPARE_SAMPLE = 40;
    spelling. Three is what a 139px column holds without the evidence becoming
    the row; past that the count says how much is not shown. */
 const SPELLING_KEYS = 3;
+/* And how many of a spelling's own tokens are named where the two share none.
+   The count alone says the two scales are different sizes; the names say what
+   they are, which is the question a reader has next. */
+const SPELLING_NAMES = 6;
 
 (function mountCompare() {
   const container = document.getElementById('compare-mount');
@@ -3141,25 +3145,47 @@ const SPELLING_KEYS = 3;
                   </span>
                 )}
               </span>
-              {evidence && (
-                <span className="compare-spelling-vals">
-                  <span className="compare-spelling-key">
-                    {(shape as any).counts[n].toLocaleString() +
-                     ((shape as any).counts[n] === 1 ? ' token' : ' tokens')}
-                  </span>
-                  {keys.slice(0, SPELLING_KEYS).map((k) => (
-                    <span className="compare-spelling-val" key={k}>
-                      <span className="compare-spelling-key">{k}</span>
-                      {(vals[n] || {})[k]}
-                    </span>
-                  ))}
-                  {keys.length > SPELLING_KEYS && (
+              {evidence && (() => {
+                const mine = Object.keys(vals[n] || {});
+                /*
+                  WHAT IS ACTUALLY IN IT, where the two share nothing.
+
+                  "24 tokens against 12" says the two scales are different
+                  sizes and leaves the reader to open the file to find out
+                  what either one is. The names answer it, and they are this
+                  spelling's OWN — no dashes, because there is nothing here to
+                  line up against.
+                */
+                const show = noneShared ? mine.slice(0, SPELLING_NAMES) : [];
+                return (
+                  <span className="compare-spelling-vals"
+                        title={x.root + '.' + n + '  —  ' + mine.join(', ')}>
                     <span className="compare-spelling-key">
-                      {'+' + (keys.length - SPELLING_KEYS)}
+                      {(shape as any).counts[n].toLocaleString() +
+                       ((shape as any).counts[n] === 1 ? ' token' : ' tokens')}
                     </span>
-                  )}
-                </span>
-              )}
+                    {show.map((k) => (
+                      <span className="compare-spelling-val" key={k}>{k}</span>
+                    ))}
+                    {show.length > 0 && mine.length > show.length && (
+                      <span className="compare-spelling-key">
+                        {'+' + (mine.length - show.length)}
+                      </span>
+                    )}
+                    {keys.slice(0, SPELLING_KEYS).map((k) => (
+                      <span className="compare-spelling-val" key={k}>
+                        <span className="compare-spelling-key">{k}</span>
+                        {(vals[n] || {})[k]}
+                      </span>
+                    ))}
+                    {keys.length > SPELLING_KEYS && (
+                      <span className="compare-spelling-key">
+                        {'+' + (keys.length - SPELLING_KEYS)}
+                      </span>
+                    )}
+                  </span>
+                );
+              })()}
             </span>
           ))}
           {/* The amber goes on the SIDE that has the problem, not on the row: a
@@ -3186,7 +3212,21 @@ const SPELLING_KEYS = 3;
       );
     };
 
-    const spellings = (rows: any[]) => {
+    const spellings = (all: any[]) => {
+      /*
+        ONLY THE ONES SOMETHING POINTS AT.
+
+        A pair nothing references is two groups to delete, not a finding about
+        this comparison: nothing above it can read as changed, because nothing
+        above it exists. They were listed and ranked last, which spent most of
+        a card on the rows that could not matter — and they were the majority,
+        because until landedGroup a reference was resolved by string prefix
+        and NOTHING was ever counted as live.
+
+        They are still on report.duplicateNames for the clipboard; what goes
+        is their claim on the page.
+      */
+      const rows = all.filter((x: any) => x.live);
       if (!rows.length) return null;
       const title = 'Names \u2014 one word, spelled two ways';
       return (

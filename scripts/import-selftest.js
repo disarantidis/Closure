@@ -3438,6 +3438,32 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           sem: { text: use(repoTarget, 3) } });
 
       /*
+        A REFERENCE IS RELATIVE TO ITS SET. {font-family.var} from a token in
+        `sem` is not a path from the document root — findRef tries the
+        referring set first and every other set after, and this is the shape a
+        real export writes. Counting by string prefix against `d.font-family`
+        matched nothing, so every pair in a real file was drawn as an orphan.
+      */
+      const relative = JD.compare(
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') } },
+          sem: { text: { a: tok('{font-family.var}'), b: tok('{font-family.var}') } } },
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') } },
+          sem: { text: { a: tok('{fontFamilies.var}'), b: tok('{fontFamilies.var}') } } });
+      ok('naming: a reference written relative to its set is counted against the group it lands in',
+         relative.duplicateNames[0].used.figma['font-family'] === 2 &&
+         relative.duplicateNames[0].used.repo.fontFamilies === 2 &&
+         relative.duplicateNames[0].consumedDiffers === true,
+         JSON.stringify(relative.duplicateNames[0].used));
+      const absolute = JD.compare(
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') } },
+          sem: { text: { a: tok('{d.font-family.var}') } } },
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') } },
+          sem: { text: { a: tok('{d.font-family.var}') } } });
+      ok('naming: and one written from the document root is counted against the same group',
+         absolute.duplicateNames[0].used.figma['font-family'] === 1,
+         JSON.stringify(absolute.duplicateNames[0].used));
+
+      /*
         THE FINDING THIS WHOLE CHECK EXISTS FOR: the two files hold the same
         two spellings and point at different ones. Every token above reads as
         changed, and nothing about it was re-valued.

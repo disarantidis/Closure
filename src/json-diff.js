@@ -1286,10 +1286,41 @@ function compare(figmaDoc, repoDoc) {
     typography token drawing fontSize and lineHeight from the same group is
     one consumer, not two. A group's own members are not its consumers.
   */
-  var referenceCounts = function (flat) {
+  /*
+    A REFERENCE IS RELATIVE TO ITS SET, NOT ABSOLUTE.
+
+    {font-family.teleneo-var} is not a path from the root of the document — it
+    is a path from the token set the referring token lives in, and findRef
+    resolves it by trying that set first and every other set after. Counting
+    consumers by string prefix against `core.font-family` therefore matched
+    nothing at all: every count came out zero and every pair in a real file
+    was drawn as an orphan.
+
+    So a reference is resolved the way the rest of this file resolves one —
+    landed, not guessed — and the group it landed in is the set it resolved in
+    plus the first segment of the path. The absolute spelling is tried last,
+    because a document is also its own base and `core.font-family.x` read as a
+    relative path would otherwise land through the document itself and be
+    attributed to the referring set.
+  */
+  var landedGroup = function (doc, fromRoot, path) {
+    var segs = path.split('.');
+    if (lookIn(doc[fromRoot], segs) !== null) return fromRoot + '.' + segs[0];
+    var order = searchOrder(doc);
+    for (var i = 0; i < order.keys.length; i++) {
+      if (order.keys[i] === fromRoot) continue;
+      if (lookIn(order.bases[i], segs) !== null) return order.keys[i] + '.' + segs[0];
+    }
+    if (segs.length > 2 && lookIn(doc[segs[0]], segs.slice(1)) !== null) {
+      return segs[0] + '.' + segs[1];
+    }
+    return null;
+  };
+  var referenceCounts = function (doc, flat) {
     var by = new Map();
     flat.forEach(function (leaf, path) {
       if (!leaf.ref) return;
+      var fromRoot = rootOf(path);
       var from = groupPathOf(path);
       var hit = null;
       var re = /\{([^{}]+)\}/g, m;
@@ -1299,7 +1330,7 @@ function compare(figmaDoc, repoDoc) {
            back through this regex as well. A reference is a path: no colons,
            no commas. */
         if (target.indexOf(':') !== -1 || target.indexOf(',') !== -1) continue;
-        var group = groupPathOf(target);
+        var group = landedGroup(doc, fromRoot, target);
         if (!group || group === from) continue;
         if (!hit) hit = {};
         hit[group] = true;
@@ -1309,7 +1340,7 @@ function compare(figmaDoc, repoDoc) {
     });
     return by;
   };
-  var figmaRefs = referenceCounts(F), repoRefs = referenceCounts(R);
+  var figmaRefs = referenceCounts(figmaDoc, F), repoRefs = referenceCounts(repoDoc, R);
   Array.from(dupBy.values()).forEach(function (e) {
     var countFor = function (refs, side) {
       var out = {};
