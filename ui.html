@@ -51255,6 +51255,7 @@ html[data-theme=dark] {
         repoName
       );
       const figmaHead = () => headWith(IconFigma(12), "Figma");
+      const rowCount = (n) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-side-detail", children: "\xD7" + n.toLocaleString() });
       const compositePairs = (v) => {
         if (v.charAt(0) !== "{" || v.charAt(v.length - 1) !== "}") return null;
         const body = v.slice(1, -1);
@@ -51379,7 +51380,7 @@ html[data-theme=dark] {
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-header", children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "json-download-title-group", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "json-download-title", children: title }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-side-detail", children: rows.length.toLocaleString() })
+            rowCount(rows.length)
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-table", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
             Table,
@@ -51413,7 +51414,7 @@ html[data-theme=dark] {
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-header", children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "json-download-title-group", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "json-download-title", children: title }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-side-detail", children: rows.length.toLocaleString() })
+            rowCount(rows.length)
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-table", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
             Table,
@@ -51474,7 +51475,7 @@ html[data-theme=dark] {
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-header", children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "json-download-title-group", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "json-download-title", children: title }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-side-detail", children: rows.length.toLocaleString() })
+            rowCount(rows.length)
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-table", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
             Table,
@@ -51538,7 +51539,7 @@ html[data-theme=dark] {
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-header", children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "json-download-title-group", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "json-download-title", children: title }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-side-detail", children: rows.length.toLocaleString() })
+            rowCount(rows.length)
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-table", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
             Table,
@@ -51612,7 +51613,7 @@ html[data-theme=dark] {
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-header", children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "json-download-title-group", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "json-download-title", children: title }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-side-detail", children: rows.length.toLocaleString() })
+            rowCount(rows.length)
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-table", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
             Table,
@@ -57342,7 +57343,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'd181f30 15:07:33';
+    var CLOSURE_BUILD = '1f95411 15:13:01';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

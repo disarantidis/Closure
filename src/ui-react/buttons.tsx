@@ -2694,6 +2694,21 @@ const COMPARE_SAMPLE = 40;
     const figmaHead = () => headWith(IconFigma(12), 'Figma');
 
     /*
+      HOW MANY ROWS, SAID AS A COUNT RATHER THAN AS A NUMBER.
+
+      The figure in a card's corner is how many rows the card has. On most of
+      them nothing else competes with it, but the collapsed-change card has a
+      column headed Tokens holding 100, and a bare 46 beside it reads as a
+      smaller number of the same thing when it is a count of something else
+      — forty-six distinct changes, one of which happened a hundred times.
+      The times sign says which of the two it is without spending a word, and
+      it is on every card because a marker that appears on one is a bug.
+    */
+    const rowCount = (n: number) => (
+      <span className="compare-side-detail">{'\u00d7' + n.toLocaleString()}</span>
+    );
+
+    /*
       A COMPOSITE IS A BAG OF SUB-VALUES, AND ONLY SOME OF THEM MOVED.
 
       A typography token renders as {fontFamily:...,fontSize:...,fontWeight:
@@ -2945,7 +2960,7 @@ const COMPARE_SAMPLE = 40;
             <div className="json-download-title-group">
               <p className="json-download-title">{title}</p>
             </div>
-            <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
+            {rowCount(rows.length)}
           </div>
           <div className="compare-table">
             <Table
@@ -2995,7 +3010,7 @@ const COMPARE_SAMPLE = 40;
             <div className="json-download-title-group">
               <p className="json-download-title">{title}</p>
             </div>
-            <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
+            {rowCount(rows.length)}
           </div>
           <div className="compare-table">
             <Table
@@ -3066,7 +3081,7 @@ const COMPARE_SAMPLE = 40;
             <div className="json-download-title-group">
               <p className="json-download-title">{title}</p>
             </div>
-            <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
+            {rowCount(rows.length)}
           </div>
           <div className="compare-table">
             <Table
@@ -3143,7 +3158,7 @@ const COMPARE_SAMPLE = 40;
             <div className="json-download-title-group">
               <p className="json-download-title">{title}</p>
             </div>
-            <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
+            {rowCount(rows.length)}
           </div>
           <div className="compare-table">
             <Table
@@ -3271,7 +3286,7 @@ const COMPARE_SAMPLE = 40;
             <div className="json-download-title-group">
               <p className="json-download-title">{title}</p>
             </div>
-            <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
+            {rowCount(rows.length)}
           </div>
           <div className="compare-table">
             <Table
