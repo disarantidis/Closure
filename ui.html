@@ -51461,33 +51461,34 @@ html[data-theme=dark] {
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
         sides,
         /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-section", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-section-head", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-section-title", children: "Values" }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-section-note", children: "someone chose differently" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stats", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat is-wide", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: r.changed.length.toLocaleString() }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "a different colour, number or string" }),
-              (r.changedByType || []).length > 1 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-types", children: r.changedByType.map((t) => {
-                const icon2 = TYPE_ICON[t.type];
-                return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
-                  Tag,
-                  {
-                    variant: "tonal",
-                    size: "small",
-                    leading: icon2 ? icon2(12) : void 0,
-                    label: t.count.toLocaleString() + " " + t.type,
-                    children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-type-n", children: t.count.toLocaleString() }),
-                      /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-type-name", children: t.type })
-                    ]
-                  },
-                  t.type
-                );
-              }) })
-            ] }) })
-          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-section", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stats", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat is-wide", "data-level": SUBCARD_LEVEL, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: r.changed.length.toLocaleString() }),
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "a different colour, number or string" }),
+            (r.changedByType || []).length > 1 && /*
+              THE TAGS LIFT OFF THE CARD THEY ARE IN, NOT THE ONE OUTSIDE
+              IT. Mounted against the outer card they computed rung 3 —
+              and this stat card IS rung 3, so measured they painted
+              rgb(37,37,37) onto rgb(37,37,37): four chips with no chip,
+              only text. Their ground is 3, so they lift to 4.
+            */
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: SUBCARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-types", children: r.changedByType.map((t) => {
+              const icon2 = TYPE_ICON[t.type];
+              return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
+                Tag,
+                {
+                  variant: "tonal",
+                  size: "small",
+                  leading: icon2 ? icon2(12) : void 0,
+                  label: t.count.toLocaleString() + " " + t.type,
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-type-n", children: t.count.toLocaleString() }),
+                    /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-type-name", children: t.type })
+                  ]
+                },
+                t.type
+              );
+            }) }) })
+          ] }) }) }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-section", children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-section-head", children: [
               /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-section-title", children: "Architecture" }),
@@ -57049,7 +57050,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'd4db85f 13:42:34';
+    var CLOSURE_BUILD = '49f54f8 13:57:34';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

@@ -3067,13 +3067,14 @@ const COMPARE_SAMPLE = 40;
             1,060 are the ones a person has to look at and agree with; the
             57,584 are what a rename did. Values go first and stand alone.
           */}
+          {/* No head. "Values" over a card that reads "500 — a different
+              colour, number or string" is the card's own sentence said twice,
+              and "someone chose differently" is what that sentence already
+              means. The Architecture head below stays: it carries a count that
+              is nowhere else. */}
           <div className="compare-section">
-            <div className="compare-section-head">
-              <span className="compare-section-title">Values</span>
-              <span className="compare-section-note">someone chose differently</span>
-            </div>
             <div className="compare-stats">
-              <div className="compare-stat is-wide">
+              <div className="compare-stat is-wide" data-level={SUBCARD_LEVEL}>
                 <div className="compare-stat-n">{r.changed.length.toLocaleString()}</div>
                 <div className="compare-stat-label">a different colour, number or string</div>
                 {/*
@@ -3090,19 +3091,28 @@ const COMPARE_SAMPLE = 40;
                   word is read, the same way it does in every row underneath.
                 */}
                 {(r.changedByType || []).length > 1 && (
-                  <div className="compare-types">
-                    {r.changedByType.map((t: any) => {
-                      const icon = TYPE_ICON[t.type];
-                      return (
-                        <Tag key={t.type} variant="tonal" size="small"
-                             leading={icon ? icon(12) : undefined}
-                             label={t.count.toLocaleString() + ' ' + t.type}>
-                          <span className="compare-type-n">{t.count.toLocaleString()}</span>
-                          <span className="compare-type-name">{t.type}</span>
-                        </Tag>
-                      );
-                    })}
-                  </div>
+                  /*
+                    THE TAGS LIFT OFF THE CARD THEY ARE IN, NOT THE ONE OUTSIDE
+                    IT. Mounted against the outer card they computed rung 3 —
+                    and this stat card IS rung 3, so measured they painted
+                    rgb(37,37,37) onto rgb(37,37,37): four chips with no chip,
+                    only text. Their ground is 3, so they lift to 4.
+                  */
+                  <LevelContext.Provider value={SUBCARD_LEVEL}>
+                    <div className="compare-types">
+                      {r.changedByType.map((t: any) => {
+                        const icon = TYPE_ICON[t.type];
+                        return (
+                          <Tag key={t.type} variant="tonal" size="small"
+                               leading={icon ? icon(12) : undefined}
+                               label={t.count.toLocaleString() + ' ' + t.type}>
+                            <span className="compare-type-n">{t.count.toLocaleString()}</span>
+                            <span className="compare-type-name">{t.type}</span>
+                          </Tag>
+                        );
+                      })}
+                    </div>
+                  </LevelContext.Provider>
                 )}
               </div>
             </div>
