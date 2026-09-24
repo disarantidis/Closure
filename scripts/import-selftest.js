@@ -3377,6 +3377,93 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          lop.has.figma.join(',') === 'font-family,fontFamilies' &&
          lop.has.repo.join(',') === 'fontFamilies',
          JSON.stringify(lop));
+      /*
+        AND WHAT POINTS AT EACH SPELLING, which is what decides whether the
+        pair matters. `use` builds a semantic group whose tokens all reference
+        one core group, so the counts below are the number of consumers.
+      */
+      const use = (ref, n) => {
+        const o = {};
+        for (let i = 0; i < n; i++) o['t' + i] = tok('{' + ref + '}');
+        return o;
+      };
+      const consumers = (figmaTarget, repoTarget) => JD.compare(
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') } },
+          sem: { text: use(figmaTarget, 3) } },
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') } },
+          sem: { text: use(repoTarget, 3) } });
+
+      /*
+        THE FINDING THIS WHOLE CHECK EXISTS FOR: the two files hold the same
+        two spellings and point at different ones. Every token above reads as
+        changed, and nothing about it was re-valued.
+      */
+      const crossed = consumers('d.font-family.var', 'd.fontFamilies.var').duplicateNames[0];
+      ok('naming: the spelling each file actually points at is counted',
+         crossed.used.figma['font-family'] === 3 &&
+         crossed.used.figma.fontFamilies === 0 &&
+         crossed.used.repo['font-family'] === 0 &&
+         crossed.used.repo.fontFamilies === 3,
+         JSON.stringify(crossed.used));
+      ok('naming: and a file pointing at one spelling where the other points at the other is flagged',
+         crossed.consumedDiffers === true &&
+         crossed.consumed.figma === 'font-family' &&
+         crossed.consumed.repo === 'fontFamilies',
+         JSON.stringify(crossed.consumed));
+
+      /* Both files point at the same one: the other spelling is dead weight,
+         not a mismatch. */
+      const agreed = consumers('d.font-family.var', 'd.font-family.var').duplicateNames[0];
+      ok('naming: two files pointing at the same spelling is not a mismatch',
+         agreed.consumedDiffers === false && agreed.live === true &&
+         agreed.used.figma.fontFamilies === 0,
+         JSON.stringify(agreed));
+
+      /* Nobody points at either: still a duplicate, and the least urgent one. */
+      const dead = JD.compare(twoNames, twoNames).duplicateNames[0];
+      ok('naming: a pair nothing points at is reported and marked not live',
+         dead.live === false && dead.consumedDiffers === false,
+         JSON.stringify(dead));
+
+      /* One document pointing at BOTH spellings — the same split, inside a
+         single file. */
+      const bothWays = JD.compare(
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') } },
+          sem: { a: use('d.font-family.var', 2), b: use('d.fontFamilies.var', 2) } },
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') } },
+          sem: { a: use('d.font-family.var', 2), b: use('d.font-family.var', 2) } });
+      const split = bothWays.duplicateNames[0];
+      ok('naming: a file that points at both spellings is named on its own',
+         split.splitIn.join(',') === 'figma',
+         JSON.stringify(split.splitIn) + ' ' + JSON.stringify(split.used));
+
+      /* A group is not its own consumer, and a token naming one group twice is
+         one consumer of it. */
+      const selfRef = JD.compare(
+        { d: { 'font-family': { var: tok('A'), alias: tok('{d.font-family.var}') },
+               fontFamilies: { var: tok('B') } } },
+        { d: { 'font-family': { var: tok('A'), alias: tok('{d.font-family.var}') },
+               fontFamilies: { var: tok('B') } } });
+      ok('naming: a group referencing itself is not one of its own consumers',
+         selfRef.duplicateNames[0].used.figma['font-family'] === 0,
+         JSON.stringify(selfRef.duplicateNames[0].used));
+
+      /* The worst first: a crossed pair outranks a live-but-agreed one, which
+         outranks one nothing points at. */
+      const ranked = JD.compare(
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') },
+               'line-height': { var: tok(1) }, lineHeights: { var: tok(2) },
+               'dead-one': { var: tok(3) }, deadOne: { var: tok(4) } },
+          sem: { a: use('d.font-family.var', 2), b: use('d.line-height.var', 2) } },
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') },
+               'line-height': { var: tok(1) }, lineHeights: { var: tok(2) },
+               'dead-one': { var: tok(3) }, deadOne: { var: tok(4) } },
+          sem: { a: use('d.fontFamilies.var', 2), b: use('d.line-height.var', 2) } });
+      ok('naming: the pair the two files disagree about is listed first, the dead pair last',
+         ranked.duplicateNames.map((e) => e.names[0]).join(',') ===
+           'font-family,line-height,dead-one',
+         JSON.stringify(ranked.duplicateNames.map((e) => [e.names[0], e.consumedDiffers, e.live])));
+
       const coincident = { d: { 'letter-spacing': { none: tok(0) },
                                 'paragraph-spacing': { none: tok(0) } } };
       ok('naming: two real concepts that happen to hold the same token are not a duplicate',

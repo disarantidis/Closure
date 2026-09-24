@@ -3072,17 +3072,53 @@ const COMPARE_SAMPLE = 40;
       screens interrupt to say it is there, and this is where it is read,
       beside the rows it explains.
     */
+    /*
+      A SPELLING, AND WHAT POINTS AT IT.
+
+      Two names for one thing is a tidiness problem until something consumes
+      them. The count is what turns the row into a finding: `×128` beside one
+      spelling and `unused` beside the other says the pair is live and which
+      half is the live half, and the same two labels landing on opposite lines
+      in the two columns IS the defect — the tokens above are identical and
+      read as changed because the thing under them was renamed.
+
+      The unused spelling is dimmed rather than marked. A band would mean
+      "this changed" here, which it already means twice on this page, and a
+      dead group is not a change — it is the half of the row that matters
+      less.
+    */
     const spellingSide = (side: string) => (x: any) => {
       const held: string[] = (x.has && x.has[side]) || [];
       if (!held.length) return <span className="compare-spelling-none">{'\u2014'}</span>;
+      const used = (x.used && x.used[side]) || {};
+      /* Nothing in this file points at either spelling. The amber below still
+         states the facts, in a quieter voice: the sort has already put this
+         row last, and an amber line at full strength on the least urgent
+         finding argues with the order it was given. */
+      const idle = !held.some((n) => used[n]);
       return (
-        <span className="compare-spelling-names">
-          {held.map((n) => <span className="compare-cell-path" key={n}>{n}</span>)}
+        <span className={'compare-spelling-names' + (idle ? ' is-idle' : '')}>
+          {held.map((n) => (
+            <span className={'compare-spelling-name' + (used[n] ? '' : ' is-dead')} key={n}>
+              <span className="compare-cell-path">{n}</span>
+              <span className="compare-spelling-uses">
+                {used[n] ? '\u00d7' + used[n].toLocaleString() : 'unused'}
+              </span>
+            </span>
+          ))}
           {/* The amber goes on the SIDE that has the problem, not on the row: a
               pair can be harmless in one document and hold two answers in the
               other. */}
           {held.length > 1 && (x.differsIn || []).indexOf(side) !== -1 && (
             <span className="compare-pattern-why">different values</span>
+          )}
+          {(x.splitIn || []).indexOf(side) !== -1 && (
+            <span className="compare-pattern-why">both spellings in use here</span>
+          )}
+          {/* Once, at the end of the row, because it is the one note here that
+              is about the pair of columns rather than about either of them. */}
+          {side === 'repo' && x.consumedDiffers && (
+            <span className="compare-pattern-why">each file points at a different spelling</span>
           )}
         </span>
       );

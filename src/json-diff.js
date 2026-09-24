@@ -443,6 +443,22 @@ function sameWordDifferentSpelling(a, b) {
 
 /* Is `name` a group — not a token — under `root` in this document? The
    question findDuplicateNames answers for one document, asked of the other. */
+/* The collection and the group under it — the two segments a duplicate-name
+   finding is about, and the unit a reference is counted against. Anything
+   shorter than two segments names a collection, not a group, and has no
+   group to be counted for.
+
+   NOT groupOf: compare() aliases that name to rootOf, where a "group" is the
+   collection alone. Two segments is a different unit and needs a different
+   name, or the alias quietly wins and every reference counts against its
+   collection. */
+function groupPathOf(path) {
+  var first = path.indexOf('.');
+  if (first === -1) return '';
+  var second = path.indexOf('.', first + 1);
+  return second === -1 ? path : path.slice(0, second);
+}
+
 function hasGroup(doc, root, name) {
   var r = doc && doc[root];
   if (!r || typeof r !== 'object') return false;
@@ -1190,7 +1206,101 @@ function compare(figmaDoc, repoDoc) {
       repo: e.names.filter(function (n) { return hasGroup(repoDoc, e.root, n); }),
     };
   });
-  report.duplicateNames = Array.from(dupBy.values());
+
+  /*
+    AND WHICH OF THE TWO THE REST OF THE FILE ACTUALLY POINTS AT.
+
+    Two spellings of one name is a tidiness problem until something consumes
+    them, and then it is the reason a comparison is full of changes. A core
+    group nothing references can be wrong in peace; a core group the semantic
+    layer points at carries every token above it.
+
+    So each spelling is counted by its consumers, per document, and the two
+    counts answer three questions the names alone could not:
+
+      - is this live at all, or two dead groups nobody points at;
+      - does one file point at one spelling and the other file at the other,
+        which is the name mismatch — the tokens above are identical and read
+        as changed because the thing under them was renamed, not re-valued;
+      - does ONE file point at both, which is the same split inside a single
+        document.
+
+    A token is counted once per group however many times it names it: a
+    typography token drawing fontSize and lineHeight from the same group is
+    one consumer, not two. A group's own members are not its consumers.
+  */
+  var referenceCounts = function (flat) {
+    var by = new Map();
+    flat.forEach(function (leaf, path) {
+      if (!leaf.ref) return;
+      var from = groupPathOf(path);
+      var hit = null;
+      var re = /\{([^{}]+)\}/g, m;
+      while ((m = re.exec(leaf.value))) {
+        var target = m[1];
+        /* A composite renders as {key:value,...} and its outer braces come
+           back through this regex as well. A reference is a path: no colons,
+           no commas. */
+        if (target.indexOf(':') !== -1 || target.indexOf(',') !== -1) continue;
+        var group = groupPathOf(target);
+        if (!group || group === from) continue;
+        if (!hit) hit = {};
+        hit[group] = true;
+      }
+      if (!hit) return;
+      Object.keys(hit).forEach(function (g) { by.set(g, (by.get(g) || 0) + 1); });
+    });
+    return by;
+  };
+  var figmaRefs = referenceCounts(F), repoRefs = referenceCounts(R);
+  Array.from(dupBy.values()).forEach(function (e) {
+    var countFor = function (refs, side) {
+      var out = {};
+      e.has[side].forEach(function (n) { out[n] = refs.get(e.root + '.' + n) || 0; });
+      return out;
+    };
+    e.used = { figma: countFor(figmaRefs, 'figma'), repo: countFor(repoRefs, 'repo') };
+    /* The spelling this file points at — the clear winner, or nothing. A tie
+       is not an answer to "which one does it use", and a tie above zero is
+       reported on its own terms as splitIn. */
+    var pick = function (counts) {
+      var best = null, bestN = 0, tied = false;
+      Object.keys(counts).forEach(function (n) {
+        if (counts[n] > bestN) { best = n; bestN = counts[n]; tied = false; }
+        else if (counts[n] === bestN && bestN > 0) tied = true;
+      });
+      return bestN > 0 && !tied ? best : null;
+    };
+    e.consumed = { figma: pick(e.used.figma), repo: pick(e.used.repo) };
+    e.consumedDiffers = !!(e.consumed.figma && e.consumed.repo &&
+                           e.consumed.figma !== e.consumed.repo);
+    e.splitIn = ['figma', 'repo'].filter(function (side) {
+      var c = e.used[side];
+      return Object.keys(c).filter(function (n) { return c[n] > 0; }).length > 1;
+    });
+    e.live = ['figma', 'repo'].some(function (side) {
+      var c = e.used[side];
+      return Object.keys(c).some(function (n) { return c[n] > 0; });
+    });
+  });
+  /*
+    THE LIVE ONES FIRST, AND THE WORST OF THOSE AT THE TOP.
+
+    The order used to be whatever the documents happened to be walked in,
+    which put a pair nothing points at above the pair that explains a hundred
+    changed rows. A duplicate name is only ever as serious as what consumes
+    it, so: the files pointing at different spellings, then a file pointing at
+    both, then anything live, then the dead pairs — which stay on the list,
+    because two groups nobody uses is still two groups somebody has to delete.
+  */
+  var rank = function (e) {
+    return (e.consumedDiffers ? 0 : 1) * 4 + (e.splitIn.length ? 0 : 1) * 2 + (e.live ? 0 : 1);
+  };
+  report.duplicateNames = Array.from(dupBy.values()).sort(function (a, b) {
+    return rank(a) - rank(b) ||
+           (a.root < b.root ? -1 : a.root > b.root ? 1 : 0) ||
+           (a.names[0] < b.names[0] ? -1 : 1);
+  });
 
   /*
     CARRIED ONTO THE ROWS THAT SHOW IT.

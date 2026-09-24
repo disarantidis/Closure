@@ -1766,6 +1766,26 @@
     /* A file that holds neither name. Quiet, because it is the absence of a
        finding, and present, because an empty cell reads as a fault. */
     .compare-spelling-none { opacity: 0.4; }
+    /* The name and its consumer count, side by side while they fit and
+       stacked when they do not — a 139px column holds `fontSize ×128` and not
+       `paragraph-indents ×128`, and the count belonging to the name above it
+       is legible either way. */
+    .compare-spelling-name {
+      display: flex; flex-wrap: wrap; align-items: baseline;
+      column-gap: 6px; min-width: 0;
+    }
+    .compare-spelling-uses {
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+      opacity: 0.6;
+      white-space: nowrap;
+    }
+    /* Nothing points at this spelling. Dimmed rather than marked: a band means
+       "this changed" elsewhere on the page, and a dead group is not a change. */
+    .compare-spelling-name.is-dead { opacity: 0.45; }
+    /* A side nothing points at: its notes stay, at the weight of the row they
+       are in. */
+    .compare-spelling-names.is-idle .compare-pattern-why { opacity: 0.5; }
     .compare-pattern-why {
       font-size: 10px;
       line-height: 1.4;
