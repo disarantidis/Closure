@@ -3083,7 +3083,7 @@ const COMPARE_SAMPLE = 40;
                            name separately once the visible content is markup,
                            and the mark is drawn in a face a screen reader
                            should not try to pronounce. */
-                        <Tag key={k.sym} variant="tonal" size="small" label={k.sym + ' means ' + k.label}>
+                        <Tag key={k.sym} variant="primary" size="small" label={k.sym + ' means ' + k.label}>
                           <span className="compare-key-sym" aria-hidden>{k.sym}</span>{k.label}
                         </Tag>
                       ))}
@@ -3099,13 +3099,21 @@ const COMPARE_SAMPLE = 40;
                               parts — `~40 +15 −25` looked like an equation. A
                               tag each makes them countable at a glance.
 
-                              `primary` for the values mark, tonal for the rest:
-                              it is the only one of the six that is a decision
-                              somebody made.
+                              ALL TONAL, and the loud variant belongs upstairs.
+                              The values mark took `primary` on the argument
+                              that it is the only one of the six that is a
+                              decision — but it appears in nearly every row, so
+                              what it actually produced was a column of white
+                              chips down the list reading as a status rather
+                              than as one of six equal counts, with the marks
+                              that make a row unusual drawn quieter than the one
+                              that makes it ordinary. The legend is the thing
+                              read once, to learn the alphabet; it is the one
+                              worth the ink.
                             */}
                             {shown.map((k: any) => (
                               <Tag key={k.sym}
-                                   variant={k.field === 'changed' ? 'primary' : 'tonal'}
+                                   variant="tonal"
                                    size="small"
                                    label={(g[k.field] || 0) + ' ' + k.label}>
                                 <span className="compare-key-sym" aria-hidden>{k.sym}</span>
