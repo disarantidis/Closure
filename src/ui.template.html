@@ -2656,14 +2656,53 @@
     */
     .compare-card-sides {
       display: flex; align-items: center; justify-content: flex-start;
-      gap: 8px; flex-wrap: wrap;
+      gap: 8px;
+      /*
+        ONE ROW, WHICH IS THE POINT — two things beside each other with the
+        relation between them. Wrapping put the second tag under the first and
+        the mark between them stranded at the end of the first line, which reads
+        as a list of two rather than as a comparison of two.
+
+        They shrink instead. The names are what must survive, and they do: what
+        a tag gives up is the tail — the token count after the name — because
+        flex takes it from the end. The full text stays in the title attribute.
+      */
+      flex-wrap: nowrap;
       /* No inset of its own: the card's padding is what both this and the
          header sit inside, so they line up by having nothing between them. */
     }
+    .compare-card-sides .nd-tag {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    /*
+      THE REPO SIDE GIVES UP THE ROOM, because it is the side that has room to
+      give. Equal shrink factors take from both in proportion to their width, so
+      the Figma tag — "tokens.json · 35k tokens", and the shorter of the two by
+      some margin — was losing its tail to buy space for a name that is longer
+      by construction: the repo's is a folder, a file, a branch and a count.
+
+      Four to one, so the deficit comes almost entirely out of the half that can
+      afford it. Both keep their full text in a title.
+    */
+    .compare-card-sides .nd-tag:first-of-type { flex-shrink: 1; }
+    .compare-card-sides .nd-tag:last-of-type { flex-shrink: 4; }
     /* Between the two, because that is what it is between. The button below
        says the verb; this says the relation, and a reader gets the shape of
        the sentence before reading either name. */
     .compare-card-vs { display: flex; opacity: 0.55; flex: none; }
+    /* The Figma document's own name, under the card's title and over the two
+       files. Smaller than the title and larger than a tag: it is the subject of
+       the sentence the tags finish. */
+    .compare-file-name {
+      font-family: var(--type-body-s-font-family);
+      font-size: var(--type-body-s-size);
+      line-height: var(--type-body-s-line-height);
+      font-weight: 600;
+      color: var(--app-text);
+    }
     .repo-file-half[hidden] { display: none; }
 
     /*
@@ -5044,12 +5083,24 @@
           }
           /* The counts are worth saying on the sides themselves: two numbers
              side by side is how "the repo is behind" reads at a glance. */
+          /*
+            THE TAGS CARRY ADDRESSES, NOT COUNTS. They sit side by side in a
+            375px card, and the two full strings with their token totals came to
+            more than that — so both truncated, and what a tag gives up first is
+            its tail: "spar/tokens.json @ m…" lost the branch, which is part of
+            the address and the one thing on that side a reader cannot infer.
+
+            The totals go to the line under them, where there is a whole row for
+            two numbers and nothing competing for it.
+          */
           window.PomCompare.setSides(
             lastFigmaFileName || 'This Figma file',
-            figmaWhere + '  ·  ' + tokensLabel(report.figmaTokens),
+            figmaWhere,
             label,
-            repoWhere + '  ·  ' + tokensLabel(report.repoTokens),
-            which);
+            repoWhere,
+            which,
+            tokensLabel(report.figmaTokens) + ' here, ' +
+              tokensLabel(report.repoTokens) + ' in the repo');
           window.PomCompare.setReport(report, window.PomJsonDiff.format(report, {
             figmaLabel: (lastFigmaFileName || 'this Figma file') + ' (' + figmaWhere + ')',
             repoLabel: label + ' ' + repoWhere,

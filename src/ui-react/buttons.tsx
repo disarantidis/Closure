@@ -697,7 +697,12 @@ declare global {
          column header can wear its mark. Optional: a comparison can be shown
          without one, and then the column is just "Repo". */
       setSides: (figma: string, figmaDetail: string, repo: string, repoDetail: string,
-                 provider?: 'github' | 'gitlab' | null) => void;
+                 provider?: 'github' | 'gitlab' | null,
+                 /* How many tokens each side holds, as one line — it used to
+                    ride on the two tags and pushed the branch out of the repo's
+                    address. Optional: the busy state names the sides before it
+                    has counted anything. */
+                 totals?: string) => void;
       /* `actionLabel` puts a button in the warning. A refusal that names the
          fix and then makes you go and do it somewhere else is a worse version
          of one that just does it. */
@@ -2403,7 +2408,7 @@ const COMPARE_SAMPLE = 40;
 (function mountCompare() {
   const container = document.getElementById('compare-mount');
   type Sides = { figma: string; figmaDetail: string; repo: string; repoDetail: string;
-                 provider?: 'github' | 'gitlab' | null };
+                 provider?: 'github' | 'gitlab' | null; totals?: string };
   type S = {
     busy: string;
     sides: Sides;
@@ -2424,31 +2429,52 @@ const COMPARE_SAMPLE = 40;
     const sides = (
       <div className="json-download-card" data-level={4}>
         {/*
-          EACH SIDE IN ITS OWN MARK. The names alone read as two files with no
-          hint of which is which — "Untitled" and "GitHub" tell you nothing
-          about direction until you have read both lines and worked it out. The
-          logo says it before the words do, and it is the same pair of marks the
-          column headers in every table below already use.
+          THE CARD SAYS WHAT IT IS, THEN WHICH FILE, THEN WHICH TWO.
+
+          It was two stacked blocks with "compared with" between them, which
+          spends three lines and a preposition on a relation a single mark
+          states — and left the card itself unnamed, so the page opened on a
+          block of file paths with no heading over them.
+
+          Three rows now, narrowing as they go: the act, the Figma document the
+          left-hand side comes out of, and the two files themselves as tags with
+          the relation drawn between them.
         */}
-        <div className="compare-sides">
-          <div className="compare-side">
-            <span className="compare-side-name">
-              <span className="compare-side-mark" aria-hidden>{IconFigma(14)}</span>
-              {s.sides.figma}
-            </span>
-            <span className="compare-side-detail">{s.sides.figmaDetail}</span>
-          </div>
-          <div className="compare-side-arrow">compared with</div>
-          <div className="compare-side">
-            <span className="compare-side-name">
-              <span className="compare-side-mark" aria-hidden>
-                {s.sides.provider === 'gitlab' ? IconGitlab(14) : IconGithub(14)}
-              </span>
-              {s.sides.repo}
-            </span>
-            <span className="compare-side-detail">{s.sides.repoDetail}</span>
+        <div className="json-download-header">
+          <div className="json-download-title-group">
+            <span className="json-download-title-icon" aria-hidden>{IconCompare(16)}</span>
+            <p className="json-download-title">Compare</p>
           </div>
         </div>
+        <span className="compare-card-main">
+          {/* The document, not the export: the left-hand tag names the file
+              this would write, and this names where it comes from. */}
+          <span className="compare-file-name">{s.sides.figma}</span>
+          {/*
+            SIDE BY SIDE, because that is the whole claim the card makes. They
+            wrap rather than truncate — a file name cut in half names nothing —
+            and each wears its own mark, so which is which is read before either
+            name is.
+          */}
+          <span className="compare-card-sides">
+            <Tag variant="tonal" size="small" leading={IconFigma(12)}
+                 style={{ minWidth: 0 }} label={s.sides.figmaDetail}>
+              <span title={s.sides.figmaDetail}>{s.sides.figmaDetail}</span>
+            </Tag>
+            {/* Between the two, because that is what it is between: the
+                relation, drawn, where "compared with" used to be written. */}
+            <span className="compare-card-vs" aria-hidden>{IconCompare(14)}</span>
+            <Tag variant="tonal" size="small"
+                 leading={s.sides.provider === 'gitlab' ? IconGitlab(12) : IconGithub(12)}
+                 style={{ minWidth: 0 }} label={s.sides.repoDetail}>
+              <span title={s.sides.repoDetail}>{s.sides.repoDetail}</span>
+            </Tag>
+          </span>
+          {/* How much is on each side, under the two things it is about — a
+              whole line for two numbers, rather than a tail on each tag that
+              was pushing the branch out of the address. */}
+          {s.sides.totals && <span className="compare-side-detail">{s.sides.totals}</span>}
+        </span>
       </div>
     );
 
@@ -3280,8 +3306,8 @@ const COMPARE_SAMPLE = 40;
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomCompare = {
     setBusy: (label) => set((s) => ({ ...s, busy: label, problem: null, report: null })),
-    setSides: (figma, figmaDetail, repo, repoDetail, provider) =>
-      set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail, provider } })),
+    setSides: (figma, figmaDetail, repo, repoDetail, provider, totals) =>
+      set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail, provider, totals } })),
     setProblem: (title, message, fix, actionLabel) =>
       set((s) => ({ ...s, busy: '', report: null, problem: { title, message, fix, actionLabel } })),
     setReport: (report, copyText) =>
