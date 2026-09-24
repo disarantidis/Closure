@@ -51461,7 +51461,7 @@ html[data-theme=dark] {
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
         sides,
         /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-section", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stats", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat is-wide", "data-level": SUBCARD_LEVEL, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-section", children: r.changed.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stats", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat is-wide", "data-level": SUBCARD_LEVEL, children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: r.changed.length.toLocaleString() }),
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "a different colour, number or string" }),
             (r.changedByType || []).length > 1 && /*
@@ -51497,28 +51497,24 @@ html[data-theme=dark] {
                 " in total"
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stats", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: r.onlyInFigma.length.toLocaleString() }),
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "only here" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: r.onlyInRepo.length.toLocaleString() }),
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "only in the repo" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: (r.repointed || []).length.toLocaleString() }),
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "pointing somewhere new" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: (r.aliased || []).length.toLocaleString() }),
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "aliased one side, inlined the other" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat is-wide", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: (r.moved || []).length.toLocaleString() }),
-                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "the same token, somewhere else" })
-              ] })
-            ] })
+            (() => {
+              const oneSide = r.onlyInFigma.length + r.onlyInRepo.length;
+              const stats = [
+                {
+                  n: oneSide,
+                  wide: true,
+                  label: "on one side only \u2014 " + r.onlyInFigma.length.toLocaleString() + " here, " + r.onlyInRepo.length.toLocaleString() + " in the repo"
+                },
+                { n: (r.repointed || []).length, label: "pointing somewhere new" },
+                { n: (r.aliased || []).length, label: "aliased one side, inlined the other" },
+                { n: (r.moved || []).length, label: "the same token, somewhere else" }
+              ].filter((x) => x.n > 0);
+              if (!stats.length) return null;
+              return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stats", children: stats.map((x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat" + (x.wide ? " is-wide" : ""), children: [
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: x.n.toLocaleString() }),
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: x.label })
+              ] }, x.label)) });
+            })()
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stats", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat is-quiet is-wide", children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: r.sameCount.toLocaleString() }),
@@ -57050,7 +57046,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '49f54f8 13:57:34';
+    var CLOSURE_BUILD = '97441cf 14:04:03';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

@@ -3073,6 +3073,9 @@ const COMPARE_SAMPLE = 40;
               means. The Architecture head below stays: it carries a count that
               is nowhere else. */}
           <div className="compare-section">
+            {/* Nothing at zero here either: a comparison where no value moved
+                says so with the "identical" line below, not with a 0. */}
+            {r.changed.length > 0 && (
             <div className="compare-stats">
               <div className="compare-stat is-wide" data-level={SUBCARD_LEVEL}>
                 <div className="compare-stat-n">{r.changed.length.toLocaleString()}</div>
@@ -3116,6 +3119,7 @@ const COMPARE_SAMPLE = 40;
                 )}
               </div>
             </div>
+            )}
           </div>
 
           <div className="compare-section">
@@ -3127,28 +3131,45 @@ const COMPARE_SAMPLE = 40;
                 {' in total'}
               </span>
             </div>
-            <div className="compare-stats">
-              <div className="compare-stat">
-                <div className="compare-stat-n">{r.onlyInFigma.length.toLocaleString()}</div>
-                <div className="compare-stat-label">only here</div>
-              </div>
-              <div className="compare-stat">
-                <div className="compare-stat-n">{r.onlyInRepo.length.toLocaleString()}</div>
-                <div className="compare-stat-label">only in the repo</div>
-              </div>
-              <div className="compare-stat">
-                <div className="compare-stat-n">{(r.repointed || []).length.toLocaleString()}</div>
-                <div className="compare-stat-label">pointing somewhere new</div>
-              </div>
-              <div className="compare-stat">
-                <div className="compare-stat-n">{(r.aliased || []).length.toLocaleString()}</div>
-                <div className="compare-stat-label">aliased one side, inlined the other</div>
-              </div>
-              <div className="compare-stat is-wide">
-                <div className="compare-stat-n">{(r.moved || []).length.toLocaleString()}</div>
-                <div className="compare-stat-label">the same token, somewhere else</div>
-              </div>
-            </div>
+            {(() => {
+              /*
+                ONE SIDE ONLY IS ONE FACT, NOT TWO.
+
+                "only here" and "only in the repo" stood as two stats, which
+                said that a token missing from one side and a token missing
+                from the other were separate findings. They are one finding:
+                these two files do not agree about which tokens exist, and the
+                number that answers it is the sum. The direction still matters
+                — one lot would be written by a push and the other would not —
+                so it is kept in the label, where it explains the figure
+                instead of splitting it in half.
+
+                AND NOTHING AT ZERO IS DRAWN. A card reading 0 is a card whose
+                whole content is that it has nothing to say. On a real
+                comparison two of these four were zero, so the eye crossed two
+                empty boxes to reach the two that were not.
+              */
+              const oneSide = r.onlyInFigma.length + r.onlyInRepo.length;
+              const stats = [
+                { n: oneSide, wide: true,
+                  label: 'on one side only \u2014 ' + r.onlyInFigma.length.toLocaleString() +
+                         ' here, ' + r.onlyInRepo.length.toLocaleString() + ' in the repo' },
+                { n: (r.repointed || []).length, label: 'pointing somewhere new' },
+                { n: (r.aliased || []).length, label: 'aliased one side, inlined the other' },
+                { n: (r.moved || []).length, label: 'the same token, somewhere else' },
+              ].filter((x) => x.n > 0);
+              if (!stats.length) return null;
+              return (
+                <div className="compare-stats">
+                  {stats.map((x) => (
+                    <div className={'compare-stat' + (x.wide ? ' is-wide' : '')} key={x.label}>
+                      <div className="compare-stat-n">{x.n.toLocaleString()}</div>
+                      <div className="compare-stat-label">{x.label}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="compare-stats">
