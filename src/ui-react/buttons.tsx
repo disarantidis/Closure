@@ -985,8 +985,8 @@ function q(s: { query: string; all: string[] }) {
 }
 
 function mountCompareSides() {
-  const icon = document.getElementById('compare-card-icon-mount');
-  if (icon) flushSync(() => createRoot(icon).render(<>{IconCompare(16)}</>));
+  /* #compare-card-icon-mount went with the main screen's compare card. What is
+     left of this mount is the Compare-mode file picker below. */
   const container = document.getElementById('compare-sides-mount');
   type S = { figma: string; provider: string; file: string; all: string[]; query: string };
   let state: S = { figma: '', provider: 'github', file: '', all: [], query: '' };
@@ -2426,80 +2426,47 @@ const COMPARE_SAMPLE = 40;
     const r = s.report;
 
     const sides = (
-      <div className="json-download-card" data-level={4}>
-        {/*
-          THE DOCUMENT, THEN THE TWO FILES IT IS BEING READ AGAINST.
+      /*
+        NO CARD AROUND THEM, AND NO HEADING OVER THEM.
 
-          It was two stacked blocks with "compared with" between them, which
-          spends three lines and a preposition on a relation a single mark
-          states.
-
-          Two rows now: the Figma document the left-hand side comes out of, and
-          the two files themselves as tags in three columns — one each and the
-          mark between them, so the pair is symmetric whatever the names are
-          doing. Each tag carries its own token count, because the whole
-          question on this page is how far apart the two are and that starts
-          with how much is in each.
-        */}
-        {/* No title. The page's own header says "Compare" three inches above
-            this, and a card repeating its page is a heading that tells nobody
-            anything. The mark between the two sides is what says the relation
-            here, which is where the relation actually is. */}
-        <span className="compare-card-main">
-          {/* The document, not the export: the left-hand tag names the file
-              this would write, and this names where it comes from. */}
-          <span className="compare-file-name">{s.sides.figma}</span>
-          {/*
-            SIDE BY SIDE, because that is the whole claim the card makes. They
-            wrap rather than truncate — a file name cut in half names nothing —
-            and each wears its own mark, so which is which is read before either
-            name is.
-          */}
-          {/*
-            EACH SIDE IS A CARD, and inside it the file is a TITLE with the size
-            as a tag under it.
-
-            Two tags of equal weight said the address and the count were the
-            same kind of fact. They are not — one names the thing and the other
-            measures it — and a heading with a tag under it says which is which
-            by shape rather than by reading order. It also gives each side an
-            edge, so the two read as two objects held up against each other
-            instead of four chips in a row with a mark somewhere among them.
-          */}
-          <span className="compare-card-sides">
-            <span className="compare-card-side" data-level={SUBCARD_LEVEL}>
-              {/* The tag inside lifts off THIS card, not the one outside it —
-                  a subcard is rung 3 and a Tag mounted against rung 4 would
-                  paint the colour of the surface it sits on. */}
-              <LevelContext.Provider value={SUBCARD_LEVEL}>
-                <span className="compare-side-title" title={s.sides.figmaDetail}>
-                  <span className="compare-side-mark" aria-hidden>{IconFigma(13)}</span>
-                  {s.sides.figmaDetail}
-                </span>
-                {s.sides.figmaCount && (
-                  <Tag variant="tonal" size="small">{s.sides.figmaCount}</Tag>
-                )}
-              </LevelContext.Provider>
+        The wrapper held a title that named the Figma document, which the two
+        cards inside it already said — the left one IS that document's export —
+        and a card whose only content is two cards is a box drawn round a box.
+        What is left is the comparison itself: two objects and the relation
+        between them, standing on the page.
+      */
+      <span className="compare-card-sides">
+        <span className="compare-card-side" data-level={TOP_CARD_LEVEL}>
+          {/* The tag inside lifts off THIS card. These stand on the page now
+              rather than inside another card, so their ground is 4 and
+              CARD_LEVEL is the name for "2-or-4, so compute at 3". */}
+          <LevelContext.Provider value={CARD_LEVEL}>
+            <span className="compare-side-title" title={s.sides.figmaDetail}>
+              <span className="compare-side-mark" aria-hidden>{IconFigma(13)}</span>
+              {s.sides.figmaDetail}
             </span>
-            {/* Between the two, because that is what it is between: the
-                relation, drawn, where "compared with" used to be written. */}
-            <span className="compare-card-vs" aria-hidden>{IconCompare(14)}</span>
-            <span className="compare-card-side" data-level={SUBCARD_LEVEL}>
-              <LevelContext.Provider value={SUBCARD_LEVEL}>
-                <span className="compare-side-title" title={s.sides.repoDetail}>
-                  <span className="compare-side-mark" aria-hidden>
-                    {s.sides.provider === 'gitlab' ? IconGitlab(13) : IconGithub(13)}
-                  </span>
-                  {s.sides.repoDetail}
-                </span>
-                {s.sides.repoCount && (
-                  <Tag variant="tonal" size="small">{s.sides.repoCount}</Tag>
-                )}
-              </LevelContext.Provider>
-            </span>
-          </span>
+            {s.sides.figmaCount && (
+              <Tag variant="tonal" size="small">{s.sides.figmaCount}</Tag>
+            )}
+          </LevelContext.Provider>
         </span>
-      </div>
+        {/* Between the two, because that is what it is between: the relation,
+            drawn, where "compared with" used to be written. */}
+        <span className="compare-card-vs" aria-hidden>{IconCompare(14)}</span>
+        <span className="compare-card-side" data-level={TOP_CARD_LEVEL}>
+          <LevelContext.Provider value={CARD_LEVEL}>
+            <span className="compare-side-title" title={s.sides.repoDetail}>
+              <span className="compare-side-mark" aria-hidden>
+                {s.sides.provider === 'gitlab' ? IconGitlab(13) : IconGithub(13)}
+              </span>
+              {s.sides.repoDetail}
+            </span>
+            {s.sides.repoCount && (
+              <Tag variant="tonal" size="small">{s.sides.repoCount}</Tag>
+            )}
+          </LevelContext.Provider>
+        </span>
+      </span>
     );
 
     if (s.busy) {

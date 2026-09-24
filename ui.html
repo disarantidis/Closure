@@ -2630,19 +2630,10 @@
       itself two inches up.
     */
     .compare-card-sides .nd-tag { max-width: 100%; }
-    .compare-card-main {
-      display: flex; flex-direction: column; min-width: 0;
-      /* The tags belong to the title, so they sit close under it. 12px read as
-         two stacked things rather than as one heading and its contents. */
-      gap: 6px;
-    }
-    /* Left, under the title. Centring was right when the card WAS the pair —
-       a row of tags over a button, with nothing else to line up against. It has
-       a heading now, and content centred under a left-aligned title reads as a
-       caption for the card rather than as the card's own content. */
-    .compare-card > span { display: block; }
-    .compare-card[hidden] { display: none; }
-    #compare-card-icon-mount { display: flex; }
+    /* .compare-card-main, .compare-card and #compare-card-icon-mount went with
+       the main screen's own compare card and then with the wrapper on this
+       page. Nothing renders any of them; what is left of the pattern is
+       .compare-card-sides and the two .compare-card-side cards inside it. */
     /*
       The two sides, side by side — which is the whole claim the card makes, so
       they wrap rather than truncate: a file name cut in half names nothing.
@@ -2690,6 +2681,10 @@
         things rather than as two readings of the same thing.
       */
       align-items: stretch;
+      /* It stands on the page now rather than inside a card, so it takes the
+         same gutter and the same gap below as the cards it sits above. */
+      margin: 0 16px 16px;
+      gap: 0;
     }
     /*
       AND THEY WRAP RATHER THAN TRUNCATE. Two full addresses with their counts
@@ -2762,16 +2757,9 @@
     /* The mark keeps its own alignment: the cards stretch, and a relation
        drawn between them belongs halfway up, not stretched to their height. */
     .compare-card-vs { display: flex; opacity: 0.55; flex: none; align-self: center; }
-    /* The Figma document's own name, under the card's title and over the two
-       files. Smaller than the title and larger than a tag: it is the subject of
-       the sentence the tags finish. */
-    .compare-file-name {
-      font-family: var(--type-body-s-font-family);
-      font-size: var(--type-body-s-size);
-      line-height: var(--type-body-s-line-height);
-      font-weight: 600;
-      color: var(--app-text);
-    }
+    /* .compare-file-name named the Figma document over the pair. It went with
+       the card that held it: the left-hand side IS that document's export, so
+       the row was the same name twice. */
     .repo-file-half[hidden] { display: none; }
 
     /*
@@ -50240,8 +50228,6 @@ html[data-theme=dark] {
     CARD_LEVEL
   );
   function mountCompareSides() {
-    const icon2 = document.getElementById("compare-card-icon-mount");
-    if (icon2) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(icon2).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(import_jsx_runtime23.Fragment, { children: IconCompare(16) })));
     const container = document.getElementById("compare-sides-mount");
     let state = { figma: "", provider: "github", file: "", all: [], query: "" };
     let apply = null;
@@ -51087,10 +51073,18 @@ html[data-theme=dark] {
       const clip = useClipboard();
       set = setS;
       const r = s.report;
-      const sides = /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "json-download-card", "data-level": 4, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-card-main", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-file-name", children: s.sides.figma }),
+      const sides = (
+        /*
+                NO CARD AROUND THEM, AND NO HEADING OVER THEM.
+        
+                The wrapper held a title that named the Figma document, which the two
+                cards inside it already said — the left one IS that document's export —
+                and a card whose only content is two cards is a box drawn round a box.
+                What is left is the comparison itself: two objects and the relation
+                between them, standing on the page.
+              */
         /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-card-sides", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-side", "data-level": SUBCARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(LevelContext.Provider, { value: SUBCARD_LEVEL, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-side", "data-level": TOP_CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(LevelContext.Provider, { value: CARD_LEVEL, children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-side-title", title: s.sides.figmaDetail, children: [
               /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-side-mark", "aria-hidden": true, children: IconFigma(13) }),
               s.sides.figmaDetail
@@ -51098,7 +51092,7 @@ html[data-theme=dark] {
             s.sides.figmaCount && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Tag, { variant: "tonal", size: "small", children: s.sides.figmaCount })
           ] }) }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-vs", "aria-hidden": true, children: IconCompare(14) }),
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-side", "data-level": SUBCARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(LevelContext.Provider, { value: SUBCARD_LEVEL, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-side", "data-level": TOP_CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(LevelContext.Provider, { value: CARD_LEVEL, children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-side-title", title: s.sides.repoDetail, children: [
               /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-side-mark", "aria-hidden": true, children: s.sides.provider === "gitlab" ? IconGitlab(13) : IconGithub(13) }),
               s.sides.repoDetail
@@ -51106,7 +51100,7 @@ html[data-theme=dark] {
             s.sides.repoCount && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Tag, { variant: "tonal", size: "small", children: s.sides.repoCount })
           ] }) })
         ] })
-      ] }) });
+      );
       if (s.busy) {
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
           sides,
@@ -57017,7 +57011,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'fd7ce39 13:29:51';
+    var CLOSURE_BUILD = '3a226ca 13:35:32';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
