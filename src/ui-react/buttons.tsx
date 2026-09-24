@@ -3076,24 +3076,36 @@ const COMPARE_SAMPLE = 40;
               <div className="compare-stat is-wide">
                 <div className="compare-stat-n">{r.changed.length.toLocaleString()}</div>
                 <div className="compare-stat-label">a different colour, number or string</div>
+                {/*
+                  THE BREAKDOWN IS INSIDE THE TOTAL IT BREAKS DOWN. It sat
+                  under the card as a separate row, which made it read as a
+                  second finding rather than as the same one counted by kind —
+                  and 290 + 109 + 100 + 1 IS the 500 above it.
+
+                  Tags, each with the mark the tables below already use for that
+                  type: a colour decision and a font-family decision are
+                  different acts, and the mix is the story. On two real exports
+                  760 colours against 6 numbers says "re-tinted", which a single
+                  total of 1,060 does not. The mark says which kind before the
+                  word is read, the same way it does in every row underneath.
+                */}
+                {(r.changedByType || []).length > 1 && (
+                  <div className="compare-types">
+                    {r.changedByType.map((t: any) => {
+                      const icon = TYPE_ICON[t.type];
+                      return (
+                        <Tag key={t.type} variant="tonal" size="small"
+                             leading={icon ? icon(12) : undefined}
+                             label={t.count.toLocaleString() + ' ' + t.type}>
+                          <span className="compare-type-n">{t.count.toLocaleString()}</span>
+                          <span className="compare-type-name">{t.type}</span>
+                        </Tag>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
-            {/*
-              BROKEN DOWN BY WHAT KIND OF TOKEN CHANGED. A colour decision and
-              a font-family decision are different acts, and on a real pair of
-              exports the mix is the story: 760 colours against 6 numbers says
-              "re-tinted", which a single total of 1,060 does not.
-            */}
-            {(r.changedByType || []).length > 1 && (
-              <div className="compare-types">
-                {r.changedByType.map((t: any) => (
-                  <span className="compare-type" key={t.type}>
-                    <span className="compare-type-n">{t.count.toLocaleString()}</span>
-                    <span className="compare-type-name">{t.type}</span>
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
 
           <div className="compare-section">

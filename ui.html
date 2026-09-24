@@ -1300,16 +1300,18 @@
     /* The value changes by kind of token — a row of small counts under the
        total, because the MIX is the finding: 760 colours against 6 numbers
        says "re-tinted" in a way one total of 1,060 never does. */
+    /* Inside the total it breaks down, so the gap above it is the one between
+       a figure and its parts rather than between two findings. */
     .compare-types {
       display: flex;
       flex-wrap: wrap;
-      gap: 4px 12px;
-      margin: 8px 2px 0;
-      font-size: 11px;
+      gap: 4px;
+      margin-top: 10px;
     }
-    .compare-type { display: flex; align-items: baseline; gap: 4px; }
+    /* The count leads and the type follows, quieter — the same weighting the
+       stat above uses, so a tag reads as a small version of it. */
     .compare-type-n { font-weight: 700; }
-    .compare-type-name { opacity: 0.6; }
+    .compare-type-name { opacity: 0.7; margin-left: 4px; }
 
     /* A column header wearing its side's mark. baseline-aligned so the glyph
        sits on the word's line rather than above it. */
@@ -51466,12 +51468,25 @@ html[data-theme=dark] {
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stats", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-stat is-wide", children: [
               /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-n", children: r.changed.length.toLocaleString() }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "a different colour, number or string" })
-            ] }) }),
-            (r.changedByType || []).length > 1 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-types", children: r.changedByType.map((t) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-type", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-type-n", children: t.count.toLocaleString() }),
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-type-name", children: t.type })
-            ] }, t.type)) })
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-stat-label", children: "a different colour, number or string" }),
+              (r.changedByType || []).length > 1 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "compare-types", children: r.changedByType.map((t) => {
+                const icon2 = TYPE_ICON[t.type];
+                return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
+                  Tag,
+                  {
+                    variant: "tonal",
+                    size: "small",
+                    leading: icon2 ? icon2(12) : void 0,
+                    label: t.count.toLocaleString() + " " + t.type,
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-type-n", children: t.count.toLocaleString() }),
+                      /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-type-name", children: t.type })
+                    ]
+                  },
+                  t.type
+                );
+              }) })
+            ] }) })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-section", children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "compare-section-head", children: [
@@ -56592,7 +56607,27 @@ function compare(figmaDoc, repoDoc) {
       var rv = resolveRef(repoDoc, rootOf(path), rawOf(repoDoc, path));
       bucket = (fv !== null && rv !== null && renderValue(fv) !== renderValue(rv))
         ? 'changed' : 'repointed';
-      if (bucket === 'changed') leaf = { value: leaf.value, ref: leaf.ref, type: inferType(fv) };
+      /*
+        THE TOKEN'S OWN TYPE SURVIVES BEING RESOLVED.
+
+        This re-derived the type from the value the reference landed on, which
+        threw away what the document had said about the token itself — and
+        `inferType` can only recognise what a value LOOKS like. A token
+        declaring `type: "text"` whose value resolves to "TeleNeo" came back
+        `unknown`, because "TeleNeo" is not a hex and not a number. Measured on
+        two real exports: 100 font-family changes filed under a heading that
+        said nothing about them, with no type mark on any of the rows.
+
+        The rule is already written at the top of this file — declared first,
+        inherited second, inferred last — and the walk has applied it. So the
+        resolved value is consulted only when the walk came back with nothing:
+        an alias whose own node declares no type, which is the case this line
+        was added for.
+      */
+      if (bucket === 'changed') {
+        leaf = { value: leaf.value, ref: leaf.ref,
+                 type: (leaf.type && leaf.type !== 'unknown') ? leaf.type : inferType(fv) };
+      }
     } else if (leaf.ref !== other.ref) {
       /*
         ONE SIDE POINTS AND THE OTHER HOLDS. Resolve the pointing one and ask
@@ -57014,7 +57049,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '3b26053 13:37:03';
+    var CLOSURE_BUILD = 'd4db85f 13:42:34';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

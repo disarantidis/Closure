@@ -867,7 +867,27 @@ function compare(figmaDoc, repoDoc) {
       var rv = resolveRef(repoDoc, rootOf(path), rawOf(repoDoc, path));
       bucket = (fv !== null && rv !== null && renderValue(fv) !== renderValue(rv))
         ? 'changed' : 'repointed';
-      if (bucket === 'changed') leaf = { value: leaf.value, ref: leaf.ref, type: inferType(fv) };
+      /*
+        THE TOKEN'S OWN TYPE SURVIVES BEING RESOLVED.
+
+        This re-derived the type from the value the reference landed on, which
+        threw away what the document had said about the token itself — and
+        `inferType` can only recognise what a value LOOKS like. A token
+        declaring `type: "text"` whose value resolves to "TeleNeo" came back
+        `unknown`, because "TeleNeo" is not a hex and not a number. Measured on
+        two real exports: 100 font-family changes filed under a heading that
+        said nothing about them, with no type mark on any of the rows.
+
+        The rule is already written at the top of this file — declared first,
+        inherited second, inferred last — and the walk has applied it. So the
+        resolved value is consulted only when the walk came back with nothing:
+        an alias whose own node declares no type, which is the case this line
+        was added for.
+      */
+      if (bucket === 'changed') {
+        leaf = { value: leaf.value, ref: leaf.ref,
+                 type: (leaf.type && leaf.type !== 'unknown') ? leaf.type : inferType(fv) };
+      }
     } else if (leaf.ref !== other.ref) {
       /*
         ONE SIDE POINTS AND THE OTHER HOLDS. Resolve the pointing one and ask

@@ -1300,16 +1300,18 @@
     /* The value changes by kind of token — a row of small counts under the
        total, because the MIX is the finding: 760 colours against 6 numbers
        says "re-tinted" in a way one total of 1,060 never does. */
+    /* Inside the total it breaks down, so the gap above it is the one between
+       a figure and its parts rather than between two findings. */
     .compare-types {
       display: flex;
       flex-wrap: wrap;
-      gap: 4px 12px;
-      margin: 8px 2px 0;
-      font-size: 11px;
+      gap: 4px;
+      margin-top: 10px;
     }
-    .compare-type { display: flex; align-items: baseline; gap: 4px; }
+    /* The count leads and the type follows, quieter — the same weighting the
+       stat above uses, so a tag reads as a small version of it. */
     .compare-type-n { font-weight: 700; }
-    .compare-type-name { opacity: 0.6; }
+    .compare-type-name { opacity: 0.7; margin-left: 4px; }
 
     /* A column header wearing its side's mark. baseline-aligned so the glyph
        sits on the word's line rather than above it. */

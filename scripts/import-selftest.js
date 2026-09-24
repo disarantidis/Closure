@@ -3216,6 +3216,38 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          JSON.stringify(noTarget.unbound));
 
       /*
+        A RESOLVED REFERENCE KEEPS THE TOKEN'S OWN TYPE.
+
+        When a reference is repointed and the two ends resolve differently, the
+        row becomes a value change — and the type used to be re-derived from
+        the value it landed on, which threw away what the document said about
+        the token. `inferType` can only recognise what a value LOOKS like, so a
+        token declaring `type: "text"` resolving to "TeleNeo" came back
+        `unknown`: not a hex, not a number. On two real exports that was 100
+        font-family changes under a heading that named none of them.
+
+        Both halves are pinned: the declared type survives, and a token that
+        declares nothing still gets the inference this line was added for.
+      */
+      {
+        const L = { d: { fonts: { a: { value: 'TeleNeo', type: 'text' } },
+                         t: { body: { value: '{fonts.a}', type: 'text' } },
+                         bare: { x: { value: '{fonts.a}' } } } };
+        const R = { d: { fonts: { b: { value: 'BullText', type: 'text' } },
+                         t: { body: { value: '{fonts.b}', type: 'text' } },
+                         bare: { x: { value: '{fonts.b}' } } } };
+        const rep = JD.compare(L, R);
+        const typed = rep.changed.find((c) => c.path === 'd.t.body');
+        ok('compare: a resolved reference keeps the type the token declared',
+           !!typed && typed.type === 'text',
+           JSON.stringify(rep.changed.map((c) => [c.path, c.type])));
+        const bare = rep.changed.find((c) => c.path === 'd.bare.x');
+        ok('compare: and one that declares none still falls back to the value',
+           !!bare && bare.type === 'unknown',
+           JSON.stringify(bare));
+      }
+
+      /*
         ONE CONCEPT SPELLED TWICE. Identical on both sides, so it never
         appears as a difference — and still a defect, with half the file
         pointing at each name.
