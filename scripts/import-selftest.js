@@ -3378,26 +3378,48 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          lop.has.repo.join(',') === 'fontFamilies',
          JSON.stringify(lop));
       /*
-        WHICH TOKENS INSIDE THEM DISAGREE — the evidence under the flag. A key
-        one spelling has and the other does not counts as a difference, and is
-        the commoner of the two shapes.
+        WHAT SHAPE THE DISAGREEMENT HAS — the evidence under the flag, and two
+        questions rather than one. Only a token both spellings hold can
+        disagree about its value; a token one of them does not have at all is
+        a different finding and is counted, not named.
       */
-      const stepped = JD.compare(
-        { d: { 'font-size': { sm: tok(12), md: tok(14) },
-               fontSizes: { sm: tok(12), md: tok(16), lg: tok(20) } } },
-        { d: { 'font-size': { sm: tok(12), md: tok(14) },
-               fontSizes: { sm: tok(12), md: tok(16), lg: tok(20) } } }).duplicateNames[0];
-      ok('naming: the tokens the two spellings disagree about are named, and the shared one is not',
-         stepped.diffKeys.figma.join(',') === 'lg,md',
-         JSON.stringify(stepped.diffKeys));
-      ok('naming: and each spelling keeps its own value for them',
-         stepped.values.figma['font-size'].md === '14' &&
-         stepped.values.figma.fontSizes.md === '16' &&
-         stepped.values.figma['font-size'].lg === undefined,
-         JSON.stringify(stepped.values.figma));
-      ok('naming: two spellings that agree throughout name nothing',
-         JD.compare(twoNames, twoNames).duplicateNames[0].diffKeys.figma.length === 0,
-         JSON.stringify(JD.compare(twoNames, twoNames).duplicateNames[0].diffKeys));
+      const shapeOf = (g) => JD.compare({ d: g }, { d: g }).duplicateNames[0].shape.figma;
+
+      const stepped = shapeOf({ 'font-size': { sm: tok(12), md: tok(14) },
+                             fontSizes: { sm: tok(12), md: tok(16), lg: tok(20) } });
+      ok('naming: only a token both spellings hold is named as a value disagreement',
+         stepped.differing.join(',') === 'md' && stepped.shared === 2,
+         JSON.stringify(stepped));
+      ok('naming: and holding a token the other does not is reported apart from it',
+         stepped.sameKeys === false &&
+         stepped.counts['font-size'] === 2 && stepped.counts.fontSizes === 3,
+         JSON.stringify(stepped));
+
+      /*
+        THE SHAPE THAT MADE THIS NECESSARY: two scales under one word, sharing
+        no token names at all. Listing keys here printed three arbitrary names
+        and three dashes; the two counts say it instead.
+      */
+      const scales = shapeOf({ 'font-sizes': { a: tok(1), b: tok(2), c: tok(3) },
+                            fontSize: { x: tok(1), y: tok(2) } });
+      ok('naming: two spellings sharing no token names name nothing and are counted',
+         scales.shared === 0 && scales.differing.length === 0 &&
+         scales.counts['font-sizes'] === 3 && scales.counts.fontSize === 2,
+         JSON.stringify(scales));
+
+      const twins = shapeOf({ 'font-family': { var: tok('TeleNeo') },
+                           fontFamilies: { var: tok('TeleNeo') } });
+      ok('naming: two spellings that are copies of each other have nothing to explain',
+         twins.sameKeys === true && twins.differing.length === 0 && twins.shared === 1,
+         JSON.stringify(twins));
+
+      ok('naming: each spelling keeps its own value for the tokens it holds',
+         JD.compare({ d: { 'font-size': { sm: tok(12), md: tok(14) },
+                           fontSizes: { sm: tok(12), md: tok(16) } } },
+                    { d: { 'font-size': { sm: tok(12), md: tok(14) },
+                           fontSizes: { sm: tok(12), md: tok(16) } } })
+           .duplicateNames[0].values.figma.fontSizes.md === '16',
+         'values');
 
       /*
         AND WHAT POINTS AT EACH SPELLING, which is what decides whether the

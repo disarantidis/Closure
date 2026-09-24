@@ -3097,17 +3097,33 @@ const SPELLING_KEYS = 3;
       dead group is not a change — it is the half of the row that matters
       less.
 
-      Under each spelling, the tokens inside it that the other spelling does
-      not agree with. "different values" is the flag and this is the evidence:
-      it sits under the name it belongs to, so no key has to say which of the
-      two it came from.
+      Under each spelling, how many tokens it holds and — where the two hold
+      the SAME tokens — which of them they disagree about. "different values"
+      is the flag and this is the evidence: it sits under the name it belongs
+      to, so no key has to say which of the two it came from.
+
+      The count carries the other case on its own. font-sizes with 36 steps
+      against fontSize with 33 and none of the names shared is two scales, not
+      a value dispute, and listing keys for it printed three arbitrary names
+      and three dashes. Two numbers say it.
+
+      Nothing is drawn where the two spellings are copies of each other. The
+      evidence is there to explain a flag, and a row with no flag has nothing
+      to explain.
     */
     const spellingSide = (side: string) => (x: any) => {
       const held: string[] = (x.has && x.has[side]) || [];
       if (!held.length) return <span className="compare-spelling-none">{'\u2014'}</span>;
       const used = (x.used && x.used[side]) || {};
       const vals = (x.values && x.values[side]) || {};
-      const keys: string[] = (x.diffKeys && x.diffKeys[side]) || [];
+      const shape = (x.shape && x.shape[side]) || null;
+      const keys: string[] = shape ? shape.differing : [];
+      /* The flag says which of the two disagreements this is, and both can be
+         true at once: the spellings can hold different tokens AND disagree
+         about the ones they share. */
+      const noneShared = !!shape && shape.shared === 0;
+      const otherTokens = !!shape && !shape.sameKeys && !noneShared;
+      const evidence = !!shape && (noneShared || otherTokens || keys.length > 0);
       /* Nothing in this file points at either spelling. The amber below still
          states the facts, in a quieter voice: the sort has already put this
          row last, and an amber line at full strength on the least urgent
@@ -3125,12 +3141,16 @@ const SPELLING_KEYS = 3;
                   </span>
                 )}
               </span>
-              {keys.length > 0 && (
+              {evidence && (
                 <span className="compare-spelling-vals">
+                  <span className="compare-spelling-key">
+                    {(shape as any).counts[n].toLocaleString() +
+                     ((shape as any).counts[n] === 1 ? ' token' : ' tokens')}
+                  </span>
                   {keys.slice(0, SPELLING_KEYS).map((k) => (
                     <span className="compare-spelling-val" key={k}>
                       <span className="compare-spelling-key">{k}</span>
-                      {(vals[n] || {})[k] !== undefined ? (vals[n] || {})[k] : '\u2014'}
+                      {(vals[n] || {})[k]}
                     </span>
                   ))}
                   {keys.length > SPELLING_KEYS && (
@@ -3145,7 +3165,13 @@ const SPELLING_KEYS = 3;
           {/* The amber goes on the SIDE that has the problem, not on the row: a
               pair can be harmless in one document and hold two answers in the
               other. */}
-          {held.length > 1 && (x.differsIn || []).indexOf(side) !== -1 && (
+          {noneShared && (
+            <span className="compare-pattern-why">no tokens in common</span>
+          )}
+          {otherTokens && (
+            <span className="compare-pattern-why">one holds tokens the other does not</span>
+          )}
+          {keys.length > 0 && (
             <span className="compare-pattern-why">different values</span>
           )}
           {(x.splitIn || []).indexOf(side) !== -1 && (

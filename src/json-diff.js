@@ -1220,29 +1220,47 @@ function compare(figmaDoc, repoDoc) {
       repo: e.names.filter(function (n) { return hasGroup(repoDoc, e.root, n); }),
     };
     /*
-      AND WHICH TOKENS INSIDE THEM DISAGREE.
+      AND WHAT SHAPE THE DISAGREEMENT HAS, which is two questions and not one.
 
-      "different values" says that the two spellings are not copies of each
-      other, which is the fact — and leaves the reader to open both files to
-      find out what the difference is. A leaf group is a handful of tokens;
-      naming the ones that differ costs a line and ends the question.
+      "different values" says the two spellings are not copies of each other,
+      which is the fact and not the answer. There are two ways for it to be
+      true and they want different reports:
 
-      A key one spelling has and the other does not is a difference too, and
-      the commoner one: font-sizes with three steps against fontSize with
-      four is exactly the shape this check was written to catch.
+        SAME TOKENS, DIFFERENT VALUES. Both spellings hold `s2` and one says
+        8 where the other says 9. Naming that key and both values costs a line
+        and ends the question.
+
+        DIFFERENT TOKENS. `font-sizes` holds 36 steps, `fontSize` holds 33,
+        and they share none of their names — two scales that happen to
+        normalise to one word. Naming keys here is worse than saying nothing:
+        the first three of a 36-key union all come from whichever spelling
+        sorts first, every one of them prints a dash against the other, and
+        the column fills with numbers that mean "absent".
+
+      So only the keys held by EVERY spelling can disagree about a value, and
+      the rest is counted rather than listed.
     */
-    e.diffKeys = {};
+    e.shape = {};
     ['figma', 'repo'].forEach(function (side) {
       var vals = e.values[side], held = e.has[side];
-      if (!vals || held.length < 2) { e.diffKeys[side] = []; return; }
-      var seen = {};
-      held.forEach(function (n) {
-        Object.keys(vals[n] || {}).forEach(function (k) { seen[k] = true; });
+      if (!vals || held.length < 2) { e.shape[side] = null; return; }
+      var counts = {};
+      held.forEach(function (n) { counts[n] = Object.keys(vals[n] || {}).length; });
+      var shared = Object.keys(vals[held[0]] || {}).filter(function (k) {
+        return held.every(function (n) { return (vals[n] || {})[k] !== undefined; });
       });
-      e.diffKeys[side] = Object.keys(seen).filter(function (k) {
-        var first = (vals[held[0]] || {})[k];
-        return held.some(function (n) { return (vals[n] || {})[k] !== first; });
+      var differing = shared.filter(function (k) {
+        var first = vals[held[0]][k];
+        return held.some(function (n) { return vals[n][k] !== first; });
       }).sort();
+      e.shape[side] = {
+        counts: counts,
+        shared: shared.length,
+        differing: differing,
+        /* Every spelling holds exactly the tokens the others do. Not the same
+           thing as agreeing about them. */
+        sameKeys: held.every(function (n) { return counts[n] === shared.length; }),
+      };
     });
   });
 
