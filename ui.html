@@ -56877,7 +56877,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'e112067 12:30:39';
+    var CLOSURE_BUILD = 'c3f5bac 12:38:51';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -57267,7 +57267,7 @@ function format(report, opts) {
       if (note) { note.className = 'folder-missing-note'; note.textContent = 'Creating ' + folder + '…'; }
       createRepoFolder(which, folder).then(function () {
         lastDiscovered[which] = (lastDiscovered[which] || []).concat([normFolder(folder)]);
-        repoFolderCache = null;
+        afterGitAction(which);
         if (note) { note.className = 'folder-missing-note is-done';
                     note.textContent = '"' + folder + '" now exists in the repository.'; }
         if (which === 'github') renderGithubFolderList(); else renderFolderList();
@@ -57345,7 +57345,7 @@ function format(report, opts) {
       }
       commitFolderChange(which, folder, mode).then(function () {
         /* The repository changed, so every reading of it is stale. */
-        repoFolderCache = null;
+        afterGitAction(which);
         lastDiscovered[which] = (lastDiscovered[which] || []).filter(function (p) {
           return p !== normFolder(folder);
         });
@@ -58674,6 +58674,41 @@ function format(report, opts) {
        become wrong. Cheap, and it only ever writes two strings. */
     setInterval(refreshSyncLabels, 60000);
 
+    /*
+      TWO WAYS THE READING GETS STALE, AND THE PLUGIN NOW NOTICES BOTH.
+
+      SOMEBODY ELSE CHANGES THE REPOSITORY. Nothing tells us; a colleague adds
+      a folder in GitHub and this panel keeps offering the list it read when the
+      page opened. Every two minutes is often enough that a folder made in
+      another tab is there by the time you look for it, and 30 requests an hour
+      per provider against GitHub's 5000 is not a budget worth protecting.
+
+      WE CHANGE IT OURSELVES, which is the half that was actually broken.
+      Creating a folder and deleting one both cleared repoFolderCache; PUSHING
+      did not — and a push is the one action that reliably creates a folder,
+      because git has no empty directories and the first file in a path is what
+      brings the path into being. So the folder you had just pushed into was
+      missing from the list that said which folders exist, until something else
+      happened to force a re-read.
+
+      afterGitAction is that re-read, and it is quiet: the panel should catch up
+      without appearing to do something nobody asked for.
+    */
+    var AUTOSYNC_MS = 120000;
+    function autoSyncTick() {
+      ['gitlab', 'github'].forEach(function (which) { syncRepo(which, true); });
+    }
+    setInterval(autoSyncTick, AUTOSYNC_MS);
+
+    function afterGitAction(which) {
+      /* The reading is stale by definition — we are the ones who changed it. */
+      repoFolderCache = null;
+      repoCheckedFor = null;
+      if (which) syncRepo(which, true);
+      else ['gitlab', 'github'].forEach(function (w) { syncRepo(w, true); });
+      refreshRepoReadRow();
+    }
+
     function syncStatus(which, text, kind) {
       var el = document.getElementById(which === 'gitlab' ? 'gl-sync-status' : 'gh-sync-status');
       if (!el) return;
@@ -58681,10 +58716,29 @@ function format(report, opts) {
       el.className = 'provider-sync-status' + (kind ? ' is-' + kind : '');
     }
 
-    function syncRepo(which) {
+    /*
+      QUIET MEANS NOBODY ASKED.
+
+      The same reading, without the parts that exist because a person pressed a
+      button: no spinner on the Sync button, no "Asking GitHub about…" line, and
+      no dialog at the end. A background refresh that animated the control would
+      be the panel appearing to do something on its own every two minutes, which
+      is worse than being slightly out of date.
+
+      A failure stays silent too. The button still says when it last succeeded,
+      which is the honest signal — "synced 6m ago" next to a repo that has been
+      refusing us for four minutes is a fact, and an error banner nobody asked
+      for on a screen they are working in is not.
+    */
+    var syncInFlight = {};
+    function syncRepo(which, quiet) {
       var btn = which === 'gitlab' ? window.PomGitlabSyncBtn : window.PomGithubSyncBtn;
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
       var ready = which === 'gitlab' ? isGitLabReady() : isGitHubReady();
+      /* One reading at a time per provider. A background tick that lands on top
+         of a press would answer the press with the tick's result. */
+      if (syncInFlight[which]) return;
+      if (quiet && !ready) return;
       if (!ready) {
         syncStatus(which, which === 'gitlab'
           ? 'Add a token and a project before syncing'
@@ -58693,10 +58747,14 @@ function format(report, opts) {
       }
       var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
       var where = which === 'gitlab' ? c.project : c.repo;
-      btn.setLoading(true);
-      syncStatus(which, 'Asking ' + label + ' about ' + where + ' on ' + c.branch + '…');
+      syncInFlight[which] = true;
+      if (!quiet) {
+        btn.setLoading(true);
+        syncStatus(which, 'Asking ' + label + ' about ' + where + ' on ' + c.branch + '…');
+      }
       listRepoFolders(which, true).then(function (res) {
-        btn.setLoading(false);
+        syncInFlight[which] = false;
+        if (!quiet) btn.setLoading(false);
         var combo = which === 'gitlab' ? window.PomFolderNew : window.PomGithubFolderNew;
         combo.setOptions(res.folders);
         lastDiscovered[which] = res.folders.slice();
@@ -58731,6 +58789,12 @@ function format(report, opts) {
           than into a dialog that opens holding nothing.
         */
         lastSyncedAt[which] = Date.now();
+        if (quiet) {
+          /* Everything the reading feeds, and nothing it says. */
+          refreshSyncLabels();
+          refreshFolderImportOffer();
+          return;
+        }
         syncStatus(which, res.truncated
           ? 'This repo holds more folders than one listing can hold — type a path if one is missing'
           : !res.folders.length
@@ -58746,6 +58810,8 @@ function format(report, opts) {
         */
         if (!saved.length && res.folders.length) openFolderDiscovery(which);
       }, function (err) {
+        syncInFlight[which] = false;
+        if (quiet) return;          // see the note on syncRepo — nobody asked
         btn.setLoading(false);
         /* Name the thing that was refused. "Could not connect" sends somebody
            to their network; "the token was refused" sends them to the field
@@ -61102,6 +61168,11 @@ function format(report, opts) {
         .then(function() {
           var succeeded = results.filter(function(r) { return r.ok; });
           var failed = results.filter(function(r) { return !r.ok; });
+          /* A push creates a file, and where there was no folder it creates the
+             folder too — git has no empty directories, so the first file in a
+             path is what brings the path into being. Every reading of the repo
+             is stale the moment one lands. */
+          succeeded.forEach(function (r) { afterGitAction(r.provider === 'GitLab' ? 'gitlab' : 'github'); });
           if (failed.length === 0) {
             window.PomButtons.push.setSuccess(true);
             showToast('Successfully pushed to ' + succeeded.map(function(r) { return r.provider; }).join(' and '));
