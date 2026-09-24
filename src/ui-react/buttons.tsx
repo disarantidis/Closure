@@ -2852,18 +2852,40 @@ const COMPARE_SAMPLE = 40;
                       <span className="compare-cell-path">{x.names.join('  \u00b7  ')}</span>
                     </span>
                   ) },
+                /*
+                  ONE ROW PER PAIR, and this column says where. Keyed by side it
+                  printed `font-sizes / fontSize` twice in a row, once per file,
+                  with the same sentence under each — thirteen rows for seven
+                  findings, and the repetition meant nothing until the reader
+                  noticed the two names above were the same two names.
+
+                  `differsIn` is asked separately from `sides` because the two
+                  questions come apart: a pair can be harmless in one document
+                  and hold different values in the other, and the row says which
+                  rather than averaging them into a boolean.
+                */
                 { key: 'side', header: 'In',
-                  cell: (x: any) => (
-                    <span className="compare-pattern-to">
-                      <span>{x.side === 'repo' ? 'the repo file' : 'this Figma file'}</span>
-                      {!x.sameValues && (
-                        <span className="compare-pattern-why">and they hold different values</span>
-                      )}
-                    </span>
-                  ) },
+                  cell: (x: any) => {
+                    const both = x.sides.length > 1;
+                    const name = (side: string) => (side === 'repo' ? 'the repo file' : 'this Figma file');
+                    const where = both ? 'both files' : name(x.sides[0]);
+                    const d = x.differsIn || [];
+                    return (
+                      <span className="compare-pattern-to">
+                        <span>{where}</span>
+                        {d.length > 0 && (
+                          <span className="compare-pattern-why">
+                            {d.length === x.sides.length
+                              ? 'and they hold different values'
+                              : 'and they hold different values in ' + name(d[0])}
+                          </span>
+                        )}
+                      </span>
+                    );
+                  } },
               ]}
               rows={rows}
-              rowKey={(x: any) => x.side + '/' + x.names.join('/')}
+              rowKey={(x: any) => x.names.join('/')}
             />
           </div>
         </div>

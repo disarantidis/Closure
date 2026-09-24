@@ -3229,11 +3229,30 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                               fontFamilies: { var: tok('TeleNeo') } } };
       const dupes = JD.compare(twoNames, twoNames);
       ok('naming: one concept under two spellings is reported though both files agree',
-         dupes.duplicateNames.length === 2 &&
+         dupes.duplicateNames.length === 1 &&
          dupes.duplicateNames[0].names.join('/') === 'font-family/fontFamilies',
          JSON.stringify(dupes.duplicateNames));
-      ok('naming: and it is reported once per side, not once per document',
-         dupes.duplicateNames.filter((d) => d.side === 'figma').length === 1);
+      /*
+        ONE FINDING, NAMING THE FILES IT IS IN. It used to be one row per side,
+        which printed the same pair twice in a row on a page — the same two
+        names with the same sentence under each, and nothing to tell a reader
+        that the second row was the first one again.
+      */
+      ok('naming: and it is one finding that names both files, not one per file',
+         dupes.duplicateNames[0].sides.slice().sort().join(',') === 'figma,repo',
+         JSON.stringify(dupes.duplicateNames[0]));
+      /*
+        WHERE THEY DISAGREE IS ASKED SEPARATELY FROM WHERE THEY EXIST, because
+        the two questions come apart: the same pair can be harmless in one
+        document and hold different values in the other.
+      */
+      const halfSplit = JD.compare(
+        { d: { 'font-family': { var: tok('TeleNeo') }, fontFamilies: { var: tok('Other') } } },
+        twoNames);
+      ok('naming: and it says which side the two halves disagree in',
+         halfSplit.duplicateNames.length === 1 &&
+         halfSplit.duplicateNames[0].differsIn.join(',') === 'figma',
+         JSON.stringify(halfSplit.duplicateNames));
       const coincident = { d: { 'letter-spacing': { none: tok(0) },
                                 'paragraph-spacing': { none: tok(0) } } };
       ok('naming: two real concepts that happen to hold the same token are not a duplicate',

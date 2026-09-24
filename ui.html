@@ -51151,17 +51151,35 @@ html[data-theme=dark] {
                   header: "The two spellings",
                   cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-token", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: x.names.join("  \xB7  ") }) })
                 },
+                /*
+                                  ONE ROW PER PAIR, and this column says where. Keyed by side it
+                                  printed `font-sizes / fontSize` twice in a row, once per file,
+                                  with the same sentence under each — thirteen rows for seven
+                                  findings, and the repetition meant nothing until the reader
+                                  noticed the two names above were the same two names.
+                
+                                  `differsIn` is asked separately from `sides` because the two
+                                  questions come apart: a pair can be harmless in one document
+                                  and hold different values in the other, and the row says which
+                                  rather than averaging them into a boolean.
+                                */
                 {
                   key: "side",
                   header: "In",
-                  cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-pattern-to", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { children: x.side === "repo" ? "the repo file" : "this Figma file" }),
-                    !x.sameValues && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "and they hold different values" })
-                  ] })
+                  cell: (x) => {
+                    const both = x.sides.length > 1;
+                    const name = (side) => side === "repo" ? "the repo file" : "this Figma file";
+                    const where = both ? "both files" : name(x.sides[0]);
+                    const d = x.differsIn || [];
+                    return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-pattern-to", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { children: where }),
+                      d.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: d.length === x.sides.length ? "and they hold different values" : "and they hold different values in " + name(d[0]) })
+                    ] });
+                  }
                 }
               ],
               rows,
-              rowKey: (x) => x.side + "/" + x.names.join("/")
+              rowKey: (x) => x.names.join("/")
             }
           ) })
         ] }, title);
@@ -56492,13 +56510,34 @@ function compare(figmaDoc, repoDoc) {
     document is not 76 findings, it is one, repeated. The document count is
     kept, because "in all 38" is part of what makes it worth fixing.
   */
+  /*
+    AND COLLAPSED ACROSS THE TWO SIDES AS WELL AS WITHIN EACH.
+
+    Keyed by side, `font-sizes / fontSize` came out twice — once for the Figma
+    file, once for the repo file — one above the other, the same two names with
+    the same sentence under each. Thirteen rows for seven findings, and the
+    repetition meant nothing until a reader noticed the two names above were
+    the same two names.
+
+    It is ONE finding with a `sides` list now: the split exists, and it exists
+    in both files or in one of them. `differsIn` is kept apart from `sides`
+    because the two questions come apart — a pair can be two spellings of one
+    harmless name in one document and two spellings holding different values in
+    the other, and flattening that into a single boolean would report the wrong
+    one half the time.
+  */
   var dupRaw = findDuplicateNames(figmaDoc, 'figma').concat(findDuplicateNames(repoDoc, 'repo'));
   var dupBy = new Map();
   dupRaw.forEach(function (d) {
-    var k = d.side + '\u241f' + d.names.join('/');
-    if (!dupBy.has(k)) dupBy.set(k, { side: d.side, names: d.names, tokens: d.tokens,
-                                      sameValues: d.sameValues, documents: 0 });
-    dupBy.get(k).documents++;
+    var k = d.names.join('/');
+    if (!dupBy.has(k)) {
+      dupBy.set(k, { names: d.names, tokens: d.tokens, sides: [], differsIn: [], documents: 0 });
+    }
+    var e = dupBy.get(k);
+    if (e.sides.indexOf(d.side) === -1) e.sides.push(d.side);
+    if (!d.sameValues && e.differsIn.indexOf(d.side) === -1) e.differsIn.push(d.side);
+    e.tokens = Math.max(e.tokens, d.tokens);
+    e.documents++;
   });
   report.duplicateNames = Array.from(dupBy.values());
 
@@ -56726,7 +56765,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '431412f 10:29:52';
+    var CLOSURE_BUILD = '4bfb311 10:38:54';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

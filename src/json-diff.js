@@ -1002,13 +1002,34 @@ function compare(figmaDoc, repoDoc) {
     document is not 76 findings, it is one, repeated. The document count is
     kept, because "in all 38" is part of what makes it worth fixing.
   */
+  /*
+    AND COLLAPSED ACROSS THE TWO SIDES AS WELL AS WITHIN EACH.
+
+    Keyed by side, `font-sizes / fontSize` came out twice — once for the Figma
+    file, once for the repo file — one above the other, the same two names with
+    the same sentence under each. Thirteen rows for seven findings, and the
+    repetition meant nothing until a reader noticed the two names above were
+    the same two names.
+
+    It is ONE finding with a `sides` list now: the split exists, and it exists
+    in both files or in one of them. `differsIn` is kept apart from `sides`
+    because the two questions come apart — a pair can be two spellings of one
+    harmless name in one document and two spellings holding different values in
+    the other, and flattening that into a single boolean would report the wrong
+    one half the time.
+  */
   var dupRaw = findDuplicateNames(figmaDoc, 'figma').concat(findDuplicateNames(repoDoc, 'repo'));
   var dupBy = new Map();
   dupRaw.forEach(function (d) {
-    var k = d.side + '\u241f' + d.names.join('/');
-    if (!dupBy.has(k)) dupBy.set(k, { side: d.side, names: d.names, tokens: d.tokens,
-                                      sameValues: d.sameValues, documents: 0 });
-    dupBy.get(k).documents++;
+    var k = d.names.join('/');
+    if (!dupBy.has(k)) {
+      dupBy.set(k, { names: d.names, tokens: d.tokens, sides: [], differsIn: [], documents: 0 });
+    }
+    var e = dupBy.get(k);
+    if (e.sides.indexOf(d.side) === -1) e.sides.push(d.side);
+    if (!d.sameValues && e.differsIn.indexOf(d.side) === -1) e.differsIn.push(d.side);
+    e.tokens = Math.max(e.tokens, d.tokens);
+    e.documents++;
   });
   report.duplicateNames = Array.from(dupBy.values());
 
