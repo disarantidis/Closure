@@ -2692,6 +2692,9 @@
       on both. Two lines inside a tag costs a few pixels of height; a name cut
       short names nothing.
     */
+    /* One side's own tags: the address, then how much is in it. They wrap
+       between themselves rather than inside either one. */
+    .compare-card-side { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
     .compare-card-sides .nd-tag { min-width: 0; height: auto; }
     /*
       THE ELLIPSIS LIVES ON .nd-tag-label, NOT ON THE TAG — which is why setting
@@ -51038,29 +51041,35 @@ html[data-theme=dark] {
       const sides = /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "json-download-card", "data-level": 4, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-card-main", children: [
         /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-file-name", children: s.sides.figma }),
         /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-card-sides", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
-            Tag,
-            {
-              variant: "tonal",
-              size: "small",
-              leading: IconFigma(12),
-              style: { minWidth: 0 },
-              label: s.sides.figmaDetail,
-              children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { title: s.sides.figmaDetail, children: s.sides.figmaDetail })
-            }
-          ),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-card-side", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+              Tag,
+              {
+                variant: "tonal",
+                size: "small",
+                leading: IconFigma(12),
+                style: { minWidth: 0 },
+                label: s.sides.figmaDetail,
+                children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { title: s.sides.figmaDetail, children: s.sides.figmaDetail })
+              }
+            ),
+            s.sides.figmaCount && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Tag, { variant: "tonal", size: "small", children: s.sides.figmaCount })
+          ] }),
           /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-card-vs", "aria-hidden": true, children: IconCompare(14) }),
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
-            Tag,
-            {
-              variant: "tonal",
-              size: "small",
-              leading: s.sides.provider === "gitlab" ? IconGitlab(12) : IconGithub(12),
-              style: { minWidth: 0 },
-              label: s.sides.repoDetail,
-              children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { title: s.sides.repoDetail, children: s.sides.repoDetail })
-            }
-          )
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-card-side", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+              Tag,
+              {
+                variant: "tonal",
+                size: "small",
+                leading: s.sides.provider === "gitlab" ? IconGitlab(12) : IconGithub(12),
+                style: { minWidth: 0 },
+                label: s.sides.repoDetail,
+                children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { title: s.sides.repoDetail, children: s.sides.repoDetail })
+              }
+            ),
+            s.sides.repoCount && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Tag, { variant: "tonal", size: "small", children: s.sides.repoCount })
+          ] })
         ] })
       ] }) });
       if (s.busy) {
@@ -51543,7 +51552,7 @@ html[data-theme=dark] {
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
     window.PomCompare = {
       setBusy: (label) => set((s) => ({ ...s, busy: label, problem: null, report: null })),
-      setSides: (figma, figmaDetail, repo, repoDetail, provider) => set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail, provider } })),
+      setSides: (figma, figmaDetail, repo, repoDetail, provider, figmaCount, repoCount) => set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail, provider, figmaCount, repoCount } })),
       setProblem: (title, message, fix, actionLabel) => set((s) => ({ ...s, busy: "", report: null, problem: { title, message, fix, actionLabel } })),
       setReport: (report, copyText) => set((s) => ({ ...s, busy: "", problem: null, report, copyText })),
       onAction: null
@@ -56973,7 +56982,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '30730f8 13:17:01';
+    var CLOSURE_BUILD = 'd2bca38 13:23:37';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -58250,11 +58259,9 @@ function format(report, opts) {
             pair symmetric while they do it.
           */
           window.PomCompare.setSides(
-            lastFigmaFileName || 'This Figma file',
-            figmaWhere + '  ·  ' + tokensLabel(report.figmaTokens),
-            label,
-            repoWhere + '  ·  ' + tokensLabel(report.repoTokens),
-            which);
+            lastFigmaFileName || 'This Figma file', figmaWhere,
+            label, repoWhere, which,
+            tokensLabel(report.figmaTokens), tokensLabel(report.repoTokens));
           window.PomCompare.setReport(report, window.PomJsonDiff.format(report, {
             figmaLabel: (lastFigmaFileName || 'this Figma file') + ' (' + figmaWhere + ')',
             repoLabel: label + ' ' + repoWhere,

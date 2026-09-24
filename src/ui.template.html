@@ -2692,6 +2692,9 @@
       on both. Two lines inside a tag costs a few pixels of height; a name cut
       short names nothing.
     */
+    /* One side's own tags: the address, then how much is in it. They wrap
+       between themselves rather than inside either one. */
+    .compare-card-side { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
     .compare-card-sides .nd-tag { min-width: 0; height: auto; }
     /*
       THE ELLIPSIS LIVES ON .nd-tag-label, NOT ON THE TAG — which is why setting
@@ -5112,11 +5115,9 @@
             pair symmetric while they do it.
           */
           window.PomCompare.setSides(
-            lastFigmaFileName || 'This Figma file',
-            figmaWhere + '  ·  ' + tokensLabel(report.figmaTokens),
-            label,
-            repoWhere + '  ·  ' + tokensLabel(report.repoTokens),
-            which);
+            lastFigmaFileName || 'This Figma file', figmaWhere,
+            label, repoWhere, which,
+            tokensLabel(report.figmaTokens), tokensLabel(report.repoTokens));
           window.PomCompare.setReport(report, window.PomJsonDiff.format(report, {
             figmaLabel: (lastFigmaFileName || 'this Figma file') + ' (' + figmaWhere + ')',
             repoLabel: label + ' ' + repoWhere,

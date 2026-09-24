@@ -697,7 +697,10 @@ declare global {
          column header can wear its mark. Optional: a comparison can be shown
          without one, and then the column is just "Repo". */
       setSides: (figma: string, figmaDetail: string, repo: string, repoDetail: string,
-                 provider?: 'github' | 'gitlab' | null) => void;
+                 provider?: 'github' | 'gitlab' | null,
+                 /* How many tokens each side holds, as their own tags. Optional:
+                    the busy state names the sides before it has counted. */
+                 figmaCount?: string, repoCount?: string) => void;
       /* `actionLabel` puts a button in the warning. A refusal that names the
          fix and then makes you go and do it somewhere else is a worse version
          of one that just does it. */
@@ -2403,7 +2406,8 @@ const COMPARE_SAMPLE = 40;
 (function mountCompare() {
   const container = document.getElementById('compare-mount');
   type Sides = { figma: string; figmaDetail: string; repo: string; repoDetail: string;
-                 provider?: 'github' | 'gitlab' | null };
+                 provider?: 'github' | 'gitlab' | null;
+                 figmaCount?: string; repoCount?: string };
   type S = {
     busy: string;
     sides: Sides;
@@ -2451,19 +2455,36 @@ const COMPARE_SAMPLE = 40;
             and each wears its own mark, so which is which is read before either
             name is.
           */}
+          {/*
+            THE ADDRESS AND THE SIZE ARE TWO TAGS, not one string with a
+            separator in it. They are different kinds of fact — where the file
+            is, and how much is in it — and run together they made one long
+            label that had to wrap mid-name to fit its column. Two short tags
+            wrap between themselves instead, and each stays whole.
+          */}
           <span className="compare-card-sides">
-            <Tag variant="tonal" size="small" leading={IconFigma(12)}
-                 style={{ minWidth: 0 }} label={s.sides.figmaDetail}>
-              <span title={s.sides.figmaDetail}>{s.sides.figmaDetail}</span>
-            </Tag>
+            <span className="compare-card-side">
+              <Tag variant="tonal" size="small" leading={IconFigma(12)}
+                   style={{ minWidth: 0 }} label={s.sides.figmaDetail}>
+                <span title={s.sides.figmaDetail}>{s.sides.figmaDetail}</span>
+              </Tag>
+              {s.sides.figmaCount && (
+                <Tag variant="tonal" size="small">{s.sides.figmaCount}</Tag>
+              )}
+            </span>
             {/* Between the two, because that is what it is between: the
                 relation, drawn, where "compared with" used to be written. */}
             <span className="compare-card-vs" aria-hidden>{IconCompare(14)}</span>
-            <Tag variant="tonal" size="small"
-                 leading={s.sides.provider === 'gitlab' ? IconGitlab(12) : IconGithub(12)}
-                 style={{ minWidth: 0 }} label={s.sides.repoDetail}>
-              <span title={s.sides.repoDetail}>{s.sides.repoDetail}</span>
-            </Tag>
+            <span className="compare-card-side">
+              <Tag variant="tonal" size="small"
+                   leading={s.sides.provider === 'gitlab' ? IconGitlab(12) : IconGithub(12)}
+                   style={{ minWidth: 0 }} label={s.sides.repoDetail}>
+                <span title={s.sides.repoDetail}>{s.sides.repoDetail}</span>
+              </Tag>
+              {s.sides.repoCount && (
+                <Tag variant="tonal" size="small">{s.sides.repoCount}</Tag>
+              )}
+            </span>
           </span>
 
         </span>
@@ -3298,8 +3319,8 @@ const COMPARE_SAMPLE = 40;
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
   window.PomCompare = {
     setBusy: (label) => set((s) => ({ ...s, busy: label, problem: null, report: null })),
-    setSides: (figma, figmaDetail, repo, repoDetail, provider) =>
-      set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail, provider } })),
+    setSides: (figma, figmaDetail, repo, repoDetail, provider, figmaCount, repoCount) =>
+      set((s) => ({ ...s, sides: { figma, figmaDetail, repo, repoDetail, provider, figmaCount, repoCount } })),
     setProblem: (title, message, fix, actionLabel) =>
       set((s) => ({ ...s, busy: '', report: null, problem: { title, message, fix, actionLabel } })),
     setReport: (report, copyText) =>
