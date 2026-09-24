@@ -2950,6 +2950,46 @@ const COMPARE_SAMPLE = 40;
       );
     };
 
+    /* Two paths and an optional note, for the findings whose whole point is
+       that they have two ends. */
+    const pairs = (title: string, rows: { was: string; now: string; note?: string }[]) => {
+      if (!rows.length) return null;
+      return (
+        <div className="json-download-card" data-level={4} key={title}>
+          <div className="json-download-header">
+            <div className="json-download-title-group">
+              <p className="json-download-title">{title}</p>
+            </div>
+            <span className="compare-side-detail">{rows.length.toLocaleString()}</span>
+          </div>
+          <div className="compare-table">
+            <Table
+              caption={title}
+              captionHidden
+              size="small"
+              rules
+              columns={[
+                { key: 'was',
+                  header: headWith(IconFigma(12), 'Was'),
+                  cell: (x: any) => pathCell(x.was) },
+                { key: 'now',
+                  header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
+                                 : s.sides.provider === 'github' ? IconGithub(12) : null, 'Now'),
+                  cell: (x: any) => (
+                    <span className="compare-pattern-to">
+                      {pathCell(x.now)}
+                      {x.note && <span className="compare-pattern-why">{x.note}</span>}
+                    </span>
+                  ) },
+              ]}
+              rows={rows}
+              rowKey={(x: any) => x.was + '\u241f' + x.now}
+            />
+          </div>
+        </div>
+      );
+    };
+
     const leaves = (title: string, rows: any[], twoSided: boolean,
                     flagOf?: (row: any) => ReactNode) => {
       if (!rows.length) return null;
@@ -3157,6 +3197,14 @@ const COMPARE_SAMPLE = 40;
                 { n: (r.repointed || []).length, label: 'pointing somewhere new' },
                 { n: (r.aliased || []).length, label: 'aliased one side, inlined the other' },
                 { n: (r.moved || []).length, label: 'the same token, somewhere else' },
+                { n: (r.renamed || []).length, wide: true,
+                  label: (r.renamed || []).length === 1
+                    ? 'group renamed \u2014 its tokens are not gone'
+                    : 'groups renamed \u2014 their tokens are not gone' },
+                { n: (r.swapped || []).length, wide: true,
+                  label: (r.swapped || []).length === 1
+                    ? 'group swapped what it holds'
+                    : 'groups swapped what they hold' },
               ].filter((x) => x.n > 0);
               if (!stats.length) return null;
               return (
@@ -3294,6 +3342,19 @@ const COMPARE_SAMPLE = 40;
         {/* Straight after the patterns, because for several of them this IS
             the explanation. */}
         {spellings(r.duplicateNames || [])}
+        {/*
+          BOTH ENDS OF ONE EDIT, ON ONE LINE. A group renamed is a from and a
+          to; a group that swapped its contents is what went and what came. Two
+          lists of paths make a reader pair them up by eye, which is the work
+          this is for.
+        */}
+        {pairs('Architecture \u2014 a group under a new name',
+               (r.renamed || []).map((x: any) => ({
+                 was: x.from, now: x.to, note: x.tokens.toLocaleString() + ' tokens' })))}
+        {pairs('Architecture \u2014 a group that swapped what it holds',
+               (r.swapped || []).map((x: any) => ({
+                 was: x.group + ' \u00b7 ' + x.gone.join(', '),
+                 now: x.group + ' \u00b7 ' + x.arrived.join(', ') })))}
         {(r.changedByType || []).length > 1
           ? r.changedByType.map((t: any) =>
               leaves('Values \u2014 ' + t.type, r.changed.filter((c: any) => c.type === t.type), true))

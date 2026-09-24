@@ -450,6 +450,78 @@ function hasGroup(doc, root, name) {
   return !!g && typeof g === 'object' && !isToken(g);
 }
 
+/*
+  See the note at the call site for what these two buckets claim and why one of
+  them deliberately claims very little.
+*/
+function findRenames(report) {
+  var parentOf = function (p) { var i = p.lastIndexOf('.'); return i === -1 ? '' : p.slice(0, i); };
+  var leafOf = function (p) { var i = p.lastIndexOf('.'); return i === -1 ? p : p.slice(i + 1); };
+  var byGroup = function (rows) {
+    var m = new Map();
+    rows.forEach(function (r) {
+      var g = parentOf(r.path);
+      if (!m.has(g)) m.set(g, []);
+      m.get(g).push(r);
+    });
+    return m;
+  };
+  var sig = function (rows) {
+    return rows.map(function (r) { return leafOf(r.path); }).sort().join('\u241f');
+  };
+
+  var F = byGroup(report.onlyInFigma);
+  var R = byGroup(report.onlyInRepo);
+  var claimed = new Set();          // paths accounted for by one of the two buckets
+
+  /* SWAPPED first, because a group on both sides is a fact rather than a
+     match: no candidate has to be chosen, so nothing can be chosen wrongly. */
+  F.forEach(function (gone, group) {
+    var arrived = R.get(group);
+    if (!arrived) return;
+    report.swapped.push({
+      group: group,
+      gone: gone.map(function (r) { return leafOf(r.path); }),
+      arrived: arrived.map(function (r) { return leafOf(r.path); }),
+    });
+    gone.concat(arrived).forEach(function (r) { claimed.add(r.path); });
+  });
+
+  /* RENAMED — only groups that exist on one side alone, and only where the
+     leaf sets are identical AND the match is unique in both directions. */
+  var fOnly = [], rOnly = [];
+  F.forEach(function (rows, g) { if (!R.has(g)) fOnly.push({ group: g, rows: rows, sig: sig(rows) }); });
+  R.forEach(function (rows, g) { if (!F.has(g)) rOnly.push({ group: g, rows: rows, sig: sig(rows) }); });
+  var countBy = function (list) {
+    var m = new Map();
+    list.forEach(function (x) { m.set(x.sig, (m.get(x.sig) || 0) + 1); });
+    return m;
+  };
+  var fCount = countBy(fOnly), rCount = countBy(rOnly);
+  fOnly.forEach(function (f) {
+    /*
+      THE SAME FLOOR THE OTHER RENAME RULE USES, and for the same reason it
+      gives: a rename is systematic by nature and a coincidence is not. Two
+      groups called `somewhere` and `elsewhere` that each hold one token called
+      `background` are not a rename, they are two files that both needed a
+      background — which is the case MOVE_RULE_MIN was written for, and it
+      would be strange for the two detectors to disagree about it.
+    */
+    if (f.rows.length < MOVE_RULE_MIN) return;
+    /* Ambiguous either way is not evidence — see the call site. */
+    if (fCount.get(f.sig) !== 1 || rCount.get(f.sig) !== 1) return;
+    var match = rOnly.find(function (r) { return r.sig === f.sig; });
+    if (!match) return;
+    report.renamed.push({ from: f.group, to: match.group, tokens: f.rows.length });
+    f.rows.concat(match.rows).forEach(function (r) { claimed.add(r.path); });
+  });
+
+  if (!claimed.size) return;
+  var keep = function (r) { return !claimed.has(r.path); };
+  report.onlyInFigma = report.onlyInFigma.filter(keep);
+  report.onlyInRepo = report.onlyInRepo.filter(keep);
+}
+
 function findDuplicateNames(doc, side) {
   var out = [];
   if (!doc || typeof doc !== 'object') return out;
@@ -680,6 +752,10 @@ function compare(figmaDoc, repoDoc) {
     comparable: true,
     problem: null,
     onlyInFigma: [], onlyInRepo: [], changed: [], repointed: [],
+    /* A group gone from one side and arrived on the other under a different
+       name, and a group on both sides whose contents were swapped — see
+       findRenames. Both exist to stop one event being read as two lists. */
+    renamed: [], swapped: [],
     /* The changed rows collapsed by the change they share — see below. */
     changedPatterns: [],
     /* One side aliases what the other inlines, and they resolve to the same
@@ -1021,6 +1097,37 @@ function compare(figmaDoc, repoDoc) {
     "a link that used to exist and no longer does".
   */
   report.unbound = report.aliased.filter(function (x) { return !!x.bindable; });
+
+  /*
+    ONE EVENT, NOT TWO LISTS.
+
+    A token missing from one side and a token arriving on the other are
+    reported as two findings, which is right when they are unrelated and wrong
+    when they are the same edit seen from both ends. Two shapes are worth
+    telling apart, and the interesting thing about them is how far apart their
+    confidence is.
+
+    RENAMED — a group that exists on ONE side only, matched to a group that
+    exists on the other side only, holding EXACTLY the same leaf names. That is
+    a rename and there is nothing to guess: `brand.primary` [50..900] against
+    `brand.main` [50..900] is one act, and reporting 10 gone and 10 arrived
+    makes a reader match them up by eye.
+
+    The match has to be exact and it has to be unambiguous. A leaf set that
+    matches two candidates is not evidence — it is two equally good stories,
+    and picking one would be inventing history. Measured on a real pair: a file
+    where `neutral.light` [50..900] and `neutral.dark` [50..900] both vanish
+    and `grey` [50..950] appears. That is a MERGE, not a rename; the leaf sets
+    do not match, and even loosened they would match two sources equally well.
+    Claiming a rename there would be wrong, so this claims nothing.
+
+    SWAPPED — a group present on BOTH sides that lost leaves and gained others.
+    No claim about intent at all: the group is the same group, and its contents
+    changed. On that same real pair, `font-family` loses `teleneo-var` and
+    gains `bull-text` — one font replacing another, which is one fact and was
+    being read as two.
+  */
+  findRenames(report);
 
   /* Not a difference between the two — a defect inside each, which only a
      reader with both files open would otherwise have to spot by eye. */

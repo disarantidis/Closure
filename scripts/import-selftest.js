@@ -3216,6 +3216,82 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          JSON.stringify(noTarget.unbound));
 
       /*
+        ONE EDIT SEEN FROM BOTH ENDS.
+
+        A group gone from one side and arrived on the other is two lists when
+        it is two events and one finding when it is one. The two buckets differ
+        in how much they are willing to claim, and both halves of that matter:
+        the rename has to fire on a real rename, and it has to REFUSE when the
+        evidence would fit more than one story.
+      */
+      {
+        /* Ten steps, because a rename has to be systematic to be believed —
+           the same floor the move rule uses, for the reason stated there. */
+
+        /*
+          RENAMED AND RE-VALUED, which is the gap this fills. The move rule
+          pairs on same value AND same leaf name, so it already catches a group
+          that was renamed and left alone — and it cannot see one whose values
+          moved too, because no value matches to pair on. That came out as ten
+          gone and ten arrived.
+        */
+        const shifted = (v) => { const r = {}; [50,100,200,300,400,500,600,700,800,900]
+          .forEach((k, i) => { r[k] = tok(v + i); }); return r; };
+        const A = JD.compare({ d: { primary: shifted('#a') } }, { d: { main: shifted('#b') } });
+        ok('rename: a group renamed AND re-valued is one finding, not twenty',
+           A.renamed.length === 1 && A.renamed[0].from === 'd.primary' &&
+           A.renamed[0].to === 'd.main' && A.renamed[0].tokens === 10 && A.moved.length === 0,
+           JSON.stringify({ renamed: A.renamed, moved: A.moved.length }));
+        ok('rename: and its leaves stop being reported as gone and arrived',
+           A.onlyInFigma.length === 0 && A.onlyInRepo.length === 0,
+           JSON.stringify([A.onlyInFigma.length, A.onlyInRepo.length]));
+
+        /*
+          AND IT REFUSES WHAT IT CANNOT TELL APART. Two groups vanish with the
+          same shape and one arrives: the leaf sets fit both sources equally,
+          so naming either one would be inventing history. This is the shape a
+          real pair of exports had — two colour ramps collapsed into one.
+        */
+        const B = JD.compare(
+          { d: { light: shifted('#a'), dark: shifted('#c') } },
+          { d: { grey: shifted('#b') } });
+        ok('rename: two equally good sources are not evidence, so nothing is claimed',
+           B.renamed.length === 0, JSON.stringify(B.renamed));
+        /* And one below the floor is not claimed however clean the match. */
+        const small = JD.compare({ d: { a: { x: tok('#111') } } }, { d: { b: { x: tok('#111') } } });
+        ok('rename: a match too small to be systematic is not claimed',
+           small.renamed.length === 0, JSON.stringify(small.renamed));
+        ok('rename: and those leaves stay reported, because nothing explained them',
+           B.onlyInFigma.length === 20 && B.onlyInRepo.length === 10,
+           JSON.stringify([B.onlyInFigma.length, B.onlyInRepo.length]));
+
+        /*
+          SWAPPED CLAIMS NOTHING ABOUT INTENT. The group is on BOTH sides, so
+          there is no candidate to choose and nothing to get wrong: it lost
+          these leaves and gained those. One font replacing another is this
+          shape, and it was being read as two findings.
+        */
+        const C = JD.compare(
+          { d: { fonts: { alpha: tok('Alpha') } } },
+          { d: { fonts: { beta: tok('Beta') } } });
+        ok('swap: a group on both sides that loses and gains names both halves',
+           C.swapped.length === 1 && C.swapped[0].group === 'd.fonts' &&
+           C.swapped[0].gone.join() === 'alpha' && C.swapped[0].arrived.join() === 'beta',
+           JSON.stringify(C.swapped));
+        ok('swap: and it is not also counted as gone and arrived',
+           C.onlyInFigma.length === 0 && C.onlyInRepo.length === 0);
+
+        /* A group that only LOST leaves is not a swap — nothing replaced them,
+           and calling it one would invent an arrival. */
+        const D = JD.compare(
+          { d: { fonts: { alpha: tok('Alpha'), beta: tok('Beta') } } },
+          { d: { fonts: { alpha: tok('Alpha') } } });
+        ok('swap: a group that only loses leaves is not a swap',
+           D.swapped.length === 0 && D.onlyInFigma.length === 1,
+           JSON.stringify([D.swapped, D.onlyInFigma.length]));
+      }
+
+      /*
         A RESOLVED REFERENCE KEEPS THE TOKEN'S OWN TYPE.
 
         When a reference is repointed and the two ends resolve differently, the
