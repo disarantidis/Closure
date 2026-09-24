@@ -2562,20 +2562,92 @@ const COMPARE_SAMPLE = 40;
       line is a piece of the name. The anywhere fallback stays in CSS for the
       one segment long enough to need it.
     */
-    const pathCell = (path: string, type?: string) => {
+    /*
+      WHICH SEGMENTS OF THIS PATH ARE NOT IN THE OTHER ONE.
+
+      Every table that puts two paths side by side is asking the reader to
+      find the difference by eye, and the difference is nearly always a
+      segment or two in the middle of forty characters that are otherwise the
+      same: {core-colours.neutral.light.300} against
+      {core-colours.grey.300}. So the shared head and the shared tail are
+      matched off by segment and whatever is left is what moved.
+
+      By SEGMENT, not by character. letter-spacing against letterSpacing share
+      the six characters "letter" and then diverge, and a character diff draws
+      that as "letter[-s/S]pacing" — true, and unreadable. The unit a reader
+      recognises here is the name, so the whole segment lights up.
+
+      Head first, then tail out of what the head left, so a path can never
+      claim the same segment twice ({a.b} against {a.b.b}). Identical paths
+      mark nothing: the table has a column for values that changed while the
+      reference did not.
+    */
+    const changedSegments = (path: string, other?: string) => {
+      if (!other || other === path) return null;
+      const a = path.split('.');
+      const b = other.split('.');
+      let head = 0;
+      while (head < a.length && head < b.length && a[head] === b[head]) head++;
+      let tail = 0;
+      while (tail < a.length - head && tail < b.length - head
+             && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+      /*
+        NOTHING IN COMMON IS NOT A DIFFERENCE WORTH DRAWING. If the two share
+        no head and no tail then every segment is new, and a band over the
+        whole cell says only what the two columns already said. #FFFFFF
+        against #000000 is that case, and so is a shadow rewritten end to end.
+      */
+      if (!head && !tail) return null;
+      const marked: { [i: number]: true } = {};
+      for (let i = head; i < a.length - tail; i++) marked[i] = true;
+      return marked;
+    };
+
+    const pathRuns = (path: string, other?: string) => {
       const parts = path.split('.');
-      const nodes: ReactNode[] = [];
+      const changed = changedSegments(path, other);
+      /*
+        The dots belong to the run they join. One between two changed
+        segments is part of the change (neutral.light moved as a piece, and a
+        gap in the highlight would read as two); one on the boundary of the
+        change is not, because it is the joint that both names still share.
+
+        Runs are coalesced before they are drawn: a <mark> per segment would
+        put its padding between two halves of one word.
+      */
+      const runs: { text: string; changed: boolean }[] = [];
+      const push = (text: string, isChanged: boolean) => {
+        const last = runs[runs.length - 1];
+        if (last && last.changed === isChanged) last.text += text;
+        else runs.push({ text: text, changed: isChanged });
+      };
       parts.forEach((seg, i) => {
-        if (i) { nodes.push(<wbr key={'w' + i} />); nodes.push('.'); }
-        nodes.push(seg);
+        const c = !!(changed && changed[i]);
+        if (i) push('.', c && !!(changed && changed[i - 1]));
+        push(seg, c);
       });
+      const nodes: ReactNode[] = runs.map((run, i) => {
+        const kids: ReactNode[] = [];
+        run.text.split('.').forEach((seg, j) => {
+          if (j) { kids.push(<wbr key={'w' + j} />); kids.push('.'); }
+          kids.push(seg);
+        });
+        return run.changed
+          ? <mark className="compare-diff" key={'m' + i}>{kids}</mark>
+          : <span key={'s' + i}>{kids}</span>;
+      });
+      return { nodes: nodes, diffed: !!changed };
+    };
+
+    const pathCell = (path: string, type?: string, other?: string) => {
+      const run = pathRuns(path, other);
       const icon = type ? TYPE_ICON[type] : undefined;
       return (
         <span className="compare-token" title={type ? path + '  (' + type + ')' : path}>
           {/* Decorative: the type is already the table's own heading, so a
               screen reader that announced it per row would say it 40 times. */}
           {icon && <span className="compare-token-icon" aria-hidden="true">{icon(13)}</span>}
-          <span className="compare-cell-path">{nodes}</span>
+          <span className={'compare-cell-path' + (run.diffed ? ' is-diffed' : '')}>{run.nodes}</span>
         </span>
       );
     };
@@ -2679,7 +2751,22 @@ const COMPARE_SAMPLE = 40;
           );
         }
       }
-      if (short.length > TAGGABLE) return <span className="compare-cell-text" title={v}>{v}</span>;
+      /*
+        A REFERENCE IS A PATH, wherever it turns up. This is the cell the
+        repointed table is made of — 231 rows of
+        {restrictions.section.background} against
+        {restrictions.white.background} — and the reader's question there is
+        the same one the pattern table answers: which part of it moved. Same
+        marking, same reason.
+      */
+      if (short.length > TAGGABLE) {
+        const run = pathRuns(v, other);
+        return (
+          <span className={'compare-cell-text' + (run.diffed ? ' is-diffed' : '')} title={v}>
+            {run.nodes}
+          </span>
+        );
+      }
       return (
         <span title={v}>
           <Tag
@@ -2770,9 +2857,9 @@ const COMPARE_SAMPLE = 40;
                 { key: 'from',
                   header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
                                  : s.sides.provider === 'github' ? IconGithub(12) : null, 'Was'),
-                  cell: (x: any) => pathCell(x.from, x.type) },
+                  cell: (x: any) => pathCell(x.from, x.type, x.path) },
                 { key: 'path', header: headWith(IconFigma(12), 'Now'),
-                  cell: (x: any) => pathCell(x.path, x.type) },
+                  cell: (x: any) => pathCell(x.path, x.type, x.from) },
               ]}
               rows={rows.slice(0, COMPARE_SAMPLE)}
               rowKey={(x: any) => x.path}
@@ -2836,13 +2923,13 @@ const COMPARE_SAMPLE = 40;
                 { key: 'count', header: 'Tokens', width: '58px',
                   cell: (x: any) => <span className="compare-pattern-count">{x.count.toLocaleString()}</span> },
                 { key: 'figma', header: headWith(IconFigma(12), 'Was'),
-                  cell: (x: any) => pathCell(String(x.figma), x.type) },
+                  cell: (x: any) => pathCell(String(x.figma), x.type, String(x.repo)) },
                 { key: 'repo',
                   header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
                                  : s.sides.provider === 'github' ? IconGithub(12) : null, 'Now'),
                   cell: (x: any) => (
                     <span className="compare-pattern-to">
-                      {pathCell(String(x.repo), x.type)}
+                      {pathCell(String(x.repo), x.type, String(x.figma))}
                       {/*
                         THE CAUSE, ON THE LINE THAT SHOWS IT. Both ends point at
                         names that are one word spelled two ways, which is not a
@@ -2971,13 +3058,13 @@ const COMPARE_SAMPLE = 40;
               columns={[
                 { key: 'was',
                   header: headWith(IconFigma(12), 'Was'),
-                  cell: (x: any) => pathCell(x.was) },
+                  cell: (x: any) => pathCell(x.was, undefined, x.now) },
                 { key: 'now',
                   header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)
                                  : s.sides.provider === 'github' ? IconGithub(12) : null, 'Now'),
                   cell: (x: any) => (
                     <span className="compare-pattern-to">
-                      {pathCell(x.now)}
+                      {pathCell(x.now, undefined, x.was)}
                       {x.note && <span className="compare-pattern-why">{x.note}</span>}
                     </span>
                   ) },

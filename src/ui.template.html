@@ -1468,6 +1468,40 @@
          here would override them and go back to breaking mid-segment. */
       overflow-wrap: break-word;
     }
+    /*
+      THE PIECE THAT CHANGED, AND THE PIECES THAT DID NOT.
+
+      Two paths in one row differ by a segment or two; the rest is there to
+      say WHERE, not WHAT. So the highlight does both halves of the job — the
+      changed run comes forward, the shared run goes back — because lighting
+      one up without quieting the other still leaves forty characters of
+      matched text at full strength competing with it.
+
+      A band rather than a colour: Was and Now are two sides of one fact, not
+      a good one and a bad one, and colouring them would invite a reading of
+      which side is wrong. Grey at 26% because it has to work on a card that
+      is near-black under Figma's dark theme and near-white under its light
+      one, and a neutral over either is the same relative step. color-mix
+      picks up the kit's own text colour where the engine has it.
+    */
+    .compare-cell-path.is-diffed,
+    .compare-cell-text.is-diffed { opacity: 1; }
+    .compare-cell-path.is-diffed > span,
+    .compare-cell-text.is-diffed > span { opacity: 0.5; }
+    .compare-diff {
+      background: rgba(128, 128, 128, 0.26);
+      background: color-mix(in srgb, currentColor 22%, transparent);
+      color: inherit;
+      border-radius: 3px;
+      padding: 0 1px;
+      font-weight: 600;
+      /* A path wraps mid-highlight in a 117px column, and the default `slice`
+         leaves the second fragment with two square corners and no padding —
+         it reads as a different, broken thing rather than the rest of the
+         same one. `clone` gives each fragment the whole box. */
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
+    }
     /* A value too long to be a pill — a reference, mostly. Same treatment as
        the path, one step quieter. */
     .compare-cell-text {

@@ -1468,6 +1468,40 @@
          here would override them and go back to breaking mid-segment. */
       overflow-wrap: break-word;
     }
+    /*
+      THE PIECE THAT CHANGED, AND THE PIECES THAT DID NOT.
+
+      Two paths in one row differ by a segment or two; the rest is there to
+      say WHERE, not WHAT. So the highlight does both halves of the job — the
+      changed run comes forward, the shared run goes back — because lighting
+      one up without quieting the other still leaves forty characters of
+      matched text at full strength competing with it.
+
+      A band rather than a colour: Was and Now are two sides of one fact, not
+      a good one and a bad one, and colouring them would invite a reading of
+      which side is wrong. Grey at 26% because it has to work on a card that
+      is near-black under Figma's dark theme and near-white under its light
+      one, and a neutral over either is the same relative step. color-mix
+      picks up the kit's own text colour where the engine has it.
+    */
+    .compare-cell-path.is-diffed,
+    .compare-cell-text.is-diffed { opacity: 1; }
+    .compare-cell-path.is-diffed > span,
+    .compare-cell-text.is-diffed > span { opacity: 0.5; }
+    .compare-diff {
+      background: rgba(128, 128, 128, 0.26);
+      background: color-mix(in srgb, currentColor 22%, transparent);
+      color: inherit;
+      border-radius: 3px;
+      padding: 0 1px;
+      font-weight: 600;
+      /* A path wraps mid-highlight in a 117px column, and the default `slice`
+         leaves the second fragment with two square corners and no padding —
+         it reads as a different, broken thing rather than the rest of the
+         same one. `clone` gives each fragment the whole box. */
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
+    }
     /* A value too long to be a pill — a reference, mostly. Same treatment as
        the path, one step quieter. */
     .compare-cell-text {
@@ -51152,20 +51186,52 @@ html[data-theme=dark] {
         const m = /hex:(#[0-9a-f]{3,8})/i.exec(v) || /^(#[0-9a-f]{3,8})$/i.exec(v);
         return m ? m[1] : null;
       };
-      const pathCell = (path, type) => {
+      const changedSegments = (path, other) => {
+        if (!other || other === path) return null;
+        const a = path.split(".");
+        const b = other.split(".");
+        let head = 0;
+        while (head < a.length && head < b.length && a[head] === b[head]) head++;
+        let tail = 0;
+        while (tail < a.length - head && tail < b.length - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+        if (!head && !tail) return null;
+        const marked = {};
+        for (let i = head; i < a.length - tail; i++) marked[i] = true;
+        return marked;
+      };
+      const pathRuns = (path, other) => {
         const parts = path.split(".");
-        const nodes = [];
+        const changed = changedSegments(path, other);
+        const runs = [];
+        const push = (text, isChanged) => {
+          const last = runs[runs.length - 1];
+          if (last && last.changed === isChanged) last.text += text;
+          else runs.push({ text, changed: isChanged });
+        };
         parts.forEach((seg, i) => {
-          if (i) {
-            nodes.push(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)("wbr", {}, "w" + i));
-            nodes.push(".");
-          }
-          nodes.push(seg);
+          const c = !!(changed && changed[i]);
+          if (i) push(".", c && !!(changed && changed[i - 1]));
+          push(seg, c);
         });
+        const nodes = runs.map((run, i) => {
+          const kids = [];
+          run.text.split(".").forEach((seg, j) => {
+            if (j) {
+              kids.push(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)("wbr", {}, "w" + j));
+              kids.push(".");
+            }
+            kids.push(seg);
+          });
+          return run.changed ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("mark", { className: "compare-diff", children: kids }, "m" + i) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { children: kids }, "s" + i);
+        });
+        return { nodes, diffed: !!changed };
+      };
+      const pathCell = (path, type, other) => {
+        const run = pathRuns(path, other);
         const icon2 = type ? TYPE_ICON[type] : void 0;
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-token", title: type ? path + "  (" + type + ")" : path, children: [
           icon2 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-token-icon", "aria-hidden": "true", children: icon2(13) }),
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: nodes })
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path" + (run.diffed ? " is-diffed" : ""), children: run.nodes })
         ] });
       };
       const headWith = (icon2, label) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-col-head", children: [
@@ -51223,7 +51289,10 @@ html[data-theme=dark] {
             ] });
           }
         }
-        if (short.length > TAGGABLE) return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-text", title: v, children: v });
+        if (short.length > TAGGABLE) {
+          const run = pathRuns(v, other);
+          return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-text" + (run.diffed ? " is-diffed" : ""), title: v, children: run.nodes });
+        }
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { title: v, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
           Tag,
           {
@@ -51268,12 +51337,12 @@ html[data-theme=dark] {
                 {
                   key: "from",
                   header: headWith(s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null, "Was"),
-                  cell: (x) => pathCell(x.from, x.type)
+                  cell: (x) => pathCell(x.from, x.type, x.path)
                 },
                 {
                   key: "path",
                   header: headWith(IconFigma(12), "Now"),
-                  cell: (x) => pathCell(x.path, x.type)
+                  cell: (x) => pathCell(x.path, x.type, x.from)
                 }
               ],
               rows: rows.slice(0, COMPARE_SAMPLE),
@@ -51322,13 +51391,13 @@ html[data-theme=dark] {
                 {
                   key: "figma",
                   header: headWith(IconFigma(12), "Was"),
-                  cell: (x) => pathCell(String(x.figma), x.type)
+                  cell: (x) => pathCell(String(x.figma), x.type, String(x.repo))
                 },
                 {
                   key: "repo",
                   header: headWith(s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null, "Now"),
                   cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-pattern-to", children: [
-                    pathCell(String(x.repo), x.type),
+                    pathCell(String(x.repo), x.type, String(x.figma)),
                     x.sameNameDifferentSpelling && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "one name, spelled two ways" })
                   ] })
                 }
@@ -51427,13 +51496,13 @@ html[data-theme=dark] {
                 {
                   key: "was",
                   header: headWith(IconFigma(12), "Was"),
-                  cell: (x) => pathCell(x.was)
+                  cell: (x) => pathCell(x.was, void 0, x.now)
                 },
                 {
                   key: "now",
                   header: headWith(s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null, "Now"),
                   cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-pattern-to", children: [
-                    pathCell(x.now),
+                    pathCell(x.now, void 0, x.was),
                     x.note && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: x.note })
                   ] })
                 }
@@ -57213,7 +57282,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '2c8e1e5 14:43:26';
+    var CLOSURE_BUILD = 'e309d18 14:54:58';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
