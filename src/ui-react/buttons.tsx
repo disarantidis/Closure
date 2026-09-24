@@ -2924,6 +2924,31 @@ const SPELLING_NAMES = 6;
       );
     };
 
+    /*
+      THE SECOND TIME A VALUE IS THE FIRST TIME, SAID AGAIN.
+
+      A hundred typography tokens that followed one font swap print
+      {…bull-text} against {…teleneo-var} on every line. The value columns
+      stop being columns and become a wall: forty rows where the only thing
+      that varies is the token that followed, and a reader scanning for where
+      the change is has to compare each line against the one above it to
+      discover that it never does.
+
+      So a pair repeated from the row above is drawn as the mark that has
+      meant exactly this in printed tables for centuries. It says "the same"
+      in one character, and the moment it stops appearing is the moment
+      something else began — which is the thing worth seeing, and was
+      invisible while every row shouted.
+
+      The full value stays on the title, and a screen reader is given the
+      words rather than the glyph.
+    */
+    const ditto = (v: string) => (
+      <span className="compare-ditto" title={v} aria-label={'same as above: ' + v}>
+        <span aria-hidden="true">{'\u3003'}</span>
+      </span>
+    );
+
     /* A leaf list, capped. The count in the heading is the REAL one, not the
        length of what is shown — a heading that said 40 when there were 13,137
        would be the page quietly lying about the size of the difference. */
@@ -3464,7 +3489,7 @@ const SPELLING_NAMES = 6;
              side that could have pointed and did not. */
           cell: (x: any) => (
             <>
-              {valueCell(x.figma, x.repo)}
+              {x._repeat ? ditto(String(x.figma)) : valueCell(x.figma, x.repo)}
               {flagOf && x.unboundSide === 'figma' ? flagOf(x) : null}
             </>
           ),
@@ -3475,7 +3500,7 @@ const SPELLING_NAMES = 6;
           width: w,
           cell: (x: any) => (
             <>
-              {valueCell(x.repo, x.figma)}
+              {x._repeat ? ditto(String(x.repo)) : valueCell(x.repo, x.figma)}
               {flagOf && x.unboundSide === 'repo' ? flagOf(x) : null}
             </>
           ),
@@ -3498,6 +3523,18 @@ const SPELLING_NAMES = 6;
           cell: (x: any) => valueCell(x.value),
         });
       }
+      /* Marked on a copy, and only on the rows that are drawn: the row after
+         the cap is never compared against one nobody sees. A one-sided table
+         is left alone — two colours that happen to match are a coincidence,
+         not a repetition. */
+      let last: string | null = null;
+      const shown = rows.slice(0, COMPARE_SAMPLE).map((x: any) => {
+        if (!twoSided) return x;
+        const key = String(x.figma) + '\u241f' + String(x.repo);
+        const repeat = key === last;
+        last = key;
+        return repeat ? { ...x, _repeat: true } : x;
+      });
       return (
         <div className="json-download-card" data-level={4} key={title}>
           <div className="json-download-header">
@@ -3513,7 +3550,7 @@ const SPELLING_NAMES = 6;
               size="small"
               rules
               columns={columns}
-              rows={rows.slice(0, COMPARE_SAMPLE)}
+              rows={shown}
               rowKey={(x: any) => x.path}
             />
           </div>
