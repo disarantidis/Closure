@@ -1370,6 +1370,24 @@ function compare(figmaDoc, repoDoc) {
       var c = e.used[side];
       return Object.keys(c).some(function (n) { return c[n] > 0; });
     });
+    /*
+      AND WHETHER THE TWO FILES SAY THE SAME THING ABOUT IT.
+
+      `font-family` live and `fontFamilies` dead, the same counts and the same
+      tokens under each, in both documents: a real defect and not a difference
+      between them. Everything a side is reported by is compared — which names
+      it holds, what points at each, and what the two spellings hold — because
+      that is exactly what a reader sees, and two columns printing the same
+      thing on a page where every other card is a diff reads as a change
+      nobody can find.
+
+      Compared as written rather than field by field: each side's shape is
+      built by walking that side's own name list, so equal inputs give equal
+      key order and the strings can be compared directly.
+    */
+    e.sameInBoth =
+      JSON.stringify([e.has.figma, e.used.figma, e.shape.figma]) ===
+      JSON.stringify([e.has.repo, e.used.repo, e.shape.repo]);
   });
   /*
     THE LIVE ONES FIRST, AND THE WORST OF THOSE AT THE TOP.

@@ -3593,6 +3593,30 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
            'font-family,line-height,dead-one',
          JSON.stringify(ranked.duplicateNames.map((e) => [e.names[0], e.consumedDiffers, e.live])));
 
+      /*
+        AND WHETHER THE TWO FILES SAY THE SAME THING ABOUT IT. A pair both
+        documents hold identically, use identically and fill identically is a
+        defect inside each and not a difference between them — the card that
+        draws two columns has nothing to draw.
+      */
+      const twinned = { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') } },
+                        sem: { t: { a: tok('{font-family.var}') } } };
+      ok('naming: a pair both files hold, use and fill the same way is marked as no difference',
+         JD.compare(twinned, twinned).duplicateNames[0].sameInBoth === true,
+         JSON.stringify(JD.compare(twinned, twinned).duplicateNames[0]));
+      ok('naming: and one the two files point at differently is not',
+         relative.duplicateNames[0].sameInBoth === false,
+         JSON.stringify(relative.duplicateNames[0].used));
+      /* Same names, same consumers, different contents on one side only. */
+      const lopsidedValues = JD.compare(
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('B') } },
+          sem: { t: { a: tok('{font-family.var}') } } },
+        { d: { 'font-family': { var: tok('A') }, fontFamilies: { var: tok('A') } },
+          sem: { t: { a: tok('{font-family.var}') } } });
+      ok('naming: nor is one the two files fill differently',
+         lopsidedValues.duplicateNames[0].sameInBoth === false,
+         JSON.stringify(lopsidedValues.duplicateNames[0].shape));
+
       const coincident = { d: { 'letter-spacing': { none: tok(0) },
                                 'paragraph-spacing': { none: tok(0) } } };
       ok('naming: two real concepts that happen to hold the same token are not a duplicate',

@@ -51561,7 +51561,7 @@ html[data-theme=dark] {
         ] });
       };
       const spellings = (all) => {
-        const rows = all.filter((x) => x.live);
+        const rows = all.filter((x) => x.live && !x.sameInBoth);
         if (!rows.length) return null;
         const title = "Names \u2014 one word, spelled two ways";
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
@@ -57388,6 +57388,24 @@ function compare(figmaDoc, repoDoc) {
       var c = e.used[side];
       return Object.keys(c).some(function (n) { return c[n] > 0; });
     });
+    /*
+      AND WHETHER THE TWO FILES SAY THE SAME THING ABOUT IT.
+
+      `font-family` live and `fontFamilies` dead, the same counts and the same
+      tokens under each, in both documents: a real defect and not a difference
+      between them. Everything a side is reported by is compared — which names
+      it holds, what points at each, and what the two spellings hold — because
+      that is exactly what a reader sees, and two columns printing the same
+      thing on a page where every other card is a diff reads as a change
+      nobody can find.
+
+      Compared as written rather than field by field: each side's shape is
+      built by walking that side's own name list, so equal inputs give equal
+      key order and the strings can be compared directly.
+    */
+    e.sameInBoth =
+      JSON.stringify([e.has.figma, e.used.figma, e.shape.figma]) ===
+      JSON.stringify([e.has.repo, e.used.repo, e.shape.repo]);
   });
   /*
     THE LIVE ONES FIRST, AND THE WORST OF THOSE AT THE TOP.
@@ -57699,7 +57717,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '2510f26 16:45:37';
+    var CLOSURE_BUILD = '361de56 17:17:04';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

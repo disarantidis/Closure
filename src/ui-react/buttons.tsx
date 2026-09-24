@@ -3272,8 +3272,17 @@ const SPELLING_NAMES = 6;
 
         They are still on report.duplicateNames for the clipboard; what goes
         is their claim on the page.
+
+        AND ONLY THE ONES THE TWO FILES DISAGREE ABOUT.
+
+        `font-family` live and `fontFamilies` dead, identically, in both
+        documents is a real defect and not a difference between them — and on
+        a page where every other card is a diff, two columns printing the same
+        thing read as a change the reader then hunts for. The card keeps what
+        it can explain: a pair the two files hold differently, use
+        differently, or fill differently.
       */
-      const rows = all.filter((x: any) => x.live);
+      const rows = all.filter((x: any) => x.live && !x.sameInBoth);
       if (!rows.length) return null;
       const title = 'Names \u2014 one word, spelled two ways';
       return (
