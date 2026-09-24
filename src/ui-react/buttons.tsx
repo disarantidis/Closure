@@ -2707,6 +2707,69 @@ const COMPARE_SAMPLE = 40;
     };
 
     const TAGGABLE = 22;
+
+    /*
+      THE FIRST COLUMN NAMES THE TOKEN; THESE TWO SAY WHAT MOVED.
+
+      A repointed row read
+        tokens.c0 | {core-colours.grey.300} | {core-colours.neutral.light.300}
+      where the only news is grey against neutral.light. Everything else is
+      the same on both sides, printed twice, wrapped over three lines each,
+      and taking the width away from the column that actually identifies the
+      row. So the shared head and tail are elided and only the part that
+      differs is printed.
+
+      THE ELLIPSES ARE NOT DECORATION. Without them the cell claims the value
+      IS {grey}, which is false — it is a fragment, and the braces plus the
+      dots that survive are what say so. The whole value stays on the title
+      for anyone who wants it, and Copy all has every one in full.
+
+      Only for two references that share something. A literal, a composite
+      (handled above, by sub-value), or two paths with nothing in common all
+      fall through to the full value, because there is no shared part to drop
+      and eliding would leave nothing.
+    */
+    const compactRef = (v: string, other?: string) => {
+      if (!other) return null;
+      if (v.charAt(0) !== '{' || v.charAt(v.length - 1) !== '}') return null;
+      if (other.charAt(0) !== '{' || other.charAt(other.length - 1) !== '}') return null;
+      const a = v.slice(1, -1);
+      const b = other.slice(1, -1);
+      if (a.indexOf(':') >= 0 || b.indexOf(':') >= 0) return null;
+      const changed = changedSegments(a, b);
+      if (!changed) return null;
+      const idx = Object.keys(changed).map(Number);
+      /* One side simply gained a segment the other never had: nothing of this
+         side's own changed, so there is nothing to show in isolation. */
+      if (!idx.length) return null;
+      const parts = a.split('.');
+      const first = Math.min.apply(null, idx);
+      const last = Math.max.apply(null, idx);
+      const mid = parts.slice(first, last + 1);
+      const open = '{' + (first > 0 ? '\u2026' : '');
+      const close = (last < parts.length - 1 ? '\u2026' : '') + '}';
+      /* The joints of what is left, offered as breaks — the same reason
+         pathCell does it. Without them {…neutral.light…} in a 92px column
+         came out as "{… / neutral.lig / ht…}": three lines, one of them a
+         word cut in half, for seventeen characters. With them it is
+         "{…neutral / .light…}". */
+      const kids: ReactNode[] = [];
+      mid.forEach((seg, i) => {
+        if (i) { kids.push(<wbr key={'w' + i} />); kids.push('.'); }
+        kids.push(seg);
+      });
+      return {
+        text: open + mid.join('.') + close,
+        nodes: (
+          <>
+            <span className="compare-elide">{open}</span>
+            {kids}
+            <span className="compare-elide">{close}</span>
+          </>
+        ),
+      };
+    };
+
     const valueCell = (v: string, other?: string) => {
       const sw = swatchOf(v);
       const short = sw || v;
@@ -2759,6 +2822,12 @@ const COMPARE_SAMPLE = 40;
         the same one the pattern table answers: which part of it moved. Same
         marking, same reason.
       */
+      const brief = compactRef(v, other);
+      if (brief) {
+        return (
+          <span className="compare-cell-text is-diffed is-brief" title={v}>{brief.nodes}</span>
+        );
+      }
       if (short.length > TAGGABLE) {
         const run = pathRuns(v, other);
         return (
@@ -3114,10 +3183,37 @@ const COMPARE_SAMPLE = 40;
           table of pills gets pills' width; a table of structures gets a share.
         */
         const sample = rows.slice(0, COMPARE_SAMPLE);
+        /* What the cell will DRAW, not what the row holds: a repointed value
+           is forty characters of reference that compactRef prints as ten, and
+           measuring the raw string handed the column 36% for a fragment that
+           fits in 92px — width taken straight out of the token path beside
+           it, which is the one that needed it. */
+        const shownLen = (mine: string, theirs: string) => {
+          const brief = compactRef(mine, theirs);
+          return brief ? brief.text.length : (swatchOf(mine) || mine).length;
+        };
         const wide = sample.some((x: any) =>
-          (swatchOf(x.repo) || x.repo).length > TAGGABLE ||
-          (swatchOf(x.figma) || x.figma).length > TAGGABLE);
-        const w = wide ? '36%' : '92px';
+          shownLen(x.repo, x.figma) > TAGGABLE ||
+          shownLen(x.figma, x.repo) > TAGGABLE);
+        /*
+          AND THE EXACT WIDTH FOLLOWS THE LONGEST OF THEM.
+
+          92px was sized for a tagged hex and holds eleven monospace
+          characters, which is under half of {…neutral.dark.200} — the column
+          drew it over three lines with a word cut in half. The cell is 12px
+          ui-monospace at 7.23px a character over 8px of cell padding
+          (measured, not assumed), so this is what the longest value in the
+          sample actually needs.
+
+          Capped at 116 because the width comes out of the token column beside
+          it, and a path that wraps at its own dots is a smaller loss than a
+          value that cannot show itself at all. Floored at 92 so a table of
+          hexes is not narrower than the pills in it.
+        */
+        const longest = sample.reduce((n: number, x: any) =>
+          Math.max(n, shownLen(x.repo, x.figma), shownLen(x.figma, x.repo)), 0);
+        const w = wide ? '36%'
+                : Math.min(116, Math.max(92, Math.round(longest * 7.23 + 12))) + 'px';
         columns.push({
           key: 'repo',
           header: headWith(s.sides.provider === 'gitlab' ? IconGitlab(12)

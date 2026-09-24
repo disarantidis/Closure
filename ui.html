@@ -1486,6 +1486,16 @@
     */
     .compare-cell-path.is-diffed,
     .compare-cell-text.is-diffed { opacity: 1; }
+    /* The braces and the ellipses around an elided reference: scaffolding
+       that says "this is a fragment of a path", drawn at the same strength as
+       any other part of the value that did not change. The rule below is the
+       one that dims them — they are direct span children like the shared runs
+       are, and for the same reason. */
+    .compare-elide { white-space: nowrap; }
+    /* break-word, not anywhere: what is left of the path carries its own
+       <wbr>s and `anywhere` overrides them — the same pairing, and the same
+       reason, as .compare-cell-path. */
+    .compare-cell-text.is-brief { overflow-wrap: break-word; }
     .compare-cell-path.is-diffed > span,
     .compare-cell-text.is-diffed > span { opacity: 0.5; }
     .compare-diff {
@@ -51268,6 +51278,40 @@ html[data-theme=dark] {
         return keys;
       };
       const TAGGABLE = 22;
+      const compactRef = (v, other) => {
+        if (!other) return null;
+        if (v.charAt(0) !== "{" || v.charAt(v.length - 1) !== "}") return null;
+        if (other.charAt(0) !== "{" || other.charAt(other.length - 1) !== "}") return null;
+        const a = v.slice(1, -1);
+        const b = other.slice(1, -1);
+        if (a.indexOf(":") >= 0 || b.indexOf(":") >= 0) return null;
+        const changed = changedSegments(a, b);
+        if (!changed) return null;
+        const idx = Object.keys(changed).map(Number);
+        if (!idx.length) return null;
+        const parts = a.split(".");
+        const first = Math.min.apply(null, idx);
+        const last = Math.max.apply(null, idx);
+        const mid = parts.slice(first, last + 1);
+        const open = "{" + (first > 0 ? "\u2026" : "");
+        const close = (last < parts.length - 1 ? "\u2026" : "") + "}";
+        const kids = [];
+        mid.forEach((seg, i) => {
+          if (i) {
+            kids.push(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)("wbr", {}, "w" + i));
+            kids.push(".");
+          }
+          kids.push(seg);
+        });
+        return {
+          text: open + mid.join(".") + close,
+          nodes: /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-elide", children: open }),
+            kids,
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-elide", children: close })
+          ] })
+        };
+      };
       const valueCell = (v, other) => {
         const sw = swatchOf(v);
         const short = sw || v;
@@ -51288,6 +51332,10 @@ html[data-theme=dark] {
               same > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-sub-same", children: `+${same} unchanged` })
             ] });
           }
+        }
+        const brief = compactRef(v, other);
+        if (brief) {
+          return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-text is-diffed is-brief", title: v, children: brief.nodes });
         }
         if (short.length > TAGGABLE) {
           const run = pathRuns(v, other);
@@ -51524,8 +51572,13 @@ html[data-theme=dark] {
         ];
         if (twoSided) {
           const sample = rows.slice(0, COMPARE_SAMPLE);
-          const wide = sample.some((x) => (swatchOf(x.repo) || x.repo).length > TAGGABLE || (swatchOf(x.figma) || x.figma).length > TAGGABLE);
-          const w = wide ? "36%" : "92px";
+          const shownLen = (mine, theirs) => {
+            const brief = compactRef(mine, theirs);
+            return brief ? brief.text.length : (swatchOf(mine) || mine).length;
+          };
+          const wide = sample.some((x) => shownLen(x.repo, x.figma) > TAGGABLE || shownLen(x.figma, x.repo) > TAGGABLE);
+          const longest = sample.reduce((n, x) => Math.max(n, shownLen(x.repo, x.figma), shownLen(x.figma, x.repo)), 0);
+          const w = wide ? "36%" : Math.min(116, Math.max(92, Math.round(longest * 7.23 + 12))) + "px";
           columns.push({
             key: "repo",
             header: headWith(s.sides.provider === "gitlab" ? IconGitlab(12) : s.sides.provider === "github" ? IconGithub(12) : null, "Repo"),
@@ -57282,7 +57335,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'e309d18 14:54:58';
+    var CLOSURE_BUILD = '44fbccd 15:02:19';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

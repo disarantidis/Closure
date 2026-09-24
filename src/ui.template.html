@@ -1486,6 +1486,16 @@
     */
     .compare-cell-path.is-diffed,
     .compare-cell-text.is-diffed { opacity: 1; }
+    /* The braces and the ellipses around an elided reference: scaffolding
+       that says "this is a fragment of a path", drawn at the same strength as
+       any other part of the value that did not change. The rule below is the
+       one that dims them — they are direct span children like the shared runs
+       are, and for the same reason. */
+    .compare-elide { white-space: nowrap; }
+    /* break-word, not anywhere: what is left of the path carries its own
+       <wbr>s and `anywhere` overrides them — the same pairing, and the same
+       reason, as .compare-cell-path. */
+    .compare-cell-text.is-brief { overflow-wrap: break-word; }
     .compare-cell-path.is-diffed > span,
     .compare-cell-text.is-diffed > span { opacity: 0.5; }
     .compare-diff {
