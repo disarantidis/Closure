@@ -13,7 +13,7 @@ const { buildManifest, bindManifest, bindThemes } = require('../src/import-manif
 const { materialise, fromRawGraph, compare, fingerprint } = require('../src/import-verify.js');
 const { apply, preflight } = require('../src/import-apply.js');
 const { diff, format } = require('../src/import-diff.js');
-const { filter, reduce } = require('../src/import-filter.js');
+const { filter, reduce, classify } = require('../src/import-filter.js');
 
 /* A Figma stand-in with the same surface apply() uses, recording what it was
    told to do. Enough to assert the call sequence and to read the result back
@@ -4120,5 +4120,129 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
     ok('filter: the program keeps the fields that are not ops',
        Object.keys(c.program).every((k) => k === 'ops' || cut.program[k] !== undefined),
        Object.keys(c.program).join(','));
+  }
+}
+
+/* ── scopes, and the chain a write can quietly cut ──────────────────────── */
+{
+  const programOf = (doc) => { const ir = toIR(doc); return compile(ir, derive(ir, {}), {}).program; };
+  const docWith = (program) => { const F = mockFigma(); apply(program, F, {}); return F; };
+  const sets = (...names) => ({ $metadata: { tokenSetOrder: names } });
+
+  /*
+    THE FOUR KINDS OF WRITE, told apart from the diff alone. A value in a mode
+    is a literal or a reference, diff() renders the second as ALIAS:…, and the
+    four combinations are four different acts.
+  */
+  {
+    const before = Object.assign(sets('core', 'sem'), {
+      core: { grey: tok('#cacaca'), blue: tok('#0000ff') },
+      sem: { plain: tok('#111111'), flat: tok('{grey}'), bind: tok('#0000ff'), moved: tok('{grey}') } });
+    const after = Object.assign(sets('core', 'sem'), {
+      core: { grey: tok('#cacaca'), blue: tok('#0000ff') },
+      sem: { plain: tok('#222222'),        // literal -> literal
+             flat: tok('#cacaca'),         // ALIAS   -> literal
+             bind: tok('{blue}'),          // literal -> ALIAS
+             moved: tok('{blue}'),         // ALIAS   -> ALIAS
+             fresh: tok('#333333') } });   // new
+    const F = docWith(programOf(before));
+    const kinds = classify(diff(F.toRawGraph(), programOf(after)));
+    ok('scope: a literal becoming another literal is a value change',
+       kinds.value.length === 1 && /sem\|plain\|/.test(kinds.value[0]), JSON.stringify(kinds));
+    ok('scope: a reference becoming a literal is named apart from it',
+       kinds.flattened.length === 1 && /sem\|flat\|/.test(kinds.flattened[0]), JSON.stringify(kinds));
+    ok('scope: a literal becoming a reference is a binding, not a value change',
+       kinds.bound.length === 1 && /sem\|bind\|/.test(kinds.bound[0]), JSON.stringify(kinds));
+    ok('scope: a reference becoming a different reference is a repoint',
+       kinds.repointed.length === 1 && /sem\|moved\|/.test(kinds.repointed[0]), JSON.stringify(kinds));
+    ok('scope: a value with nothing before it is architecture, not a value',
+       kinds.added.length === 1 && /sem\|fresh\|/.test(kinds.added[0]), JSON.stringify(kinds));
+  }
+
+  /*
+    THE GUARD THE WHOLE THING IS FOR. A reference replaced by a copy of what it
+    resolved to leaves a file that looks right today and has stopped following
+    its own core. Held back unless it is asked for, in every scope, and
+    counted either way.
+  */
+  {
+    const before = Object.assign(sets('core', 'sem'),
+      { core: { grey: tok('#cacaca') }, sem: { bg: tok('{grey}') } });
+    const after = Object.assign(sets('core', 'sem'),
+      { core: { grey: tok('#cacaca') }, sem: { bg: tok('#cacaca') } });
+    const F = docWith(programOf(before));
+    const full = programOf(after);
+
+    const held = reduce(full, F.toRawGraph());
+    ok('chain: a write that would replace a reference with its own value is held back',
+       held.stats.values === 0 && held.stats.heldBack === 1,
+       JSON.stringify(held.stats));
+
+    const asked = reduce(full, F.toRawGraph(), { flatten: true });
+    ok('chain: and it is written when it is asked for, and only then',
+       asked.stats.values === 1 && asked.stats.heldBack === 0,
+       JSON.stringify(asked.stats));
+
+    /* Proved rather than argued: the alias is still an alias afterwards. */
+    const B = docWith(programOf(before));
+    apply(held.program, B, { existing: snapshotOf(B) });
+    const sem = B.collections.find((c) => c.name === 'sem');
+    const bg = sem.vars.find((v) => v.name === 'bg');
+    ok('chain: the token is still bound after the run',
+       Object.values(bg.valuesByMode).every((x) => x && x.type === 'VARIABLE_ALIAS'),
+       JSON.stringify(bg.valuesByMode));
+  }
+
+  /*
+    'values' IS THE SMALLEST THING A SYNC CAN BE: no collection appears, no
+    variable appears, no mode appears, and nothing that is bound comes unbound
+    or gets rebound.
+  */
+  {
+    const before = Object.assign(sets('core', 'sem'),
+      { core: { grey: tok('#cacaca') }, sem: { bg: tok('{grey}'), text: tok('#111111') } });
+    const after = Object.assign(sets('core', 'sem', 'extra'),
+      { core: { grey: tok('#999999') },
+        sem: { bg: tok('{grey}'), text: tok('#222222'), fresh: tok('#333333') },
+        extra: { one: tok('#444444') } });
+    const F = docWith(programOf(before));
+    const full = programOf(after);
+
+    const vals = reduce(full, F.toRawGraph(), { scope: 'values' });
+    const ops = vals.program.ops;
+    ok('scope: values-only writes the literals that moved',
+       vals.stats.values === 2, JSON.stringify(vals.stats));
+    ok('scope: and brings in no collection, variable or mode that was not there',
+       !ops.some((o) => o.op === 'setAlias') &&
+       !ops.some((o) => o.op === 'addMode') &&
+       ops.filter((o) => o.op === 'createVariable').every((o) => o.name !== 'fresh' && o.name !== 'one'),
+       ops.map((o) => o.op + ':' + o.name).join(' '));
+
+    const everything = reduce(full, F.toRawGraph());
+    ok('scope: and the whole file is still the other choice',
+       everything.stats.values > vals.stats.values &&
+       everything.program.ops.some((o) => o.op === 'createVariable' && o.name === 'fresh'),
+       JSON.stringify(everything.stats));
+
+    /* The narrow run leaves the wide one's variables alone rather than
+       half-making them — an import that creates a variable and never fills it
+       is worse than one that does not create it. */
+    const N = docWith(programOf(before));
+    apply(vals.program, N, { existing: snapshotOf(N) });
+    ok('scope: values-only created nothing at all',
+       N.collections.length === 2 &&
+       N.collections.every((c) => c.vars.every((v) => Object.keys(v.valuesByMode).length > 0)),
+       N.collections.map((c) => c.name + ':' + c.vars.map((v) => v.name).join('+')).join(' '));
+  }
+
+  /* Default is every kind but flattening, which is what the button has always
+     meant minus the one act nobody asks for on purpose. */
+  {
+    const before = Object.assign(sets('core'), { core: { a: tok('#000000') } });
+    const after = Object.assign(sets('core'), { core: { a: tok('#ffffff'), b: tok('#111111') } });
+    const F = docWith(programOf(before));
+    const cut = reduce(programOf(after), F.toRawGraph());
+    ok('scope: with no scope asked for, everything the file says still runs',
+       cut.stats.scope === 'all' && cut.stats.values === 2, JSON.stringify(cut.stats));
   }
 }

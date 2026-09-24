@@ -1750,6 +1750,15 @@
     /* The names, wrapping. Fourteen of them read as fourteen things without
        anybody counting, which a comma list cannot do. */
     .import-change-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    /* One line per kind of write: the figure, what it is, and — when the
+       chosen scope excludes it — that it is not in this run. Struck through
+       rather than hidden, because a reader deciding between two scopes needs
+       to see what the narrow one costs. */
+    .import-kinds { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+    .import-kind { display: flex; align-items: baseline; gap: 6px; font-size: 11px; }
+    .import-kind > b { font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+    .import-kind > i { font-style: normal; opacity: 0.55; font-size: 10px; }
+    .import-kind.is-off { opacity: 0.45; }
     .import-changes .import-detail { margin-left: 0; }
 
     /* The file's card, once it has moved inside the repo card. No margin — the
@@ -52285,16 +52294,91 @@ html[data-theme=dark] {
     const container = document.getElementById("import-changes-mount");
     let set = () => {
     };
+    let readScope = () => ({ scope: "all", flatten: false });
     function View() {
       const [d, setD] = (0, import_react16.useState)(null);
+      const [scope, setScope] = (0, import_react16.useState)("all");
+      const [flatten, setFlatten] = (0, import_react16.useState)(false);
       set = setD;
+      readScope = () => ({ scope, flatten });
       if (!d) return null;
       const s = d.summary || {};
       if (s.noop) {
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "import-change-note is-lead", children: "This file already matches the document \u2014 nothing would change." });
       }
       const plural = (n, one, many) => n === 1 ? one : many;
+      const kinds = window.PomImportFilter ? window.PomImportFilter.classify(d) : { value: [], bound: [], repointed: [], flattened: [], added: [] };
+      const willWrite = window.PomImportFilter ? window.PomImportFilter.wantedKeys(d, { scope, flatten }).wanted : null;
+      const changedInRun = willWrite ? (d.changed || []).filter((c) => willWrite[c.key]) : d.changed || [];
+      const variablesInRun = new Set(changedInRun.map((c) => c.key.split("|").slice(0, 2).join("|"))).size;
+      const narrow = scope === "values";
+      const runWrites = willWrite ? Object.keys(willWrite).length : narrow ? kinds.value.length : kinds.value.length + kinds.bound.length + kinds.repointed.length + kinds.added.length;
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-changes", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-group", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-change-heading", children: "How much to take" }),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+            SegmentedControl,
+            {
+              label: "How much of this file to apply",
+              size: "medium",
+              block: true,
+              value: scope,
+              options: [
+                { value: "all", label: "Everything" },
+                { value: "values", label: "Only values" }
+              ],
+              onChange: (v) => setScope(v)
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-change-note", children: narrow ? "Only a literal becoming another literal, in a variable this document already has. Nothing is created, and nothing bound comes unbound." : "Every collection, mode, variable and value this file names." })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-group", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-heading", children: [
+            runWrites.toLocaleString(),
+            " ",
+            plural(runWrites, "write", "writes"),
+            " in this run"
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-kinds", children: [
+            { n: kinds.value.length, label: "a value changing", on: true },
+            { n: kinds.bound.length, label: "bound to a reference", on: !narrow },
+            { n: kinds.repointed.length, label: "pointing somewhere new", on: !narrow },
+            { n: kinds.added.length, label: "created", on: !narrow }
+          ].filter((k) => k.n > 0).map((k) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-kind" + (k.on ? "" : " is-off"), children: [
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("b", { children: k.n.toLocaleString() }),
+            k.label,
+            !k.on && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("i", { children: "not in this run" })
+          ] }, k.label)) })
+        ] }),
+        kinds.flattened.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-group", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-heading is-warn", children: [
+            kinds.flattened.length.toLocaleString(),
+            " would stop following a reference"
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "import-change-note", children: "This file spells out a value where the document points at another variable. Writing it leaves the same colour and breaks the link \u2014 change the core token later and these will not move." }),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+            Checkbox,
+            {
+              label: "Write them anyway",
+              checked: flatten,
+              onChange: (v) => setFlatten(v)
+            }
+          ),
+          !flatten && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-detail", children: [
+            kinds.flattened.slice(0, 4).map((k, i) => {
+              const p = k.split("|");
+              return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { children: [
+                p[0] + " / " + p[1] + " [" + p[2] + "]",
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("br", {})
+              ] }, i);
+            }),
+            kinds.flattened.length > 4 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
+              "\u2026 and ",
+              (kinds.flattened.length - 4).toLocaleString(),
+              " more"
+            ] })
+          ] })
+        ] }),
         s.willCreateCollections > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-group", children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-heading", children: [
             s.willCreateCollections.toLocaleString(),
@@ -52329,28 +52413,28 @@ html[data-theme=dark] {
             " this file does not mention \u2014 left alone, never deleted"
           ] })
         ] }),
-        s.willChangeVariables > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-group", children: [
+        variablesInRun > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-group", children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-heading is-warn", children: [
-            s.willChangeVariables.toLocaleString(),
+            variablesInRun.toLocaleString(),
             " existing ",
-            plural(s.willChangeVariables, "variable", "variables"),
+            plural(variablesInRun, "variable", "variables"),
             " overwritten"
           ] }),
           s.valuesUnchanged > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-change-note", children: [
             s.valuesUnchanged.toLocaleString(),
             " more already hold the same value"
           ] }),
-          (d.changed || []).length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-detail", children: [
-            d.changed.slice(0, 6).map((c, i) => {
+          changedInRun.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "import-detail", children: [
+            changedInRun.slice(0, 6).map((c, i) => {
               const p = c.key.split("|");
               return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { children: [
                 p[0] + " / " + p[1] + " [" + p[2] + "]  " + c.from + " \u2192 " + c.to,
                 /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("br", {})
               ] }, i);
             }),
-            d.changed.length > 6 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
+            changedInRun.length > 6 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
               "\u2026 and ",
-              (d.changed.length - 6).toLocaleString(),
+              (changedInRun.length - 6).toLocaleString(),
               " more"
             ] })
           ] })
@@ -52358,7 +52442,7 @@ html[data-theme=dark] {
       ] });
     }
     if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
-    window.PomImportChanges = { set: (d) => set(d) };
+    window.PomImportChanges = { set: (d) => set(d), scope: () => readScope() };
   })();
   (function mountImportFile() {
     const container = document.getElementById("import-file-item-mount");
@@ -56206,7 +56290,8 @@ function format(report, limit) {
     4. the createCollection for every collection the above mention.
 
   WHAT IT DROPS is every op that would write a value the document already
-  holds, and the scaffolding that exists only for those.
+  holds, the ones this scope is not allowed to write, and the scaffolding that
+  exists only for those.
 
   WHAT IT DOES NOT DO is decide anything. A value diff() did not name is not
   examined here, an op is never rewritten, and the ops that survive keep the
@@ -56230,6 +56315,87 @@ function keyOf(op) {
   return op.collection + '|' + op.name + '|' + op.mode;
 }
 
+var IS_ALIAS = /^ALIAS:/;
+
+/*
+  WHAT KIND OF WRITE EACH DIFFERENCE IS, AND WHICH OF THEM TOUCH THE CHAIN.
+
+  A value in a mode is one of two things: a literal, or a reference to another
+  variable. diff() already renders the second as `ALIAS:collection/name`, so
+  every row it reports can be told apart with nothing else to hand — which
+  matters, because the four combinations are four different acts and only one
+  of them is what anybody means by "change the values".
+
+    value       a literal becomes another literal. This is the colour someone
+                chose being a different colour. Nothing about the shape of the
+                system moves.
+
+    bound       a literal becomes a reference. The repo points where this file
+                spelled it out, so applying it JOINS a token to the chain.
+
+    repointed   a reference becomes a different reference. The token stays
+                bound and follows something else — the shape moving, on
+                purpose.
+
+    flattened   A REFERENCE BECOMES A LITERAL, and this is the one to be
+                careful about. The token still resolves to the same colour
+                today and has stopped following anything: change the core
+                token tomorrow and this one will not move. Nothing on the page
+                looks wrong, which is exactly why it has to be said out loud.
+
+  `added` is a value with nothing before it — a variable or a mode this
+  document has not got. Architecture rather than a value, and it is kept apart
+  for that reason.
+
+  THE CLASSIFICATION IS THE DIFF'S, NOT A SECOND READING OF THE DOCUMENT.
+  Every row here came from the report the person was shown, which is what lets
+  the count under a scope control and the writes a run makes be the same
+  numbers.
+*/
+function classify(report) {
+  var out = { value: [], bound: [], repointed: [], flattened: [], added: [] };
+  ((report && report.added) || []).forEach(function (x) { out.added.push(x.key); });
+  ((report && report.changed) || []).forEach(function (x) {
+    var wasRef = IS_ALIAS.test(String(x.from));
+    var willRef = IS_ALIAS.test(String(x.to));
+    if (wasRef && willRef) out.repointed.push(x.key);
+    else if (wasRef) out.flattened.push(x.key);
+    else if (willRef) out.bound.push(x.key);
+    else out.value.push(x.key);
+  });
+  return out;
+}
+
+/*
+  WHICH OF THOSE A RUN IS ALLOWED TO WRITE.
+
+    'all'      everything the file says, which is what an import has always
+               meant.
+    'values'   only a literal becoming another literal, in a variable this
+               document already has. No collection appears, no variable
+               appears, no mode appears, and nothing that is bound comes
+               unbound or gets rebound. It is the smallest thing a sync can
+               be, and the only one that cannot change the shape of anything.
+
+  FLATTENING IS HELD BACK IN BOTH, unless it is asked for. A run that silently
+  replaces a reference with a copy of what it resolved to leaves a file that
+  looks right and has quietly stopped following its own core — and the count
+  of what was held back is returned, because holding something back without
+  saying so is its own kind of lie.
+*/
+function wantedKeys(report, opts) {
+  var kinds = classify(report);
+  var scope = (opts && opts.scope) || 'all';
+  var take = scope === 'values'
+    ? [kinds.value]
+    : [kinds.value, kinds.bound, kinds.repointed, kinds.added];
+  if (opts && opts.flatten) take.push(kinds.flattened);
+  var wanted = Object.create(null);
+  take.forEach(function (list) { list.forEach(function (k) { wanted[k] = 1; }); });
+  return { wanted: wanted, kinds: kinds, scope: scope,
+           heldBack: (opts && opts.flatten) ? 0 : kinds.flattened.length };
+}
+
 /*
   filter(program, report) -> { program, dropped, kept }
 
@@ -56238,16 +56404,25 @@ function keyOf(op) {
   being made is that the run does what the panel said, and two calls to diff()
   is two chances to differ.
 */
-function filter(program, report) {
+function filter(program, report, opts) {
   var out = { ops: [] };
   var stats = { kept: 0, dropped: 0, values: 0, variables: 0, collections: 0, modes: 0 };
   if (!program || !program.ops) return { program: out, stats: stats };
 
-  /* The keys diff() named. A Set of strings, not of objects, so an op can ask
-     about itself without either side knowing how the other was built. */
-  var wanted = Object.create(null);
-  ((report && report.added) || []).forEach(function (x) { wanted[x.key] = 1; });
-  ((report && report.changed) || []).forEach(function (x) { wanted[x.key] = 1; });
+  /* The keys diff() named, narrowed to the ones this scope may write. Strings,
+     not objects, so an op can ask about itself without either side knowing how
+     the other was built. */
+  var choice = wantedKeys(report, opts);
+  var wanted = choice.wanted;
+  stats.scope = choice.scope;
+  stats.kinds = {
+    value: choice.kinds.value.length,
+    bound: choice.kinds.bound.length,
+    repointed: choice.kinds.repointed.length,
+    flattened: choice.kinds.flattened.length,
+    added: choice.kinds.added.length,
+  };
+  stats.heldBack = choice.heldBack;
 
   /* One pass to learn what is needed, one to emit in the program's own order.
      Learning and emitting in a single pass would drop a createVariable that
@@ -56317,13 +56492,17 @@ function filter(program, report) {
   and wants the short version of the program. Returns the diff too, because
   the panel and the run must be reading the same one.
 */
-function reduce(program, existingRawGraph) {
+function reduce(program, existingRawGraph, opts) {
   var report = diff(existingRawGraph, program);
-  var cut = filter(program, report);
+  var cut = filter(program, report, opts);
   return { program: cut.program, stats: cut.stats, report: report };
 }
 
-  var api = { filter, reduce };
+  /* The same question the run asks, asked by the panel that describes it.
+     Exported so the two cannot drift: a section counting rows the run will not
+     write is the panel disagreeing with itself in front of the person who is
+     about to press the button. */
+  var api = { filter, reduce, classify, wantedKeys };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.PomImportFilter = api;
@@ -58031,7 +58210,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'c69ae9d 18:39:15';
+    var CLOSURE_BUILD = '56201d4 19:20:32';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -59768,9 +59947,13 @@ function format(report, opts) {
       */
       var toRun = importState.compiled.program;
       if (importState.changes && window.PomImportFilter) {
-        var cut = window.PomImportFilter.filter(toRun, importState.changes);
-        console.log('[Import] ' + cut.stats.kept + ' ops to run, ' +
-          cut.stats.dropped + ' dropped as already right');
+        /* The control's own answer, read now rather than remembered: the
+           panel above it is what was agreed to, and the run has to be that. */
+        var want = window.PomImportChanges.scope();
+        var cut = window.PomImportFilter.filter(toRun, importState.changes, want);
+        console.log('[Import] scope ' + cut.stats.scope + ': ' + cut.stats.kept +
+          ' ops to run, ' + cut.stats.dropped + ' dropped' +
+          (cut.stats.heldBack ? ', ' + cut.stats.heldBack + ' held back to keep a reference' : ''));
         toRun = cut.program;
       }
       parent.postMessage({ pluginMessage: {

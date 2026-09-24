@@ -616,7 +616,12 @@ declare global {
     PomImportApplyBtn: any;
     /* What the import would do, drawn as headings and tags rather than as a
        column of counts — see mountImportChanges. */
-    PomImportChanges: { set: (d: any) => void };
+    PomImportChanges: {
+      set: (d: any) => void;
+      /* The scope control's answer, read at the moment the run is sent. */
+      scope: () => { scope: 'all' | 'values'; flatten: boolean };
+    };
+    PomImportFilter?: any;
     PomImportLevels: {
       set: (candidates: any[], applied: Record<string, Record<string, string>>, collections?: any[],
             groupCandidates?: any[], groupOrder?: string[]) => void;
@@ -4470,17 +4475,142 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
 (function mountImportChanges() {
   const container = document.getElementById('import-changes-mount');
   let set: (d: any) => void = () => {};
+  /* What the run must ask for, read out of the control the person just used —
+     so the scope the panel describes and the scope the run takes are the same
+     answer rather than two copies of it. */
+  let readScope: () => { scope: 'all' | 'values'; flatten: boolean } =
+    () => ({ scope: 'all', flatten: false });
   function View() {
     const [d, setD] = useState<any>(null);
+    const [scope, setScope] = useState<'all' | 'values'>('all');
+    const [flatten, setFlatten] = useState(false);
     set = setD;
+    readScope = () => ({ scope, flatten });
     if (!d) return null;
     const s = d.summary || {};
     if (s.noop) {
       return <p className="import-change-note is-lead">This file already matches the document — nothing would change.</p>;
     }
     const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+    /*
+      THE FOUR KINDS OF WRITE, FROM THE SAME REPORT THIS PANEL IS ALREADY
+      SHOWING. Counting them here rather than taking them from the run is the
+      point: what the control says will happen and what the run does are one
+      calculation, not two that agree most of the time.
+    */
+    const kinds = window.PomImportFilter
+      ? window.PomImportFilter.classify(d)
+      : { value: [], bound: [], repointed: [], flattened: [], added: [] };
+    /*
+      AND WHICH OF THEM THIS SCOPE WILL ACTUALLY WRITE, asked the same way the
+      run asks it. Every section below counts what will happen, not what the
+      file contains — a panel saying "2 overwritten" above a run that writes
+      one is the panel disagreeing with itself in front of the person about to
+      agree to it.
+    */
+    const willWrite = window.PomImportFilter
+      ? window.PomImportFilter.wantedKeys(d, { scope, flatten }).wanted
+      : null;
+    const changedInRun = willWrite
+      ? (d.changed || []).filter((c: any) => willWrite[c.key])
+      : (d.changed || []);
+    const variablesInRun = new Set(changedInRun.map((c: any) => c.key.split('|').slice(0, 2).join('|'))).size;
+    const narrow = scope === 'values';
+    /* Counted from the same set the run will write, so the figure over the
+       list and the ops that leave the page are one number. The flattening
+       ones are in it only when they have been asked for, and they keep their
+       own section either way — a kind that needs a paragraph to explain does
+       not belong in a list of one-line labels. */
+    const runWrites = willWrite ? Object.keys(willWrite).length
+      : (narrow ? kinds.value.length
+                : kinds.value.length + kinds.bound.length + kinds.repointed.length + kinds.added.length);
     return (
       <span className="import-changes">
+        {/*
+          HOW MUCH TO TAKE, before what it would do — the reader is choosing
+          the size of the act, and the list underneath is what that choice
+          produces. Two options because there are two honest ones: the file as
+          it stands, or the part of it that cannot change the shape of
+          anything.
+        */}
+        <span className="import-change-group">
+          <span className="import-change-heading">How much to take</span>
+          <SegmentedControl
+            label="How much of this file to apply"
+            size="medium"
+            block
+            value={scope}
+            options={[
+              { value: 'all', label: 'Everything' },
+              { value: 'values', label: 'Only values' },
+            ]}
+            onChange={(v: string) => setScope(v as 'all' | 'values')}
+          />
+          <span className="import-change-note">
+            {narrow
+              ? 'Only a literal becoming another literal, in a variable this document already has. Nothing is created, and nothing bound comes unbound.'
+              : 'Every collection, mode, variable and value this file names.'}
+          </span>
+        </span>
+
+        {/*
+          WHAT EACH KIND OF WRITE ACTUALLY IS. The counts above this said how
+          many; these say what sort, which is the difference between a colour
+          changing and a token stopping following its core.
+        */}
+        <span className="import-change-group">
+          <span className="import-change-heading">
+            {runWrites.toLocaleString()} {plural(runWrites, 'write', 'writes')} in this run
+          </span>
+          <span className="import-kinds">
+            {[
+              { n: kinds.value.length, label: 'a value changing', on: true },
+              { n: kinds.bound.length, label: 'bound to a reference', on: !narrow },
+              { n: kinds.repointed.length, label: 'pointing somewhere new', on: !narrow },
+              { n: kinds.added.length, label: 'created', on: !narrow },
+            ].filter((k) => k.n > 0).map((k) => (
+              <span className={'import-kind' + (k.on ? '' : ' is-off')} key={k.label}>
+                <b>{k.n.toLocaleString()}</b>{k.label}
+                {!k.on && <i>not in this run</i>}
+              </span>
+            ))}
+          </span>
+        </span>
+
+        {/*
+          THE ONE THAT CANNOT BE LEFT TO A COUNT.
+
+          A reference replaced by a copy of what it resolved to leaves a token
+          that is the right colour today and has stopped following its core.
+          Nothing on the page looks wrong afterwards, which is exactly why it
+          is held back by default and named rather than tallied.
+        */}
+        {kinds.flattened.length > 0 && (
+          <span className="import-change-group">
+            <span className="import-change-heading is-warn">
+              {kinds.flattened.length.toLocaleString()} would stop following a reference
+            </span>
+            <span className="import-change-note">
+              This file spells out a value where the document points at another variable. Writing
+              it leaves the same colour and breaks the link — change the core token later and these
+              will not move.
+            </span>
+            <Checkbox
+              label={'Write them anyway'}
+              checked={flatten}
+              onChange={(v: boolean) => setFlatten(v)}
+            />
+            {!flatten && (
+              <span className="import-detail">
+                {kinds.flattened.slice(0, 4).map((k: string, i: number) => {
+                  const p = k.split('|');
+                  return <span key={i}>{p[0] + ' / ' + p[1] + ' [' + p[2] + ']'}<br /></span>;
+                })}
+                {kinds.flattened.length > 4 && <>… and {(kinds.flattened.length - 4).toLocaleString()} more</>}
+              </span>
+            )}
+          </span>
+        )}
         {s.willCreateCollections > 0 && (
           <span className="import-change-group">
             <span className="import-change-heading">
@@ -4523,25 +4653,27 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
           </span>
         )}
 
-        {s.willChangeVariables > 0 && (
+        {variablesInRun > 0 && (
           <span className="import-change-group">
             {/* The one heading that is not an addition, so it is marked as
-                such rather than sitting in the same voice as the rest. */}
+                such rather than sitting in the same voice as the rest. Counted
+                from what THIS run will write rather than from the file: a
+                scope that holds something back has not overwritten it. */}
             <span className="import-change-heading is-warn">
-              {s.willChangeVariables.toLocaleString()} existing {plural(s.willChangeVariables, 'variable', 'variables')} overwritten
+              {variablesInRun.toLocaleString()} existing {plural(variablesInRun, 'variable', 'variables')} overwritten
             </span>
             {s.valuesUnchanged > 0 && (
               <span className="import-change-note">
                 {s.valuesUnchanged.toLocaleString()} more already hold the same value
               </span>
             )}
-            {(d.changed || []).length > 0 && (
+            {changedInRun.length > 0 && (
               <span className="import-detail">
-                {d.changed.slice(0, 6).map((c: any, i: number) => {
+                {changedInRun.slice(0, 6).map((c: any, i: number) => {
                   const p = c.key.split('|');
                   return <span key={i}>{p[0] + ' / ' + p[1] + ' [' + p[2] + ']  ' + c.from + ' \u2192 ' + c.to}<br /></span>;
                 })}
-                {d.changed.length > 6 && <>… and {(d.changed.length - 6).toLocaleString()} more</>}
+                {changedInRun.length > 6 && <>… and {(changedInRun.length - 6).toLocaleString()} more</>}
               </span>
             )}
           </span>
@@ -4550,7 +4682,7 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
     );
   }
   if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
-  window.PomImportChanges = { set: (d) => set(d) };
+  window.PomImportChanges = { set: (d) => set(d), scope: () => readScope() };
 })();
 
 /* ── the file that was chosen ───────────────────────────────────────────────

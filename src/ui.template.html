@@ -1750,6 +1750,15 @@
     /* The names, wrapping. Fourteen of them read as fourteen things without
        anybody counting, which a comma list cannot do. */
     .import-change-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+    /* One line per kind of write: the figure, what it is, and — when the
+       chosen scope excludes it — that it is not in this run. Struck through
+       rather than hidden, because a reader deciding between two scopes needs
+       to see what the narrow one costs. */
+    .import-kinds { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+    .import-kind { display: flex; align-items: baseline; gap: 6px; font-size: 11px; }
+    .import-kind > b { font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+    .import-kind > i { font-style: normal; opacity: 0.55; font-size: 10px; }
+    .import-kind.is-off { opacity: 0.45; }
     .import-changes .import-detail { margin-left: 0; }
 
     /* The file's card, once it has moved inside the repo card. No margin — the
@@ -5728,9 +5737,13 @@
       */
       var toRun = importState.compiled.program;
       if (importState.changes && window.PomImportFilter) {
-        var cut = window.PomImportFilter.filter(toRun, importState.changes);
-        console.log('[Import] ' + cut.stats.kept + ' ops to run, ' +
-          cut.stats.dropped + ' dropped as already right');
+        /* The control's own answer, read now rather than remembered: the
+           panel above it is what was agreed to, and the run has to be that. */
+        var want = window.PomImportChanges.scope();
+        var cut = window.PomImportFilter.filter(toRun, importState.changes, want);
+        console.log('[Import] scope ' + cut.stats.scope + ': ' + cut.stats.kept +
+          ' ops to run, ' + cut.stats.dropped + ' dropped' +
+          (cut.stats.heldBack ? ', ' + cut.stats.heldBack + ' held back to keep a reference' : ''));
         toRun = cut.program;
       }
       parent.postMessage({ pluginMessage: {
