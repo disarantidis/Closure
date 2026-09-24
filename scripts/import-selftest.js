@@ -3378,6 +3378,28 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          lop.has.repo.join(',') === 'fontFamilies',
          JSON.stringify(lop));
       /*
+        WHICH TOKENS INSIDE THEM DISAGREE — the evidence under the flag. A key
+        one spelling has and the other does not counts as a difference, and is
+        the commoner of the two shapes.
+      */
+      const stepped = JD.compare(
+        { d: { 'font-size': { sm: tok(12), md: tok(14) },
+               fontSizes: { sm: tok(12), md: tok(16), lg: tok(20) } } },
+        { d: { 'font-size': { sm: tok(12), md: tok(14) },
+               fontSizes: { sm: tok(12), md: tok(16), lg: tok(20) } } }).duplicateNames[0];
+      ok('naming: the tokens the two spellings disagree about are named, and the shared one is not',
+         stepped.diffKeys.figma.join(',') === 'lg,md',
+         JSON.stringify(stepped.diffKeys));
+      ok('naming: and each spelling keeps its own value for them',
+         stepped.values.figma['font-size'].md === '14' &&
+         stepped.values.figma.fontSizes.md === '16' &&
+         stepped.values.figma['font-size'].lg === undefined,
+         JSON.stringify(stepped.values.figma));
+      ok('naming: two spellings that agree throughout name nothing',
+         JD.compare(twoNames, twoNames).duplicateNames[0].diffKeys.figma.length === 0,
+         JSON.stringify(JD.compare(twoNames, twoNames).duplicateNames[0].diffKeys));
+
+      /*
         AND WHAT POINTS AT EACH SPELLING, which is what decides whether the
         pair matters. `use` builds a semantic group whose tokens all reference
         one core group, so the counts below are the number of consumers.

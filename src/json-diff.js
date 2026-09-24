@@ -548,21 +548,27 @@ function findDuplicateNames(doc, side) {
     /* Leaf groups only — a group whose children are all tokens. Anything
        deeper is structure, and structure sharing a shape is not a duplicate
        name, it is a system with a shape. */
-    var sigOf = new Map();
+    var sigOf = new Map(), valuesOf = new Map();
     Object.keys(root).forEach(function (groupName) {
       if (groupName.charAt(0) === '$') return;
       var group = root[groupName];
       if (!group || typeof group !== 'object' || isToken(group)) return;
-      var parts = [];
+      var parts = [], vals = {};
       var keys = Object.keys(group);
       for (var i = 0; i < keys.length; i++) {
         if (keys[i].charAt(0) === '$') continue;
         var child = group[keys[i]];
         if (!isToken(child)) return;                   // not a leaf group
-        parts.push(keys[i] + '=' + renderValue(tokenValue(child)));
+        var rendered = renderValue(tokenValue(child));
+        parts.push(keys[i] + '=' + rendered);
+        vals[keys[i]] = rendered;
       }
       if (!parts.length) return;
       sigOf.set(groupName, parts.sort().join('|'));
+      /* The signature answers WHETHER the two agree and cannot answer where.
+         Kept apart from it rather than parsed back out of it: a value with an
+         = or a | in it would come back as a different value than went in. */
+      valuesOf.set(groupName, vals);
     });
     /*
       CLUSTERED BY THE NAME, AND ONLY THEN ASKED ABOUT THE CONTENT.
@@ -599,10 +605,14 @@ function findDuplicateNames(doc, side) {
       var sigs = names.map(function (n) { return sigOf.get(n); });
       var same = sigs.every(function (x) { return x === sigs[0]; });
       var counts = sigs.map(function (x) { return x.split('|').length; });
+      var sorted = names.slice().sort();
+      var values = {};
+      sorted.forEach(function (n) { values[n] = valuesOf.get(n) || {}; });
       out.push({
-        side: side, root: rootName, names: names.slice().sort(),
+        side: side, root: rootName, names: sorted,
         tokens: Math.max.apply(null, counts),
         sameValues: same,
+        values: values,
       });
     });
   });
@@ -1176,10 +1186,14 @@ function compare(figmaDoc, repoDoc) {
     var k = d.root + '\u241f' + d.names.join('/');
     if (!dupBy.has(k)) {
       dupBy.set(k, { root: d.root, names: d.names, tokens: d.tokens,
-                     sides: [], differsIn: [], has: {}, documents: 0 });
+                     sides: [], differsIn: [], has: {}, values: {}, documents: 0 });
     }
     var e = dupBy.get(k);
     if (e.sides.indexOf(d.side) === -1) e.sides.push(d.side);
+    /* A themes-shaped export repeats the same duplicate in every document; the
+       first one that has it speaks for all of them, as the token count and the
+       differsIn list already do. */
+    if (!e.values[d.side]) e.values[d.side] = d.values;
     if (!d.sameValues && e.differsIn.indexOf(d.side) === -1) e.differsIn.push(d.side);
     e.tokens = Math.max(e.tokens, d.tokens);
     e.documents++;
@@ -1205,6 +1219,31 @@ function compare(figmaDoc, repoDoc) {
       figma: e.names.filter(function (n) { return hasGroup(figmaDoc, e.root, n); }),
       repo: e.names.filter(function (n) { return hasGroup(repoDoc, e.root, n); }),
     };
+    /*
+      AND WHICH TOKENS INSIDE THEM DISAGREE.
+
+      "different values" says that the two spellings are not copies of each
+      other, which is the fact — and leaves the reader to open both files to
+      find out what the difference is. A leaf group is a handful of tokens;
+      naming the ones that differ costs a line and ends the question.
+
+      A key one spelling has and the other does not is a difference too, and
+      the commoner one: font-sizes with three steps against fontSize with
+      four is exactly the shape this check was written to catch.
+    */
+    e.diffKeys = {};
+    ['figma', 'repo'].forEach(function (side) {
+      var vals = e.values[side], held = e.has[side];
+      if (!vals || held.length < 2) { e.diffKeys[side] = []; return; }
+      var seen = {};
+      held.forEach(function (n) {
+        Object.keys(vals[n] || {}).forEach(function (k) { seen[k] = true; });
+      });
+      e.diffKeys[side] = Object.keys(seen).filter(function (k) {
+        var first = (vals[held[0]] || {})[k];
+        return held.some(function (n) { return (vals[n] || {})[k] !== first; });
+      }).sort();
+    });
   });
 
   /*

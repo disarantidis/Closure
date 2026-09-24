@@ -1766,14 +1766,29 @@
     /* A file that holds neither name. Quiet, because it is the absence of a
        finding, and present, because an empty cell reads as a fault. */
     .compare-spelling-none { opacity: 0.4; }
-    /* The name and its consumer count, side by side while they fit and
-       stacked when they do not — a 139px column holds `fontSize ×128` and not
-       `paragraph-indents ×128`, and the count belonging to the name above it
-       is legible either way. */
-    .compare-spelling-name {
+    /* A spelling: its name and count on one line, the tokens it disagrees
+       about underneath. */
+    .compare-spelling-name { display: flex; flex-direction: column; min-width: 0; }
+    /* Name and count side by side while they fit and stacked when they do not
+       — a 139px column holds `fontSize ×128` and not `paragraph-indents ×128`,
+       and the count belonging to the name above it is legible either way. */
+    .compare-spelling-head {
       display: flex; flex-wrap: wrap; align-items: baseline;
       column-gap: 6px; min-width: 0;
     }
+    /* The evidence under the flag: which tokens inside this spelling the other
+       one does not agree with. Quiet, because the name above is the subject
+       and these are its details, and indented so a glance down the column
+       reads the two names and skips them. */
+    .compare-spelling-vals {
+      display: flex; flex-wrap: wrap; column-gap: 8px;
+      margin-inline-start: 10px;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+      opacity: 0.7;
+    }
+    .compare-spelling-val { display: flex; gap: 4px; white-space: nowrap; }
+    .compare-spelling-key { opacity: 0.6; }
     .compare-spelling-uses {
       font-size: 10px;
       font-variant-numeric: tabular-nums;
@@ -51136,6 +51151,7 @@ html[data-theme=dark] {
     { sym: "\u21B4", field: "moved", label: "moved here" }
   ];
   var COMPARE_SAMPLE = 40;
+  var SPELLING_KEYS = 3;
   (function mountCompare() {
     const container = document.getElementById("compare-mount");
     let set = () => {
@@ -51495,11 +51511,22 @@ html[data-theme=dark] {
         const held = x.has && x.has[side] || [];
         if (!held.length) return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-none", children: "\u2014" });
         const used = x.used && x.used[side] || {};
+        const vals = x.values && x.values[side] || {};
+        const keys = x.diffKeys && x.diffKeys[side] || [];
         const idle = !held.some((n) => used[n]);
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-names" + (idle ? " is-idle" : ""), children: [
           held.map((n) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-name" + (used[n] ? "" : " is-dead"), children: [
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: n }),
-            /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-uses", children: used[n] ? "\xD7" + used[n].toLocaleString() : "unused" })
+            /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-head", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: n }),
+              !!used[n] && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-uses", children: "\xD7" + used[n].toLocaleString() })
+            ] }),
+            keys.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-vals", children: [
+              keys.slice(0, SPELLING_KEYS).map((k) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-val", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-key", children: k }),
+                (vals[n] || {})[k] !== void 0 ? (vals[n] || {})[k] : "\u2014"
+              ] }, k)),
+              keys.length > SPELLING_KEYS && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-key", children: "+" + (keys.length - SPELLING_KEYS) })
+            ] })
           ] }, n)),
           held.length > 1 && (x.differsIn || []).indexOf(side) !== -1 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "different values" }),
           (x.splitIn || []).indexOf(side) !== -1 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "both spellings in use here" }),
@@ -56511,21 +56538,27 @@ function findDuplicateNames(doc, side) {
     /* Leaf groups only — a group whose children are all tokens. Anything
        deeper is structure, and structure sharing a shape is not a duplicate
        name, it is a system with a shape. */
-    var sigOf = new Map();
+    var sigOf = new Map(), valuesOf = new Map();
     Object.keys(root).forEach(function (groupName) {
       if (groupName.charAt(0) === '$') return;
       var group = root[groupName];
       if (!group || typeof group !== 'object' || isToken(group)) return;
-      var parts = [];
+      var parts = [], vals = {};
       var keys = Object.keys(group);
       for (var i = 0; i < keys.length; i++) {
         if (keys[i].charAt(0) === '$') continue;
         var child = group[keys[i]];
         if (!isToken(child)) return;                   // not a leaf group
-        parts.push(keys[i] + '=' + renderValue(tokenValue(child)));
+        var rendered = renderValue(tokenValue(child));
+        parts.push(keys[i] + '=' + rendered);
+        vals[keys[i]] = rendered;
       }
       if (!parts.length) return;
       sigOf.set(groupName, parts.sort().join('|'));
+      /* The signature answers WHETHER the two agree and cannot answer where.
+         Kept apart from it rather than parsed back out of it: a value with an
+         = or a | in it would come back as a different value than went in. */
+      valuesOf.set(groupName, vals);
     });
     /*
       CLUSTERED BY THE NAME, AND ONLY THEN ASKED ABOUT THE CONTENT.
@@ -56562,10 +56595,14 @@ function findDuplicateNames(doc, side) {
       var sigs = names.map(function (n) { return sigOf.get(n); });
       var same = sigs.every(function (x) { return x === sigs[0]; });
       var counts = sigs.map(function (x) { return x.split('|').length; });
+      var sorted = names.slice().sort();
+      var values = {};
+      sorted.forEach(function (n) { values[n] = valuesOf.get(n) || {}; });
       out.push({
-        side: side, root: rootName, names: names.slice().sort(),
+        side: side, root: rootName, names: sorted,
         tokens: Math.max.apply(null, counts),
         sameValues: same,
+        values: values,
       });
     });
   });
@@ -57139,10 +57176,14 @@ function compare(figmaDoc, repoDoc) {
     var k = d.root + '\u241f' + d.names.join('/');
     if (!dupBy.has(k)) {
       dupBy.set(k, { root: d.root, names: d.names, tokens: d.tokens,
-                     sides: [], differsIn: [], has: {}, documents: 0 });
+                     sides: [], differsIn: [], has: {}, values: {}, documents: 0 });
     }
     var e = dupBy.get(k);
     if (e.sides.indexOf(d.side) === -1) e.sides.push(d.side);
+    /* A themes-shaped export repeats the same duplicate in every document; the
+       first one that has it speaks for all of them, as the token count and the
+       differsIn list already do. */
+    if (!e.values[d.side]) e.values[d.side] = d.values;
     if (!d.sameValues && e.differsIn.indexOf(d.side) === -1) e.differsIn.push(d.side);
     e.tokens = Math.max(e.tokens, d.tokens);
     e.documents++;
@@ -57168,6 +57209,31 @@ function compare(figmaDoc, repoDoc) {
       figma: e.names.filter(function (n) { return hasGroup(figmaDoc, e.root, n); }),
       repo: e.names.filter(function (n) { return hasGroup(repoDoc, e.root, n); }),
     };
+    /*
+      AND WHICH TOKENS INSIDE THEM DISAGREE.
+
+      "different values" says that the two spellings are not copies of each
+      other, which is the fact — and leaves the reader to open both files to
+      find out what the difference is. A leaf group is a handful of tokens;
+      naming the ones that differ costs a line and ends the question.
+
+      A key one spelling has and the other does not is a difference too, and
+      the commoner one: font-sizes with three steps against fontSize with
+      four is exactly the shape this check was written to catch.
+    */
+    e.diffKeys = {};
+    ['figma', 'repo'].forEach(function (side) {
+      var vals = e.values[side], held = e.has[side];
+      if (!vals || held.length < 2) { e.diffKeys[side] = []; return; }
+      var seen = {};
+      held.forEach(function (n) {
+        Object.keys(vals[n] || {}).forEach(function (k) { seen[k] = true; });
+      });
+      e.diffKeys[side] = Object.keys(seen).filter(function (k) {
+        var first = (vals[held[0]] || {})[k];
+        return held.some(function (n) { return (vals[n] || {})[k] !== first; });
+      }).sort();
+    });
   });
 
   /*
@@ -57489,7 +57555,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '93a56b6 15:35:09';
+    var CLOSURE_BUILD = '9013154 15:39:58';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

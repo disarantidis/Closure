@@ -1766,14 +1766,29 @@
     /* A file that holds neither name. Quiet, because it is the absence of a
        finding, and present, because an empty cell reads as a fault. */
     .compare-spelling-none { opacity: 0.4; }
-    /* The name and its consumer count, side by side while they fit and
-       stacked when they do not — a 139px column holds `fontSize ×128` and not
-       `paragraph-indents ×128`, and the count belonging to the name above it
-       is legible either way. */
-    .compare-spelling-name {
+    /* A spelling: its name and count on one line, the tokens it disagrees
+       about underneath. */
+    .compare-spelling-name { display: flex; flex-direction: column; min-width: 0; }
+    /* Name and count side by side while they fit and stacked when they do not
+       — a 139px column holds `fontSize ×128` and not `paragraph-indents ×128`,
+       and the count belonging to the name above it is legible either way. */
+    .compare-spelling-head {
       display: flex; flex-wrap: wrap; align-items: baseline;
       column-gap: 6px; min-width: 0;
     }
+    /* The evidence under the flag: which tokens inside this spelling the other
+       one does not agree with. Quiet, because the name above is the subject
+       and these are its details, and indented so a glance down the column
+       reads the two names and skips them. */
+    .compare-spelling-vals {
+      display: flex; flex-wrap: wrap; column-gap: 8px;
+      margin-inline-start: 10px;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+      opacity: 0.7;
+    }
+    .compare-spelling-val { display: flex; gap: 4px; white-space: nowrap; }
+    .compare-spelling-key { opacity: 0.6; }
     .compare-spelling-uses {
       font-size: 10px;
       font-variant-numeric: tabular-nums;

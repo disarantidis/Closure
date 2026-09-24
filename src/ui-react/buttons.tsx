@@ -2402,6 +2402,10 @@ const COUNT_KEYS: { sym: string; field: string; label: string }[] = [
   the page is has already been failed by it.
 */
 const COMPARE_SAMPLE = 40;
+/* How many of a duplicate pair's disagreeing tokens are named under each
+   spelling. Three is what a 139px column holds without the evidence becoming
+   the row; past that the count says how much is not shown. */
+const SPELLING_KEYS = 3;
 
 (function mountCompare() {
   const container = document.getElementById('compare-mount');
@@ -3077,20 +3081,33 @@ const COMPARE_SAMPLE = 40;
 
       Two names for one thing is a tidiness problem until something consumes
       them. The count is what turns the row into a finding: `×128` beside one
-      spelling and `unused` beside the other says the pair is live and which
-      half is the live half, and the same two labels landing on opposite lines
-      in the two columns IS the defect — the tokens above are identical and
-      read as changed because the thing under them was renamed.
+      spelling and nothing beside the other says the pair is live and which
+      half is the live half, and the count landing on opposite lines in the
+      two columns IS the defect — the tokens above are identical and read as
+      changed because the thing under them was renamed.
+
+      NOTHING is the word for nothing. A spelling with no consumers used to
+      carry the label `unused`, which spent the widest thing in the cell on
+      the row's least interesting fact and made the two lines look like two
+      findings. The count is there when there is one to state; the dimming
+      says the rest.
 
       The unused spelling is dimmed rather than marked. A band would mean
       "this changed" here, which it already means twice on this page, and a
       dead group is not a change — it is the half of the row that matters
       less.
+
+      Under each spelling, the tokens inside it that the other spelling does
+      not agree with. "different values" is the flag and this is the evidence:
+      it sits under the name it belongs to, so no key has to say which of the
+      two it came from.
     */
     const spellingSide = (side: string) => (x: any) => {
       const held: string[] = (x.has && x.has[side]) || [];
       if (!held.length) return <span className="compare-spelling-none">{'\u2014'}</span>;
       const used = (x.used && x.used[side]) || {};
+      const vals = (x.values && x.values[side]) || {};
+      const keys: string[] = (x.diffKeys && x.diffKeys[side]) || [];
       /* Nothing in this file points at either spelling. The amber below still
          states the facts, in a quieter voice: the sort has already put this
          row last, and an amber line at full strength on the least urgent
@@ -3100,10 +3117,29 @@ const COMPARE_SAMPLE = 40;
         <span className={'compare-spelling-names' + (idle ? ' is-idle' : '')}>
           {held.map((n) => (
             <span className={'compare-spelling-name' + (used[n] ? '' : ' is-dead')} key={n}>
-              <span className="compare-cell-path">{n}</span>
-              <span className="compare-spelling-uses">
-                {used[n] ? '\u00d7' + used[n].toLocaleString() : 'unused'}
+              <span className="compare-spelling-head">
+                <span className="compare-cell-path">{n}</span>
+                {!!used[n] && (
+                  <span className="compare-spelling-uses">
+                    {'\u00d7' + used[n].toLocaleString()}
+                  </span>
+                )}
               </span>
+              {keys.length > 0 && (
+                <span className="compare-spelling-vals">
+                  {keys.slice(0, SPELLING_KEYS).map((k) => (
+                    <span className="compare-spelling-val" key={k}>
+                      <span className="compare-spelling-key">{k}</span>
+                      {(vals[n] || {})[k] !== undefined ? (vals[n] || {})[k] : '\u2014'}
+                    </span>
+                  ))}
+                  {keys.length > SPELLING_KEYS && (
+                    <span className="compare-spelling-key">
+                      {'+' + (keys.length - SPELLING_KEYS)}
+                    </span>
+                  )}
+                </span>
+              )}
             </span>
           ))}
           {/* The amber goes on the SIDE that has the problem, not on the row: a
