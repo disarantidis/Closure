@@ -2512,9 +2512,17 @@
       words it belongs to and the button it has nothing to do with. An auto
       margin at its trailing edge takes the row's slack instead, so the tag
       sits with the title and Download keeps the far right on its own.
+
+      SCOPED TO THE CARD, WHICH IS WHY IT CAME UNDONE. It named
+      #json-download-card, and that card was split in two: the header became
+      #json-file-card and the id it was keyed to stopped existing, so the rule
+      stopped matching and the tag drifted back to the middle. Keyed to the
+      header's own position now — this is the one header in the file with three
+      children, and it is three because the third is an action rather than
+      another fact about the file.
     */
-    #json-download-card .json-download-header #json-file-size-mount { margin-inline-end: auto; }
-    #json-download-card .json-download-header #download-btn-mount { display: flex; }
+    .json-file-card .json-download-header #json-file-size-mount { margin-inline-end: auto; }
+    .json-file-card .json-download-header #download-btn-mount { display: flex; }
     /* The header's trailing group. Two things now — the token-count tag and
        the Compare button — and .json-download-header's space-between would
        otherwise push them to opposite ends of the row with the title stranded
