@@ -2872,6 +2872,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
       */
       {
         const mk = (ref) => ({ value: '{' + ref + '}', type: 'number' });
+        const mkv = (v) => ({ value: v, type: 'number' });
         const L = { core: { 'letter-spacing': { 0: { value: 0, type: 'number' } },
                             'letterSpacing': { 0: { value: '-5%', type: 'letterSpacing' } },
                             'font-family': { a: { value: 'Alpha', type: 'fontFamily' } } },
@@ -2898,6 +2899,42 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
            is a row, and it is already in the table below. */
         ok('compare: a change of one token is not reported as a pattern',
            pats.every((p) => p.count > 1));
+        ok('compare: a pattern that really is one string pair still reports the pair',
+           !!big && big.shape === null && big.exact === true,
+           JSON.stringify([big.figma, big.repo, big.exact]));
+
+        /*
+          AND THE SHAPE, where the strings never repeat. A re-rooted group
+          gives every token its own (from, to): the head and tail the two
+          references share are matched off and what is left is the edit.
+          Measured on a real pair of exports this was 109 rows the card had
+          nothing to say about.
+        */
+        const deep = (root, v) => ({
+          white:   { elevation: { FAB: { standard: { y: mkv(1), blur: mkv(2), spread: mkv(3) } } } },
+          section: { elevation: { FAB: { standard: { y: mkv(10), blur: mkv(20), spread: mkv(30) } } } },
+          sem: { fab: { y: mk(root + '.elevation.FAB.standard.y'),
+                        blur: mk(root + '.elevation.FAB.standard.blur'),
+                        spread: mk(root + '.elevation.FAB.standard.spread') } },
+        });
+        const rooted = JD.compare(deep('section'), deep('white'));
+        const shaped = (rooted.changedPatterns || [])[0];
+        ok('compare: rows sharing no string pair but one shape collapse to a single pattern',
+           !!shaped && shaped.count === 3 && shaped.exact === false,
+           JSON.stringify(rooted.changedPatterns));
+        ok('compare: and the row prints the part that moved, not one of its members',
+           !!shaped && shaped.figma === '{section\u2026}' && shaped.repo === '{white\u2026}' &&
+           shaped.shape.head === false && shaped.shape.tail === true,
+           JSON.stringify(shaped));
+        /* Two references with nothing in common are not a shape — there is no
+           head and no tail to match off, so the pair stands on its own. */
+        const unrelated = JD.compare(
+          { c: { a: { x: mkv(1) }, b: { x: mkv(2) } }, s: { p: mk('a.x'), q: mk('a.x') } },
+          { c: { a: { x: mkv(1) }, b: { x: mkv(2) } }, s: { p: mk('b.x'), q: mk('b.x') } });
+        ok('compare: and that collapse is the ordinary one when the strings do repeat',
+           (unrelated.changedPatterns[0] || {}).exact === true &&
+           unrelated.changedPatterns[0].figma === '{a.x}',
+           JSON.stringify(unrelated.changedPatterns));
 
         /*
           THE SAME FINDING WITHOUT A SECOND DOCUMENT. This is the check that

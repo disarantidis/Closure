@@ -3019,6 +3019,35 @@ const SPELLING_NAMES = 6;
       biggest first. Nothing is inferred to build it — two rows are the same
       change when both of their sides are identical strings.
     */
+    /*
+      A ROW IS EITHER A PAIR OR A SHAPE, AND THEY ARE DRAWN DIFFERENTLY.
+
+      A pair is two whole references and gets the marking every other table
+      here uses: both sides in full, the differing segments lit. A shape is a
+      hundred pairs with one thing in common, and the only honest thing to
+      print is that thing — the braces and ellipses say the rest was matched
+      off and is not being claimed.
+    */
+    const patternSide = (x: any, side: 'figma' | 'repo') => {
+      const mine = String(side === 'figma' ? x.figma : x.repo);
+      if (!x.shape) {
+        const other = String(side === 'figma' ? x.repo : x.figma);
+        return pathCell(mine, x.type, other);
+      }
+      const icon = x.type ? TYPE_ICON[x.type] : undefined;
+      const part = side === 'figma' ? x.shape.figma : x.shape.repo;
+      return (
+        <span className="compare-token" title={mine}>
+          {icon && <span className="compare-token-icon" aria-hidden="true">{icon(13)}</span>}
+          <span className="compare-cell-path is-diffed">
+            <span className="compare-elide">{'{' + (x.shape.head ? '\u2026' : '')}</span>
+            <mark className="compare-diff">{part}</mark>
+            <span className="compare-elide">{(x.shape.tail ? '\u2026' : '') + '}'}</span>
+          </span>
+        </span>
+      );
+    };
+
     const patterns = (rows: any[]) => {
       if (!rows.length) return null;
       const title = 'What changed \u2014 by the change, not the token';
@@ -3054,11 +3083,11 @@ const SPELLING_NAMES = 6;
                 { key: 'count', header: 'Tokens', width: '58px',
                   cell: (x: any) => <span className="compare-pattern-count">{x.count.toLocaleString()}</span> },
                 { key: 'figma', header: figmaHead(),
-                  cell: (x: any) => pathCell(String(x.figma), x.type, String(x.repo)) },
+                  cell: (x: any) => patternSide(x, 'figma') },
                 { key: 'repo', header: repoHead(),
                   cell: (x: any) => (
                     <span className="compare-pattern-to">
-                      {pathCell(String(x.repo), x.type, String(x.figma))}
+                      {patternSide(x, 'repo')}
                       {/*
                         THE CAUSE, ON THE LINE THAT SHOWS IT. Both ends point at
                         names that are one word spelled two ways, which is not a

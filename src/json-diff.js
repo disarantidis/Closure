@@ -1430,19 +1430,79 @@ function compare(figmaDoc, repoDoc) {
     word. That is the pair above — {letter-spacing.0} against {letterSpacing.0}
     — and on those 99 pairs it fired once, on that one, and nowhere else.
   */
+  /*
+    AND COLLAPSED BY THE SHAPE OF THE CHANGE WHERE THE STRINGS DO NOT REPEAT.
+
+    Identical strings catch a variable swapped for another variable, which is
+    the commonest edit and not the only one. A group re-rooted —
+    {section.elevation.FAB.standard.y} for {white.elevation.FAB.standard.y},
+    and again for .blur, and .spread, and every state under it — gives every
+    token its own (from, to) pair. Measured on a real pair of exports: 109
+    rows from one edit, and this card, whose whole job is to say that, had
+    nothing to say about any of them.
+
+    So the head and the tail the two references share are matched off and what
+    is left is the change: `section` for `white`, at depth zero. Rows whose
+    remainder is the same are the same edit however deep they sit and however
+    long their tails are — and a group that turns out to hold one string pair
+    after all still reports that pair, because the exact thing is better than
+    a fragment of it when the exact thing is what happened.
+
+    Nothing is inferred to build it. Two references with nothing in common are
+    not a shape, and neither is a pair where one side is entirely the other's
+    head and tail — there is no remainder to name.
+  */
+  var refShape = function (a, b) {
+    if (!/^\{[^{}]+\}$/.test(a) || !/^\{[^{}]+\}$/.test(b)) return null;
+    var A = a.slice(1, -1).split('.'), B = b.slice(1, -1).split('.');
+    var head = 0;
+    while (head < A.length && head < B.length && A[head] === B[head]) head++;
+    var tail = 0;
+    while (tail < A.length - head && tail < B.length - head &&
+           A[A.length - 1 - tail] === B[B.length - 1 - tail]) tail++;
+    if (!head && !tail) return null;
+    var midA = A.slice(head, A.length - tail), midB = B.slice(head, B.length - tail);
+    if (!midA.length || !midB.length) return null;
+    return { head: head > 0, tail: tail > 0,
+             figma: midA.join('.'), repo: midB.join('.'),
+             key: head + '\u241f' + midA.join('.') + '\u241f' + midB.join('.') };
+  };
+
   var patternBy = new Map();
   report.changed.forEach(function (c) {
-    var k = String(c.figma) + '\u241f' + String(c.repo);
+    var figma = String(c.figma), repo = String(c.repo);
+    var shape = refShape(figma, repo);
+    var k = shape ? 'shape\u241f' + shape.key : figma + '\u241f' + repo;
     if (!patternBy.has(k)) {
-      patternBy.set(k, { figma: c.figma, repo: c.repo, type: c.type, count: 0, paths: [],
-                         sameNameDifferentSpelling: sameWordDifferentSpelling(c.figma, c.repo) });
+      patternBy.set(k, { figma: figma, repo: repo, type: c.type, count: 0, paths: [],
+                         shape: shape, exact: true,
+                         sameNameDifferentSpelling: sameWordDifferentSpelling(figma, repo) });
     }
     var p = patternBy.get(k);
     p.count++;
     if (p.paths.length < 3) p.paths.push(c.path);
+    /* One string pair, or several with one shape. The row says which, because
+       the two want different words on the page. */
+    if (p.figma !== figma || p.repo !== repo) p.exact = false;
+    /* A shape can span types — a re-rooting takes the colours and the numbers
+       under it together — and a type that is true of some of the rows is
+       worse than none. */
+    if (p.type !== c.type) p.type = undefined;
   });
   report.changedPatterns = Array.from(patternBy.values())
     .filter(function (p) { return p.count > 1; })
+    .map(function (p) {
+      if (p.exact) { p.shape = null; return p; }
+      /* The fragment replaces the strings: a group holding a hundred (from,
+         to) pairs cannot honestly print one of them as though it were the
+         pattern. sameNameDifferentSpelling goes with them — it was a reading
+         of two whole names, and there are no longer two whole names. */
+      p.figma = '{' + (p.shape.head ? '\u2026' : '') + p.shape.figma + (p.shape.tail ? '\u2026' : '') + '}';
+      p.repo = '{' + (p.shape.head ? '\u2026' : '') + p.shape.repo + (p.shape.tail ? '\u2026' : '') + '}';
+      p.sameNameDifferentSpelling = sameWordDifferentSpelling(
+        '{' + p.shape.figma + '}', '{' + p.shape.repo + '}');
+      return p;
+    })
     .sort(function (a, b) { return b.count - a.count; });
 
   var typeCount = new Map();
