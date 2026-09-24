@@ -1757,13 +1757,15 @@
       flex-shrink: 0;
     }
     .compare-pattern-to { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    /* One line per file: the file's mark, then the spellings that file holds. */
-    .compare-spelling-line { display: flex; align-items: flex-start; gap: 5px; min-width: 0; }
-    .compare-spelling-mark { display: flex; flex-shrink: 0; margin-top: 2px; opacity: 0.7; }
+    /* One column per file, and the spellings that file holds stacked inside
+       it — one per line, because two long names on one wrapped line is the
+       reader doing the splitting the column was drawn to do for them. */
     .compare-spelling-names {
       display: flex; flex-direction: column; gap: 1px; min-width: 0;
-      overflow-wrap: anywhere;
     }
+    /* A file that holds neither name. Quiet, because it is the absence of a
+       finding, and present, because an empty cell reads as a fault. */
+    .compare-spelling-none { opacity: 0.4; }
     .compare-pattern-why {
       font-size: 10px;
       line-height: 1.4;

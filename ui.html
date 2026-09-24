@@ -1757,13 +1757,15 @@
       flex-shrink: 0;
     }
     .compare-pattern-to { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    /* One line per file: the file's mark, then the spellings that file holds. */
-    .compare-spelling-line { display: flex; align-items: flex-start; gap: 5px; min-width: 0; }
-    .compare-spelling-mark { display: flex; flex-shrink: 0; margin-top: 2px; opacity: 0.7; }
+    /* One column per file, and the spellings that file holds stacked inside
+       it — one per line, because two long names on one wrapped line is the
+       reader doing the splitting the column was drawn to do for them. */
     .compare-spelling-names {
       display: flex; flex-direction: column; gap: 1px; min-width: 0;
-      overflow-wrap: anywhere;
     }
+    /* A file that holds neither name. Quiet, because it is the absence of a
+       finding, and present, because an empty cell reads as a fault. */
+    .compare-spelling-none { opacity: 0.4; }
     .compare-pattern-why {
       font-size: 10px;
       line-height: 1.4;
@@ -51469,6 +51471,14 @@ html[data-theme=dark] {
           ] })
         ] }, title);
       };
+      const spellingSide = (side) => (x) => {
+        const held = x.has && x.has[side] || [];
+        if (!held.length) return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-none", children: "\u2014" });
+        return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-names", children: [
+          held.map((n) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: n }, n)),
+          held.length > 1 && (x.differsIn || []).indexOf(side) !== -1 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "different values" })
+        ] });
+      };
       const spellings = (rows) => {
         if (!rows.length) return null;
         const title = "Names \u2014 one word, spelled two ways";
@@ -51485,14 +51495,29 @@ html[data-theme=dark] {
               size: "small",
               rules: true,
               columns: [
+                /*
+                                  THE COLLECTION, WHICH NOTHING HERE USED TO SAY.
+                
+                                  Column one held the two spellings joined by a dot, and once
+                                  each side lists what it holds that is the same text a third
+                                  time. What it could not answer was WHERE — a split in
+                                  Typography and a split in Spacing read identically. The root
+                                  is the one fact about a finding that was on the report and
+                                  never on the table.
+                                */
+                /* 24%: the narrowest that still fits a collection name on one
+                   line, because the width it gives up goes to the two columns
+                   being compared — where a wrap falls inside the name the
+                   reader is checking character by character. */
                 {
-                  key: "names",
-                  header: "The two spellings",
-                  cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-token", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: x.names.join("  \xB7  ") }) })
+                  key: "root",
+                  header: "Collection",
+                  width: "24%",
+                  cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-token", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: x.root }) })
                 },
                 /*
-                                  WHICH FILE SPELLS IT WHICH WAY, one line per file, in that
-                                  file's own mark.
+                                  WHICH FILE SPELLS IT WHICH WAY — a column each, the same two
+                                  sides in the same order as every other table on this page.
                 
                                   It said "both files", which answers where the split is and not
                                   what the reader asked — which name is in which document. The
@@ -51500,33 +51525,17 @@ html[data-theme=dark] {
                                   and `letterSpacing` are both in the Figma file and only
                                   `letterSpacing` is in the repo, and "this Figma file" left the
                                   repo unmentioned as though it had nothing to do with it. That
-                                  asymmetry IS the hundred-token change on this page.
+                                  asymmetry IS the hundred-token change on this page, and
+                                  stacked in one cell it was two lines a reader had to diff;
+                                  side by side it is the shape of the row.
                 
                                   A file holding both names is the defect; a file holding one is
-                                  the other end of it, so both lines are drawn either way.
+                                  the other end of it, so a column is drawn either way — and a
+                                  dash where a file holds neither, because an empty cell would
+                                  read as a rendering fault rather than as an answer.
                                 */
-                {
-                  key: "side",
-                  header: "In",
-                  cell: (x) => {
-                    const mark = s.sides.provider === "gitlab" ? IconGitlab(11) : IconGithub(11);
-                    const line = (side, icon2) => {
-                      const held = x.has && x.has[side] || [];
-                      if (!held.length) return null;
-                      return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-line", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-mark", "aria-hidden": true, children: icon2 }),
-                        /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-names", children: [
-                          held.join(", "),
-                          held.length > 1 && (x.differsIn || []).indexOf(side) !== -1 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "different values" })
-                        ] })
-                      ] });
-                    };
-                    return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-pattern-to", children: [
-                      line("figma", IconFigma(11)),
-                      line("repo", mark)
-                    ] });
-                  }
-                }
+                { key: "figma", header: figmaHead(), cell: spellingSide("figma") },
+                { key: "repo", header: repoHead(), cell: spellingSide("repo") }
               ],
               rows,
               rowKey: (x) => x.names.join("/")
@@ -57343,7 +57352,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '1f95411 15:13:01';
+    var CLOSURE_BUILD = '9abbf92 15:18:56';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

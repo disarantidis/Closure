@@ -3072,6 +3072,22 @@ const COMPARE_SAMPLE = 40;
       screens interrupt to say it is there, and this is where it is read,
       beside the rows it explains.
     */
+    const spellingSide = (side: string) => (x: any) => {
+      const held: string[] = (x.has && x.has[side]) || [];
+      if (!held.length) return <span className="compare-spelling-none">{'\u2014'}</span>;
+      return (
+        <span className="compare-spelling-names">
+          {held.map((n) => <span className="compare-cell-path" key={n}>{n}</span>)}
+          {/* The amber goes on the SIDE that has the problem, not on the row: a
+              pair can be harmless in one document and hold two answers in the
+              other. */}
+          {held.length > 1 && (x.differsIn || []).indexOf(side) !== -1 && (
+            <span className="compare-pattern-why">different values</span>
+          )}
+        </span>
+      );
+    };
+
     const spellings = (rows: any[]) => {
       if (!rows.length) return null;
       const title = 'Names \u2014 one word, spelled two ways';
@@ -3090,15 +3106,29 @@ const COMPARE_SAMPLE = 40;
               size="small"
               rules
               columns={[
-                { key: 'names', header: 'The two spellings',
+                /*
+                  THE COLLECTION, WHICH NOTHING HERE USED TO SAY.
+
+                  Column one held the two spellings joined by a dot, and once
+                  each side lists what it holds that is the same text a third
+                  time. What it could not answer was WHERE — a split in
+                  Typography and a split in Spacing read identically. The root
+                  is the one fact about a finding that was on the report and
+                  never on the table.
+                */
+                /* 24%: the narrowest that still fits a collection name on one
+                   line, because the width it gives up goes to the two columns
+                   being compared — where a wrap falls inside the name the
+                   reader is checking character by character. */
+                { key: 'root', header: 'Collection', width: '24%',
                   cell: (x: any) => (
                     <span className="compare-token">
-                      <span className="compare-cell-path">{x.names.join('  \u00b7  ')}</span>
+                      <span className="compare-cell-path">{x.root}</span>
                     </span>
                   ) },
                 /*
-                  WHICH FILE SPELLS IT WHICH WAY, one line per file, in that
-                  file's own mark.
+                  WHICH FILE SPELLS IT WHICH WAY — a column each, the same two
+                  sides in the same order as every other table on this page.
 
                   It said "both files", which answers where the split is and not
                   what the reader asked — which name is in which document. The
@@ -3106,39 +3136,17 @@ const COMPARE_SAMPLE = 40;
                   and `letterSpacing` are both in the Figma file and only
                   `letterSpacing` is in the repo, and "this Figma file" left the
                   repo unmentioned as though it had nothing to do with it. That
-                  asymmetry IS the hundred-token change on this page.
+                  asymmetry IS the hundred-token change on this page, and
+                  stacked in one cell it was two lines a reader had to diff;
+                  side by side it is the shape of the row.
 
                   A file holding both names is the defect; a file holding one is
-                  the other end of it, so both lines are drawn either way.
+                  the other end of it, so a column is drawn either way — and a
+                  dash where a file holds neither, because an empty cell would
+                  read as a rendering fault rather than as an answer.
                 */
-                { key: 'side', header: 'In',
-                  cell: (x: any) => {
-                    const mark = s.sides.provider === 'gitlab' ? IconGitlab(11) : IconGithub(11);
-                    const line = (side: string, icon: ReactNode) => {
-                      const held: string[] = (x.has && x.has[side]) || [];
-                      if (!held.length) return null;
-                      return (
-                        <span className="compare-spelling-line">
-                          <span className="compare-spelling-mark" aria-hidden>{icon}</span>
-                          <span className="compare-spelling-names">
-                            {held.join(', ')}
-                            {/* The amber goes on the SIDE that has the problem,
-                                not on the row: a pair can be harmless in one
-                                document and hold two answers in the other. */}
-                            {held.length > 1 && (x.differsIn || []).indexOf(side) !== -1 && (
-                              <span className="compare-pattern-why">different values</span>
-                            )}
-                          </span>
-                        </span>
-                      );
-                    };
-                    return (
-                      <span className="compare-pattern-to">
-                        {line('figma', IconFigma(11))}
-                        {line('repo', mark)}
-                      </span>
-                    );
-                  } },
+                { key: 'figma', header: figmaHead(), cell: spellingSide('figma') },
+                { key: 'repo', header: repoHead(), cell: spellingSide('repo') },
               ]}
               rows={rows}
               rowKey={(x: any) => x.names.join('/')}
