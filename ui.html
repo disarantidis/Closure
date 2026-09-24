@@ -1512,6 +1512,28 @@
       -webkit-box-decoration-break: clone;
       box-decoration-break: clone;
     }
+    /* The template path and, under it, the members that followed the same
+       edit. */
+    .compare-group-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    /* Wrapped, not one per line: a hundred names one to a line is the wall
+       this replaced. The separator is drawn between them rather than typed,
+       so a name that starts a line never starts with a bullet. */
+    .compare-group-mates {
+      display: flex; flex-wrap: wrap; column-gap: 8px; row-gap: 1px;
+      margin-inline-start: 10px;
+      font-size: 10px;
+      opacity: 0.75;
+      min-width: 0;
+    }
+    .compare-group-mate { position: relative; overflow-wrap: anywhere; }
+    .compare-group-mate + .compare-group-mate::before {
+      content: '\00B7';
+      position: absolute;
+      inset-inline-start: -5px;
+      opacity: 0.5;
+    }
+    .compare-group-mate.is-more { opacity: 0.6; }
+
     /* A value too long to be a pill — a reference, mostly. Same treatment as
        the path, one step quieter. */
     .compare-cell-text {
@@ -51150,6 +51172,7 @@ html[data-theme=dark] {
   var COMPARE_SAMPLE = 40;
   var SPELLING_KEYS = 3;
   var SPELLING_NAMES = 6;
+  var GROUP_MATES = 12;
   (function mountCompare() {
     const container = document.getElementById("compare-mount");
     let set = () => {
@@ -51660,13 +51683,70 @@ html[data-theme=dark] {
           ) })
         ] }, title);
       };
+      const commonEnds = (paths) => {
+        const segs = paths.map((p) => p.split("."));
+        const most = Math.min.apply(null, segs.map((x) => x.length)) - 1;
+        let head = 0;
+        while (head < most && segs.every((x) => x[head] === segs[0][head])) head++;
+        let tail = 0;
+        while (tail < most - head && segs.every((x) => x[x.length - 1 - tail] === segs[0][segs[0].length - 1 - tail])) tail++;
+        return { head, tail };
+      };
+      const middleOf = (path, head, tail) => {
+        const segs = path.split(".");
+        return segs.slice(head, segs.length - tail).join(".");
+      };
+      const groupPath = (path, head, tail, type) => {
+        const segs = path.split(".");
+        const before = segs.slice(0, head).join(".");
+        const mid = segs.slice(head, segs.length - tail).join(".");
+        const after = segs.slice(segs.length - tail).join(".");
+        const icon2 = type ? TYPE_ICON[type] : void 0;
+        return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-token", title: type ? path + "  (" + type + ")" : path, children: [
+          icon2 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-token-icon", "aria-hidden": "true", children: icon2(13) }),
+          /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-cell-path", children: [
+            !!before && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { children: [
+              dotted(before),
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("wbr", {}),
+              "."
+            ] }),
+            head || tail ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("mark", { className: "compare-diff", children: dotted(mid) }) : /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { children: dotted(mid) }),
+            !!after && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("wbr", {}),
+              ".",
+              dotted(after)
+            ] })
+          ] })
+        ] });
+      };
       const leaves = (title, rows, twoSided, flagOf, side) => {
         if (!rows.length) return null;
         const columns = [
           {
             key: "path",
             header: "Token",
-            cell: (x) => pathCell(x.path, x.type)
+            /*
+                        ONE LINE PER EDIT, AND THE TOKENS THAT FOLLOWED IT UNDER IT.
+            
+                        A group is every row whose two values are the same two values, so
+                        the row above is the edit and these are the names it reached. The
+                        template carries the first of them; the rest are the segment they
+                        differ in, listed, because a hundred paths that agree on four
+                        segments out of five are one path and a list of fifth segments.
+                      */
+            cell: (x) => {
+              const members = x._members || [x];
+              if (members.length < 2) return pathCell(x.path, x.type);
+              const { head, tail } = x._ends;
+              const mates = members.slice(1).map((m) => middleOf(m.path, head, tail));
+              return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-group-cell", children: [
+                groupPath(x.path, head, tail, x.type),
+                /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-group-mates", children: [
+                  mates.slice(0, GROUP_MATES).map((n, i) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-group-mate", children: n }, n + i)),
+                  mates.length > GROUP_MATES && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-group-mate is-more", children: "+" + (mates.length - GROUP_MATES).toLocaleString() })
+                ] })
+              ] });
+            }
           }
         ];
         if (twoSided) {
@@ -51685,7 +51765,7 @@ html[data-theme=dark] {
             /* The flag goes under whichever side holds the literal — that is the
                side that could have pointed and did not. */
             cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
-              x._repeat ? null : valueCell(x.figma, x.repo),
+              valueCell(x.figma, x.repo),
               flagOf && x.unboundSide === "figma" ? flagOf(x) : null
             ] })
           });
@@ -51694,7 +51774,7 @@ html[data-theme=dark] {
             header: repoHead(),
             width: w,
             cell: (x) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
-              x._repeat ? null : valueCell(x.repo, x.figma),
+              valueCell(x.repo, x.figma),
               flagOf && x.unboundSide === "repo" ? flagOf(x) : null
             ] })
           });
@@ -51706,14 +51786,25 @@ html[data-theme=dark] {
             cell: (x) => valueCell(x.value)
           });
         }
-        let last = null;
-        const shown = rows.slice(0, COMPARE_SAMPLE).map((x) => {
-          if (!twoSided) return x;
-          const key = String(x.figma) + "\u241F" + String(x.repo);
-          const repeat = key === last;
-          last = key;
-          return repeat ? { ...x, _repeat: true } : x;
-        });
+        const groups = [];
+        if (twoSided) {
+          const by = /* @__PURE__ */ new Map();
+          rows.forEach((x) => {
+            const k = String(x.figma) + "\u241F" + String(x.repo) + "\u241F" + String(x.path).split(".")[0];
+            if (!by.has(k)) {
+              const g = { ...x, _members: [] };
+              by.set(k, g);
+              groups.push(g);
+            }
+            by.get(k)._members.push(x);
+          });
+          groups.forEach((g) => {
+            g._ends = commonEnds(g._members.map((m) => m.path));
+          });
+        } else {
+          rows.forEach((x) => groups.push(x));
+        }
+        const shown = groups.slice(0, COMPARE_SAMPLE);
         return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-card", "data-level": 4, children: [
           /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "json-download-header", children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { className: "json-download-title-group", children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "json-download-title", children: title }) }),
@@ -51731,7 +51822,7 @@ html[data-theme=dark] {
               rowKey: (x) => x.path
             }
           ) }),
-          rows.length > COMPARE_SAMPLE && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "compare-more", children: `\u2026 and ${(rows.length - COMPARE_SAMPLE).toLocaleString()} more \u2014 Copy all has every one` })
+          groups.length > COMPARE_SAMPLE && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("p", { className: "compare-more", children: `\u2026 and ${(groups.length - COMPARE_SAMPLE).toLocaleString()} more \u2014 Copy all has every one` })
         ] }, title);
       };
       return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(import_jsx_runtime23.Fragment, { children: [
@@ -57730,7 +57821,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'd712f26 17:51:52';
+    var CLOSURE_BUILD = '1daa482 18:00:31';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

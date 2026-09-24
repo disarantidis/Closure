@@ -2410,6 +2410,12 @@ const SPELLING_KEYS = 3;
    The count alone says the two scales are different sizes; the names say what
    they are, which is the question a reader has next. */
 const SPELLING_NAMES = 6;
+/* How many of a group's other members are named under the one that carries
+   the template. Twelve short segments fill about four lines of a token
+   column, which is the most a summary can spend before it is the thing it was
+   summarising; past that the count says how much is not shown, and Copy all
+   has every one. */
+const GROUP_MATES = 12;
 
 (function mountCompare() {
   const container = document.getElementById('compare-mount');
@@ -3408,6 +3414,56 @@ const SPELLING_NAMES = 6;
       );
     };
 
+    /*
+      THE SEGMENT THE MEMBERS OF A GROUP DISAGREE ABOUT.
+
+      Every token that followed one edit has a path, and the paths are nearly
+      the same path: breakpoint/mobile.breakpoint.typography.SOMETHING
+      .font-family, a hundred times. The head and the tail they all share are
+      matched off by the rule used everywhere else on this page, and what is
+      left of each is the only thing that told it apart.
+
+      Every member keeps a segment, so a group can never be collapsed into
+      nothing. Nothing shared at either end is not a template — the paths are
+      simply different paths, and they are listed whole.
+    */
+    const commonEnds = (paths: string[]) => {
+      const segs = paths.map((p) => p.split('.'));
+      const most = Math.min.apply(null, segs.map((x) => x.length)) - 1;
+      let head = 0;
+      while (head < most && segs.every((x) => x[head] === segs[0][head])) head++;
+      let tail = 0;
+      while (tail < most - head &&
+             segs.every((x) => x[x.length - 1 - tail] === segs[0][segs[0].length - 1 - tail])) tail++;
+      return { head, tail };
+    };
+    const middleOf = (path: string, head: number, tail: number) => {
+      const segs = path.split('.');
+      return segs.slice(head, segs.length - tail).join('.');
+    };
+
+    /* One path, with the part its group disagrees about lit. The unchanged
+       ends keep the joints they had, so the cell still wraps at dots. */
+    const groupPath = (path: string, head: number, tail: number, type?: string) => {
+      const segs = path.split('.');
+      const before = segs.slice(0, head).join('.');
+      const mid = segs.slice(head, segs.length - tail).join('.');
+      const after = segs.slice(segs.length - tail).join('.');
+      const icon = type ? TYPE_ICON[type] : undefined;
+      return (
+        <span className="compare-token" title={type ? path + '  (' + type + ')' : path}>
+          {icon && <span className="compare-token-icon" aria-hidden="true">{icon(13)}</span>}
+          <span className="compare-cell-path">
+            {!!before && <span>{dotted(before)}<wbr />{'.'}</span>}
+            {head || tail
+              ? <mark className="compare-diff">{dotted(mid)}</mark>
+              : <span>{dotted(mid)}</span>}
+            {!!after && <span><wbr />{'.'}{dotted(after)}</span>}
+          </span>
+        </span>
+      );
+    };
+
     const leaves = (title: string, rows: any[], twoSided: boolean,
                     flagOf?: (row: any) => ReactNode,
                     side?: 'figma' | 'repo') => {
@@ -3416,7 +3472,36 @@ const SPELLING_NAMES = 6;
         {
           key: 'path',
           header: 'Token',
-          cell: (x: any) => pathCell(x.path, x.type),
+          /*
+            ONE LINE PER EDIT, AND THE TOKENS THAT FOLLOWED IT UNDER IT.
+
+            A group is every row whose two values are the same two values, so
+            the row above is the edit and these are the names it reached. The
+            template carries the first of them; the rest are the segment they
+            differ in, listed, because a hundred paths that agree on four
+            segments out of five are one path and a list of fifth segments.
+          */
+          cell: (x: any) => {
+            const members: any[] = x._members || [x];
+            if (members.length < 2) return pathCell(x.path, x.type);
+            const { head, tail } = x._ends;
+            const mates = members.slice(1).map((m: any) => middleOf(m.path, head, tail));
+            return (
+              <span className="compare-group-cell">
+                {groupPath(x.path, head, tail, x.type)}
+                <span className="compare-group-mates">
+                  {mates.slice(0, GROUP_MATES).map((n: string, i: number) => (
+                    <span className="compare-group-mate" key={n + i}>{n}</span>
+                  ))}
+                  {mates.length > GROUP_MATES && (
+                    <span className="compare-group-mate is-more">
+                      {'+' + (mates.length - GROUP_MATES).toLocaleString()}
+                    </span>
+                  )}
+                </span>
+              </span>
+            );
+          },
         },
       ];
       /*
@@ -3485,7 +3570,7 @@ const SPELLING_NAMES = 6;
              side that could have pointed and did not. */
           cell: (x: any) => (
             <>
-              {x._repeat ? null : valueCell(x.figma, x.repo)}
+              {valueCell(x.figma, x.repo)}
               {flagOf && x.unboundSide === 'figma' ? flagOf(x) : null}
             </>
           ),
@@ -3496,7 +3581,7 @@ const SPELLING_NAMES = 6;
           width: w,
           cell: (x: any) => (
             <>
-              {x._repeat ? null : valueCell(x.repo, x.figma)}
+              {valueCell(x.repo, x.figma)}
               {flagOf && x.unboundSide === 'repo' ? flagOf(x) : null}
             </>
           ),
@@ -3519,18 +3604,43 @@ const SPELLING_NAMES = 6;
           cell: (x: any) => valueCell(x.value),
         });
       }
-      /* Marked on a copy, and only on the rows that are drawn: the row after
-         the cap is never compared against one nobody sees. A one-sided table
-         is left alone — two colours that happen to match are a coincidence,
-         not a repetition. */
-      let last: string | null = null;
-      const shown = rows.slice(0, COMPARE_SAMPLE).map((x: any) => {
-        if (!twoSided) return x;
-        const key = String(x.figma) + '\u241f' + String(x.repo);
-        const repeat = key === last;
-        last = key;
-        return repeat ? { ...x, _repeat: true } : x;
-      });
+      /*
+        GROUPED BY THE PAIR, IN THE ORDER THE FIRST OF EACH APPEARED.
+
+        Globally, not run by run: a group is the same edit wherever its
+        members sit, and grouping only what happened to be adjacent would
+        print the same two values twice because one token was filed between
+        them. The row lands where its first member was, so the table still
+        reads in the document's own order.
+
+        The cap counts GROUPS, which is what changes a page of forty
+        near-identical lines into forty edits.
+
+        AND BY COLLECTION, because one stray member costs the group its
+        template. The head and tail are what every member shares, so a single
+        token from somewhere else with the same two values takes them to
+        nothing, and fifteen names that would have read `subtitle`,
+        `paragraph`, `caption` print as fifteen whole paths instead. Tokens in
+        one collection are the ones whose paths are shaped alike, and a change
+        that crosses collections is two rows — which is what it is.
+
+        One-sided tables are not grouped: two colours that happen to match are
+        a coincidence, not a repetition.
+      */
+      const groups: any[] = [];
+      if (twoSided) {
+        const by = new Map<string, any>();
+        rows.forEach((x: any) => {
+          const k = String(x.figma) + '\u241f' + String(x.repo) +
+                    '\u241f' + String(x.path).split('.')[0];
+          if (!by.has(k)) { const g = { ...x, _members: [] as any[] }; by.set(k, g); groups.push(g); }
+          by.get(k)._members.push(x);
+        });
+        groups.forEach((g) => { g._ends = commonEnds(g._members.map((m: any) => m.path)); });
+      } else {
+        rows.forEach((x: any) => groups.push(x));
+      }
+      const shown = groups.slice(0, COMPARE_SAMPLE);
       return (
         <div className="json-download-card" data-level={4} key={title}>
           <div className="json-download-header">
@@ -3550,9 +3660,9 @@ const SPELLING_NAMES = 6;
               rowKey={(x: any) => x.path}
             />
           </div>
-          {rows.length > COMPARE_SAMPLE && (
+          {groups.length > COMPARE_SAMPLE && (
             <p className="compare-more">
-              {`… and ${(rows.length - COMPARE_SAMPLE).toLocaleString()} more — Copy all has every one`}
+              {`… and ${(groups.length - COMPARE_SAMPLE).toLocaleString()} more — Copy all has every one`}
             </p>
           )}
         </div>

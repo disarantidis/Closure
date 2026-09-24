@@ -1512,6 +1512,28 @@
       -webkit-box-decoration-break: clone;
       box-decoration-break: clone;
     }
+    /* The template path and, under it, the members that followed the same
+       edit. */
+    .compare-group-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    /* Wrapped, not one per line: a hundred names one to a line is the wall
+       this replaced. The separator is drawn between them rather than typed,
+       so a name that starts a line never starts with a bullet. */
+    .compare-group-mates {
+      display: flex; flex-wrap: wrap; column-gap: 8px; row-gap: 1px;
+      margin-inline-start: 10px;
+      font-size: 10px;
+      opacity: 0.75;
+      min-width: 0;
+    }
+    .compare-group-mate { position: relative; overflow-wrap: anywhere; }
+    .compare-group-mate + .compare-group-mate::before {
+      content: '\00B7';
+      position: absolute;
+      inset-inline-start: -5px;
+      opacity: 0.5;
+    }
+    .compare-group-mate.is-more { opacity: 0.6; }
+
     /* A value too long to be a pill — a reference, mostly. Same treatment as
        the path, one step quieter. */
     .compare-cell-text {
