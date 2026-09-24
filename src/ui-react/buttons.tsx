@@ -23,14 +23,11 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 
 import { Button } from '../vendor/pomegranate/panel/node/Button';
-import { Switch } from '../vendor/pomegranate/panel/node/Switch';
-import { ListControlItem } from '../vendor/pomegranate/panel/node/ListControlItem';
 import { SegmentedControl } from '../vendor/pomegranate/panel/node/SegmentedControl';
 import { Checkbox } from '../vendor/pomegranate/panel/node/Checkbox';
 import { DropDownSelect } from '../vendor/pomegranate/panel/node/DropDownSelect';
 import { Combobox } from '../vendor/pomegranate/panel/node/Combobox';
 import { Dialog } from '../vendor/pomegranate/panel/node/Dialog';
-import { InteractiveCard } from '../vendor/pomegranate/panel/node/InteractiveCard';
 import { Toast } from '../vendor/pomegranate/panel/node/Toast';
 import { Alert } from '../vendor/pomegranate/panel/node/Alert';
 import { Skeleton } from '../vendor/pomegranate/panel/node/Skeleton';
@@ -1668,10 +1665,10 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
 })();
 
 /* ── loading skeletons ─────────────────────────────────────────────────────── */
-// Mirrors the real "ODS Test Foundation" card (mountCollectionsAccordion
-// above) now that it's one solid InteractiveCard rather than a variable-
-// length row list: icon + title on the left, the token-count tag flush
-// right — same .skeleton-foundation-card shape ui.template.html defines
+// Mirrors the real card above it: icon + title on the left, the token-count
+// tag flush right. (It said "one solid InteractiveCard" — that card is gone,
+// see mountCollectionsAccordion; the SHAPE it stands in for is the Figma
+// card's header, which is still icon-title-tag.) — same .skeleton-foundation-card shape ui.template.html defines
 // right beside .export-panel's own skeleton below, so both read as one
 // family of "the container that's coming, in outline" rather than two
 // unrelated placeholder styles.
@@ -1990,11 +1987,11 @@ mountFolderList('folder-list', 'PomFolderList', 'folder-row-input', CARD_LEVEL);
 mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-input', CARD_LEVEL);
 
 /* ── collections card → modal (read-only breakdown) ─────────────────────────── */
-// Was an Accordion that expanded in place; requested instead as "a card
-// that opens a modal that showcases the collections" — InteractiveCard
-// (a real DS component: "a card whose whole box is a target", not the
-// hand-rolled div ProviderChoiceCard used to be — see 33ed673/ddc4da9 for
-// why that matters) for the card itself, a plain Dialog for the modal.
+// Was an Accordion that expanded in place, then a card that opened a modal,
+// and now only the modal: the card became the Figma card, whose header holds
+// the count as a real button. See the note inside on why a card that was
+// itself a button could not survive holding another card. A plain Dialog is
+// all that is left here.
 // window.PomCollectionsAccordion's own name/shape is kept exactly as-is:
 // the vanilla script's 'extracted'/'transformed' handlers call
 // setTitle/setCollections/setSummary and don't know or care how this
@@ -3297,16 +3294,15 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
   This is where that measurement gets confirmed or overridden — not a blank
   question, a proposal with its evidence attached.
 
-  ListControlItem with a trailing Switch, which is the kit's own pairing for
-  this: the row carries the name and the explanation, the control carries only
-  the state, and Switch's `labelHidden` exists precisely so the name is not
-  said twice. (Checkbox cannot carry a description of its own — see
-  disarantidis/pomegranate#87 — and this is the row that would have needed it.)
+  A DROPDOWN PER DEPTH, not a switch per depth. This described a
+  ListControlItem with a trailing Switch for as long as the choice was binary —
+  axis or not — and it stopped being binary when a depth gained a third
+  reading: it stays in the name, it becomes modes, or it becomes collections.
+  Three states is a list, and DropDownSelect is the kit's list.
 
-  ONE AXIS PER COLLECTION is enforced here as well as refused downstream: once
-  a depth in a group is on, its siblings go disabled and say why. Letting
-  someone turn on a second one and only then be told it is impossible would be
-  offering a choice that was never available.
+  ONE AXIS PER COLLECTION is still refused downstream, but it is no longer
+  enforced by disabling siblings: the mode option carries "— axis taken" and is
+  disabled on its own row, which says the same thing where the choice is made.
 */
 (function mountImportLevels() {
   const container = document.getElementById('import-levels-mount');
