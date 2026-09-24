@@ -680,6 +680,8 @@ declare global {
          does, the same way the level rows own their own toggles. */
       onClearVariables: (() => void) | null;
     };
+    /* "Synced 4m ago" in the repo card's header — see mountRepoSyncTag. */
+    PomRepoSyncTag: { set: (label: string) => void };
     PomJsonFileCard: { setSize: (sizeLabel: string) => void };
     /* The file name field, which is a plain TextField until the repo turns
        out to hold JSON files to choose from and a Combobox after that.
@@ -2164,6 +2166,24 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     close: () => openDialog(false),
     onClearVariables: null,
   };
+})();
+
+/* ── when the repo card last read the repository ─────────────────────────────
+   The same shape as the Json file card's size tag next door: a fact about the
+   card, in the card's own header, fed by the vanilla script. Renders nothing
+   until there is something to say — see refreshSyncLabels, which is also what
+   keeps it honest as the minutes pass. */
+(function mountRepoSyncTag() {
+  const container = document.getElementById('repo-sync-tag-mount');
+  let set: (v: string) => void = () => {};
+  function View() {
+    const [label, setLabel] = useState('');
+    set = setLabel;
+    if (!label) return null;
+    return <Tag variant="tonal" size="small">{label}</Tag>;
+  }
+  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomRepoSyncTag = { set: (v) => set(v) };
 })();
 
 /* ── "Json file" card title's own file-size tag ──────────────────────────────

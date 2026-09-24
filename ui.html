@@ -2522,6 +2522,10 @@
       another fact about the file.
     */
     .json-file-card .json-download-header #json-file-size-mount { margin-inline-end: auto; }
+    /* Same arrangement in the repo card's header: the tag reads with the title
+       it qualifies, and the mode switch keeps the far right. */
+    .export-panel > .json-download-header #repo-sync-tag-mount { margin-inline-end: auto; }
+    .export-panel > .json-download-header #repo-sync-tag-mount:empty { margin-inline-end: auto; }
     .json-file-card .json-download-header #download-btn-mount { display: flex; }
     /* The header's trailing group. Two things now — the token-count tag and
        the Compare button — and .json-download-header's space-between would
@@ -22964,6 +22968,18 @@ html[data-theme=dark] {
             -->
             <p class="json-download-title" id="repo-card-title">Repo settings</p>
           </div>
+          <!--
+            WHEN THIS CARD LAST LOOKED. The folder list and the file list it
+            offers are both a reading of the repository taken at some moment,
+            and until now that moment was only visible in Settings, on the Sync
+            button. This is the card standing on the reading, so this is where
+            the age of it belongs.
+
+            Empty until the first reading lands — "never synced" is a state
+            nobody needs named, because the card cannot show a stale list it has
+            not read yet.
+          -->
+          <span id="repo-sync-tag-mount"></span>
           <!-- .json-download-header is space-between, so this takes the end of
                the row on its own — the same place the Json file card's own
                Download button sits, one card in. -->
@@ -50824,6 +50840,19 @@ html[data-theme=dark] {
       onClearVariables: null
     };
   })();
+  (function mountRepoSyncTag() {
+    const container = document.getElementById("repo-sync-tag-mount");
+    let set = () => {
+    };
+    function View() {
+      const [label, setLabel] = (0, import_react16.useState)("");
+      set = setLabel;
+      if (!label) return null;
+      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(Tag, { variant: "tonal", size: "small", children: label });
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })));
+    window.PomRepoSyncTag = { set: (v) => set(v) };
+  })();
   (function mountJsonFileCard() {
     const container = document.getElementById("json-file-size-mount");
     let set = () => {
@@ -56877,7 +56906,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'c3f5bac 12:38:51';
+    var CLOSURE_BUILD = 'caebacb 12:52:18';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -58669,6 +58698,13 @@ function format(report, opts) {
         var at = lastSyncedAt[pair[0]];
         btn.setLabel(at ? syncedAgo(at) : 'Sync');
       });
+      /* And the same fact on the main screen, for whichever provider that card
+         is actually about — one card, one reading, one age. */
+      if (window.PomRepoSyncTag) {
+        var which = activeRepoProvider();
+        var when = which ? lastSyncedAt[which] : null;
+        window.PomRepoSyncTag.set(when ? syncedAgo(when) : '');
+      }
     }
     /* A minute is the smallest unit it shows, so a minute is how often it can
        become wrong. Cheap, and it only ever writes two strings. */
