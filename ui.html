@@ -1798,9 +1798,6 @@
     /* Nothing points at this spelling. Dimmed rather than marked: a band means
        "this changed" elsewhere on the page, and a dead group is not a change. */
     .compare-spelling-name.is-dead { opacity: 0.45; }
-    /* A side nothing points at: its notes stay, at the weight of the row they
-       are in. */
-    .compare-spelling-names.is-idle .compare-pattern-why { opacity: 0.5; }
     .compare-pattern-why {
       font-size: 10px;
       line-height: 1.4;
@@ -51518,11 +51515,11 @@ html[data-theme=dark] {
         const noneShared = !!shape && shape.shared === 0;
         const otherTokens = !!shape && !shape.sameKeys && !noneShared;
         const evidence = !!shape && (noneShared || otherTokens || keys.length > 0);
-        const idle = !held.some((n) => used[n]);
-        return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-names" + (idle ? " is-idle" : ""), children: [
+        const consumed = x.consumed && x.consumed[side];
+        return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-names", children: [
           held.map((n) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-name" + (used[n] ? "" : " is-dead"), children: [
             /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "compare-spelling-head", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: n }),
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-cell-path", children: x.consumedDiffers && n === consumed ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("mark", { className: "compare-diff", children: n }) : n }),
               !!used[n] && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-spelling-uses", children: "\xD7" + used[n].toLocaleString() })
             ] }),
             evidence && (() => {
@@ -51547,11 +51544,7 @@ html[data-theme=dark] {
               );
             })()
           ] }, n)),
-          noneShared && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "no tokens in common" }),
-          otherTokens && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "one holds tokens the other does not" }),
-          keys.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "different values" }),
-          (x.splitIn || []).indexOf(side) !== -1 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "both spellings in use here" }),
-          side === "repo" && x.consumedDiffers && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "each file points at a different spelling" })
+          (x.splitIn || []).indexOf(side) !== -1 && /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "compare-pattern-why", children: "both spellings in use here" })
         ] });
       };
       const spellings = (all) => {
@@ -57626,7 +57619,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '4ccadf7 15:53:07';
+    var CLOSURE_BUILD = '251d0c4 15:57:15';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';

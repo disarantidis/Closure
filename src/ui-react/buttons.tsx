@@ -3122,23 +3122,35 @@ const SPELLING_NAMES = 6;
       const vals = (x.values && x.values[side]) || {};
       const shape = (x.shape && x.shape[side]) || null;
       const keys: string[] = shape ? shape.differing : [];
-      /* The flag says which of the two disagreements this is, and both can be
-         true at once: the spellings can hold different tokens AND disagree
-         about the ones they share. */
       const noneShared = !!shape && shape.shared === 0;
       const otherTokens = !!shape && !shape.sameKeys && !noneShared;
       const evidence = !!shape && (noneShared || otherTokens || keys.length > 0);
-      /* Nothing in this file points at either spelling. The amber below still
-         states the facts, in a quieter voice: the sort has already put this
-         row last, and an amber line at full strength on the least urgent
-         finding argues with the order it was given. */
-      const idle = !held.some((n) => used[n]);
+      /*
+        THE NAME IS THE FINDING, SO THE NAME CARRIES THE MARK.
+
+        Three amber lines under a cell — no tokens in common, one holds tokens
+        the other does not, each file points at a different spelling — said in
+        sentences what the two columns were already showing, and stacked into
+        a paragraph under every row of a card that is meant to be scanned.
+
+        What is left is the mark this page already uses for a change, on the
+        spelling each file actually points at, and only where the two files
+        point at different ones. That is the change: the tokens above are
+        identical and read as changed because the name under them moved. The
+        counts and the token lists stay — they are the evidence, and they were
+        never the noise.
+      */
+      const consumed = x.consumed && x.consumed[side];
       return (
-        <span className={'compare-spelling-names' + (idle ? ' is-idle' : '')}>
+        <span className="compare-spelling-names">
           {held.map((n) => (
             <span className={'compare-spelling-name' + (used[n] ? '' : ' is-dead')} key={n}>
               <span className="compare-spelling-head">
-                <span className="compare-cell-path">{n}</span>
+                <span className="compare-cell-path">
+                  {x.consumedDiffers && n === consumed
+                    ? <mark className="compare-diff">{n}</mark>
+                    : n}
+                </span>
                 {!!used[n] && (
                   <span className="compare-spelling-uses">
                     {'\u00d7' + used[n].toLocaleString()}
@@ -3188,25 +3200,10 @@ const SPELLING_NAMES = 6;
               })()}
             </span>
           ))}
-          {/* The amber goes on the SIDE that has the problem, not on the row: a
-              pair can be harmless in one document and hold two answers in the
-              other. */}
-          {noneShared && (
-            <span className="compare-pattern-why">no tokens in common</span>
-          )}
-          {otherTokens && (
-            <span className="compare-pattern-why">one holds tokens the other does not</span>
-          )}
-          {keys.length > 0 && (
-            <span className="compare-pattern-why">different values</span>
-          )}
+          {/* The one thing the columns cannot show by themselves: this file
+              points at BOTH spellings, so there is no single name to mark. */}
           {(x.splitIn || []).indexOf(side) !== -1 && (
             <span className="compare-pattern-why">both spellings in use here</span>
-          )}
-          {/* Once, at the end of the row, because it is the one note here that
-              is about the pair of columns rather than about either of them. */}
-          {side === 'repo' && x.consumedDiffers && (
-            <span className="compare-pattern-why">each file points at a different spelling</span>
           )}
         </span>
       );
