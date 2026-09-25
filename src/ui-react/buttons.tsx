@@ -1304,16 +1304,91 @@ window.PomCompareFolder = mountLiveDropdown(
 ) as any;
 window.PomCompareFolder.onChange = null;
 
-/* The folder a contract goes in, picked from the folders the repo actually
-   has. The same control the compare and push pickers use, for the same reason:
-   a path typed from memory is a path that is wrong on the third component. */
-window.PomComponentFolder = mountLiveDropdown(
-  'component-folder-mount',
-  { label: 'Folder in the repo', icon: IconFolder(16) },
-  (v: string) => window.PomComponentFolder?.onChange?.(v),
-  CARD_LEVEL,
-) as any;
-window.PomComponentFolder.onChange = null;
+/*
+  THE FOLDER, ONE LEVEL AT A TIME.
+
+  A flat list of every folder is fine for a repository with nine of them and
+  unusable for a monorepo with four hundred — which is the shape this is
+  actually for. So each level offers only the folders inside the one above it,
+  and a new level appears when the folder just chosen has folders of its own.
+
+  EVERY LEVEL CAN BE THE DESTINATION. `src/panel/node` is where Pomegranate's
+  components live, and `src` is where another repository's might; a picker that
+  made you descend to a leaf would be wrong about half of them. So each level
+  carries "stay here", and choosing it stops the descent without pretending
+  there is nothing deeper.
+
+  Choosing at a level truncates what was below it, because the folders under
+  the old choice are not under the new one and leaving them would offer a path
+  that does not exist.
+*/
+(function mountComponentFolder() {
+  const container = document.getElementById('component-folder-mount');
+  let set: (s: any) => void = () => {};
+
+  /* The immediate children of a prefix — one segment on, deduplicated. The
+     tree arrives as full paths, and this is the only place that treats them as
+     a hierarchy rather than a list. */
+  const childrenOf = (folders: string[], prefix: string) => {
+    const at = prefix ? prefix + '/' : '';
+    const out: string[] = [];
+    folders.forEach((f) => {
+      if (prefix && f.indexOf(at) !== 0) return;
+      const rest = f.slice(at.length);
+      if (!rest || rest.indexOf('/') !== -1) return;
+      if (out.indexOf(rest) === -1) out.push(rest);
+    });
+    return out.sort();
+  };
+
+  const STAY = '\u0000stay';
+
+  function View() {
+    const [s, setS] = useState<{ folders: string[]; value: string }>({ folders: [], value: '' });
+    set = setS;
+
+    const segments = s.value ? s.value.split('/') : [];
+    const levels: { prefix: string; kids: string[]; chosen: string }[] = [];
+    let prefix = '';
+    for (let depth = 0; ; depth++) {
+      const kids = childrenOf(s.folders, prefix);
+      if (!kids.length) break;
+      const chosen = segments[depth] && kids.indexOf(segments[depth]) !== -1 ? segments[depth] : '';
+      levels.push({ prefix, kids, chosen });
+      if (!chosen) break;
+      prefix = prefix ? prefix + '/' + chosen : chosen;
+    }
+
+    return (
+      <>
+        {levels.map((lv, i) => (
+          <DropDownSelect
+            key={lv.prefix || '(root)'}
+            /* The parent's own name, not its whole path: at this width
+               "Inside packages/react/src" truncates to "Inside pa…", which
+               names nothing. The ladder above it already says where it is. */
+            label={i === 0 ? 'Folder in the repo' : 'Inside ' + lv.prefix.split('/').pop()}
+            value={lv.chosen || STAY}
+            icon={IconFolder(16)}
+            options={[{ value: STAY,
+                        label: lv.prefix ? 'Stay in ' + lv.prefix.split('/').pop() : 'Repository root' }]
+              .concat(lv.kids.map((k) => ({ value: k, label: k })))}
+            onChange={(v: string) => {
+              const next = v === STAY ? lv.prefix : (lv.prefix ? lv.prefix + '/' + v : v);
+              window.PomComponentFolder?.onChange?.(next);
+            }}
+          />
+        ))}
+      </>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(
+    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomComponentFolder = {
+    set: (folders: string[], value: string) => set({ folders, value }),
+    onChange: null as ((v: string) => void) | null,
+  };
+})();
 
 /*
   THE CONTRACTS THIS REPOSITORY ALREADY HOLDS.

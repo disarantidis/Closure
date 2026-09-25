@@ -357,6 +357,39 @@ function figmaWith(vars, styles) {
      fileMod.componentOfPath('src/panel/node/Avatar.contract.json') === 'Avatar',
      fileMod.componentOfPath('src/panel/node/Avatar.contract.json'));
 
+  /*
+    ONE LEVEL AT A TIME. A flat list of every folder is fine for nine and
+    unusable for four hundred, which is the shape a monorepo actually has. The
+    ladder is built from the same paths; this is the arithmetic under it.
+  */
+  {
+    const childrenOf = (folders, prefix) => {
+      const at = prefix ? prefix + '/' : '';
+      const out = [];
+      folders.forEach((f) => {
+        if (prefix && f.indexOf(at) !== 0) return;
+        const rest = f.slice(at.length);
+        if (!rest || rest.indexOf('/') !== -1) return;
+        if (out.indexOf(rest) === -1) out.push(rest);
+      });
+      return out.sort();
+    };
+    const dirs = ['apps', 'apps/web', 'docs', 'packages', 'packages/react',
+                  'packages/react/src', 'packages/react/src/panel',
+                  'packages/react/src/panel/node', 'packages/tokens'];
+    ok('ladder: the first level is the repository\'s own top folders',
+       childrenOf(dirs, '').join(',') === 'apps,docs,packages', childrenOf(dirs, '').join(','));
+    ok('ladder: a level offers only what is inside the one above it',
+       childrenOf(dirs, 'packages').join(',') === 'react,tokens',
+       childrenOf(dirs, 'packages').join(','));
+    ok('ladder: a grandchild is not offered as a child',
+       childrenOf(dirs, 'packages').indexOf('src') === -1);
+    ok('ladder: a folder with nothing inside ends the descent',
+       childrenOf(dirs, 'packages/react/src/panel/node').length === 0);
+    ok('ladder: and a prefix that merely starts the same is not a parent',
+       childrenOf(dirs, 'app').length === 0, JSON.stringify(childrenOf(dirs, 'app')));
+  }
+
   /* The exception form's rule reads before its exceptions, which is the order
      a person says it in. */
   const exc = fileMod.orderedMap({ 'Size=S': 'x', '*': 'FIXED', 'Size=L': 'y' });

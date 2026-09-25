@@ -1246,6 +1246,16 @@
     }
     /* Compare first, push second, and the order is the argument: a contract is
        written after somebody has seen what writing it would change. */
+    /* The folder ladder: one dropdown per level, wrapping. Each is as wide as
+       it needs to be rather than sharing the row equally — "node" and
+       "packages" are not the same length and forcing them to be wastes the
+       width the deeper ones need. */
+    #component-folder-mount {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
+      margin-bottom: 10px;
+    }
+    #component-folder-mount > * { flex: 0 1 auto; min-width: 0; }
+
     /* The contracts this repo already holds. A list rather than a dropdown:
        it is the answer to "what else is here", which is a thing to read before
        it is a thing to choose from. */
@@ -5318,9 +5328,9 @@
     var componentState = { capture: null, contract: null, path: '', id: null, followed: false };
     var lastSelection = null;
     /* What the last browse found. Held so a folder change or a pick can redraw
-       the list without asking the repo again — the tree has not moved because
-       somebody chose a row in it. */
-    var lastFolderItems = [];
+       without asking the repo again — the tree has not moved because somebody
+       chose a row in it. */
+    var lastFolders = [];
     var lastFoundRows = [];
 
     /* The main screen's own line about what is selected. Kept in step with the
@@ -5463,15 +5473,13 @@
       if (!which) return;
       listRepoFolders(which).then(function (got) {
         var folders = (got.folders || []).slice();
-        /* The repository root is a real answer and has no row of its own in a
-           tree listing — a flat repo keeps its components at the top. */
-        if (folders.indexOf('') === -1) folders.unshift('');
         var current = componentFolderOf(window.PomComponentPath.get());
-        if (folders.indexOf(current) === -1) folders.push(current);
-        lastFolderItems = folders.map(function (f) {
-          return { value: f, label: f || '(repository root)' };
-        });
-        window.PomComponentFolder.setItems(lastFolderItems, current);
+        /* A folder the tree does not list, because the default path invented
+           it and the first push will create it. Offered anyway — a picker that
+           dropped the value it was given would silently move the file. */
+        if (current && folders.indexOf(current) === -1) folders.push(current);
+        lastFolders = folders.filter(Boolean);
+        window.PomComponentFolder.set(lastFolders, current);
 
         lastFoundRows = (got.files || [])
           .filter(window.PomComponentFile.isContractPath)
@@ -5499,6 +5507,9 @@
       var file = String(path).split('/').pop();
       var next = (dir ? dir + '/' : '') + file;
       window.PomComponentPath.set(next);
+      /* Redrawn with the new folder so the next level down appears — the point
+         of descending is that choosing a folder reveals what is inside it. */
+      window.PomComponentFolder.set(lastFolders, dir);
       window.PomComponentFound.set(lastFoundRows, next);
     };
 
@@ -5506,7 +5517,7 @@
        because the name is the house style this repo has already settled. */
     window.PomComponentFound.onPick = function (path) {
       window.PomComponentPath.set(path);
-      window.PomComponentFolder.setItems(lastFolderItems, componentFolderOf(path));
+      window.PomComponentFolder.set(lastFolders, componentFolderOf(path));
       window.PomComponentFound.set(lastFoundRows, path);
     };
 

@@ -1246,6 +1246,16 @@
     }
     /* Compare first, push second, and the order is the argument: a contract is
        written after somebody has seen what writing it would change. */
+    /* The folder ladder: one dropdown per level, wrapping. Each is as wide as
+       it needs to be rather than sharing the row equally — "node" and
+       "packages" are not the same length and forcing them to be wastes the
+       width the deeper ones need. */
+    #component-folder-mount {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
+      margin-bottom: 10px;
+    }
+    #component-folder-mount > * { flex: 0 1 auto; min-width: 0; }
+
     /* The contracts this repo already holds. A list rather than a dropdown:
        it is the answer to "what else is here", which is a thing to read before
        it is a thing to choose from. */
@@ -50695,13 +50705,62 @@ html[data-theme=dark] {
     CARD_LEVEL
   );
   window.PomCompareFolder.onChange = null;
-  window.PomComponentFolder = mountLiveDropdown(
-    "component-folder-mount",
-    { label: "Folder in the repo", icon: IconFolder(16) },
-    (v) => window.PomComponentFolder?.onChange?.(v),
-    CARD_LEVEL
-  );
-  window.PomComponentFolder.onChange = null;
+  (function mountComponentFolder() {
+    const container = document.getElementById("component-folder-mount");
+    let set = () => {
+    };
+    const childrenOf = (folders, prefix) => {
+      const at = prefix ? prefix + "/" : "";
+      const out = [];
+      folders.forEach((f) => {
+        if (prefix && f.indexOf(at) !== 0) return;
+        const rest = f.slice(at.length);
+        if (!rest || rest.indexOf("/") !== -1) return;
+        if (out.indexOf(rest) === -1) out.push(rest);
+      });
+      return out.sort();
+    };
+    const STAY = "\0stay";
+    function View() {
+      const [s, setS] = (0, import_react16.useState)({ folders: [], value: "" });
+      set = setS;
+      const segments = s.value ? s.value.split("/") : [];
+      const levels = [];
+      let prefix = "";
+      for (let depth = 0; ; depth++) {
+        const kids = childrenOf(s.folders, prefix);
+        if (!kids.length) break;
+        const chosen = segments[depth] && kids.indexOf(segments[depth]) !== -1 ? segments[depth] : "";
+        levels.push({ prefix, kids, chosen });
+        if (!chosen) break;
+        prefix = prefix ? prefix + "/" + chosen : chosen;
+      }
+      return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(import_jsx_runtime23.Fragment, { children: levels.map((lv, i) => /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+        DropDownSelect,
+        {
+          label: i === 0 ? "Folder in the repo" : "Inside " + lv.prefix.split("/").pop(),
+          value: lv.chosen || STAY,
+          icon: IconFolder(16),
+          options: [{
+            value: STAY,
+            label: lv.prefix ? "Stay in " + lv.prefix.split("/").pop() : "Repository root"
+          }].concat(lv.kids.map((k) => ({ value: k, label: k }))),
+          onChange: (v) => {
+            const next = v === STAY ? lv.prefix : lv.prefix ? lv.prefix + "/" + v : v;
+            window.PomComponentFolder?.onChange?.(next);
+          }
+        },
+        lv.prefix || "(root)"
+      )) });
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(
+      /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })
+    ));
+    window.PomComponentFolder = {
+      set: (folders, value) => set({ folders, value }),
+      onChange: null
+    };
+  })();
   (function mountComponentFound() {
     const container = document.getElementById("component-found-mount");
     let set = () => {
@@ -59248,7 +59307,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'ba7b4bc 19:46:22';
+    var CLOSURE_BUILD = '92a36f8 19:52:01';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -60435,9 +60494,9 @@ function format(report, opts) {
     var componentState = { capture: null, contract: null, path: '', id: null, followed: false };
     var lastSelection = null;
     /* What the last browse found. Held so a folder change or a pick can redraw
-       the list without asking the repo again — the tree has not moved because
-       somebody chose a row in it. */
-    var lastFolderItems = [];
+       without asking the repo again — the tree has not moved because somebody
+       chose a row in it. */
+    var lastFolders = [];
     var lastFoundRows = [];
 
     /* The main screen's own line about what is selected. Kept in step with the
@@ -60580,15 +60639,13 @@ function format(report, opts) {
       if (!which) return;
       listRepoFolders(which).then(function (got) {
         var folders = (got.folders || []).slice();
-        /* The repository root is a real answer and has no row of its own in a
-           tree listing — a flat repo keeps its components at the top. */
-        if (folders.indexOf('') === -1) folders.unshift('');
         var current = componentFolderOf(window.PomComponentPath.get());
-        if (folders.indexOf(current) === -1) folders.push(current);
-        lastFolderItems = folders.map(function (f) {
-          return { value: f, label: f || '(repository root)' };
-        });
-        window.PomComponentFolder.setItems(lastFolderItems, current);
+        /* A folder the tree does not list, because the default path invented
+           it and the first push will create it. Offered anyway — a picker that
+           dropped the value it was given would silently move the file. */
+        if (current && folders.indexOf(current) === -1) folders.push(current);
+        lastFolders = folders.filter(Boolean);
+        window.PomComponentFolder.set(lastFolders, current);
 
         lastFoundRows = (got.files || [])
           .filter(window.PomComponentFile.isContractPath)
@@ -60616,6 +60673,9 @@ function format(report, opts) {
       var file = String(path).split('/').pop();
       var next = (dir ? dir + '/' : '') + file;
       window.PomComponentPath.set(next);
+      /* Redrawn with the new folder so the next level down appears — the point
+         of descending is that choosing a folder reveals what is inside it. */
+      window.PomComponentFolder.set(lastFolders, dir);
       window.PomComponentFound.set(lastFoundRows, next);
     };
 
@@ -60623,7 +60683,7 @@ function format(report, opts) {
        because the name is the house style this repo has already settled. */
     window.PomComponentFound.onPick = function (path) {
       window.PomComponentPath.set(path);
-      window.PomComponentFolder.setItems(lastFolderItems, componentFolderOf(path));
+      window.PomComponentFolder.set(lastFolders, componentFolderOf(path));
       window.PomComponentFound.set(lastFoundRows, path);
     };
 
