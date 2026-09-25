@@ -8017,7 +8017,14 @@
     }
 
     function encodeContent(tokens) {
-      return btoa(unescape(encodeURIComponent(JSON.stringify(tokens, null, 2))));
+      return encodeText(JSON.stringify(tokens, null, 2));
+    }
+    /* The same encoding, given text that is already exactly what should land in
+       the file. A component contract is serialised by its own module — its key
+       order is the thing that makes it diffable — so re-stringifying the parsed
+       object here would quietly undo that. */
+    function encodeText(text) {
+      return btoa(unescape(encodeURIComponent(text)));
     }
 
     /*
@@ -8092,15 +8099,18 @@
     }
 
     // Push to GitLab (incl. self-hosted). Returns a promise; no button UI here.
-    function pushGitLab(tokens) {
+    /* `what` as in pushGitHub: absent for the token export, present for a
+       component contract, one writer either way. */
+    function pushGitLab(tokens, what) {
+      what = what || {};
       var c = gitlabConfig();
       if (!c.token || !c.project) return Promise.reject({ message: 'GitLab not configured' });
 
       var host = c.host.replace(/\/+$/, '');
-      var filePath = composeFilePath(c.folder, c.filename);
-      var commitMsg = document.getElementById('commit-message').value.trim();
+      var filePath = what.path || composeFilePath(c.folder, c.filename);
+      var commitMsg = what.message || document.getElementById('commit-message').value.trim();
       if (!commitMsg) return Promise.reject({ message: 'Commit message is required' });
-      var content = encodeContent(tokens);
+      var content = what.text ? encodeText(what.text) : encodeContent(tokens);
       // Project id/path and file path must be URL-encoded (slashes -> %2F).
       var base = host + '/api/v4/projects/' + encodeURIComponent(c.project) +
                  '/repository/files/' + encodeURIComponent(filePath);
@@ -8263,7 +8273,24 @@
     // Push to GitHub. Contents API uses PUT for both create and update —
     // whether the body includes `sha` is what decides which (a fetched
     // sha means the file already exists on this branch; 404 = create).
-    function pushGitHub(tokens) {
+    /*
+      `what` IS THE FILE, and every field of it is optional.
+
+      Without it this pushes the token export to the configured path with the
+      commit message from the field — what it has always done, and what every
+      existing caller still gets. With it, the same function writes a different
+      file to a different address: the component contract, whose bytes and path
+      are decided by its own module.
+
+      ONE WRITER, NOT TWO. Everything difficult here is difficult for any file:
+      the sha lookup that decides create-from-update, the two size ceilings and
+      the fallback between them, the error reading that turns a GitHub response
+      into a sentence. A second push would be a second place for all of it to be
+      subtly wrong, and the wrongness would surface the day a contract failed to
+      write for a reason the token push had solved a year earlier.
+    */
+    function pushGitHub(tokens, what) {
+      what = what || {};
       var c = githubConfig();
       if (!c.token || !c.repo) return Promise.reject({ message: 'GitHub not configured' });
       // Exactly two segments — `owner/repo/anything` is a typo, not a repo we
@@ -8271,10 +8298,10 @@
       var parts = c.repo.split('/');
       if (parts.length !== 2 || !parts[0] || !parts[1]) return Promise.reject({ message: 'GitHub repo must be owner/repo' });
 
-      var filePath = composeFilePath(c.folder, c.filename);
-      var commitMsg = document.getElementById('commit-message').value.trim();
+      var filePath = what.path || composeFilePath(c.folder, c.filename);
+      var commitMsg = what.message || document.getElementById('commit-message').value.trim();
       if (!commitMsg) return Promise.reject({ message: 'Commit message is required' });
-      var json = JSON.stringify(tokens, null, 2);
+      var json = what.text || JSON.stringify(tokens, null, 2);
       var apiUrl = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
                    encodeURIComponent(parts[1]) + '/contents/' + filePath.split('/').map(encodeURIComponent).join('/');
       var headers = { 'Authorization': 'token ' + c.token, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
@@ -8296,7 +8323,12 @@
         var blobBody = blobPayload(json);
         /* Readable beats compact right up until readable cannot be pushed. */
         if (byteLength(blobBody) > BLOB_API_MAX) {
-          json = JSON.stringify(tokens);
+            /* Compacting is a token-export remedy: that document is one large
+               object whose whitespace is the only thing that can go. A contract
+               is already as short as its own serialiser makes it, and
+               re-stringifying would destroy the key order that makes it
+               diffable — so one too large to push says so instead. */
+            json = what.text ? json : JSON.stringify(tokens);
           blobBody = blobPayload(json);
           if (byteLength(blobBody) > BLOB_API_MAX) {
             return Promise.reject({ message:
@@ -8308,7 +8340,7 @@
         }
         return pushGitHubLarge(parts, c, filePath, json, commitMsg, headers, readErr, blobBody);
       }
-      var content = encodeContent(tokens);
+      var content = what.text ? encodeText(json) : encodeContent(tokens);
 
       // Look up the file's current sha (needed to update it); 404 = doesn't
       // exist yet = create (no sha in the write body).

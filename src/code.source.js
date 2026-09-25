@@ -3625,6 +3625,54 @@ figma.ui.onmessage = function(msg) {
     promise this code can make — which is why the confirmation in the UI says
     what will go rather than offering to reverse it.
   */
+  /*
+    CAPTURE THE SELECTED COMPONENT SET.
+
+    The selection is resolved here rather than asked for, because the thing a
+    person has selected is usually a variant — they clicked the one they were
+    looking at — and refusing that would be the plugin being pedantic about a
+    distinction it can resolve itself. An INSTANCE is refused, because an
+    instance is a use of a component and its contract belongs to the component.
+
+    Everything after the read is the capture module's, and everything after
+    THAT is the UI's: this handler walks nothing and decides nothing.
+  */
+  if (msg.type === 'captureComponent') {
+    (async function() {
+      try {
+        var sel = figma.currentPage.selection;
+        var set = null, why = '';
+        if (!sel.length) {
+          why = 'Select a component set — or any one of its variants.';
+        } else if (sel[0].type === 'COMPONENT_SET') {
+          set = sel[0];
+        } else if (sel[0].type === 'COMPONENT' && sel[0].parent && sel[0].parent.type === 'COMPONENT_SET') {
+          set = sel[0].parent;
+        } else if (sel[0].type === 'COMPONENT') {
+          why = '"' + sel[0].name + '" is a component on its own, with no variants. ' +
+                'A contract describes a set and the axes it varies over.';
+        } else if (sel[0].type === 'INSTANCE') {
+          why = 'That is an instance. Select the component set it came from — a ' +
+                'contract belongs to the component, not to a use of it.';
+        } else {
+          why = 'Selected a ' + String(sel[0].type).toLowerCase().replace(/_/g, ' ') +
+                '. Select a component set.';
+        }
+        if (!set) {
+          figma.ui.postMessage({ type: 'componentCaptureFailed', reason: why });
+          return;
+        }
+        var capture = await PomComponentCapture.captureComponentSet(set, figma, {});
+        figma.ui.postMessage({ type: 'componentCaptured', capture: capture });
+      } catch (e) {
+        console.error('[Closure] component capture failed:', e);
+        figma.ui.postMessage({ type: 'componentCaptureFailed',
+                               reason: (e && e.message) || String(e) });
+      }
+    })();
+    return;
+  }
+
   if (msg.type === 'clearVariables') {
     (async function() {
       try {
