@@ -98,6 +98,47 @@ function diffApi(figma, repo) {
 }
 
 /*
+  IS THIS THE SAME COMPONENT AT ALL?
+
+  Asked before anything is compared, because comparing Avatar against Button's
+  contract produces a long and perfectly coherent report about nothing. Every
+  row of it would be true and the whole of it would be meaningless, and a
+  reader has no way to tell that from a component that has genuinely changed
+  beyond recognition.
+
+  THE PUBLISHED KEY IS THE ANSWER WHEN THERE IS ONE. It survives the component
+  being copied into another file, where the node id does not. A file key and
+  node id together are the fallback, and the pair has to match: a node id alone
+  means nothing across files, since two documents number their nodes the same
+  way.
+
+  A contract with NO identity — hand-written, or from before this was
+  recorded — is not a mismatch. It is a file that never said, and refusing to
+  compare it would be refusing the case this was built to migrate.
+*/
+function identity(contract) {
+  var f = (contract && contract.figma) || {};
+  return { key: f.key || null, fileKey: f.fileKey || null, nodeId: f.nodeId || null };
+}
+
+function samePairing(figma, repo) {
+  var a = identity(figma), b = identity(repo);
+  if (!b.key && !b.nodeId) return { verdict: 'unstated' };
+  if (a.key && b.key) {
+    return a.key === b.key ? { verdict: 'same' }
+                           : { verdict: 'different', by: 'key', figma: a.key, repo: b.key };
+  }
+  if (a.nodeId && b.nodeId) {
+    var sameFile = !a.fileKey || !b.fileKey || a.fileKey === b.fileKey;
+    if (sameFile && a.nodeId === b.nodeId) return { verdict: 'same' };
+    return { verdict: 'different', by: 'nodeId',
+             figma: (a.fileKey || '?') + ' ' + a.nodeId,
+             repo: (b.fileKey || '?') + ' ' + b.nodeId };
+  }
+  return { verdict: 'unstated' };
+}
+
+/*
   diff(figmaContract, repoContract) -> report
 
   Neither side is modified and nothing is written. `same` is the answer most
@@ -107,6 +148,7 @@ function diffApi(figma, repo) {
 function diff(figma, repo) {
   figma = figma || {}; repo = repo || {};
   var report = {
+    pairing: samePairing(figma, repo),
     component: figma.component !== repo.component
       ? { figma: figma.component, repo: repo.component } : null,
     api: diffApi(figma.api, repo.api),
@@ -153,7 +195,7 @@ function diff(figma, repo) {
   return report;
 }
 
-  var api = { keysOf, sameList, factChange, split, diffApi, diff };
+  var api = { keysOf, sameList, factChange, split, diffApi, identity, samePairing, diff };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.PomComponentDiff = api;

@@ -5436,6 +5436,7 @@
     function renderComponent(capture) {
       componentState.capture = capture;
       componentState.id = capture.nodeId;
+      componentState.locked = capture.contractPath || null;
       var contract = window.PomComponentContract.contract(capture);
       componentState.contract = contract;
 
@@ -5510,7 +5511,18 @@
         */
         var name = componentState.capture && componentState.capture.name;
         var match = window.PomComponentFile.matchInRepo(name, got);
-        if (match && window.PomComponentPath.get() === componentState.path) {
+        /*
+          A LOCK OUTRANKS A MATCH, because it is not a guess. The component
+          carries the path its contract was last written to, so a rename on
+          either side — the component in Figma, the file in the repo — stops
+          being able to break the pairing. Matching by name is what happens
+          before there is a lock, and what happens if one is ever lost.
+        */
+        if (componentState.locked && window.PomComponentPath.get() === componentState.path) {
+          componentState.path = componentState.locked;
+          window.PomComponentPath.set(componentState.locked);
+          window.PomComponentFolder.set(lastFolders, componentFolderOf(componentState.locked));
+        } else if (match && window.PomComponentPath.get() === componentState.path) {
           var matched = window.PomComponentFile.pathForMatch(name, match);
           if (matched) {
             componentState.path = matched;
@@ -5518,7 +5530,7 @@
             window.PomComponentFolder.set(lastFolders, componentFolderOf(matched));
           }
         }
-        renderComponentMatch(match);
+        renderComponentMatch(match, componentState.locked);
         window.PomComponentFound.set(lastFoundRows, window.PomComponentPath.get());
       }, function () { /* browsing is a convenience; the default path still works */ });
     }
@@ -5531,9 +5543,15 @@
       what was matched. So the line names the file it found, and when several
       matched equally it says that instead of pretending the first was special.
     */
-    function renderComponentMatch(match) {
+    function renderComponentMatch(match, locked) {
       var el = document.getElementById('component-match-line');
       if (!el) return;
+      if (locked) {
+        el.textContent = 'This component is linked to ' + locked +
+          ' — set when its contract was last pushed.';
+        el.hidden = false;
+        return;
+      }
       if (!match) {
         el.textContent = 'No file in the repo matches this name — pick where it should go.';
         el.hidden = false;
@@ -5594,6 +5612,13 @@
         window.PomComponentPushBtn.setLoading(false);
         window.PomComponentPushBtn.setSuccess(true);
         showToast('Wrote ' + what.path);
+        /* THE PUSH IS WHAT SETTLES IT. Recorded after the write lands, never
+           before — remembering a path somebody was still choosing would lock
+           in a decision they had not made. */
+        componentState.locked = what.path;
+        parent.postMessage({ pluginMessage: {
+          type: 'rememberContractPath', nodeId: componentState.id, path: what.path } }, '*');
+        renderComponentMatch(null, what.path);
       }, function (err) {
         window.PomComponentPushBtn.setLoading(false);
         showToast(errText(err), true);
@@ -5623,6 +5648,24 @@
           return;
         }
         var report = window.PomComponentDiff.diff(componentState.contract, theirs);
+        /*
+          A DIFFERENT COMPONENT IS NOT A DIFFERENCE.
+
+          Comparing Avatar against Button's contract produces a long and
+          perfectly coherent report about nothing: every row true, the whole
+          meaningless, and no way for a reader to tell it from a component that
+          has changed beyond recognition. So the pairing is checked first and a
+          mismatch is refused rather than rendered.
+        */
+        if (report.pairing.verdict === 'different') {
+          window.PomComponentResult.problem(
+            'That contract is for another component',
+            'The file at ' + path + ' records a different ' +
+            (report.pairing.by === 'key' ? 'component key' : 'Figma node') + ' — ' +
+            report.pairing.repo + ', where this one is ' + report.pairing.figma + '.',
+            'Point the path at this component\'s own contract, or push to overwrite that file.');
+          return;
+        }
         window.PomComponentResult.report(report, path);
       }, function (err) {
         window.PomComponentCompareBtn.setLoading(false);

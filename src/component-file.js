@@ -151,6 +151,7 @@ function ordered(contract) {
   out.figma = {
     fileKey: (contract.figma && contract.figma.fileKey) || null,
     nodeId: (contract.figma && contract.figma.nodeId) || null,
+    key: (contract.figma && contract.figma.key) || null,
   };
 
   var api = contract.api || {};

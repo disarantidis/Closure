@@ -3717,6 +3717,36 @@ figma.ui.onmessage = function(msg) {
     return;
   }
 
+  /*
+    LOCK THE COMPONENT TO ITS FILE.
+
+    Sent after a contract has been written, never before: the push is the act
+    that settles which file this component's contract is, and recording it any
+    earlier would be remembering a path somebody was still choosing.
+
+    THE ONLY THING THIS PLUGIN WRITES TO A COMPONENT, and it is metadata — no
+    layer, property or value is touched. Shared plugin data so the answer
+    travels with the component into files that import it, and so a teammate
+    running this plugin is told rather than left to guess again.
+  */
+  if (msg.type === 'rememberContractPath') {
+    (async function() {
+      try {
+        var node = await figma.getNodeByIdAsync(msg.nodeId);
+        if (!node || node.type !== 'COMPONENT_SET') return;
+        node.setSharedPluginData(PomComponentCapture.LOCK_NAMESPACE,
+                                 PomComponentCapture.LOCK_KEY, String(msg.path || ''));
+        figma.ui.postMessage({ type: 'contractPathRemembered', nodeId: msg.nodeId, path: msg.path });
+      } catch (e) {
+        /* Not being able to remember is not a reason to undo a push that has
+           already landed. The next capture falls back to matching by name,
+           which is where this started. */
+        console.warn('[Closure] could not remember the contract path:', e);
+      }
+    })();
+    return;
+  }
+
   if (msg.type === 'clearVariables') {
     (async function() {
       try {

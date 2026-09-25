@@ -559,6 +559,35 @@ function figmaWith(vars, styles) {
     ok('compare: a component it did not used to compose is named',
        diff(base, r).composes.added.join(',') === 'Icon');
   }
+
+  /*
+    THE LOCK, FROM THE FILE'S SIDE. Comparing Avatar against Button's contract
+    produces a long and perfectly coherent report about nothing — every row
+    true, the whole meaningless, and no way for a reader to tell it from a
+    component that has changed beyond recognition.
+  */
+  {
+    const { samePairing } = require('../src/component-diff.js');
+    const F = (o) => ({ figma: o });
+    ok('lock: the published key settles it, and survives a copy into another file',
+       samePairing(F({ key: 'k1', nodeId: '1:1' }), F({ key: 'k1', nodeId: '9:9' })).verdict === 'same');
+    ok('lock: a different key is a different component, whatever the names say',
+       samePairing(F({ key: 'k1' }), F({ key: 'k2' })).verdict === 'different');
+    ok('lock: without keys, the file and the node together answer',
+       samePairing(F({ fileKey: 'A', nodeId: '1:1' }), F({ fileKey: 'A', nodeId: '1:1' })).verdict === 'same');
+    /* A node id alone means nothing across files — two documents number their
+       nodes the same way. */
+    ok('lock: the same node id in another file is not the same component',
+       samePairing(F({ fileKey: 'A', nodeId: '1:1' }), F({ fileKey: 'B', nodeId: '1:1' })).verdict === 'different');
+    /* A contract that never said is not a mismatch. Refusing it would be
+       refusing the hand-written and the historical, which is the case this
+       exists to migrate. */
+    ok('lock: a contract with no identity is unstated, not wrong',
+       samePairing(F({ key: 'k1' }), F({})).verdict === 'unstated');
+    ok('lock: and the verdict rides on the report rather than beside it',
+       diff({ figma: { key: 'k1' }, layers: {} }, { figma: { key: 'k2' }, layers: {} })
+         .pairing.verdict === 'different');
+  }
 }
 
 pending.then(() => {

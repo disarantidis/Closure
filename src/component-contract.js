@@ -313,7 +313,16 @@ function contract(capture, opts) {
 
   var out = {
     component: capture.name,
-    figma: { fileKey: capture.fileKey || null, nodeId: capture.nodeId },
+    /*
+      THE OTHER HALF OF THE LOCK. The Figma side remembers which file its
+      contract is; this is the file remembering which component it came from,
+      so a comparison can tell that it has been pointed at the wrong one. The
+      published key outlives the node id — a component copied to another file
+      keeps the key and gets a new id — so both travel and whichever survives
+      answers.
+    */
+    figma: { fileKey: capture.fileKey || null, nodeId: capture.nodeId,
+             key: capture.key || null },
     api: (capture.api || []).reduce(function (acc, p) {
       var e = { type: String(p.type).toLowerCase().replace('_', '-') };
       if (p.values) e.values = p.values;

@@ -57225,7 +57225,16 @@ function contract(capture, opts) {
 
   var out = {
     component: capture.name,
-    figma: { fileKey: capture.fileKey || null, nodeId: capture.nodeId },
+    /*
+      THE OTHER HALF OF THE LOCK. The Figma side remembers which file its
+      contract is; this is the file remembering which component it came from,
+      so a comparison can tell that it has been pointed at the wrong one. The
+      published key outlives the node id — a component copied to another file
+      keeps the key and gets a new id — so both travel and whichever survives
+      answers.
+    */
+    figma: { fileKey: capture.fileKey || null, nodeId: capture.nodeId,
+             key: capture.key || null },
     api: (capture.api || []).reduce(function (acc, p) {
       var e = { type: String(p.type).toLowerCase().replace('_', '-') };
       if (p.values) e.values = p.values;
@@ -57406,6 +57415,7 @@ function ordered(contract) {
   out.figma = {
     fileKey: (contract.figma && contract.figma.fileKey) || null,
     nodeId: (contract.figma && contract.figma.nodeId) || null,
+    key: (contract.figma && contract.figma.key) || null,
   };
 
   var api = contract.api || {};
@@ -57672,6 +57682,47 @@ function diffApi(figma, repo) {
 }
 
 /*
+  IS THIS THE SAME COMPONENT AT ALL?
+
+  Asked before anything is compared, because comparing Avatar against Button's
+  contract produces a long and perfectly coherent report about nothing. Every
+  row of it would be true and the whole of it would be meaningless, and a
+  reader has no way to tell that from a component that has genuinely changed
+  beyond recognition.
+
+  THE PUBLISHED KEY IS THE ANSWER WHEN THERE IS ONE. It survives the component
+  being copied into another file, where the node id does not. A file key and
+  node id together are the fallback, and the pair has to match: a node id alone
+  means nothing across files, since two documents number their nodes the same
+  way.
+
+  A contract with NO identity — hand-written, or from before this was
+  recorded — is not a mismatch. It is a file that never said, and refusing to
+  compare it would be refusing the case this was built to migrate.
+*/
+function identity(contract) {
+  var f = (contract && contract.figma) || {};
+  return { key: f.key || null, fileKey: f.fileKey || null, nodeId: f.nodeId || null };
+}
+
+function samePairing(figma, repo) {
+  var a = identity(figma), b = identity(repo);
+  if (!b.key && !b.nodeId) return { verdict: 'unstated' };
+  if (a.key && b.key) {
+    return a.key === b.key ? { verdict: 'same' }
+                           : { verdict: 'different', by: 'key', figma: a.key, repo: b.key };
+  }
+  if (a.nodeId && b.nodeId) {
+    var sameFile = !a.fileKey || !b.fileKey || a.fileKey === b.fileKey;
+    if (sameFile && a.nodeId === b.nodeId) return { verdict: 'same' };
+    return { verdict: 'different', by: 'nodeId',
+             figma: (a.fileKey || '?') + ' ' + a.nodeId,
+             repo: (b.fileKey || '?') + ' ' + b.nodeId };
+  }
+  return { verdict: 'unstated' };
+}
+
+/*
   diff(figmaContract, repoContract) -> report
 
   Neither side is modified and nothing is written. `same` is the answer most
@@ -57681,6 +57732,7 @@ function diffApi(figma, repo) {
 function diff(figma, repo) {
   figma = figma || {}; repo = repo || {};
   var report = {
+    pairing: samePairing(figma, repo),
     component: figma.component !== repo.component
       ? { figma: figma.component, repo: repo.component } : null,
     api: diffApi(figma.api, repo.api),
@@ -57727,7 +57779,7 @@ function diff(figma, repo) {
   return report;
 }
 
-  var api = { keysOf, sameList, factChange, split, diffApi, diff };
+  var api = { keysOf, sameList, factChange, split, diffApi, identity, samePairing, diff };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.PomComponentDiff = api;
@@ -59435,7 +59487,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '1e23095 19:55:01';
+    var CLOSURE_BUILD = '32b90fb 20:04:55';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -60722,6 +60774,7 @@ function format(report, opts) {
     function renderComponent(capture) {
       componentState.capture = capture;
       componentState.id = capture.nodeId;
+      componentState.locked = capture.contractPath || null;
       var contract = window.PomComponentContract.contract(capture);
       componentState.contract = contract;
 
@@ -60796,7 +60849,18 @@ function format(report, opts) {
         */
         var name = componentState.capture && componentState.capture.name;
         var match = window.PomComponentFile.matchInRepo(name, got);
-        if (match && window.PomComponentPath.get() === componentState.path) {
+        /*
+          A LOCK OUTRANKS A MATCH, because it is not a guess. The component
+          carries the path its contract was last written to, so a rename on
+          either side — the component in Figma, the file in the repo — stops
+          being able to break the pairing. Matching by name is what happens
+          before there is a lock, and what happens if one is ever lost.
+        */
+        if (componentState.locked && window.PomComponentPath.get() === componentState.path) {
+          componentState.path = componentState.locked;
+          window.PomComponentPath.set(componentState.locked);
+          window.PomComponentFolder.set(lastFolders, componentFolderOf(componentState.locked));
+        } else if (match && window.PomComponentPath.get() === componentState.path) {
           var matched = window.PomComponentFile.pathForMatch(name, match);
           if (matched) {
             componentState.path = matched;
@@ -60804,7 +60868,7 @@ function format(report, opts) {
             window.PomComponentFolder.set(lastFolders, componentFolderOf(matched));
           }
         }
-        renderComponentMatch(match);
+        renderComponentMatch(match, componentState.locked);
         window.PomComponentFound.set(lastFoundRows, window.PomComponentPath.get());
       }, function () { /* browsing is a convenience; the default path still works */ });
     }
@@ -60817,9 +60881,15 @@ function format(report, opts) {
       what was matched. So the line names the file it found, and when several
       matched equally it says that instead of pretending the first was special.
     */
-    function renderComponentMatch(match) {
+    function renderComponentMatch(match, locked) {
       var el = document.getElementById('component-match-line');
       if (!el) return;
+      if (locked) {
+        el.textContent = 'This component is linked to ' + locked +
+          ' — set when its contract was last pushed.';
+        el.hidden = false;
+        return;
+      }
       if (!match) {
         el.textContent = 'No file in the repo matches this name — pick where it should go.';
         el.hidden = false;
@@ -60880,6 +60950,13 @@ function format(report, opts) {
         window.PomComponentPushBtn.setLoading(false);
         window.PomComponentPushBtn.setSuccess(true);
         showToast('Wrote ' + what.path);
+        /* THE PUSH IS WHAT SETTLES IT. Recorded after the write lands, never
+           before — remembering a path somebody was still choosing would lock
+           in a decision they had not made. */
+        componentState.locked = what.path;
+        parent.postMessage({ pluginMessage: {
+          type: 'rememberContractPath', nodeId: componentState.id, path: what.path } }, '*');
+        renderComponentMatch(null, what.path);
       }, function (err) {
         window.PomComponentPushBtn.setLoading(false);
         showToast(errText(err), true);
@@ -60909,6 +60986,24 @@ function format(report, opts) {
           return;
         }
         var report = window.PomComponentDiff.diff(componentState.contract, theirs);
+        /*
+          A DIFFERENT COMPONENT IS NOT A DIFFERENCE.
+
+          Comparing Avatar against Button's contract produces a long and
+          perfectly coherent report about nothing: every row true, the whole
+          meaningless, and no way for a reader to tell it from a component that
+          has changed beyond recognition. So the pairing is checked first and a
+          mismatch is refused rather than rendered.
+        */
+        if (report.pairing.verdict === 'different') {
+          window.PomComponentResult.problem(
+            'That contract is for another component',
+            'The file at ' + path + ' records a different ' +
+            (report.pairing.by === 'key' ? 'component key' : 'Figma node') + ' — ' +
+            report.pairing.repo + ', where this one is ' + report.pairing.figma + '.',
+            'Point the path at this component\'s own contract, or push to overwrite that file.');
+          return;
+        }
         window.PomComponentResult.report(report, path);
       }, function (err) {
         window.PomComponentCompareBtn.setLoading(false);

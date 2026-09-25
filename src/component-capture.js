@@ -47,6 +47,21 @@ var DEFAULTS = {
   maxNodesPerVariant: 400,
 };
 
+/*
+  WHERE THE LOCK LIVES ON THE FIGMA SIDE.
+
+  Matching a component to a file by its name is a guess, and a good one — but
+  it is a guess made again every time, and it breaks the moment either side is
+  renamed. Once somebody has confirmed it by pushing, the answer is known and
+  should stop being derived.
+
+  Shared plugin data, not document plugin data: it travels with the component
+  into any file that imports it, and any teammate running this plugin gets the
+  same answer rather than re-guessing for themselves.
+*/
+var LOCK_NAMESPACE = 'closure';
+var LOCK_KEY = 'contractPath';
+
 /* The first two segments of a boundVariables entry: fills and strokes arrive as
    arrays (one entry per paint), everything else as a single object. Only the
    first is taken — a layer with two bound paints is telling us about the paint
@@ -267,11 +282,27 @@ async function captureComponentSet(set, figma, opts) {
     variants: variants,
   };
   if (figma.fileKey) out.fileKey = figma.fileKey;
+  /*
+    THE PUBLISHED IDENTITY, WHICH OUTLIVES THE NODE ID.
+
+    A node id belongs to one file: copy the component to another and it
+    changes, which makes it a poor thing to pair a repository file to. A
+    published component set carries a `key` that survives the copy, so both are
+    written and whichever is available answers.
+  */
+  if (set.key) out.key = set.key;
+  /* The lock, if one has been set. Read here rather than derived so the whole
+     capture is what the sandbox knows about this component. */
+  try {
+    var locked = set.getSharedPluginData(LOCK_NAMESPACE, LOCK_KEY);
+    if (locked) out.contractPath = locked;
+  } catch (e) { /* older documents and stand-ins have no plugin data */ }
   if (Object.keys(truncated).length) out.truncated = truncated;
   return out;
 }
 
-  var api = { DEFAULTS, firstEntry, pathFrom, outermostInstance, hiddenWithin,
+  var api = { DEFAULTS, LOCK_NAMESPACE, LOCK_KEY,
+              firstEntry, pathFrom, outermostInstance, hiddenWithin,
               captureLayer, captureComponentSet };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
