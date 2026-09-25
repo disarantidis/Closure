@@ -1236,6 +1236,18 @@
        inset because it stands on the page like the sides do, not inside a
        card. */
     .compare-apply { margin: 0 16px 16px; }
+    /* The contract page. Same scroll behaviour as Compare — it is the same
+       kind of page: a long answer to a question asked once. */
+    .component-page { overflow-y: auto; overflow-x: hidden; }
+    .component-status-line { margin: 0; font-size: 12px; line-height: 1.5; color: var(--app-text); }
+    .component-status-line.is-quiet { color: var(--app-text-muted); }
+    .component-composes {
+      margin: 10px 0 0; font-size: 11px; line-height: 1.5; color: var(--app-text-muted);
+    }
+    /* Compare first, push second, and the order is the argument: a contract is
+       written after somebody has seen what writing it would change. */
+    .component-buttons { display: flex; gap: 8px; margin-top: 12px; }
+    .component-buttons > span { flex: 1 1 0; min-width: 0; }
     .compare-page { overflow-y: auto; overflow-x: hidden; }
     .compare-page::-webkit-scrollbar { width: 8px; }
     .compare-page::-webkit-scrollbar-track { background: transparent; }
@@ -3205,6 +3217,28 @@
       one button that saves it live here, and everything about the repository
       stays in the repository's card.
     -->
+    <!--
+      THE WAY IN TO A COMPONENT'S CONTRACT.
+
+      Its own card rather than a button on an existing one: everything else on
+      this screen is about the file's variables, and this is about one
+      component somebody has selected. Always visible, because the answer to
+      "nothing is selected" belongs on the page that asks — a button that
+      hides when the selection is wrong teaches nobody what to select.
+    -->
+    <div class="json-file-card" id="component-entry-card" data-level="4">
+      <div class="json-download-header">
+        <div class="json-download-title-group">
+          <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+          </svg>
+          <p class="json-download-title">Component contract</p>
+        </div>
+        <span id="component-open-btn-mount"></span>
+      </div>
+    </div>
+
     <div class="json-file-card" id="json-file-card" data-level="4" hidden>
         <div class="json-download-header">
           <div class="json-download-title-group">
@@ -3642,6 +3676,66 @@
     </header>
     <div class="settings-page-content">
       <div id="compare-mount"></div>
+    </div>
+  </div>
+
+  <!--
+    THE COMPONENT CONTRACT. Its own page rather than a card on the main screen,
+    for the same reason Compare has one: it answers a question about ONE thing
+    the person selected, and the main screen is about the file as a whole.
+  -->
+  <div class="page component-page" id="component-page">
+    <header class="header-settings">
+      <div class="header-panel">
+        <div class="git-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+          </svg>
+        </div>
+        <h1 class="title">Contract</h1>
+        <span id="component-back-btn-mount"></span>
+      </div>
+    </header>
+    <div class="settings-page-content">
+      <!-- What is selected, or why nothing can be done yet. Always present:
+           this page opens on a selection it did not choose. -->
+      <div class="json-download-card" data-level="4" id="component-status">
+        <p class="component-status-line" id="component-status-line">Reading the selection…</p>
+      </div>
+
+      <!-- The contract, summarised. The file itself is long and nobody reads a
+           290-line JSON to decide whether to push it; these are the numbers
+           that say whether it looks right. -->
+      <div class="json-download-card" data-level="4" id="component-summary" hidden>
+        <div class="json-download-header">
+          <div class="json-download-title-group">
+            <p class="json-download-title" id="component-name">—</p>
+          </div>
+          <span class="compare-side-detail" id="component-variants">—</span>
+        </div>
+        <div class="compare-stats" id="component-stats"></div>
+        <p class="component-composes" id="component-composes" hidden></p>
+      </div>
+
+      <!-- Where it goes, and the two things that can be done with it. The path
+           is shown rather than hidden because it is the half of this feature a
+           repository cares about, and it is editable because a repository's
+           layout is its own business. -->
+      <div class="json-download-card" data-level="4" id="component-actions" hidden>
+        <div class="json-download-header">
+          <div class="json-download-title-group">
+            <p class="json-download-title">In the repo</p>
+          </div>
+        </div>
+        <span id="component-path-mount"></span>
+        <div class="component-buttons">
+          <span id="component-compare-btn-mount"></span>
+          <span id="component-push-btn-mount"></span>
+        </div>
+      </div>
+
+      <div id="component-result-mount"></div>
     </div>
   </div>
 
@@ -5178,11 +5272,155 @@
       the way to bring a repo's tokens INTO Figma, this is the way to see how
       far the two have drifted.
     */
+    /* ── the component contract ──────────────────────────────────────────────
+       Capture in the sandbox, everything else here. The page holds one
+       component at a time — the one that was selected when it opened — and
+       re-reads the selection every time it is opened rather than watching it,
+       because a selection that changes under a contract you are about to push
+       is a worse surprise than having to open the page again. */
+    var componentState = { capture: null, contract: null, path: '' };
+
+    function openComponent() {
+      document.getElementById('main-page').classList.add('hidden');
+      document.getElementById('component-page').classList.add('visible');
+      componentState = { capture: null, contract: null, path: '' };
+      document.getElementById('component-summary').hidden = true;
+      document.getElementById('component-actions').hidden = true;
+      window.PomComponentResult.clear();
+      componentStatus('Reading the selection…');
+      parent.postMessage({ pluginMessage: { type: 'captureComponent' } }, '*');
+    }
+
+    function closeComponent() {
+      document.getElementById('component-page').classList.remove('visible');
+      document.getElementById('main-page').classList.remove('hidden');
+    }
+
+    function componentStatus(text, quiet) {
+      var el = document.getElementById('component-status-line');
+      el.textContent = text;
+      el.classList.toggle('is-quiet', !!quiet);
+    }
+
+    /* The path the contract will be written to. Derived from the component's
+       name and the folder already chosen for this provider, and editable —
+       a repository's layout is its own business and a guess that cannot be
+       corrected is a guess that has to be right. */
+    function componentPath() {
+      var which = activeRepoProvider();
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      return window.PomComponentFile.pathFor(
+        (componentState.capture && componentState.capture.name) || 'component',
+        { dir: (c && c.folder) || '' });
+    }
+
+    function renderComponent(capture) {
+      componentState.capture = capture;
+      var contract = window.PomComponentContract.contract(capture);
+      componentState.contract = contract;
+
+      componentStatus(capture.name + ' — captured from this file.', true);
+      document.getElementById('component-name').textContent = capture.name;
+      document.getElementById('component-variants').textContent =
+        capture.variants.length.toLocaleString() + ' variants';
+
+      var s = contract.summary;
+      window.PomComponentStats.set([
+        { n: s.facts, label: 'facts in the contract' },
+        { n: s.varying, label: 'that depend on a variant axis' },
+        { n: s.unbound, label: 'not bound to a token' },
+      ]);
+
+      var composes = document.getElementById('component-composes');
+      composes.hidden = !(contract.composes && contract.composes.length);
+      if (!composes.hidden) composes.textContent = 'Composes ' + contract.composes.join(', ') + '.';
+
+      componentState.path = componentPath();
+      window.PomComponentPath.set(componentState.path);
+      document.getElementById('component-summary').hidden = false;
+      document.getElementById('component-actions').hidden = false;
+    }
+
+    function componentPushMessage() {
+      return 'Contract: ' + ((componentState.capture && componentState.capture.name) || 'component');
+    }
+
+    function pushComponentContract() {
+      if (!componentState.contract) return;
+      var which = activeRepoProvider();
+      if (!which) { showToast('Add a repository in Settings first', true); return; }
+      var text = window.PomComponentFile.serialise(componentState.contract);
+      var what = { path: window.PomComponentPath.get(), text: text, message: componentPushMessage() };
+      window.PomComponentPushBtn.setLoading(true);
+      var run = which === 'gitlab' ? pushGitLab(null, what) : pushGitHub(null, what);
+      run.then(function () {
+        window.PomComponentPushBtn.setLoading(false);
+        window.PomComponentPushBtn.setSuccess(true);
+        showToast('Wrote ' + what.path);
+      }, function (err) {
+        window.PomComponentPushBtn.setLoading(false);
+        showToast(errText(err), true);
+      });
+    }
+
+    /*
+      COMPARE, which is the half that answers the question worth asking: is the
+      repository's contract still this component? Read at the SAME address the
+      push writes to, so the two can never mean different files.
+    */
+    function compareComponentContract() {
+      if (!componentState.contract) return;
+      var which = activeRepoProvider();
+      if (!which) { showToast('Add a repository in Settings first', true); return; }
+      var path = window.PomComponentPath.get();
+      window.PomComponentCompareBtn.setLoading(true);
+      var read = which === 'gitlab' ? fetchGitLabFile(path) : fetchGitHubFile(path);
+      read.then(function (got) {
+        window.PomComponentCompareBtn.setLoading(false);
+        var theirs;
+        try { theirs = window.PomComponentFile.parse(got.text); }
+        catch (e) {
+          window.PomComponentResult.problem('That file is not a contract',
+            (e && e.message) || String(e),
+            'It is at ' + path + ', which is where this component\'s contract would be written.');
+          return;
+        }
+        var report = window.PomComponentDiff.diff(componentState.contract, theirs);
+        window.PomComponentResult.report(report, path);
+      }, function (err) {
+        window.PomComponentCompareBtn.setLoading(false);
+        /* A 404 is the commonest answer and is not a failure: the contract has
+           simply not been written yet, and saying so names the next step. */
+        if (err && err.status === 404) {
+          window.PomComponentResult.problem('No contract there yet',
+            'Nothing is at ' + path + ' on this branch.',
+            'Push it, and this becomes the file the next comparison reads.');
+          return;
+        }
+        window.PomComponentResult.problem('Could not read it', errText(err), '');
+      });
+    }
+
+    window.addEventListener('message', function (event) {
+      var m = event.data && event.data.pluginMessage;
+      if (!m) return;
+      if (m.type === 'componentCaptured') renderComponent(m.capture);
+      if (m.type === 'componentCaptureFailed') {
+        document.getElementById('component-summary').hidden = true;
+        document.getElementById('component-actions').hidden = true;
+        componentStatus(m.reason || 'Nothing to capture.');
+      }
+    });
+
     function closeCompare() {
       document.getElementById('compare-page').classList.remove('visible');
       document.getElementById('main-page').classList.remove('hidden');
     }
     document.getElementById('compare-back-btn').addEventListener('click', closeCompare);
+    document.getElementById('component-open-btn').addEventListener('click', openComponent);
+    document.getElementById('component-back-btn').addEventListener('click', closeComponent);
+    document.getElementById('component-push-btn').addEventListener('click', pushComponentContract);
+    document.getElementById('component-compare-btn').addEventListener('click', compareComponentContract);
 
     function openCompare(which) {
       which = which || activeRepoProvider();
@@ -8053,13 +8291,14 @@
       Both hosts are already in manifest.json's allowedDomains. A self-hosted
       GitLab is not, and needs adding there — the manifest's own note says so.
     */
-    function fetchGitLabFile() {
+    /* `atPath` as in fetchGitHubFile below. */
+    function fetchGitLabFile(atPath) {
       var c = gitlabConfig();
       if (!c.token || !c.project) return Promise.reject({ message: 'GitLab is not configured' });
       var host = c.host.replace(/\/+$/, '');
       /* repoFilePath, not the push name: this is the file being READ, which
          the repo card picks and which need not be the one we write. */
-      var filePath = repoFilePath('gitlab');
+      var filePath = atPath || repoFilePath('gitlab');
       var url = host + '/api/v4/projects/' + encodeURIComponent(c.project) +
                 '/repository/files/' + encodeURIComponent(filePath) +
                 '/raw?ref=' + encodeURIComponent(c.branch);
@@ -8073,13 +8312,18 @@
         .then(function (text) { return { text: text, where: 'GitLab ' + filePath + ' @ ' + c.branch }; });
     }
 
-    function fetchGitHubFile() {
+    /* `atPath` reads a file this plugin addresses some other way — a component
+       contract lives beside its component, not at the token export's address —
+       and absent it reads exactly what it always has. The pair with pushGitHub's
+       `what` is deliberate: one reader and one writer per provider, so "where
+       we put it" and "what is in the repo" cannot drift apart. */
+    function fetchGitHubFile(atPath) {
       var c = githubConfig();
       if (!c.token || !c.repo) return Promise.reject({ message: 'GitHub is not configured' });
       var parts = c.repo.split('/');
       if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
       /* The READ address — see fetchGitLabFile above. */
-      var filePath = repoFilePath('github');
+      var filePath = atPath || repoFilePath('github');
       var url = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
                 encodeURIComponent(parts[1]) + '/contents/' +
                 filePath.split('/').map(encodeURIComponent).join('/') +
