@@ -34,7 +34,7 @@
   boolean bolted on now.
 */
 import type { CSSProperties, ReactNode } from 'react'
-import { Button, type ButtonSize } from './Button'
+import { Button, type ButtonSize, type ButtonVariant } from './Button'
 import { DismissIcon, FileIcon, ImageIcon, TextIcon } from './Icon'
 import { ListItem } from './ListItem'
 import { ProgressBar } from './ProgressBar'
@@ -121,10 +121,38 @@ export type FileUploadItemProps = {
   /** hand it a remover and it has a ✕; hand it none and it cannot be told it is removable */
   onRemove?: () => void
   /*
+    THE ✕'S VARIANT, BECAUSE `ghost` IS THE RIGHT DEFAULT AND NOT THE ONLY RIGHT ANSWER.
+
+    `ghost` is correct for the case this row was written for — one of several in a
+    `FileUploadList`, on the page ground, where a filled control would be the loudest thing in
+    a quiet list. It is wrong when the row is the ONLY content of a raised card: there the ✕
+    has no ground of its own and sits at the same value as the surface behind it, which is the
+    condition `tonal` exists for. The note beside `glass={false}` below already reasons about
+    this row standing on someone else's surface; this is that thought one step further.
+
+    It had to be a prop rather than a caller's override: the button carries no stable class of
+    its own, so reaching it from outside means selecting into `.nd-uploaditem` descendants and
+    guessing at Button's internals — which breaks on the next change to either, and for a
+    VENDORED kit the only remaining route is a fork that stops receiving every other fix.
+
+    ALIASED (§25), not restated — the same argument `size` makes directly above. A fresh
+    `'primary' | 'tonal' | 'ghost'` here would be another copy of three words that look
+    identical until the day one of them moves.
+  */
+  removeVariant?: ButtonVariant
+  /*
     REPLACES THE DERIVED GLYPH — a thumbnail of the picture, an Avatar, a Spinner while the
     row is still resolving. `leading` and not `icon`: six components against two settled that
     vocabulary (§25), and the logical name survives a right-to-left document where `left`
     does not. `FileUpload`'s own slot is the same word for the same reason.
+
+    A SPINNER CANNOT FINISH; `<ProgressBar shape="ring" labelHidden>` CAN. For a single row
+    whose operation has an amount and an ending, the ring is the one to reach for here: it
+    turns while `value` is undefined, fills as it arrives, and `state="done"` lands the
+    ending on the same mark rather than cutting to a different glyph. It is also why this row
+    does not need its bar in that case — the bar is a second line of furniture that appears
+    and then never changes again, which a one-file row has no room for. #93 was filed for
+    exactly this and the answer was already a prop; the omission was that nothing here said so.
   */
   leading?: ReactNode
   /** placement only — margin and grid position belong to the list that holds the row */
@@ -153,6 +181,7 @@ export function FileUploadItem({
   error,
   size = 'small',
   onRemove,
+  removeVariant = 'ghost',
   leading,
   style,
 }: FileUploadItemProps) {
@@ -176,10 +205,14 @@ export function FileUploadItem({
         trailing={
           onRemove && (
             <Button
-              variant="ghost"
+              variant={removeVariant}
               kind="icon-button"
-              /* 24 — `spacing.group.target.minimum` itself, which is what Button's `small`
-                 IS. A control that only has to be hittable does not grow with the row. */
+              /* 32 — Button's SMALLEST rung, which is the row ladder's MEDIUM and not its
+                 floor: `--nd-btn-rung-small` is `--nd-rung-medium`, stated where the two
+                 ladders are declared. This said 24 and named `spacing.group.target.minimum`,
+                 which is the row ladder's small and a rung Button does not have. The point it
+                 was making survives the correction — a control that only has to be hittable
+                 does not grow with the row, which is what pinning the size at all buys. */
               size="small"
               /* the row is the surface; a control standing on someone else's surface does
                  not frost it a second time */

@@ -1,5 +1,11 @@
 // Closure — Figma plugin (design-token JSON export)
-figma.showUI(__html__, { width: 420, height: 740, themeColors: true });
+/*
+  THE PANEL'S WIDTH, IN ONE PLACE. The resize handler below has to agree with
+  it — Figma's resize takes an absolute width, so a number written twice is a
+  panel that changes width the first time the UI asks to grow.
+*/
+var PANEL_WIDTH = 483;                 // 420 + 15%
+figma.showUI(__html__, { width: PANEL_WIDTH, height: 740, themeColors: true });
 
 function normalizeVariableName(name, collectionName) {
   if (!name) return '';
@@ -10,7 +16,19 @@ function normalizeVariableName(name, collectionName) {
   // because those create separate groups that would collide if merged)
   normalized = normalized.replace(/^(Light|Dark)\//i, '');
 
-  // Remove collection name prefix for dot-collections (.breakpoint, .core, .mode)
+  /*
+    Remove a collection-name prefix the variable repeats: ".breakpoint" holding
+    "breakpoint/viewport/minimum" means the token "viewport.minimum".
+
+    GATED ON THE DOT ON PURPOSE, and it must stay that way: buildAliasPath()
+    gates the identical strip on the identical condition, and the two have to
+    agree or every reference misses. Making this one generic while that one
+    stayed dot-only stripped the root out of the CONTENT while the REFERENCES
+    kept pointing at it — 180 broken references became 1,552.
+
+    A non-dot collection therefore keeps its prefix in both, which is a
+    consistent convention rather than a better one.
+  */
   if (collectionName && collectionName.startsWith('.')) {
     var baseCollectionName = collectionName.substring(1);
     var prefixPattern = new RegExp('^' + baseCollectionName + '/', 'i');
@@ -162,11 +180,83 @@ function findParentCollection(collections, modeCollectionName) {
     }
   });
   
-  // Return the first candidate (should be "Schemes (Neutral)")
+  /*
+    DECIDED BY NAME, NOT BY POSITION.
+
+    This used to return candidates[0] — the first collection Figma happened to
+    hand back, which is the order they sit in the panel. Every ".mode" alias
+    path is built from the answer, so the export's correctness rested on ".core"
+    being the first collection in the file. It is, in the file this was written
+    against, and that is the whole reason it works.
+
+    It stops working the moment anything reorders the rail. Creating the
+    collections in dependency order — the last hop first, which is what someone
+    reading the panel wants — put "foundation" in front instead, and 2,008
+    references were rewritten to point at a "foundation" root that does not
+    hold them.
+
+    So the primitive collection is now found by NAME. It is the one every other
+    layer bottoms out in, it is what this returned on every file that worked,
+    and unlike a position it cannot be changed by dragging something. The old
+    scan stays as the fallback for a file with no such collection, where there
+    is nothing better to go on and the answer was never more than a guess.
+  */
+  var primitive = null;
+  collections.forEach(function (col) {
+    if (col.name === modeCollectionName) return;
+    if (primitive) return;
+    if (stripIcons(col.name).replace(/^[._]+/, '').toLowerCase() === 'core') {
+      primitive = stripIcons(col.name).replace(/^[._]+/, '');
+    }
+  });
+  if (primitive) return primitive;
+
   return candidates.length > 0 ? candidates[0] : null;
 }
 
 // --- CONSTRUCT PROPER ALIAS PATH ---
+/*
+  DOES THIS COLLECTION HOLD ITS OWN VALUE FOR THE VARIABLE, or is it only
+  seeing the owner's?
+
+  An extended collection lists every variable it inherits among its own
+  variableIds, so a collection can "have" a variable it has nothing to say
+  about. Writing those out is what turned one colour into 38 identical copies —
+  45% of a real 40 MB export — and what made a "{path}" reference ambiguous on
+  the way back in, since 38 documents defined the path and the reference named
+  none of them.
+
+  Unchanged means unchanged, and anything else counts as an override. A mode is
+  inherited when its parent mode holds the identical value, or when the owner
+  holds ONE value across all of its modes and this is it. A mode passing
+  neither is an override, and one override makes the whole variable worth
+  writing here — the failure to avoid is dropping a real value, never keeping a
+  copy.
+
+  `ownValues` is the OWNER's valuesByMode; `collectionValues` is what this
+  collection sees, keyed by its own mode ids.
+*/
+function inheritsUnchanged(collectionValues, ownValues, colModes) {
+  var own = ownValues || {};
+  var distinct = {};
+  Object.keys(own).forEach(function(k) { distinct[JSON.stringify(own[k])] = 1; });
+  var keys = Object.keys(distinct);
+  var single = keys.length === 1 ? keys[0] : null;
+
+  var parentOf = {};
+  (colModes || []).forEach(function(m) { parentOf[m.modeId] = m.parentModeId || null; });
+
+  var ids = Object.keys(collectionValues || {});
+  /* Nothing to compare is not evidence of inheritance. */
+  if (!ids.length) return false;
+  return ids.every(function(mId) {
+    var here = JSON.stringify(collectionValues[mId]);
+    var pm = parentOf[mId];
+    if (pm && own[pm] !== undefined && JSON.stringify(own[pm]) === here) return true;
+    return single !== null && single === here;
+  });
+}
+
 function buildAliasPath(aliasedVar, aliasedVarCollection, currentCollectionName, collections) {
   if (!aliasedVar) return null;
   
@@ -285,13 +375,25 @@ var NATO_TYPO_LINE_HEIGHT_MULT_KEY = {
   'microcopy-bold': '130', 'microcopy-regular': '130'
 };
 
-function injectBreakpointTypographyLineHeightFormulas(breakpointContent) {
+/*
+  Rewrites each scale's line-height as "size / 100 * {line-heights.<mult>}".
+
+  ONLY WHERE THAT MULTIPLIER EXISTS. core['line-heights'] is a group one design
+  system happens to define; the formula is worthless without it, and worse than
+  worthless in place of a value that WAS there — this overwrote 55 imported
+  literal line-heights with references to a group the file does not contain,
+  turning working values into dangling ones.
+*/
+function injectBreakpointTypographyLineHeightFormulas(breakpointContent, core) {
   if (!breakpointContent || !breakpointContent.typography) return breakpointContent;
+  var mults = core && core['line-heights'];
+  if (!mults || typeof mults !== 'object') return breakpointContent;
   var typo = breakpointContent.typography;
   Object.keys(typo).forEach(function(scale) {
     var scaleObj = typo[scale];
     if (!scaleObj || !scaleObj['line-height']) return;
     var mult = NATO_TYPO_LINE_HEIGHT_MULT_KEY[scale] || '100';
+    if (mults[mult] === undefined) return;      // no such multiplier here
     var lhRef = '{line-heights.' + mult + '}';
     scaleObj['line-height'] = {
       value: '( {breakpoint.typography.' + scale + '.size} / 100 ) * ' + lhRef,
@@ -761,6 +863,29 @@ function transformToFinalFormat(rawData, options) {
 
         var token = { type: finalType, value: tokenValue };
 
+        /*
+          WHICH COLLECTION THE ALIAS POINTS AT — the one fact "{a.b.c}" cannot
+          carry, and the reason importing this file back used to be impossible.
+
+          In Figma an alias names a variable, and a variable belongs to exactly
+          one collection. Written as a path that collection is gone, and when
+          the same path is visible from several collections — which is the
+          normal state of a file built on extended collections — nothing in the
+          document says which one was meant. The importer had to stop and ask,
+          once per reference: 4,880 questions on a real file, about a fact the
+          exporter was holding at this line and dropping.
+
+          A plain extra key on the token: the DTCG writer sweeps anything it has
+          no home for into $extensions["com.closure.legacyJson"] (see
+          dtcg-format.js), so it survives both shapes and every other tool
+          ignores it. It names a COLLECTION, not a variable id, because ids are
+          local to the file that produced them and this has to survive being
+          imported somewhere else — which is the entire point of the round trip.
+        */
+        if (aliasData && aliasData.isAlias && aliasData.aliasedVarCollection) {
+          token.aliasCollection = aliasData.aliasedVarCollection;
+        }
+
         // Figma's per-variable description. Carried on every mode's token (the
         // description belongs to the variable, not the mode) and surfaced as
         // DTCG's $description.
@@ -815,11 +940,40 @@ function normalizeFontFamilyAliasSegments(str) {
     });
 }
 
-// --- ALIAS PATH FIX: strip .core. and core. prefixes from alias references (Fix D) ---
-function fixAliasPaths(obj) {
+/*
+  ALIAS PATH FIX: strip the ".core." / "core." prefix from alias references —
+  BUT ONLY WHERE THE STRIPPED PATH IS THE ONE THAT EXISTS.
+
+  In the file this was written for, ".core" holds variables named "dimension/0"
+  and normalizeVariableName drops the collection prefix, so the token is
+  published at "dimension.0" while buildAliasPath produces "{core.dimension.0}".
+  The strip is what makes those two meet.
+
+  A file where "core" is a GROUP rather than a dot-collection inverts that. A
+  resolved DTCG tree names its variables "core/dimension/0", nothing is
+  stripped from the token path, and the token really does live at
+  "core.dimension.0" — which buildAliasPath gets right and this line then broke,
+  every time, silently: 645 of 645 references in one real import pointed at a
+  "dimension" group that does not exist in that document.
+
+  So the prefix is no longer assumed to be noise. `index` is every token path
+  actually present in the output; a reference that already resolves is left
+  alone, and one that does not is stripped exactly as before. Where the index
+  is absent the old unconditional behaviour stands, so nothing that calls this
+  without one changes.
+*/
+function fixAliasPaths(obj, index) {
   if (typeof obj === 'string') {
-    // {.core.X} → {X}  and  {core.X} → {X}
-    var s = obj.replace(/\{\.core\./g, '{').replace(/\{core\./g, '{');
+    var s = obj.replace(/\{(\.?core\.)([^{}]+)\}/g, function (whole, prefix, rest) {
+      if (index) {
+        /* The unstripped path is what buildAliasPath computed; believe it when
+           the document actually contains it. */
+        var full = whole.slice(1, -1);
+        if (index[full]) return whole;
+        if (!index[rest]) return whole;      // neither resolves — changing it helps nobody
+      }
+      return '{' + rest + '}';
+    });
     return normalizeFontFamilyAliasSegments(s);
   }
   if (Array.isArray(obj)) return obj; // preserve arrays (e.g. $themes: [])
@@ -827,7 +981,10 @@ function fixAliasPaths(obj) {
     var result = {};
     var keys = Object.keys(obj);
     for (var i = 0; i < keys.length; i++) {
-      result[keys[i]] = fixAliasPaths(obj[keys[i]]);
+      /* `index` has to travel down: every string this touches is a leaf, so
+         dropping it one level in means every reference is stripped
+         unconditionally and the check above never runs on anything. */
+      result[keys[i]] = fixAliasPaths(obj[keys[i]], index);
     }
     return result;
   }
@@ -875,12 +1032,25 @@ function fixFoundationTokens(obj, pathParts) {
   return out;
 }
 
-// Three fixups below rebuild token nodes from scratch, dropping every key beyond
-// value/type. Carry the description across so it survives to $description.
-// Deliberately narrow: those same rebuilds also drop codeSyntax, and preserving
-// that as well would change the existing the token format export.
+/*
+  Three fixups below rebuild token nodes from scratch, dropping every key beyond
+  value/type. This carries across the ones that have to survive that.
+
+  $description was the first. aliasCollection is the second, and it was found
+  the hard way: the import asked one question about one token out of 111,554,
+  and the reason was this. 62,859 of the file's 63,360 references carried the
+  collection they point at; the 501 that did not were exactly the tokens these
+  rebuilds touch — the typography scales, the breakpoint set, and a single
+  `variant.breakpoint`, which was the one the question was about. A reference is
+  only referenced once sometimes, so a lost hint cannot be reconstructed from
+  its neighbours. It has to survive.
+
+  Still deliberately narrow: these rebuilds also drop codeSyntax, and preserving
+  that as well would change an export that has always looked this way.
+*/
 function carryDescription(target, source) {
   if (source && source.description) target.description = source.description;
+  if (source && source.aliasCollection) target.aliasCollection = source.aliasCollection;
   return target;
 }
 
@@ -1977,7 +2147,7 @@ var TS_RAW_SETS = [
   { col: '.magenta-light', prefix: 'base/',      by: 'col'  }, // base/magenta-light
   { col: '.magenta-dark',  prefix: 'base/',      by: 'col'  }  // base/magenta-dark
 ];
-function emitRawNameSets(out, native, rawData) {
+function emitRawNameSets(out, native, rawData, claimed) {
   TS_RAW_SETS.forEach(function(cfg) {
     if (!native[cfg.col]) return;
     var rawCol = null;
@@ -1985,6 +2155,7 @@ function emitRawNameSets(out, native, rawData) {
       if (stripIcons(rawData.collections[i].name) === cfg.col) { rawCol = rawData.collections[i]; break; }
     }
     if (!rawCol) return;
+    if (claimed) claimed[cfg.col] = 1;   // taken — the pass-through must not repeat it
     Object.keys(native[cfg.col]).forEach(function(modeName) {
       if (modeName === 'typography') return; // collection-level typography, not a mode
       var setName = cfg.by === 'mode' ? (cfg.prefix + modeName) : (cfg.prefix + cfg.col.slice(1));
@@ -2150,8 +2321,34 @@ function completeThemeSelections(out) {
 function toTokenFormat(native, rawData) {
   var out = {};
 
+  /*
+    WHICH COLLECTIONS THE RULES BELOW TOOK.
+
+    Recorded AT THE READ, by the rule doing the reading, because both other
+    ways of knowing were tried and both were wrong.
+
+    A hand-kept list of claimed names, written in one place away from the
+    rules, rotted on contact: it missed ".white", ".black" and the two
+    magentas, which emitRawNameSets emits as "base/white" and friends, so each
+    was written out a second time under its own name.
+
+    Probing the OUTPUT for a collection's tokens — "if its content is already
+    somewhere, a rule took it" — was worse. These rules RENAME as they read:
+    fixCoreTokens rewrites, the scheme rule re-roots under "scheme", the
+    breakpoint rule restructures typography. So the probe missed the big
+    collections, the pass-through emitted them a second time on top of their
+    own renamed output, and the ODS export went from 0 broken references to
+    1,992 with 16k refs appearing from nowhere.
+
+    A claim marked next to its read cannot drift from the rule that made it.
+    The pass-through at the bottom then handles exactly what is left.
+  */
+  var claimed = {};
+  function claim(k) { if (k) claimed[k] = 1; }
+
   // Rule 2: core — unwrap double nesting + type corrections (Nato-style camel primitives) + dimension math
   if (native['.core'] && native['.core']['.core']) {
+    claim('.core');
     out['core'] = fixCoreTokens(native['.core']['.core']);
     applyDimensionBaseExpressions(out['core']);
   }
@@ -2161,6 +2358,7 @@ function toTokenFormat(native, rawData) {
 
   // Rule 8 (spec): foundation — unwrap double nesting
   if (native['foundation'] && native['foundation']['foundation']) {
+    claim('foundation');
     out['foundation'] = native['foundation']['foundation'];
   }
 
@@ -2208,12 +2406,41 @@ function toTokenFormat(native, rawData) {
   // Elevation composites for every set (incl. foundation) are injected in a
   // single deep pass at the end of this function — see addElevationCompositesDeep.
 
-  // Fix 9: foundation.variant.breakpoint
-  if (!out['foundation']['variant']) out['foundation']['variant'] = {};
-  out['foundation']['variant']['breakpoint'] = {
-    value: '{breakpoint.breakpoint-string}',
-    type: 'text'
-  };
+  /*
+    THE BREAKPOINT COLLECTION, FOUND RATHER THAN NAMED — see the longer note on
+    bpKey below, which this used to duplicate as a bare does-it-exist test.
+    Hoisted because Fix 9 and Fix 8 do not just need to know it is there, they
+    need its NAME: everything they emit points into it, and a reference that
+    cannot say which collection it means is one the import has to stop and ask
+    about.
+  */
+  var bpKey = native['.breakpoint'] ? '.breakpoint'
+    : Object.keys(native).filter(function (k) {
+        return k.replace(/^[._]+/, '').toLowerCase() === 'breakpoint';
+      })[0] || null;
+
+  /*
+    Fix 9: foundation.variant.breakpoint — only when there is a breakpoint
+    collection for it to name.
+
+    INVENTED HERE, WHICH IS WHY IT NEEDED THE STAMP MOST. This token is not a
+    Figma alias — nothing in the document aliases anything, the exporter writes
+    the reference itself — so there is no aliasInfo for it and no hint could
+    survive a rebuild, because none was ever made. It was the single token, out
+    of 111,554, that the import still could not resolve: breakpoint-string
+    exists in the breakpoint collection AND in every collection that inherits
+    it, and "{breakpoint.breakpoint-string}" named none of them.
+
+    The collection is known right here. Saying so costs one key.
+  */
+  if (bpKey) {
+    if (!out['foundation']['variant']) out['foundation']['variant'] = {};
+    out['foundation']['variant']['breakpoint'] = {
+      value: '{breakpoint.breakpoint-string}',
+      type: 'text',
+      aliasCollection: bpKey
+    };
+  }
 
   // Fix 8: foundation.typography — N scales × 10 props, each an alias to breakpoint.typography.*
   // Scale list is derived from the actual breakpoint typography so new styles
@@ -2221,21 +2448,55 @@ function toTokenFormat(native, rawData) {
   // dropped by a stale hardcoded list. Falls back to the known set if absent.
   var typScales;
   var bpTypoSource = null;
+  /*
+    ".breakpoint" is what one design system calls it; another calls it
+    "breakpoint". Everything below aliases INTO it, so failing to find it does
+    not degrade the output — it invents references to a set that is not there.
+    Found above, where Fix 9 needs the same answer.
+  */
+  if (bpKey) native['.breakpoint'] = native['.breakpoint'] || native[bpKey];
   if (native['.breakpoint']) {
-    // typography is now per-mode; pull the scale list from any breakpoint mode
-    // (or the legacy collection-level group if present).
-    if (native['.breakpoint'].typography) bpTypoSource = native['.breakpoint'].typography;
-    else {
+    /*
+      typography is now per-mode; pull the scale list from any breakpoint mode
+      (or the legacy collection-level group if present).
+
+      AND FROM UNDER THE COLLECTION'S OWN ROOT, because a non-dot collection
+      keeps its name in the token path (see normalizeVariableName): the
+      scales of a collection called "breakpoint" sit at
+      [mode].breakpoint.typography, not [mode].typography. Looking only at the
+      shallow spot found nothing, fell through to the hardcoded scale list
+      below, and invented 146 references to ODS scale names — "title-L" — that
+      this file has never heard of.
+    */
+    var bpBase = bpKey ? bpKey.replace(/^[._]+/, '') : '';
+    var typoIn = function (node) {
+      if (!node || typeof node !== 'object') return null;
+      if (node.typography) return node.typography;
+      if (bpBase && node[bpBase] && node[bpBase].typography) return node[bpBase].typography;
+      return null;
+    };
+    bpTypoSource = typoIn(native['.breakpoint']);
+    if (!bpTypoSource) {
       Object.keys(native['.breakpoint']).some(function(m) {
-        if (native['.breakpoint'][m] && native['.breakpoint'][m].typography) {
-          bpTypoSource = native['.breakpoint'][m].typography; return true;
-        }
-        return false;
+        bpTypoSource = typoIn(native['.breakpoint'][m]);
+        return !!bpTypoSource;
       });
     }
   }
   if (bpTypoSource) {
     typScales = Object.keys(bpTypoSource);
+  } else if (!bpKey) {
+    /*
+      NO BREAKPOINT COLLECTION AT ALL, so there is nothing for these aliases to
+      point at. The fallback list below exists for a file that HAS one whose
+      scales could not be read; using it when the collection is simply absent
+      manufactured 146 dangling references — foundation.typography.display.display
+      pointing at a breakpoint.typography that was never written.
+
+      An export that omits what it cannot express is honest. One that emits
+      references to nothing is not.
+    */
+    typScales = [];
   } else {
     typScales = [
       'display', 'title-L', 'title-M', 'title-S', 'subtitle', 'paragraph',
@@ -2255,6 +2516,17 @@ function toTokenFormat(native, rawData) {
     { name: 'text-case',         type: 'textCase' },
     { name: 'text-decoration',   type: 'textDecoration' }
   ];
+  /*
+    Emitted for every prop in the list, then PRUNED against what was actually
+    written — see pruneSynthesisedFoundationRefs at the end of this function.
+
+    Filtering here instead, on the raw breakpoint source, was tried and is
+    wrong: the composite and the text-case / text-decoration props do not
+    exist in that source at all. fixBreakpointTypography() invents them later,
+    so a scale legitimately carrying ten props looked like it carried five and
+    54 real ODS tokens were dropped. The emitted set is the only honest
+    authority, and it does not exist yet at this point in the function.
+  */
   var foundTypography = {};
   typScales.forEach(function(scale) {
     foundTypography[scale] = {};
@@ -2262,7 +2534,10 @@ function toTokenFormat(native, rawData) {
       var propKey = prop.name !== null ? prop.name : scale;
       foundTypography[scale][propKey] = {
         value: '{breakpoint.typography.' + scale + '.' + propKey + '}',
-        type: prop.type
+        type: prop.type,
+        /* Invented the same way Fix 9's token is, and pointing into the same
+           collection, so it says so for the same reason. */
+        aliasCollection: bpKey
       };
     });
   });
@@ -2282,6 +2557,7 @@ function toTokenFormat(native, rawData) {
   // Rule 4: mode — flat slash keys, keep mode-inverted as a sibling wrapper.
   // Elevation composites are added later by the deep pass.
   if (native['.mode']) {
+    claim('.mode');
     Object.keys(native['.mode']).forEach(function(name) {
       var content = native['.mode'][name];
       var modeInverted = content['mode-inverted'];
@@ -2297,6 +2573,7 @@ function toTokenFormat(native, rawData) {
 
   // Rule 3: scheme — flat slash keys. Elevation composites added by deep pass.
   if (native['.scheme']) {
+    claim('.scheme');
     Object.keys(native['.scheme']).forEach(function(name) {
       out['scheme/' + name] = { scheme: native['.scheme'][name] };
     });
@@ -2306,7 +2583,7 @@ function toTokenFormat(native, rawData) {
   // are emitted with RAW variable names → set names secondary/<palette> and
   // base/<leaf>, with token roots matching the raw leaf references. Elevation
   // composites are added by the deep pass.
-  emitRawNameSets(out, native, rawData);
+  emitRawNameSets(out, native, rawData, claimed);
 
   // Section / Card — middle links of the chain
   //   foundation → .scheme → .mode → .section → .card → leaf → .core
@@ -2314,11 +2591,13 @@ function toTokenFormat(native, rawData) {
   // from .mode (and broke subtle / black resolution downstream). Wrapped to match
   // the alias roots produced by buildAliasPath (root = section / card).
   if (native['.section']) {
+    claim('.section');
     Object.keys(native['.section']).forEach(function(name) {
       out['section/' + name] = { section: native['.section'][name] };
     });
   }
   if (native['.card']) {
+    claim('.card');
     Object.keys(native['.card']).forEach(function(name) {
       out['card/' + name] = { card: native['.card'][name] };
     });
@@ -2329,12 +2608,25 @@ function toTokenFormat(native, rawData) {
 
   // Rule 7: restrictions — flat slash keys
   if (native['_restricted']) {
+    claim('_restricted');
     Object.keys(native['_restricted']).forEach(function(name) {
       out['restrictions/' + name] = native['_restricted'][name];
     });
   }
 
   // Rule 5: breakpoints — flat slash keys + semantic types (Fix F) + typography composites (Fix G)
+  /*
+    The ODS breakpoint modes are named "S Mobile", "M Tablet" and so on, and
+    the export publishes them as "mobile", "tablet". This map is that rename
+    and nothing more — so a mode NOT in it is not a stranger to skip, it is a
+    mode that already reads the way the export wants to publish it.
+
+    Reading it as a whitelist is what broke: every mode of an imported
+    breakpoint collection was already called "mobile"/"tablet", so every one
+    of them failed `bpMap[name]` and the rule emitted no sets at all — while
+    still claiming the collection, so the generic pass-through skipped it too.
+    75 variables vanished and 180 references to "breakpoint.*" dangled.
+  */
   var bpMap = {
     'S Mobile': 'mobile',
     'M Tablet': 'tablet',
@@ -2342,18 +2634,27 @@ function toTokenFormat(native, rawData) {
     'XL Desktop': 'desktop',
     'XXL Large Desktop': 'large-desktop'
   };
+  var bpSlug = function (name) {
+    if (bpMap[name]) return bpMap[name];
+    return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  };
   // the token format key order for breakpoint content
   var BP_KEY_ORDER = ['spacing', 'sizing', 'typography', 'grid', 'stretch-grid', 'overflow-grid', 
                       'fixed-grid', 'columns', 'layout', 'breakpoint-string'];
   
+  var bpEmitted = 0;
+  var bpIsDotted = !bpKey || bpKey.charAt(0) === '.' || bpKey.charAt(0) === '_';
   if (native['.breakpoint']) {
     // Typography tokens are written at collection level (not inside each mode)
     // They're at native['.breakpoint'].typography, not native['.breakpoint']['S Mobile'].typography
     var collectionLevelTypography = native['.breakpoint'].typography;
     
     Object.keys(native['.breakpoint']).forEach(function(name) {
-      if (!bpMap[name]) return; // skip non-mode keys like 'typography'
-      var slug = bpMap[name];
+      if (name === 'typography') return;   // the collection-level group, not a mode
+      var bpNode = native['.breakpoint'][name];
+      if (!bpNode || typeof bpNode !== 'object') return;
+      var slug = bpSlug(name);
+      if (!slug) return;
       var content = fixBreakpointTypes(native['.breakpoint'][name], []);
 
       // Inject typography from collection level if this breakpoint mode lacks it
@@ -2382,13 +2683,29 @@ function toTokenFormat(native, rawData) {
         if (orderedContent[k] === undefined) orderedContent[k] = content[k];
       });
       
-      out['breakpoint/' + slug] = { breakpoint: orderedContent };
+      /*
+        The wrapper puts back exactly what normalizeVariableName took off, and
+        it only takes anything off a DOT-collection. A plain "breakpoint"
+        collection keeps its prefix in the token path, so wrapping again
+        published "breakpoint.breakpoint.viewport.minimum" and left every
+        reference to "breakpoint.*" pointing at nothing.
+      */
+      out['breakpoint/' + slug] = orderedContent.breakpoint && !bpIsDotted
+        ? orderedContent
+        : { breakpoint: orderedContent };
+      bpEmitted++;
     });
   }
+  /* Claimed only because it PRODUCED something. A rule that matched nothing
+     has not handled the collection, and saying it did is what silently drops
+     it — the pass-through is the safety net and it only works if the claim is
+     honest about what came out. */
+  if (bpEmitted) { claim('.breakpoint'); claim(bpKey); }
 
   // layout passthrough — unwrap 'columns' mode wrapper, fix column token types (number → sizing)
   var layoutRoot = native['layout'] || native['Layout'];
   if (layoutRoot && layoutRoot['columns']) {
+    claim('layout'); claim('Layout');
     var layoutMode = layoutRoot['columns'];
     var layoutContent = layoutMode['columns'] || layoutMode;
     out['layout/layout'] = { columns: fixLayoutColumnTypes(layoutContent) };
@@ -2407,7 +2724,7 @@ function toTokenFormat(native, rawData) {
     alignBreakpointTypographyToNato(core, bp);
     normalizeTypographyCompositeCamelRefs(core, bp);
     normalizeBreakpointTypographyStandaloneRefs(bp);
-    injectBreakpointTypographyLineHeightFormulas(bp);
+    injectBreakpointTypographyLineHeightFormulas(bp, core);
     coerceBreakpointSpacingSizingToDimensionExpressions(bp, core);
   });
 
@@ -2436,11 +2753,98 @@ function toTokenFormat(native, rawData) {
   if (!out['core']) out['core'] = {};
   out['core']['Elevation'] = buildCoreElevationReference();
 
+  /*
+    EVERYTHING THE RULES ABOVE DID NOT TAKE.
+
+    Every rule above is keyed to a collection this exporter was written
+    against — ".core", ".mode", ".scheme", "_restricted" and the rest. Against
+    a file built by anyone else, almost none of them fire: one real import had
+    the collections "core mode fill base level foundation breakpoint scheme
+    interaction tense master", which overlaps that list on "foundation" alone.
+    33 sets collapsed to 2 and 246 references dangled, while the export
+    reported success.
+
+    So what is left over is emitted on its own terms: one set per mode, named
+    "collection/mode", with the leading "." or "_" that marks a Figma helper
+    collection stripped. No interpretation, no renaming — a set the exporter
+    does not understand is still a set, and a token nobody claimed is better
+    passed through verbatim than dropped.
+  */
+  var passedThrough = [];
+  Object.keys(native).forEach(function (colName) {
+    if (claimed[colName]) return;
+    var byMode = native[colName];
+    if (!byMode || typeof byMode !== 'object') return;
+    var modes = Object.keys(byMode).filter(function (m) {
+      return byMode[m] && typeof byMode[m] === 'object';
+    });
+    if (!modes.length) return;
+
+    var base = colName.replace(/^[._]+/, '') || colName;
+    /*
+      A DOT COLLECTION HAS ITS NAME TAKEN OFF THE TOKEN PATH, SO PUT IT BACK.
+
+      normalizeVariableName strips the collection's own name from a variable
+      in a ".foo" collection — ".restrictions" holding
+      "restrictions/normal/white/basic/background" becomes the token
+      "normal.white.basic.background". buildAliasPath performs the SAME strip
+      and then re-adds the base name, so every reference to it says
+      "restrictions.normal.white.basic.background".
+
+      The named rules re-add it too: the section rule emits { section: … },
+      the card rule { card: … }. This one did not, so a dot collection no
+      named rule claimed came out one level too shallow and every reference
+      into it dangled — 4,884 of them in a real import, all of them pointing
+      at a "restrictions" root that had been stripped away and never replaced.
+
+      Gated on the dot, exactly as normalizeVariableName is: an undotted
+      collection keeps its name in the path and must not be wrapped again.
+    */
+    var dotted = colName.charAt(0) === '.';
+    /* A single mode named after its own collection is Figma's way of saying
+       "this collection has no axis" — one set, not "base/base". */
+    var single = modes.length === 1 && modes[0].replace(/^[._]+/, '') === base;
+    modes.forEach(function (m) {
+      var setName = single ? base : base + '/' + m.replace(/^[._]+/, '');
+      var incoming = byMode[m];
+      if (dotted) { var wrapped = {}; wrapped[base] = incoming; incoming = wrapped; }
+      if (out[setName]) {
+        /* Merged, not skipped. out['core'] and out['foundation'] are created
+           unconditionally above and FILLED with primitives this exporter
+           synthesises, so the set is neither absent nor empty — it holds
+           invented tokens and none of the file's own. Skipping on "it exists"
+           lost 2,156 references while reporting 33 sets exported. */
+        var target = out[setName];
+        Object.keys(incoming).forEach(function (k) {
+          if (target[k] === undefined) target[k] = incoming[k];
+          else deepMerge(target[k], incoming[k]);
+        });
+      } else {
+        out[setName] = incoming;
+      }
+      passedThrough.push(setName);
+    });
+  });
+  if (passedThrough.length) {
+    console.log('[Closure] ' + passedThrough.length + ' set(s) passed through from ' +
+      'collections this export has no specific rule for: ' + passedThrough.slice(0, 8).join(', ') +
+      (passedThrough.length > 8 ? ' …' : ''));
+  }
+
   // Reorder value/type keys globally
   out = fixKeyOrder(out);
 
-  // Fix D/Rule 10: strip {core.} and {.core.} alias prefixes (deep clone)
-  out = fixAliasPaths(out);
+  /*
+    Fix D/Rule 10: strip {core.} and {.core.} alias prefixes (deep clone).
+    Given the paths that exist, so the strip can tell a prefix that is noise
+    from one that is part of the address — see fixAliasPaths.
+  */
+  /* The pass-through above has already run, which is what makes this index
+     complete: a collection the named rules did not claim gets its tokens
+     there, and until it has, every reference INTO one looks unresolvable —
+     so the strip would leave it alone and it would dangle under its
+     unstripped name. */
+  out = fixAliasPaths(out, tokenPathIndex(out));
   walkAndFinalizeNatoTypographyComposites(out['core'], out);
 
   // Canonical breakpoint typography quirks — run LAST on the final tree so no
@@ -2451,11 +2855,122 @@ function toTokenFormat(native, rawData) {
     }
   });
 
+  /*
+    EVERY COLLECTION THE RULES ABOVE DID NOT CLAIM, EMITTED AS ITS OWN SET.
+
+    Everything before this line is keyed to literal collection names — ".core",
+    ".mode", ".breakpoint" and seven more — because each carries a rule that is
+    genuinely specific to one design system: core's double unwrap, the
+    dimension-math layer, the typography scale list. Those rules are correct
+    and stay exactly as they are.
+
+    What was wrong is what happened to a collection matching NONE of them: it
+    was dropped, silently and completely. A Figma file whose collections are
+    called "brand" and "theme" exported as two empty sets, and every reference
+    into them dangled. transformToFinalFormat had kept them; this function
+    threw them away. That is not a rule being specific, it is a file being lost.
+
+    So the named rules run first and claim what they know, and whatever is left
+    passes through verbatim: one set per mode for a multi-mode collection,
+    named "collection/mode" the way .mode and .breakpoint already are, and a
+    single set named after the collection when it has one mode. The leading
+    "." or "_" a Figma collection often wears is dropped, because a set name
+    never carries it — which is the same normalisation buildAliasPath already
+    applies to the references that point at them.
+  */
+
+  /* Last, so it sees every set: see pruneSynthesisedFoundationRefs. */
+  var prunedRefs = pruneSynthesisedFoundationRefs(out);
+  if (prunedRefs) {
+    console.log('[Closure] dropped ' + prunedRefs + ' generated foundation reference(s) ' +
+      'whose target this document does not contain');
+  }
+
   out['$metadata'] = { tokenSetOrder: buildTokenSetOrder(out) };
+
+  /*
+    THE ARCHITECTURE THIS CAME OUT OF, written down, so importing it back does
+    not have to be inferred.
+
+    Everything above this line has been rewriting names: ".core" became "core",
+    "_restricted" became "restrictions", ".breakpoint"'s "S Mobile" became
+    "mobile". Those are this exporter's spellings, not the file's, and nothing
+    in the resulting JSON can undo them — the information is gone by the time
+    the tree exists. So it is recorded here from rawData, which still holds the
+    collections exactly as Figma gave them.
+
+    It also settles, with certainty rather than inference, the one question an
+    importer otherwise has to measure its way to: whether "base/white" and
+    "base/black" are two modes of one collection or two collections sharing a
+    prefix. At this point we KNOW — we just read them out of Figma.
+
+    A hint, never a contract. src/import-manifest.js binds it per group and
+    ignores whatever does not match the document it arrives in, so a
+    hand-edited or stale structure falls back to being measured rather than
+    being believed.
+  */
+  if (rawData && rawData.collections && rawData.collections.length) {
+    out['$figmaStructure'] = {
+      version: 1,
+      collections: rawData.collections.map(function (c) {
+        return {
+          figmaName: c.name,
+          modes: (c.modes || []).map(function (m) { return m.name; }),
+          variables: (c.variables || []).length,
+        };
+      }),
+    };
+  }
+
   // Runs last: every set is final here, so the closure it computes is the one
   // a consumer will actually validate against.
   completeThemeSelections(out);
+  reportUnhintedReferences(out);
   return out;
+}
+
+/*
+  HOW MANY REFERENCES WENT OUT UNABLE TO SAY WHAT THEY POINT AT.
+
+  Every one of these is a question the import will have to ask a person, and
+  each was found by hand at some cost: reading the pushed file, counting the
+  references, grouping them by set until the shape of the gap gave away which
+  rebuild had dropped the key. Once was enough. A reference without a target
+  collection is a defect with a number, so the number gets printed.
+
+  Nothing depends on this being zero — a file whose paths are unambiguous
+  imports perfectly well without a single hint. It is zero on a file this
+  exporter fully understands, and when it is not, this says where to look.
+*/
+function reportUnhintedReferences(out) {
+  var withCol = 0, without = 0, where = {};
+  Object.keys(out).forEach(function (set) {
+    if (set.charAt(0) === '$') return;
+    (function walk(node, path) {
+      if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+      var v = node.value !== undefined ? node.value : node.$value;
+      if (v !== undefined) {
+        if (typeof v !== 'string' || v.charAt(0) !== '{') return;
+        if (node.aliasCollection) { withCol++; return; }
+        without++;
+        var key = set + ' :: ' + path.slice(0, 2).join('.');
+        where[key] = (where[key] || 0) + 1;
+        return;
+      }
+      Object.keys(node).forEach(function (k) {
+        if (k.charAt(0) === '$') return;
+        walk(node[k], path.concat(k));
+      });
+    })(out[set], []);
+  });
+  if (!without) {
+    console.log('[Closure] every one of the ' + withCol + ' references says which collection it means');
+    return;
+  }
+  console.log('[Closure] ' + without + ' of ' + (withCol + without) + ' references do NOT say which ' +
+    'collection they point at — the import will ask about any whose path is defined more than once');
+  Object.keys(where).sort(function (a, b) { return where[b] - where[a]; }).slice(0, 8)
+    .forEach(function (k) { console.log('[Closure]     ' + where[k] + '  ' + k); });
 }
 
 // ============================================================================
@@ -2465,13 +2980,94 @@ function toTokenFormat(native, rawData) {
 // The real alias chain is foundation → .scheme → .mode → .section → .card →
 // leaf → .core, so omitting any middle set breaks subtle / elevation / black.
 // ============================================================================
+/*
+  Drop the aliases toTokenFormat INVENTS when their target was never written.
+
+  foundation.typography is a cross-product — every scale in the breakpoint
+  collection times a fixed list of ten props — and foundation.variant.breakpoint
+  names a breakpoint-string token. Both are generated, not read from the file,
+  so on a document shaped differently from the one they were written against
+  they name tokens that do not exist. In one real import that was 56 dangling
+  references sitting in the set a consumer reads typography from.
+
+  Pruned rather than not emitted, because the targets only exist once every set
+  is built: fixBreakpointTypography() adds the composite and the text-case /
+  text-decoration props well after foundation.typography is assembled. Run last,
+  this reads the finished output and asks the same question a consumer will.
+
+  DELIBERATELY NARROW. It touches only these two generated branches. A dangling
+  reference anywhere else is a bug to find, not a line to quietly delete, and
+  validateReferenceClosure still reports it.
+*/
+function pruneSynthesisedFoundationRefs(out) {
+  var index = {};
+  Object.keys(out).forEach(function (setName) {
+    if (setName.charAt(0) === '$') return;
+    (function walk(node, path) {
+      if (!node || typeof node !== 'object') return;
+      if (('value' in node) || ('$value' in node)) { index[path.replace(/\//g, '.')] = true; return; }
+      for (var k in node) if (node.hasOwnProperty(k)) walk(node[k], path ? path + '/' + k : k);
+    })(out[setName], '');
+  });
+
+  var f = out['foundation'];
+  if (!f) return 0;
+  var dropped = 0;
+  var refOf = function (node) {
+    if (!node || typeof node.value !== 'string') return null;
+    var m = node.value.match(/^\{([A-Za-z0-9_.\- ]+)\}$/);
+    return m ? m[1] : null;
+  };
+
+  if (f.typography) {
+    Object.keys(f.typography).forEach(function (scale) {
+      var props = f.typography[scale];
+      if (!props || typeof props !== 'object') return;
+      Object.keys(props).forEach(function (prop) {
+        var ref = refOf(props[prop]);
+        if (ref && !index[ref]) { delete props[prop]; dropped++; }
+      });
+      if (!Object.keys(props).length) delete f.typography[scale];
+    });
+    if (!Object.keys(f.typography).length) delete f.typography;
+  }
+
+  if (f.variant && f.variant.breakpoint) {
+    var vref = refOf(f.variant.breakpoint);
+    if (vref && !index[vref]) {
+      delete f.variant.breakpoint;
+      dropped++;
+      if (!Object.keys(f.variant).length) delete f.variant;
+    }
+  }
+  return dropped;
+}
+
+/* Every dotted token path present in a token tree. The same walk
+   validateReferenceClosure does, factored out so the alias fix can ask the
+   same question the validator will ask afterwards. */
+function tokenPathIndex(tokens) {
+  var index = {};
+  Object.keys(tokens).forEach(function (setName) {
+    if (setName.charAt(0) === '$') return;
+    (function walk(node, path) {
+      if (!node || typeof node !== 'object') return;
+      if (('value' in node) || ('$value' in node)) { index[path.replace(/\//g, '.')] = true; return; }
+      for (var k in node) if (node.hasOwnProperty(k)) walk(node[k], path ? path + '/' + k : k);
+    })(tokens[setName], '');
+  });
+  return index;
+}
+
 function validateReferenceClosure(tokens) {
-  var META = { '$themes': 1, '$metadata': 1 };
+  // Any $-prefixed root key is metadata, not a token set — an allowlist would
+  // have to be extended for every new one ($figmaStructure was the first).
+  var META = { '$themes': 1, '$metadata': 1, '$figmaStructure': 1 };
 
   // 1) Index every token name-path present in the output (dotted form).
   var index = {};
   Object.keys(tokens).forEach(function(setName) {
-    if (META[setName]) return;
+    if (META[setName] || setName.charAt(0) === '$') return;
     (function walk(node, path) {
       if (!node || typeof node !== 'object') return;
       if (('value' in node) || ('$value' in node)) {
@@ -2537,7 +3133,18 @@ function validateReferenceClosure(tokens) {
     brokenCount: broken.length,
     byRoot: byRoot,
     missingRoots: Object.keys(byRoot).sort(function(a, b) { return byRoot[b] - byRoot[a]; }),
-    sampleBroken: broken.slice(0, 15)
+    sampleBroken: broken.slice(0, 15),
+    /*
+      THE WHOLE LIST, for copying rather than for reading. The panel shows 15
+      because 645 rows is a wall, but 15 is not what someone needs when they
+      are pasting the problem to whoever can fix it — the tail is where the
+      unfamiliar names are.
+
+      Capped anyway: this crosses postMessage and a pathological document can
+      break tens of thousands of references. 5,000 pairs is far past what any
+      person will read and still a payload rather than a hazard.
+    */
+    broken: broken.slice(0, 5000)
   };
 }
 
@@ -2578,7 +3185,7 @@ function buildResolvedDocument(rawData, options) {
 
 figma.ui.onmessage = function(msg) {
   if (msg.type === 'resize') {
-    figma.ui.resize(420, msg.height);
+    figma.ui.resize(PANEL_WIDTH, msg.height);
     return;
   }
 
@@ -2619,6 +3226,27 @@ figma.ui.onmessage = function(msg) {
           variableIdToCollection.set(vid, stripIcons(col.name));
         });
       });
+
+      /*
+        WHICH COLLECTION A VARIABLE ACTUALLY LIVES IN.
+
+        Not variableIdToCollection, which cannot answer this: an extended
+        collection lists every variable it INHERITS in its own variableIds, so
+        one primitive appears in the ids of every collection that extends its
+        owner, and the loop above keeps whichever came last. For a file where
+        eleven collections extend one base that is an arbitrary borrower, and
+        it is arbitrary for exactly the variables this matters for.
+
+        variable.variableCollectionId is the owner, stated by Figma. Mapped
+        through this rather than inferred.
+      */
+      var collectionIdToName = new Map();
+      collections.forEach(function(col) {
+        collectionIdToName.set(col.id, stripIcons(col.name));
+      });
+
+      /* See the note beside where these are counted. */
+      var skipStats = { seen: 0, noOwner: 0, owned: 0, pruned: 0, borrowedButChanged: 0, examples: [] };
 
       // --- DIAGNOSTIC: log each collection's extended-collection properties ---
       collections.forEach(function(col) {
@@ -2730,6 +3358,49 @@ figma.ui.onmessage = function(msg) {
               var variable = pair.variable;
               var collectionValues = pair.collectionValues;
 
+              /*
+                IS THIS COLLECTION THE VARIABLE'S HOME, OR IS IT BORROWING IT?
+
+                An extended collection lists every variable it inherits in its
+                own variableIds, so walking collections and writing what each
+                one can see emits a single primitive once per collection. On a
+                real file that was one colour written into 38 documents, 45% of
+                a 40 MB export — and, worse, it is what made references to it
+                ambiguous on the way back in: 38 definitions of a path, and a
+                "{path}" naming none of them.
+
+                So: written where it lives, plus anywhere it is actually
+                OVERRIDDEN, because an override is a real value that exists
+                nowhere else. Never written where it is merely visible.
+              */
+              var ownerCollection = collectionIdToName.get(variable.variableCollectionId) || null;
+              var borrowed = !!(ownerCollection && ownerCollection !== stripIcons(col.name));
+              /*
+                COUNTED, BECAUSE THE FIRST VERSION OF THIS PRUNED NOTHING AT ALL
+                and there was no way to tell which of three things was true: the
+                owner was not being found, nothing was borrowed, or the
+                unchanged test was rejecting everything. A real file went out at
+                exactly the same 111,554 rows it had before the change, and the
+                only way to tell the three apart was to guess. Three counters
+                and a log line settle it in one export.
+              */
+              skipStats.seen++;
+              if (!ownerCollection) skipStats.noOwner++;
+              else if (!borrowed) skipStats.owned++;
+              if (borrowed) {
+                if (inheritsUnchanged(collectionValues, variable.valuesByMode, col.modes)) {
+                  skipStats.pruned++;
+                  return;                         // visible here, but it lives elsewhere
+                }
+                skipStats.borrowedButChanged++;
+                if (skipStats.examples.length < 3) {
+                  skipStats.examples.push(stripIcons(col.name) + '/' + variable.name +
+                    ' lives in ' + ownerCollection +
+                    ', here ' + Object.keys(collectionValues).length + ' mode(s)' +
+                    ', there ' + Object.keys(variable.valuesByMode || {}).length + ' mode(s)');
+                }
+              }
+
               var valuesByMode = {}, resolvedValuesByMode = {}, aliasInfo = {};
 
               Object.entries(collectionValues).forEach(function(entry) {
@@ -2742,7 +3413,10 @@ figma.ui.onmessage = function(msg) {
                       var currentVal = val;
                       var firstAliasedVar = await figma.variables.getVariableByIdAsync(currentVal.id);
                       if (firstAliasedVar) {
-                        var aliasedVarCollection = variableIdToCollection.get(firstAliasedVar.id);
+                        /* The owner, not a borrower — see collectionIdToName. */
+                        var aliasedVarCollection =
+                              collectionIdToName.get(firstAliasedVar.variableCollectionId) ||
+                              variableIdToCollection.get(firstAliasedVar.id);
                         var aliasPath = buildAliasPath(firstAliasedVar, aliasedVarCollection, col.name, collections);
                         aliasInfo[mId] = {
                           isAlias: true,
@@ -2776,6 +3450,10 @@ figma.ui.onmessage = function(msg) {
                 valuesByMode: valuesByMode,
                 resolvedValuesByMode: resolvedValuesByMode,
                 aliasInfo: aliasInfo,
+                /* Where it lives, and whether this collection is only holding
+                   an override of it — carried so the export can say so. */
+                ownerCollection: ownerCollection,
+                borrowed: borrowed,
                 codeSyntax: variable.codeSyntax,
                 // Where Figma allows this variable to be used (CORNER_RADIUS, GAP,
                 // FONT_SIZE, ...). It is the same semantic distinction the token
@@ -2802,7 +3480,23 @@ figma.ui.onmessage = function(msg) {
           });
         });
 
-        return Promise.all(promises);
+        /*
+          REPORTED HERE, WHICH IS WHERE THE COUNTERS EXIST. The first version of
+          this logged from the NEXT .then in the chain — a sibling of the
+          callback that declares them, not a child of it — so reading skipStats
+          threw a ReferenceError and took the whole extract down with it. The
+          plugin showed a cheerful mascot and "Error: 'skipStats' is not
+          defined", which is a fair summary of the mistake.
+        */
+        return Promise.all(promises).then(function (cols) {
+          console.log('[Closure] variables seen ' + skipStats.seen +
+            ' — owned here ' + skipStats.owned +
+            ', inherited and identical (not written) ' + skipStats.pruned +
+            ', inherited but differing (written) ' + skipStats.borrowedButChanged +
+            ', owner unknown ' + skipStats.noOwner);
+          skipStats.examples.forEach(function (e) { console.log('[Closure]     e.g. ' + e); });
+          return cols;
+        });
       });
     }).then(function(result) {
       // How many variables actually carry a Figma description, counted on the RAW
@@ -2857,6 +3551,109 @@ figma.ui.onmessage = function(msg) {
     });
   }
 
+  /*
+    THE ONLY WRITE PATH IN THE PLUGIN.
+
+    Everything that decided WHAT to write happened in the UI — reading the
+    file, projecting it, refusing what it could not know, and showing the diff.
+    By the time a program arrives here every decision is already made, which is
+    why this handler is short and has no judgement in it.
+
+    snapshot() first, so names in the program resolve to the objects already in
+    this document: that is what makes the run an upsert rather than a duplicate
+    factory, and it is what the diff has been describing.
+  */
+  if (msg.type === 'applyImport') {
+    (async function() {
+      try {
+        var existing = await PomImportApply.snapshot(figma);
+
+        /*
+          ASK THE DOCUMENT BEFORE TOUCHING IT. Figma has no transaction, and
+          this program is ordered in phases — every createVariable runs before
+          any setValue — so a limit discovered PART WAY THROUGH leaves a file
+          full of variables holding nothing. That is not hypothetical: a real
+          import created 6,192 of them before stopping on the 5,001st variable
+          of a collection Figma caps at 5,000.
+
+          Refusing up front costs one read and cannot half-write.
+        */
+        var pre = await PomImportApply.preflight(msg.program, figma, { existing: existing });
+        if (!pre.ok) {
+          console.warn('[Import] refused before writing: ' +
+            pre.problems.map(function(p) { return p.message; }).join('; '));
+          figma.ui.postMessage({ type: 'importRefused', problems: pre.problems });
+          return;
+        }
+
+        var report = PomImportApply.apply(msg.program, figma, { existing: existing });
+        console.log('[Import] ' + report.applied + ' applied, ' + report.failed + ' failed; ' +
+          report.variables + ' created, ' + (report.reusedVariables || 0) + ' reused, ' +
+          (report.modesAdded || 0) + ' modes added');
+        figma.ui.postMessage({ type: 'importApplied', report: report });
+      } catch (e) {
+        console.error('[Import] apply failed:', e);
+        figma.ui.postMessage({ type: 'importApplied',
+          report: { applied: 0, failed: 1, variables: 0, errors: [{ error: e.message || String(e) }] } });
+      }
+    })();
+    return;
+  }
+
+  /*
+    DELETE EVERY LOCAL VARIABLE COLLECTION IN THIS FILE.
+
+    The most destructive thing this plugin can do, and the only handler that
+    removes rather than adds. Three things make it survivable:
+
+      IT ONLY EVER SEES LOCAL COLLECTIONS. getLocalVariableCollectionsAsync
+      returns what this file owns; a collection consumed from a library is not
+      in the list and has no remove() to call, so a shared design system cannot
+      be deleted from a file that merely uses it.
+
+      IT COUNTS BEFORE IT CUTS. variableIds is read while the collection still
+      exists — after remove() the object is gone and the number with it, so a
+      report gathered afterwards would be a report of nothing.
+
+      IT DOES NOT STOP ON ONE FAILURE. A collection that refuses is recorded
+      and the rest still go; the alternative is a half-cleared file whose
+      remaining contents depend on iteration order, which is the state hardest
+      to reason about afterwards.
+
+    NOT UNDONE BY THIS PLUGIN. Figma keeps plugin edits on its own undo stack,
+    so Cmd-Z may bring them back, but that is Figma's behaviour and not a
+    promise this code can make — which is why the confirmation in the UI says
+    what will go rather than offering to reverse it.
+  */
+  if (msg.type === 'clearVariables') {
+    (async function() {
+      try {
+        var cols = await figma.variables.getLocalVariableCollectionsAsync();
+        var removed = [], failed = [], variables = 0;
+        cols.forEach(function(c) {
+          var n = (c.variableIds || []).length;   // read BEFORE remove()
+          var name = c.name;
+          try {
+            c.remove();
+            removed.push({ name: name, variables: n });
+            variables += n;
+          } catch (e) {
+            failed.push({ name: name, error: (e && e.message) || String(e) });
+          }
+        });
+        console.log('[Closure] cleared ' + removed.length + ' collection(s), ' +
+          variables + ' variable(s)' + (failed.length ? '; ' + failed.length + ' refused' : ''));
+        figma.ui.postMessage({ type: 'variablesCleared',
+          removed: removed, failed: failed, variables: variables });
+      } catch (e) {
+        console.error('[Closure] clear failed:', e);
+        figma.ui.postMessage({ type: 'variablesCleared',
+          removed: [], failed: [{ name: null, error: (e && e.message) || String(e) }], variables: 0 });
+      }
+    })();
+    return;
+  }
+
   if (msg.type === 'transform') {
     var nativeResult = transformToFinalFormat(msg.raw, {
       includeDescriptions: !!msg.includeDescriptions
@@ -2908,6 +3705,41 @@ figma.ui.onmessage = function(msg) {
         unplacedAxes: built.unplacedAxes || [],
         autoPinned: built.autoPinned || null
       };
+
+      /*
+        HOW TO READ THIS BACK, written by the thing that wrote it.
+
+        The resolved shape denormalises axes into nesting — light/dark and the
+        schemes stop being collections and become path depths — and until now
+        an importer had to work out which depths those were by measuring, or
+        ask a person. It never had to: the layout above just DECIDED where each
+        axis went, so it can say so. `built.levels` is that decision.
+
+        This is the gap the export side was missing. $figmaStructure already
+        recorded the collections a file came out of, which survives a
+        non-resolved export unchanged; a resolved one flattens them, and the
+        flattening is exactly what needed declaring.
+
+        Only the axes given a level of their own are here. The scheme axis ends
+        up naming a leaf rather than a level, so nothing is claimed about it and
+        the import still asks — saying nothing beats declaring a reading that
+        was never made.
+      */
+      if (built.levels && Object.keys(built.levels).length) {
+        /* finalTokens, not `out` — that one is a local of toTokenFormat and
+           belongs to the legacy tree. This is the resolved document. */
+        finalTokens['$figmaStructure'] = {
+          version: 1,
+          collections: (msg.raw.collections || []).map(function (c) {
+            return {
+              figmaName: c.name,
+              modes: (c.modes || []).map(function (m) { return m.name; }),
+              variables: (c.variables || []).length
+            };
+          }),
+          levels: built.levels
+        };
+      }
       if (built.autoPinned) {
         console.warn('[Resolved] held at their default mode so the layout fits: ' +
           Object.keys(built.autoPinned).map(function (k) {
@@ -2921,7 +3753,7 @@ figma.ui.onmessage = function(msg) {
     }
     var closure = (exportMode === 'legacy' && !msg.resolvedShape)
       ? validateReferenceClosure(finalTokens)
-      : { ok: true, brokenCount: 0, totalRefs: 0, byRoot: {}, missingRoots: [], sampleBroken: [] };
+      : { ok: true, brokenCount: 0, totalRefs: 0, byRoot: {}, missingRoots: [], sampleBroken: [], broken: [] };
     if (!closure.ok) {
       console.warn('[Closure] ⚠ ' + closure.brokenCount + ' broken references. Missing sets: ' + closure.missingRoots.join(', '));
       console.warn('[Closure] sample:', closure.sampleBroken);

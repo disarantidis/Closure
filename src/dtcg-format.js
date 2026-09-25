@@ -63,7 +63,11 @@
   // $extensions so $value stays spec-shaped without losing them.
   var TYPOGRAPHY_KEYS = ['fontFamily', 'fontSize', 'fontWeight', 'letterSpacing', 'lineHeight'];
 
-  var META_KEYS = { '$themes': 1, '$metadata': 1 };
+  /* Any $-prefixed key at the document root is metadata, not a token set.
+     An allowlist meant every new root key ($figmaStructure was the one that
+     found this) got converted as if it were tokens. */
+  var META_KEYS = { '$themes': 1, '$metadata': 1, '$figmaStructure': 1 };
+  var isMetaKey = function (k) { return k.charAt(0) === '$'; };
 
   function isObject(v) {
     return v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -672,7 +676,7 @@
     var metadata = legacyTokens['$metadata'] || {};
     var themes = legacyTokens['$themes'] || [];
     var tokenSetOrder = metadata.tokenSetOrder || Object.keys(legacyTokens).filter(function (k) {
-      return !META_KEYS[k];
+      return !isMetaKey(k);
     });
 
     var out = {};
@@ -693,6 +697,9 @@
       // Native, at the root, exactly where build-dtcg.js looks for them.
       if (legacyTokens['$themes']) out['$themes'] = legacyTokens['$themes'];
       if (legacyTokens['$metadata']) out['$metadata'] = legacyTokens['$metadata'];
+      // Travels with the document — it is what lets this file be imported back
+      // without its architecture having to be inferred. See code.source.js.
+      if (legacyTokens['$figmaStructure']) out['$figmaStructure'] = legacyTokens['$figmaStructure'];
       return { tokens: out, report: report };
     }
 

@@ -194,9 +194,38 @@ export function Toast({
     hovering. A value that must survive a re-run cannot be a local of the thing that re-runs.
   */
   const remaining = useRef<number | null>(null)
+  /*
+    A FRESH MESSAGE GETS A FRESH CLOCK, AND THE TIMER IS THE ONE THAT GIVES IT ONE — which is a
+    reversal of the note above, so the reason had better be good.
+
+    Clearing the ref used to live in its own effect, on `[open, title, ms]`, precisely so the timer
+    could not reset it. That solved the hover case and opened a worse one: `ms` resolves AFTER paint
+    (`readingTime` measures the rendered node), so on the render where it goes null → 2500 BOTH
+    effects have a changed dependency. Effects run in declaration order, the timer ran first and set
+    the clock, and the clearer ran second and unset it. The timer never re-runs — its deps did not
+    change again — so `remaining.current` stayed null for the life of the toast: the rAF guard below
+    was never true, `onClose()` was never reached, and the FIRST transient toast of a session sat
+    there forever. Every later one worked, because by then `ms` was already resolved and the two
+    effects no longer changed together.
+
+    Two effects writing one ref cannot be ordered safely by declaration alone, so there is now one.
+    It resets on the MESSAGE, not on every re-run, which keeps the hover fix the old note describes:
+    `held` and `onClose` change the deps without changing the message, so the clock is left alone.
+  */
+  const clockFor = useRef<string | null>(null)
   useEffect(() => {
-    if (!open || ms == null) return
-    if (remaining.current == null) remaining.current = ms
+    /* closed is not a message — nulling it here is what makes a REOPEN a fresh clock rather than
+       a resumption of the one that was running when it closed */
+    if (!open || ms == null) {
+      clockFor.current = null
+      return
+    }
+    const message = `${title}\u0000${ms}`
+    if (clockFor.current !== message) {
+      clockFor.current = message
+      remaining.current = ms
+      setLeft(1)
+    }
     let raf = 0
     let since = performance.now()
     const tick = (now: number) => {
@@ -208,22 +237,15 @@ export function Toast({
         }
       }
       since = now
-      setLeft(Math.max(0, (remaining.current ?? 0) / ms))
+      /* `?? ms` and not `?? 0`: a clock that has not started yet has ALL its time left, and the
+         old fallback painted it empty — which is what turned the fault above into a bar that
+         looked merely finished instead of one that was never running */
+      setLeft(Math.max(0, (remaining.current ?? ms) / ms))
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [open, ms, held, title, onClose])
-
-  /*
-    A FRESH MESSAGE GETS A FRESH CLOCK. The ref is cleared here rather than in the timer, because the
-    timer must NOT reset it — that is the bug above. This effect is the one place a new message is
-    known, so it is the one place the remaining time is allowed to go back to full.
-  */
-  useEffect(() => {
-    remaining.current = null
-    setLeft(1)
-  }, [open, title, ms])
 
   const hold = useCallback(() => setHeld(true), [])
   const release = useCallback(() => setHeld(false), [])

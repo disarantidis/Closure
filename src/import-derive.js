@@ -1,0 +1,973 @@
+/*
+  Dual-mode, exactly like src/resolve-architecture.js and src/dtcg-format.js:
+  module.exports when there is a require(), a global otherwise. One file runs
+  in Node (the suite and the CLI), in the plugin sandbox, and in the plugin UI
+  — so all three paths run identical code rather than three copies of it.
+*/
+(function (global) {
+/*
+  DERIVE — project an IR onto Figma's three structural slots, and report the
+  projection rather than performing it.
+
+  THIS MODULE WRITES NOTHING. It has no Figma dependency at all, which is what
+  lets the hard part be tested against real exports without a document open and
+  without any risk of half-applying a wrong answer.
+
+  THE ONE DECISION THAT MATTERS is whether the variants of a group are MODES of
+  one collection or SEPARATE collections that happen to share a name prefix.
+  "mode/light" + "mode/dark" are the first; "base/white" + "base/black" are the
+  second, and the two are indistinguishable by name. Getting it wrong does not
+  throw — it produces a collection in which every variable is empty in all but
+  one of its modes, which looks fine until someone tries to use it.
+
+  So it is decided by measurement, not by naming: DO THE VARIANTS DEFINE THE
+  SAME TOKEN PATHS? Alternative values for one thing are modes. Disjoint path
+  sets are separate namespaces. On a real 34,481-token export this came out
+  absolute — every group was either 100% or 0%, never in between.
+
+  AND WHERE IT IS NOT ABSOLUTE, THE IMPORT STOPS. A group at 61% overlap is not
+  a thing to guess at, because the wrong guess is silent. Ambiguity blocks and
+  asks; it never picks the likelier reading.
+
+  WHAT AN ANSWER LOOKS LIKE. Every open question gets an id — "group:theme",
+  "type:core/radius.s", "ref:shared.c" — and a caller resolves it by passing a
+  decision under that id. Decisions are the ONLY way past a refusal, they are
+  recorded in the plan, and they serialise into the manifest, so answering a
+  question once answers it for every later import of the same file.
+*/
+
+  var __dep = (typeof require !== 'undefined')
+    ? require('./import-manifest.js')
+    : global.PomImportManifest;
+  var bindManifest = __dep.bindManifest;
+  var bindThemes = __dep.bindThemes;
+  var normName = __dep.norm;
+/* Above MODES_MIN the variants are read as modes, at or below SEPARATE_MAX as
+   separate collections, and anything between is refused. The band is wide on
+   purpose: real axes share ~all their paths and real namespaces share ~none, so
+   a group landing in the middle means the file is not saying what we think it
+   is — which is a reason to ask, not to round. */
+const MODES_MIN = 0.9;
+const SEPARATE_MAX = 0;
+
+/*
+  FIGMA CAPS A COLLECTION AT 5,000 VARIABLES, and unlike the mode ceiling this
+  one is not a plan tier — it is the same for everybody. Found the hard way: a
+  real import ran 6,195 operations and then stopped on the 5,001st variable of
+  a collection wanting 6,480.
+
+  It has to be caught BEFORE anything is written, because of how the program is
+  ordered. Every createVariable runs before any setValue, so a failure during
+  variable creation leaves a file full of variables holding NOTHING — 6,192 of
+  them, in the run that found this. Discovering the limit by hitting it is the
+  worst possible time to discover it.
+
+  Which collection blows it is a property of the DOCUMENT SHAPE, not its size.
+  The system this came from holds that collection as 716 variables across two
+  modes; the resolved export denormalises those modes into names, and 716
+  becomes 6,480 in a single mode. Same tokens, nine times the variables.
+*/
+const VARIABLE_CEILING = 5000;
+
+/* Figma has four variable types. Everything else is either one of these in
+   disguise or not a variable at all. */
+const FLOAT_TYPES = ['dimension', 'borderRadius', 'fontSizes', 'lineHeights', 'letterSpacing',
+                     'number', 'spacing', 'sizing', 'borderWidth', 'opacity', 'paragraphSpacing',
+                     'paragraphIndent',
+                     /* DTCG has a duration type and Figma does not. The value
+                        is a count of milliseconds, so a unitless FLOAT is the
+                        honest carrier — better than the STRING it fell through
+                        to, which would have made "100" un-arithmetic. */
+                     'duration'];
+const STRING_TYPES = ['fontFamilies', 'fontWeights', 'textCase', 'textDecoration', 'string',
+                      'asset', 'text', 'fontFamily', 'fontWeight'];
+/* Not "unsupported" — NOT VARIABLES. A shadow or a type ramp is a Figma STYLE,
+   a different API with a different shape. Reported as a loss for the variable
+   importer and as the scope of a second one. */
+const COMPOSITE_TYPES = ['typography', 'boxShadow', 'border', 'shadow', 'composition', 'gradient'];
+
+const FIGMA_TYPES = ['COLOR', 'FLOAT', 'STRING', 'BOOLEAN'];
+
+function figmaType(t) {
+  if (t == null) return null;
+  if (t === 'color') return 'COLOR';
+  if (t === 'boolean') return 'BOOLEAN';
+  if (FLOAT_TYPES.indexOf(t) !== -1) return 'FLOAT';
+  if (STRING_TYPES.indexOf(t) !== -1) return 'STRING';
+  if (COMPOSITE_TYPES.indexOf(t) !== -1) return null;
+  return 'STRING';
+}
+const isComposite = (t) => COMPOSITE_TYPES.indexOf(t) !== -1;
+
+/* W3C DTCG writes two SCALAR types as objects — colour as
+   { colorSpace, components, alpha, hex } and dimension as { value, unit } —
+   so "the value is an object" does not mean "the value is a composite". */
+function isDtcgScalar(type, value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (type === 'color') return value.components !== undefined || value.hex !== undefined;
+  return value.value !== undefined && value.unit !== undefined;
+}
+
+const SEP = '␟';
+const vkey = (col, path) => col + SEP + path;
+
+/*
+  ── THE LEVEL MAP ──────────────────────────────────────────────────────────
+
+  A JSON has N nesting depths; Figma has three structural slots. Until now
+  derive() read exactly ONE signal to bridge them — a "/" in a set name — and
+  everything else became part of a token's name. That is enough for Tokens
+  Studio, where the set IS the axis, and enough for nothing else.
+
+  A level map says which DEPTH of a path is an axis:
+
+      mode . light . neutral . colours . basic . background
+       d0     d1       d2      └──────────┴──────────┘
+              ↑
+              promote this depth to the mode axis
+
+  DEPTH IS RELATIVE TO THE TOKEN PATH, and the two adapters disagree about
+  where that starts. Tokens Studio's set name is not part of any path, so
+  "mode/light" + "brand.primary" puts the axis at depth 0 of "light.brand…"
+  only if the set was flat; DTCG has no sets and keeps its top-level group in
+  the path, so the same axis sits one deeper. A level map is therefore tied to
+  the format it was written for — which is another reason it belongs in
+  $figmaStructure beside the rest of the projection rather than in a config
+  someone carries between files.
+
+  It is applied as a PRE-TRANSFORM on the IR, before any other decision, which
+  is what keeps it small: promoting depth 1 turns one group with 6,480 paths
+  into one group with two variants of 3,240, and every existing step — the
+  overlap measurement, the manifest binding, the verdicts — then works
+  unchanged on the rewritten rows. Nothing downstream needs to know a level
+  map exists.
+
+  ONE AXIS PER COLLECTION, and this is a Figma constraint rather than a choice
+  here: a variable collection has exactly one mode dimension. A document with
+  two independent axes — light/dark AND twenty schemes — cannot become one
+  collection, no matter how the depths are assigned. The system that produced
+  that document solves it with SEPARATE collections and aliases between them,
+  and an import cannot synthesise those, because it would have to invent which
+  direction the dependency runs. So promoting a second depth is refused rather
+  than approximated.
+*/
+/* A level entry is a bare role, or { role, axis } when whoever wrote it knew
+   which Figma axis the depth came from. */
+function roleOf(entry) {
+  return (entry && typeof entry === 'object') ? entry.role : entry;
+}
+
+function applyLevels(ir, levels) {
+  if (!levels || !Object.keys(levels).length) return ir;
+  const rows = ir.rows.map((r) => {
+    const spec = levels[r.group];
+    if (!spec) return r;
+    const segs = r.path.split('.');
+    let group = r.group, variant = r.variant, movedCollection = false, movedMode = false;
+    const drop = new Set();
+
+    /* Read by ORIGINAL index and removed in one pass at the end — taking one
+       segment out first would shift every index after it, so a map written
+       against the document would stop naming the depths it meant. */
+    for (const key of Object.keys(spec)) {
+      const i = Number(key);
+      if (!(i >= 0 && i < segs.length)) continue;
+      /* Either a bare role or { role, axis } — the EXPORTER writes the second,
+         because it knows which Figma axis it put at this depth and that is
+         worth recording even though applyLevels only needs the role. */
+      const entry = spec[key];
+      const role = (entry && typeof entry === 'object') ? entry.role : entry;
+      if (role === 'collection') { group = segs[i]; drop.add(i); movedCollection = true; }
+      else if (role === 'mode') { variant = segs[i]; drop.add(i); movedMode = true; }
+    }
+    if (!drop.size) return r;
+
+    /* A depth read as COLLECTIONS gives each of its values a collection of its
+       own, and a collection with no axis has exactly one mode — named after
+       itself, the same as any other single-set collection here. */
+    if (movedCollection && !movedMode) variant = group;
+
+    /* Whatever was promoted LEAVES the name. Otherwise it appears twice: once
+       as the structure and once again inside every variable underneath it. */
+    const rest = segs.filter((_, i) => !drop.has(i));
+    /* Tagged, because a row that has been given an explicit reading must not
+       then be re-addressed by a declaration — see address(). Without this the
+       $themes set map silently won, and choosing "modes" or "collections"
+       produced the same document: only the NAME change survived. */
+    /* originGroup survives the rewrite. A `collection` reading replaces the
+       group with the segment's own value — "restrictions" becomes "normal" and
+       "subtle" — and without this the collections it produced could no longer
+       be traced back to the choice that produced them, which is exactly what a
+       per-group preview has to do. */
+    return Object.assign({}, r, { group, variant, leveled: true,
+                                  originGroup: r.originGroup || r.group,
+                                  path: rest.join('.') || segs[segs.length - 1] });
+  });
+  return Object.assign({}, ir, { rows });
+}
+
+/*
+  WHICH DEPTHS LOOK LIKE AXES, measured rather than guessed — the same
+  reasoning the group verdict uses, one level down.
+
+  A depth is a candidate when its distinct values are FEW relative to the rows
+  beneath it, and when every one of those values carries the same set of paths
+  below it. That second half is the real test: an axis is a dimension along
+  which the same thing takes different values, so its branches must agree on
+  what "the same thing" is. A depth whose branches hold disjoint names is a
+  namespace, not an axis.
+
+  Reported, never applied. The point of a candidate is that someone confirms it.
+*/
+function levelCandidates(ir, opts) {
+  opts = opts || {};
+  const maxValues = opts.maxValues || 64;
+  const byGroup = new Map();
+  for (const r of ir.rows) {
+    if (!byGroup.has(r.group)) byGroup.set(r.group, []);
+    byGroup.get(r.group).push(r.path.split('.'));
+  }
+  const out = [];
+  for (const [group, paths] of byGroup) {
+    const depth = Math.min.apply(null, paths.map((p) => p.length));
+    /* The last segment is the token's own name, never an axis. */
+    for (let d = 0; d < depth - 1; d++) {
+      const branches = new Map();
+      for (const p of paths) {
+        const key = p[d];
+        if (!branches.has(key)) branches.set(key, new Set());
+        branches.get(key).add(p.slice(0, d).concat(p.slice(d + 1)).join('.'));
+      }
+      const values = [...branches.keys()];
+      if (values.length < 2 || values.length > maxValues) continue;
+      const sets = values.map((v) => branches.get(v));
+      const smallest = sets.reduce((a, b) => (a.size <= b.size ? a : b));
+      let shared = 0;
+      for (const x of smallest) if (sets.every((t) => t.has(x))) shared++;
+      const overlap = smallest.size ? shared / smallest.size : 0;
+
+      /*
+        BOTH READINGS ARE REPORTED, because both are real and the measurement
+        distinguishes them the same way the group verdict does one level up.
+
+        Branches that carry the SAME paths are alternative values for one
+        thing — an axis, so: modes. Branches that carry DISJOINT paths are
+        separate namespaces that happen to share a parent — so: collections.
+        Anything in between is neither, and saying nothing is the honest
+        answer there.
+      */
+      const suggests = overlap >= MODES_MIN ? 'mode'
+                     : overlap <= SEPARATE_MAX ? 'collection' : null;
+      if (suggests) {
+        /*
+          ONE REAL PATH, so the UI can show WHERE this choice bites.
+
+          A group with two candidates renders two identical-looking lists of
+          names, and nothing on screen says they are different DEPTHS of the
+          same path — so the two dropdowns read as a duplicated control rather
+          than as two positions that move independently. The segments let the
+          row draw the path with its own one marked.
+
+          The first path long enough to contain this depth: every path in this
+          branch shares the segment at `d` by construction, so any of them
+          shows the same thing and the first is as representative as the last.
+        */
+        const sample = paths.find((p) => p.length > d + 1) || paths[0];
+        out.push({ group, depth: d, values, distinct: values.length,
+                   segments: sample.slice(), overlap: +(overlap * 100).toFixed(1), suggests,
+                   variablesIfPromoted: suggests === 'mode'
+                     ? smallest.size
+                     : Math.round(sets.reduce((n, t) => n + t.size, 0) / sets.length) });
+      }
+    }
+  }
+  return out;
+}
+
+/* The first segment of a dotted path, which is the name family a token belongs
+   to ("restrictions.basic.text" -> "restrictions"). A leading dot is part of
+   the name, not a separator — ".core.red" is one root, not an empty one. */
+function rootOfPath(path) {
+  const i = path.indexOf('.', path.charAt(0) === '.' ? 1 : 0);
+  return i === -1 ? path : path.slice(0, i);
+}
+
+/*
+  ── THE ORDER COLLECTIONS GO IN ──────────────────────────────────────────────
+
+  LAST HOP FIRST. A token file is a chain: primitives at the bottom, then each
+  layer aliasing the one beneath it, up to the semantic layer a designer
+  actually picks from. Reading order and dependency order are opposites —
+  nobody opens the panel looking for "core.dimension.4", they open it looking
+  for "foundation.colours.basic.text" — so the deepest CONSUMER comes first and
+  the primitives last.
+
+  SHARED, BECAUSE IT WAS TWO ANSWERS TO ONE QUESTION. compile() has ordered the
+  collections it CREATES this way all along — the only order Figma offers, since
+  the Plugin API cannot reorder a collection after the fact — while the list the
+  import page SHOWS was sorted by variable count, largest first. So the page
+  promised one order and the import wrote another, and a file whose semantic
+  layer is small showed it at the bottom and then created it at the top.
+
+  Depth is the longest path down the alias graph, computed from refTarget so it
+  describes the references that will actually be written rather than the ones
+  the file mentions. A cycle cannot lengthen a path: a name already on the
+  current descent contributes zero. Ties keep the document's own order, so the
+  result is stable and a file that declares no references at all comes out in
+  exactly the order it was written in.
+*/
+function collectionOrder(vars, modesOf, refTarget, isLive) {
+  const live = isLive || (() => true);
+  const dependsOn = new Map();
+  for (const spec of vars.values()) {
+    if (!live(spec.col)) continue;
+    if (!dependsOn.has(spec.col)) dependsOn.set(spec.col, new Set());
+    for (const [, v] of spec.values) {
+      if (v.ref === undefined) continue;
+      const t = refTarget.get(v.ref);
+      if (t && t.col !== spec.col) dependsOn.get(spec.col).add(t.col);
+    }
+  }
+  const memo = new Map();
+  const depthOf = (name, onPath) => {
+    if (memo.has(name)) return memo.get(name);
+    if (onPath.has(name)) return 0;
+    onPath.add(name);
+    let d = 0;
+    for (const t of (dependsOn.get(name) || [])) d = Math.max(d, 1 + depthOf(t, new Set(onPath)));
+    onPath.delete(name);
+    memo.set(name, d);
+    return d;
+  };
+  const order = [...modesOf.keys()];
+  const documentOrder = new Map(order.map((n, i) => [n, i]));
+  order.sort((a, b) => {
+    const d = depthOf(b, new Set()) - depthOf(a, new Set());
+    return d !== 0 ? d : documentOrder.get(a) - documentOrder.get(b);
+  });
+  return order;
+}
+
+function derive(ir, opts) {
+  opts = opts || {};
+  /*
+    FIRST, before anything else looks at the rows — see applyLevels.
+
+    A map the DOCUMENT carries is the default, and a caller's overrides it.
+    That ordering is what makes the answer durable: the level map is the one
+    part of the projection no measurement can settle on its own — light/dark
+    genuinely could be modes, collections, or names, and only whoever owns the
+    system knows which. Asking once and writing it into $figmaStructure means
+    the next import of the same file does not ask again.
+
+    It is format-specific, which is exactly why it belongs in the file rather
+    than in a shared config: depth 1 of a Tokens Studio path and depth 1 of a
+    DTCG path are not the same depth (see applyLevels).
+  */
+  const declaredLevels = (ir.manifest && ir.manifest.levels) || {};
+  const levels = Object.keys(opts.levels || {}).length ? opts.levels : declaredLevels;
+  /* Measured on the ORIGINAL rows, not the rewritten ones. What a document
+     could be read as does not change because of what it is currently being
+     read as — and the depth indices would shift under the transform anyway,
+     so post-transform numbers would not even name the same depths. A caller
+     showing these as choices needs the SIBLINGS of the one already taken, not
+     a list that shrinks as it is used. */
+  const candidates = levelCandidates(ir);
+  ir = applyLevels(ir, levels);
+
+  const modeCeiling = opts.modeCeiling || Infinity;
+  /* Figma's own hard limit, not a caller's preference — so it applies unless
+     a caller deliberately turns it off, rather than only when asked for. */
+  const variableCeiling = opts.variableCeiling === undefined ? VARIABLE_CEILING : opts.variableCeiling;
+  const decisions = opts.decisions || {};
+
+  const plan = {
+    source: ir.source,
+    usedManifest: false,
+    collections: [],
+    ambiguous: [],
+    blocked: [],
+    losses: { composites: [], expressions: [], unresolvedRefs: [], typeConflicts: [], emptyCollections: [] },
+    refCollisions: [],
+    /* Paths several collections list with the SAME value in every mode — one
+       inherited variable written out once per collection, not a decision. Kept
+       so the count is reportable, but never asked about. */
+    refDuplicates: [],
+    /* Every open question, by id. compile() refuses while this is non-empty,
+       and each entry names exactly what a decision for it must say. */
+    unresolved: [],
+    decisionsApplied: [],
+    decisionsUnused: [],
+    /* Depths that measure like axes but have not been promoted. Reported so a
+       caller can offer them; never applied on their own. */
+    levelCandidates: [],
+    groupCandidates: [],
+    groupOrder: [],
+    levelsApplied: levels,
+    /* Whether this reading came from the file or from the caller — worth
+       reporting, because "the document says so" and "you just chose it" are
+       different kinds of confidence. */
+    levelsDeclared: levels === declaredLevels && Object.keys(levels).length > 0,
+    totals: {},
+    ok: false,
+  };
+
+  const claim = (id) => {
+    if (!Object.prototype.hasOwnProperty.call(decisions, id)) return undefined;
+    plan.decisionsApplied.push({ id, value: decisions[id] });
+    return decisions[id];
+  };
+  const ask = (id, question, options, detail) =>
+    plan.unresolved.push(Object.assign({ id, question, options }, detail || {}));
+
+  /* ── 1. group verdicts ─────────────────────────────────────────────────── */
+  const groups = new Map();                 // group -> Map(variant -> Set(path))
+  for (const r of ir.rows) {
+    if (!groups.has(r.group)) groups.set(r.group, new Map());
+    const g = groups.get(r.group);
+    if (!g.has(r.variant)) g.set(r.variant, new Set());
+    g.get(r.variant).add(r.path);
+  }
+
+  /* A DECLARATION BEATS A MEASUREMENT. $figmaStructure, when the document
+     carries one, states the architecture the export came out of — including
+     the names the export itself then threw away (".core" -> "core",
+     "_restricted" -> "restrictions"). Bound per group, so a hand-added set
+     falls through to measurement without invalidating the rest, and a manifest
+     that matches nothing at all is ignored entirely. */
+  const bound = opts.ignoreManifest ? null : bindManifest(ir, ir.manifest);
+  plan.usedManifest = !!bound;
+  if (bound) plan.manifestBinding = { bound: bound.bound, measured: bound.unbound };
+
+  /*
+    $themes, WHICH EVERY TOKENS STUDIO DOCUMENT ALREADY CARRIES.
+
+    It maps SETS to (collection, mode) by declaration — theme.group is the
+    Figma collection under its real name, theme.name is the mode, and the
+    `enabled` sets are the ones that collection owns. That is strictly better
+    than anything derivable from set names, because it survives the renaming
+    the exporter does: ".breakpoint" declares its modes as "S Mobile" and
+    "M Tablet" while the set names had already flattened those to "mobile"
+    and "tablet".
+
+    Ranked below $figmaStructure, which is this tool's own and therefore
+    exact, and above the measurement, which is a last resort. Per SET rather
+    than per group, so the sets a theme list forgets — eight of forty-six in
+    the document this was built against — still get measured.
+  */
+  const themeBound = opts.ignoreThemes ? null : bindThemes(ir);
+  plan.usedThemes = !!themeBound;
+  if (themeBound) {
+    plan.themeBinding = { sets: themeBound.covered, measured: themeBound.uncovered.length,
+                          uncovered: themeBound.uncovered };
+  }
+
+  const verdict = new Map();                // group -> 'modes' | 'separate'
+  const naming = new Map();                 // group -> how the manifest names it
+  const evidence = new Map();
+  /*
+    ONE ROW PER GROUP THAT HAS A VARIANT AXIS — see plan.groupCandidates.
+
+    A group's SETS are an axis just as much as a depth inside a token's path
+    is, and for a group whose paths are only two segments deep ("tense.background",
+    "interaction.background") they are the ONLY axis it has. Those groups
+    produced no level candidates at all and so rendered nothing, which is how
+    two real collections came to be invisible in the panel that decides how
+    collections are read.
+  */
+  const groupChoices = [];
+
+  for (const [g, variants] of groups) {
+    const names = [...variants.keys()];
+
+    const b = bound && bound.bindings.get(g);
+    if (b) {
+      verdict.set(g, b.verdict);
+      naming.set(g, b);
+      evidence.set(g, { variants: names.length, overlap: null, declared: true,
+                        note: 'declared by $figmaStructure' });
+      continue;
+    }
+
+    if (names.length === 1) {
+      verdict.set(g, 'modes');
+      evidence.set(g, { variants: 1, overlap: 1, note: 'single set', decided: false });
+      continue;
+    }
+    const sets = names.map((n) => variants.get(n));
+    /* Intersection over ALL variants as a fraction of the SMALLEST — using the
+       smallest rather than the first makes the measure order-independent. */
+    const smallest = sets.reduce((a, b) => (a.size <= b.size ? a : b));
+    let shared = 0;
+    for (const p of smallest) if (sets.every((s) => s.has(p))) shared++;
+    const overlap = smallest.size ? shared / smallest.size : 0;
+
+    /*
+      AN EXPLICIT ANSWER IS CONSULTED FIRST, not only when the measurement
+      gives up.
+
+      It used to be reached only inside `if (v === null)` — so the override
+      existed but could only ever be used on a group the file could not settle
+      by itself. Every group in a real export measures at an extreme (three
+      variants of "tense" share 100% of their paths), resolves confidently,
+      and the question was therefore never asked, never rendered, and could
+      not be answered. A panel titled "How should this be read?" that silently
+      omits the axis for two of eleven groups is not offering a choice.
+
+      The measurement is not wrong when it is confident — 100% overlap IS the
+      evidence for modes. But "correct about the bytes" and "what the system
+      means" are different questions, which is exactly why the DEPTH rows have
+      always been overridable regardless of what they measured. This makes the
+      variant axis behave the same way.
+    */
+    const answer = claim('group:' + g);
+    let v = (answer === 'modes' || answer === 'separate') ? answer : null;
+    let decided = v !== null;
+    if (v === null) v = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : null;
+    if (v === null) {
+      v = 'modes';                          // provisional, only so the rest can be reported
+      plan.ambiguous.push({ group: g, variants: names, overlap: +(overlap * 100).toFixed(1),
+                            shared, of: smallest.size });
+      ask('group:' + g,
+          'Are the ' + names.length + ' variants of "' + g + '" modes of one collection, or separate collections?',
+          ['modes', 'separate'],
+          { evidence: names.length + ' variants share ' + shared + ' of ' + smallest.size +
+                      ' paths (' + (overlap * 100).toFixed(1) + '%)' });
+    }
+    verdict.set(g, v);
+    const measured = overlap >= MODES_MIN ? 'modes' : overlap <= SEPARATE_MAX ? 'separate' : null;
+    groupChoices.push({ group: g, variants: names, verdict: v, measured, decided,
+                        overlap: +(overlap * 100).toFixed(1), shared, of: smallest.size });
+    evidence.set(g, { variants: names.length, overlap, shared, of: smallest.size, decided,
+                      note: overlap === 1 ? 'every variant defines the same paths'
+                          : overlap === 0 ? 'no path defined by more than one variant'
+                          : 'partial overlap — cannot be read from the file' });
+  }
+
+  /* ── 2. address every row to (collection, mode) ────────────────────────── */
+  const address = (r) => {
+    /*
+      AN EXPLICIT READING OUTRANKS EVERY DECLARATION.
+
+      A declaration is what the file says when nobody has said otherwise.
+      Somebody just did — they chose a reading for this depth — and a file
+      cannot overrule the person importing it. Ranked above both
+      $figmaStructure and $themes for exactly the groups a level map names,
+      and below them everywhere else.
+    */
+    if (r.leveled) {
+      /* The reading decides the SHAPE; $figmaStructure may still supply the
+         NAMES. Those are orthogonal — one says "this depth is an axis", the
+         other says "the collection it belongs to is called .mode" — and a
+         level map the FILE declared arrives alongside exactly such a binding.
+         Only the $themes set map is genuinely displaced, since that addresses
+         a row outright. */
+      const named = naming.get(r.group);
+      if (named && named.verdict === 'modes') {
+        return { col: named.collection, mode: (named.modeName && named.modeName[r.variant]) || r.variant };
+      }
+      return { col: r.group, mode: r.variant };
+    }
+
+    /* A set the themes claim is addressed by DECLARATION, and nothing derived
+       from its name applies — that is the whole point of the declaration.
+       $figmaStructure still outranks it, since that one is exact. */
+    if (themeBound && !naming.get(r.group)) {
+      const decl = themeBound.setMap.get(r.set);
+      if (decl) return { col: decl.collection, mode: decl.mode };
+      /* A set no theme claimed, but whose PREFIX belongs to one that is
+         declared — the theme list forgot a mode rather than a collection.
+         Without this it becomes a rival collection of the same name and every
+         path the two share turns into a reference collision. */
+      const owner = themeBound.groupOfCollection.get(normName(r.group));
+      if (owner) return { col: owner, mode: r.variant };
+    }
+    const n = naming.get(r.group);
+    if (n) {
+      /* The manifest's own names — this is the only route by which ".core"
+         comes back as ".core" rather than "core". */
+      return n.verdict === 'separate'
+        ? { col: n.per[r.variant].collection, mode: n.per[r.variant].mode }
+        : { col: n.collection, mode: n.modeName[r.variant] || r.variant };
+    }
+    return verdict.get(r.group) === 'separate'
+      ? { col: r.variant, mode: r.variant }   // a namespace of its own, one mode
+      : { col: r.group, mode: r.variant };    // a mode of the group's collection
+  };
+
+  /* ── 3. a variable is (collection, path); modes contribute values ──────── */
+  const vars = new Map();
+  const modesOf = new Map();
+  const groupOfCol = new Map();
+  for (const r of ir.rows) {
+    const a = address(r);
+    if (!modesOf.has(a.col)) { modesOf.set(a.col, []); groupOfCol.set(a.col, r.originGroup || r.group); }
+    const ms = modesOf.get(a.col);
+    if (ms.indexOf(a.mode) === -1) ms.push(a.mode);
+
+    const k = vkey(a.col, r.path);
+    let spec = vars.get(k);
+    if (!spec) {
+      spec = { col: a.col, path: r.path, types: new Set(), values: new Map(),
+               description: r.description || '' };
+      vars.set(k, spec);
+    }
+    spec.types.add(r.type);
+    spec.values.set(a.mode, r.value);
+    if (!spec.description && r.description) spec.description = r.description;
+  }
+
+  /* ── 4. a variable is ONE type across all its modes ────────────────────── */
+  for (const spec of vars.values()) {
+    const ts = [...spec.types];
+    spec.type = ts[0];
+    spec.ft = figmaType(spec.type);
+    if (ts.length > 1) {
+      const id = 'type:' + spec.col + '/' + spec.path;
+      const answer = claim(id);
+      if (answer && FIGMA_TYPES.indexOf(answer) !== -1) { spec.ft = answer; spec.typeDecided = true; }
+      else {
+        plan.losses.typeConflicts.push({ collection: spec.col, path: spec.path, types: ts });
+        ask(id, 'Variable "' + spec.col + '/' + spec.path + '" is ' + ts.join(' in one mode and ') +
+                ' in another. Which Figma type?', FIGMA_TYPES.slice(),
+            { evidence: 'declared types: ' + ts.join(', ') });
+      }
+    }
+  }
+
+  /* ── 5. reference targets ──────────────────────────────────────────────—
+     A reference names a token PATH, not a collection. If that path exists in
+     more than one collection the reference is genuinely ambiguous — the source
+     format resolved it by which sets a theme had enabled, and that context is
+     gone once the sets have become collections. Asked, never guessed. */
+  const byPath = new Map();
+  for (const spec of vars.values()) {
+    if (!byPath.has(spec.path)) byPath.set(spec.path, []);
+    byPath.get(spec.path).push(spec);
+  }
+  /* Only a path something actually POINTS AT can be ambiguous. Two collections
+     holding a variable of the same name is ordinary — Figma allows it and it
+     carries no meaning — so a duplicate nobody references is not a question,
+     and asking about it would bury the real ones. */
+  const referenced = new Set();
+  /* A reference that NAMES its collection answers itself — see refCollectionOf
+     in import-ir.js. Only the ones that do not can make a path ambiguous, so
+     only they are counted here; a path every reference already resolves is not
+     a question however many collections list it. */
+  const referencedBlind = new Set();
+  for (const spec of vars.values()) {
+    for (const v of spec.values.values()) {
+      if (v.ref === undefined) continue;
+      referenced.add(v.ref);
+      if (!v.refCol) referencedBlind.add(v.ref);
+    }
+  }
+
+  /*
+    THE SAME ANSWER SPELLED SIX WAYS IS NOT A QUESTION.
+
+    A path listed by several collections is usually one variable that several
+    collections INHERIT — Figma's extended collections, where a primitive
+    defined once is visible from every collection built on it, and an exporter
+    walking collections writes it out once per collection. On a real file 3,457
+    of 4,880 collisions were that: every candidate holding the identical value
+    in every mode, so every button on the panel resolved to the same colour.
+
+    Asking those buries the ones that matter, and there is no answer to give:
+    whichever is picked, nothing about the imported file differs. So they are
+    settled here and reported as a note. Only a path whose candidates actually
+    disagree is put to the person.
+  */
+  const sameEverywhere = (list) => {
+    const seen = new Set();
+    for (const s of list) {
+      for (const v of s.values.values()) {
+        seen.add(JSON.stringify(v));
+        if (seen.size > 1) return false;
+      }
+    }
+    return true;
+  };
+
+  const refTarget = new Map();              // path -> the one spec it resolves to
+  const byPathCol = new Map();              // path -> Map(collection -> spec)
+  const pending = [];                       // genuinely ambiguous, grouped below
+  for (const [p, list] of byPath) {
+    const live = list.filter((s) => s.ft !== null);
+    if (live.length) {
+      const m = new Map();
+      for (const s of live) m.set(s.col, s);
+      byPathCol.set(p, m);
+    }
+    if (live.length <= 1) { if (live.length) refTarget.set(p, live[0]); continue; }
+    if (!referenced.has(p)) continue;       // duplicated, but nothing can hit it
+    const id = 'ref:' + p;
+    const answer = claim(id);
+    const picked = answer && live.filter((s) => s.col === answer)[0];
+    if (picked) { refTarget.set(p, picked); continue; }
+    /* Every reference to it says which collection it means. */
+    if (!referencedBlind.has(p)) { refTarget.set(p, live[0]); continue; }
+    if (sameEverywhere(live)) {
+      /* Deterministic, so two runs of the same file agree: the order byPath
+         was built in, which is the order the document declares its sets. */
+      refTarget.set(p, live[0]);
+      plan.refDuplicates.push({ path: p, collections: live.map((s) => s.col), used: live[0].col });
+      continue;
+    }
+    plan.refCollisions.push({ path: p, collections: live.map((s) => s.col) });
+    pending.push({ path: p, live });
+  }
+
+  /*
+    ONE QUESTION PER SITUATION, NOT PER TOKEN.
+
+    What is left is genuinely ambiguous, and on a real file it was still 1,423
+    questions — a wall nobody gets through, which is the same as refusing the
+    import. But they are not 1,423 different situations: they collapse to seven,
+    because every "restrictions.*" path defined in the same three collections is
+    the same decision asked over and over. Grouped by the token's own root and
+    the exact set of collections defining it — two paths only share a question
+    when they are ambiguous in identical ways.
+
+    A per-path decision still wins (claim('ref:' + path) above is tried first),
+    so answering the group is a default, not a ceiling.
+  */
+  const groups2 = new Map();
+  for (const it of pending) {
+    const cols = it.live.map((s) => s.col);
+    const key = rootOfPath(it.path) + '\u0000' + cols.join(',');
+    if (!groups2.has(key)) groups2.set(key, { cols, paths: [], live: it.live });
+    groups2.get(key).paths.push(it.path);
+  }
+  for (const [key, g] of groups2) {
+    const id = 'refgroup:' + key.replace('\u0000', '|');
+    const answer = claim(id);
+    const hit = answer && g.live.filter((s) => s.col === answer)[0];
+    for (const path of g.paths) {
+      const m = byPathCol.get(path);
+      const picked = (answer && m && m.get(answer)) || null;
+      if (picked) refTarget.set(path, picked);
+    }
+    if (hit || (answer && g.paths.every((x) => refTarget.has(x)))) continue;
+    const root = key.slice(0, key.indexOf('\u0000'));
+    ask(id, g.paths.length === 1
+          ? 'Path "' + g.paths[0] + '" is defined in ' + g.cols.length +
+            ' collections. Which one do references to it mean?'
+          : g.paths.length + ' paths under "' + root + '" are defined in ' + g.cols.length +
+            ' collections. Which one do references to them mean?',
+        g.cols.slice(),
+        { evidence: 'defined in: ' + g.cols.join(', ') +
+                    (g.paths.length > 1
+                      ? '  ·  e.g. ' + g.paths.slice(0, 3).join(', ') +
+                        (g.paths.length > 3 ? ', …' : '')
+                      : '') });
+  }
+
+  /* ── 6. walk every value, classify what can and cannot land ────────────── */
+  let literals = 0, aliases = 0, importable = 0;
+  for (const spec of vars.values()) {
+    if (spec.ft === null) {
+      plan.losses.composites.push({ collection: spec.col, path: spec.path, type: spec.type });
+      continue;
+    }
+    importable++;
+    for (const [mode, v] of spec.values) {
+      if (v.ref !== undefined) {
+        /* The collection the exporter recorded wins over the path's single
+           winner: the winner is one guess for the whole document, this is the
+           fact for this reference. Falls through when the file does not carry
+           it, or names a collection this document does not define. */
+        const hinted = v.refCol && byPathCol.has(v.ref) ? byPathCol.get(v.ref).get(v.refCol) : null;
+        const target = hinted || refTarget.get(v.ref);
+        if (!target) {
+          const known = byPath.has(v.ref);
+          plan.losses.unresolvedRefs.push({ collection: spec.col, path: spec.path, mode, ref: v.ref,
+            reason: known ? 'target is a composite, so it is not a variable'
+                          : 'no token defines this path' });
+        } else { aliases++; spec.resolved = true; }
+      } else if (v.expr !== undefined) {
+        plan.losses.expressions.push({ collection: spec.col, path: spec.path, mode, expr: v.expr });
+      } else if (v.literal && typeof v.literal === 'object' && !isDtcgScalar(spec.type, v.literal)) {
+        /* An object under a non-composite type USUALLY means the type is
+           lying. The exception is DTCG's own scalars — colour and dimension
+           are objects in that spec — and treating those as composites is what
+           made a real document import as 723 of 8,312 tokens with no colours
+           at all. */
+        plan.losses.composites.push({ collection: spec.col, path: spec.path, type: spec.type,
+                                      note: 'object value under a non-composite type' });
+      } else literals++;
+    }
+  }
+
+  /* ── 7. collections, with the mode ceiling applied ─────────────────────── */
+  const varsPerCol = new Map();
+  for (const spec of vars.values()) {
+    if (spec.ft === null) continue;
+    varsPerCol.set(spec.col, (varsPerCol.get(spec.col) || 0) + 1);
+  }
+  for (const [name, modes] of modesOf) {
+    const g = groupOfCol.get(name);
+    const ev = evidence.get(g) || {};
+    const count = varsPerCol.get(name) || 0;
+    /* A few real variable names, so a preview can show ROWS rather than a
+       count. Cheap, and a count alone cannot show what a reading does to the
+       names — which is most of the difference between the three. */
+    const sample = [];
+    for (const spec of vars.values()) {
+      if (sample.length >= 3) break;
+      if (spec.col === name && spec.ft !== null) sample.push(spec.path.split('.').join('/'));
+    }
+
+    /*
+      THE GROUP TREE, which is the other half of what Figma's rail shows.
+
+      A collection's panel lists its collections at the top and, under a
+      "Groups" heading, every folder in its variable names with the number of
+      variables beneath it — nested, and counting through the nesting, so
+      `scheme` reports everything in `scheme/basic` and `scheme/shades` too.
+      That is exactly what the three readings move around, so a preview that
+      leaves it out is missing the change it is previewing.
+
+      Every prefix of every path except the leaf, counted. Sorting the keys
+      gives the tree its order for free: '/' sorts before any name character,
+      so a parent always precedes its own children.
+    */
+    const groupCount = new Map();
+    for (const spec of vars.values()) {
+      if (spec.col !== name || spec.ft === null) continue;
+      const segs = spec.path.split('.');
+      for (let i = 1; i < segs.length; i++) {
+        const key = segs.slice(0, i).join('/');
+        groupCount.set(key, (groupCount.get(key) || 0) + 1);
+      }
+    }
+    const groups = [...groupCount.keys()].sort().map((path) => ({
+      path,
+      depth: path.split('/').length - 1,
+      name: path.slice(path.lastIndexOf('/') + 1),
+      count: groupCount.get(path),
+    }));
+
+    const entry = {
+      name, modes: modes.slice(), variables: count, fromGroup: g, sample, groups,
+      verdict: verdict.get(g),
+      overlap: ev.overlap === undefined ? null : +(ev.overlap * 100).toFixed(1),
+      evidence: ev.note,
+      confidence: plan.ambiguous.some((a) => a.group === g) ? 'AMBIGUOUS'
+                : ev.declared ? 'declared'
+                : ev.decided ? 'decided by caller'
+                : ev.variants === 1 ? 'certain (single set)'
+                : ev.overlap === 1 || ev.overlap === 0 ? 'certain' : 'high',
+    };
+    if (count === 0) {
+      plan.losses.emptyCollections.push({ name, reason: 'every token in it is a composite' });
+      continue;
+    }
+    if (modes.length > modeCeiling) {
+      plan.blocked.push({ collection: name, kind: 'modes', needs: modes.length, ceiling: modeCeiling,
+                          reason: "more modes than this file's plan allows" });
+      entry.blocked = true;
+    }
+    if (count > variableCeiling) {
+      plan.blocked.push({ collection: name, kind: 'variables', needs: count, ceiling: variableCeiling,
+                          reason: 'more variables than Figma allows in one collection' });
+      entry.blocked = true;
+    }
+    plan.collections.push(entry);
+  }
+  /* The order they will be CREATED in, which is the order the panel will show
+     them in — so the list here is a preview of the result rather than a
+     different arrangement of the same names. It was sorted by variable count,
+     which answered a question nobody asked. */
+  const colOrder = collectionOrder(vars, modesOf, refTarget);
+  const colRank = new Map(colOrder.map((n, i) => [n, i]));
+  plan.collections.sort((a, b) =>
+    (colRank.has(a.name) ? colRank.get(a.name) : 1e9) -
+    (colRank.has(b.name) ? colRank.get(b.name) : 1e9));
+
+  /* One axis per collection is Figma's rule, not a preference — a second
+     promoted depth cannot be expressed at all, so it is refused rather than
+     silently ignored. */
+  for (const g of Object.keys(levels)) {
+    /* Only MODE depths compete. A collection split produces independent
+       collections, each free to have an axis of its own. */
+    const promoted = Object.keys(levels[g]).filter((d) => levels[g][d] === 'mode');
+    if (promoted.length > 1) {
+      plan.unresolved.push({
+        id: 'level:' + g, options: promoted.map((d) => 'depth ' + d),
+        question: '"' + g + '" promotes ' + promoted.length + ' depths to modes, and a Figma ' +
+                  'collection has exactly one mode axis. Which one is the axis?',
+        evidence: 'depths ' + promoted.join(', ') + ' were all marked as modes',
+      });
+    }
+  }
+
+  /* Every candidate, each marked with whether it is the one in force. A
+     collection has one mode axis, so the others in its group are alternatives
+     rather than additions — which is a thing to show, not to hide. */
+  /* Groups whose reading came from $figmaStructure or that hold a single set
+     are deliberately absent: there is nothing to choose in either case. */
+  plan.groupCandidates = groupChoices;
+  /* Every group, in the order the document introduces them. The panel needs
+     it because a section can now come from either list — a group with a
+     variant axis and no depths ("tense") appears in one and not the other,
+     and ordering by whichever list is longer puts it wherever it happens to
+     land rather than where the file put it. */
+  plan.groupOrder = [...groups.keys()];
+
+  plan.levelCandidates = candidates.map((c) => {
+    const spec = levels[c.group] || {};
+    const role = roleOf(spec[String(c.depth)]) || 'name';
+    return Object.assign({}, c, {
+      role,
+      applied: role !== 'name',
+      /* Only a MODE elsewhere in this group rules out a mode here. Reading
+         this depth as collections stays available either way. */
+      modeTakenBySibling: Object.keys(spec)
+        .some((d) => roleOf(spec[d]) === 'mode' && String(c.depth) !== d),
+      /* Present only when a DECLARATION named the Figma axis this depth came
+         from — the measurement can never know that, only the exporter can. */
+      axis: (spec[String(c.depth)] && spec[String(c.depth)].axis) || null,
+    });
+  });
+
+  for (const id of Object.keys(decisions)) {
+    if (!plan.decisionsApplied.some((d) => d.id === id)) plan.decisionsUnused.push(id);
+  }
+
+  plan.totals = {
+    rows: ir.rows.length,
+    sets: ir.sets ? ir.sets.length : null,
+    collections: plan.collections.length,
+    variables: importable,
+    modeValues: literals + aliases,
+    literals, aliases,
+    composites: plan.losses.composites.length,
+    blockedVariables: plan.blocked.reduce((n, b) => n + (varsPerCol.get(b.collection) || 0), 0),
+  };
+  const t = plan.totals;
+  t.importablePct = t.rows ? +(100 * (t.literals + t.aliases) / t.rows).toFixed(1) : 0;
+
+  /* A blocked collection does not make the plan invalid — it makes it PARTIAL,
+     which is the user's call and is gated separately in compile(). Only an open
+     question makes it unusable. */
+  plan.ok = plan.unresolved.length === 0;
+  plan.needsConfirmation = !plan.ok;
+
+  /* Everything compile() needs, kept off the reported surface so a plan stays
+     printable and serialisable. */
+  Object.defineProperty(plan, '_internals', {
+    enumerable: false, value: { vars, modesOf, refTarget, verdict, address },
+  });
+
+  return plan;
+}
+
+  var api = { derive, applyLevels, levelCandidates, roleOf, figmaType, isComposite, isDtcgScalar, vkey,
+              collectionOrder,
+                   MODES_MIN, SEPARATE_MAX, FIGMA_TYPES, VARIABLE_CEILING,
+                   FLOAT_TYPES, STRING_TYPES, COMPOSITE_TYPES };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (global) global.PomImportDerive = api;
+})(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

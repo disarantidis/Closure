@@ -73,11 +73,47 @@ async function main() {
   // scripts/dtcg-preview.js, so both paths run identical conversion code.
   const dtcg = fs.readFileSync(path.join(ROOT, 'src/dtcg-format.js'), 'utf8');
 
+  /*
+    The import pipeline, inlined the same way and for the same reason: these
+    are the files Node's suite and the CLI load, so the plugin cannot drift
+    from what the tests cover.
+
+    ORDER MATTERS, because each one reads its dependency's global at the
+    moment its own IIFE runs — manifest before derive, derive before compile,
+    verify before diff. Same constraint buildCode() has for
+    resolve-architecture -> emit-resolved.
+
+    apply() is NOT here. It is the only module that needs `figma`, so it goes
+    into code.js instead (see buildCode); the UI does everything up to the
+    program and the sandbox does the writing.
+  */
+  const IMPORT_MODULES = [
+    'src/import-ir.js',
+    'src/import-manifest.js',
+    'src/import-derive.js',
+    'src/import-compile.js',
+    'src/import-verify.js',
+    'src/import-diff.js',
+    /* After import-diff.js, which it reads: it turns a compiled program and
+       that diff into the shorter program that writes only what moved. */
+    'src/import-filter.js',
+    /* Not part of the import pipeline at all — it is the Compare page's
+       engine, and it rides in here because this is the list of modules the
+       UI gets. It answers a different question from import-diff.js (document
+       against document, rather than document against the live variable
+       graph); see its own header. */
+    'src/json-diff.js',
+  ];
+  const importPipeline = IMPORT_MODULES
+    .map((m) => '// ===== ' + m + ' =====\n' + fs.readFileSync(path.join(ROOT, m), 'utf8'))
+    .join('\n');
+
   const template = fs.readFileSync(path.join(ROOT, 'src/ui.template.html'), 'utf8');
   const html = template
     .replace('__Pom_BUTTONS_STYLE__', () => style)
     .replace('__Pom_BUTTONS_SCRIPT__', () => script)
     .replace('__Pom_DTCG_SCRIPT__', () => dtcg)
+    .replace('__Pom_IMPORT_SCRIPT__', () => importPipeline)
     .replace(/__Pom_BUILD_STAMP__/g, () => STAMP);
 
   const outFile = path.join(ROOT, 'ui.html');
@@ -102,6 +138,7 @@ function buildCode() {
     'src/resolve-architecture.js',
     'src/emit-resolved.js',
     'src/dtcg-format.js',
+    'src/import-apply.js',
   ];
   const banner =
     '// ---------------------------------------------------------------------------\n' +
