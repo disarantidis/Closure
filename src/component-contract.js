@@ -244,9 +244,20 @@ function presence(seen, allProps, axes) {
 */
 function contract(capture, opts) {
   opts = opts || {};
+  /*
+    SORTED, AND THE ORDER MATTERS MORE THAN IT LOOKS.
+
+    Every collapsed key is these names joined — "Size=Large, Variant=Avatar" —
+    so the axis order IS the text of every key in the file. Figma reports the
+    properties in the order they were defined, and rearranging variants in a
+    set can change it. Taken as given, somebody reordering a component set
+    would produce a contract diff in which every line moved and nothing
+    changed.
+  */
   var axes = (capture.api || [])
     .filter(function (p) { return p.type === 'VARIANT'; })
-    .map(function (p) { return p.name; });
+    .map(function (p) { return p.name; })
+    .sort();
 
   var variants = capture.variants || [];
   var allProps = variants.map(function (v) { return v.props || {}; });

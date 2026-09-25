@@ -274,6 +274,81 @@ function figmaWith(vars, styles) {
   }
 }
 
+/* ── the file, and where it goes ──────────────────────────────────────────── */
+{
+  const fileMod = require('../src/component-file.js');
+  const { contract } = require('../src/component-contract.js');
+
+  ok('slug: a component name becomes one path segment',
+     fileMod.slugFor('ODS Avatar') === 'ods-avatar', fileMod.slugFor('ODS Avatar'));
+  ok('slug: punctuation collapses rather than accumulating',
+     fileMod.slugFor('Button / Primary (new)') === 'button-primary-new',
+     fileMod.slugFor('Button / Primary (new)'));
+  ok('slug: and a name with nothing usable still produces a segment',
+     fileMod.slugFor('  ---  ') === 'component', fileMod.slugFor('  ---  '));
+
+  ok('path: the default puts the contract inside the component\'s own folder',
+     fileMod.pathFor('ODS Avatar', { dir: 'packages/ds' }) ===
+       'packages/ds/ods-avatar/ods-avatar.contract.json',
+     fileMod.pathFor('ODS Avatar', { dir: 'packages/ds' }));
+  ok('path: a repository with its own shape says so',
+     fileMod.pathFor('ODS Avatar', { dir: 'contracts', pattern: '{dir}/{slug}.json' }) ===
+       'contracts/ods-avatar.json');
+  /* A repo path is relative. An absolute one is refused by both providers with
+     a message about nothing in particular. */
+  ok('path: an empty folder leaves no leading slash behind',
+     fileMod.pathFor('ODS Avatar', { pattern: '{dir}/{slug}.json' }) === 'ods-avatar.json',
+     fileMod.pathFor('ODS Avatar', { pattern: '{dir}/{slug}.json' }));
+
+  /*
+    THE ONE PROPERTY THAT MATTERS MORE THAN BEING RIGHT. The file lands in a
+    repository and is reviewed as a diff, so the same component must produce
+    the same bytes — otherwise every push is a rewrite and the diff that was
+    meant to show a decision shows the file being shuffled.
+  */
+  const build = (apiOrder, layerOrder) => ({
+    name: 'T', nodeId: '1:1', fileKey: 'K', description: '',
+    api: apiOrder,
+    variants: [
+      { props: { Size: 'L', Variant: 'A' }, layers: layerOrder.map((p) => ({
+        path: p, type: 'FRAME', bindings: { width: 'w14' }, sizing: ['FIXED', 'FIXED'], size: [1, 1] })) },
+      { props: { Size: 'S', Variant: 'A' }, layers: layerOrder.map((p) => ({
+        path: p, type: 'FRAME', bindings: { width: 'w10' }, sizing: ['FIXED', 'FIXED'], size: [1, 1] })) },
+    ],
+  });
+  const axesA = [{ name: 'Size', type: 'VARIANT', values: ['L', 'S'] },
+                 { name: 'Variant', type: 'VARIANT', values: ['A'] }];
+  const axesB = [{ name: 'Variant', type: 'VARIANT', values: ['A'] },
+                 { name: 'Size', type: 'VARIANT', values: ['L', 'S'] }];
+
+  ok('file: the axis order Figma happens to report does not reach the file',
+     fileMod.serialise(contract(build(axesA, ['root', 'Box']))) ===
+     fileMod.serialise(contract(build(axesB, ['root', 'Box']))));
+  ok('file: nor does the z-order the layers came back in',
+     fileMod.serialise(contract(build(axesA, ['root', 'Box']))) ===
+     fileMod.serialise(contract(build(axesA, ['Box', 'root']))));
+
+  const text = fileMod.serialise(contract(build(axesA, ['root', 'Box'])));
+  ok('file: the summary is derived, so it is not written — six numbers churning on every edit',
+     text.indexOf('summary') === -1);
+  ok('file: a layer that is not an instance says nothing about instances',
+     text.indexOf('instanceOf') === -1, text.slice(0, 120));
+  ok('file: it ends with a newline, like everything else in a repository',
+     text.charAt(text.length - 1) === '\n');
+  ok('file: and it reads back as what it was',
+     fileMod.parse(text).component === 'T');
+  let refused = null;
+  try { fileMod.parse('{"hello":true}'); } catch (e) { refused = e.message; }
+  ok('file: something that is not a contract is refused rather than half-read',
+     /not a component contract/.test(refused || ''), String(refused));
+
+  /* The exception form's rule reads before its exceptions, which is the order
+     a person says it in. */
+  const exc = fileMod.orderedMap({ 'Size=S': 'x', '*': 'FIXED', 'Size=L': 'y' });
+  ok('file: `*` is written first, then the exceptions in a fixed order',
+     Object.keys(exc).join(',') === '*,Size=L,Size=S', Object.keys(exc).join(','));
+}
+
 pending.then(() => {
   console.log('');
   console.log(pass + '/' + (pass + fail) + ' passed');
