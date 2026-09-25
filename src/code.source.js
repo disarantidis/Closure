@@ -3183,6 +3183,50 @@ function buildResolvedDocument(rawData, options) {
   });
 }
 
+/*
+  WHAT IS SELECTED, WATCHED RATHER THAN ASKED FOR.
+
+  A component set is a different subject from the file's variables, and which
+  one the plugin is about is not a mode somebody should have to set — they
+  already said it by clicking. So the selection is reported as it changes, and
+  the UI decides what to do with that.
+
+  DELIBERATELY CHEAP. This is identity and nothing else: a name, an id, how
+  many variants. The capture is the expensive part and stays a separate,
+  explicit request — a plugin that walked every variant of every set somebody
+  clicked through would be unusable on a real library page.
+
+  A VARIANT COUNTS AS ITS SET, because somebody examining a component clicks
+  the variant they are looking at. Refusing that would be the plugin being
+  pedantic about a distinction it can settle itself.
+*/
+function describeSelection() {
+  var sel = figma.currentPage.selection;
+  if (!sel.length) return { kind: 'none' };
+  var node = sel[0];
+  var set = null;
+  if (node.type === 'COMPONENT_SET') set = node;
+  else if (node.type === 'COMPONENT' && node.parent && node.parent.type === 'COMPONENT_SET') set = node.parent;
+  if (!set) return { kind: 'other', type: node.type, name: node.name };
+  return {
+    kind: 'component-set',
+    id: set.id,
+    name: set.name,
+    variants: set.children.filter(function (c) { return c.type === 'COMPONENT'; }).length,
+  };
+}
+
+function postSelection() {
+  try { figma.ui.postMessage({ type: 'selectionChanged', selection: describeSelection() }); }
+  catch (e) { /* the UI is not listening yet; the next change will say it again */ }
+}
+
+figma.on('selectionchange', postSelection);
+/* Said once at startup too: the plugin can be opened with something already
+   selected, and a UI that only learned on CHANGE would show the wrong subject
+   until the person clicked somewhere else. */
+postSelection();
+
 figma.ui.onmessage = function(msg) {
   if (msg.type === 'resize') {
     figma.ui.resize(PANEL_WIDTH, msg.height);

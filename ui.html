@@ -23125,6 +23125,13 @@ html[data-theme=dark] {
         </div>
         <span id="component-open-btn-mount"></span>
       </div>
+      <!-- What the plugin is currently pointed at. Selecting a component set
+           takes over the screen, so this line is mostly read in the state where
+           nothing is — which is exactly when somebody needs telling what to
+           select. -->
+      <p class="component-status-line is-quiet" id="component-entry-line">
+        Select a component set in Figma and this becomes a contract.
+      </p>
     </div>
 
     <div class="json-file-card" id="json-file-card" data-level="4" hidden>
@@ -59137,7 +59144,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '0d3fd9f 17:38:49';
+    var CLOSURE_BUILD = '8a163ed 17:44:00';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -60321,12 +60328,71 @@ function format(report, opts) {
        re-reads the selection every time it is opened rather than watching it,
        because a selection that changes under a contract you are about to push
        is a worse surprise than having to open the page again. */
-    var componentState = { capture: null, contract: null, path: '' };
+    var componentState = { capture: null, contract: null, path: '', id: null, followed: false };
+    var lastSelection = null;
 
-    function openComponent() {
+    /* The main screen's own line about what is selected. Kept in step with the
+       selection rather than with the page, because somebody who pressed Back
+       with the component still selected needs the button to still make sense. */
+    function renderComponentEntry() {
+      var line = document.getElementById('component-entry-line');
+      if (!line) return;
+      var sel = lastSelection;
+      if (sel && sel.kind === 'component-set') {
+        line.textContent = sel.name + ' is selected — ' +
+          sel.variants.toLocaleString() + ' variant' + (sel.variants === 1 ? '' : 's') + '.';
+        line.classList.remove('is-quiet');
+      } else {
+        line.textContent = 'Select a component set in Figma and this becomes a contract.';
+        line.classList.add('is-quiet');
+      }
+    }
+
+    /*
+      THE PLUGIN FOLLOWS THE SELECTION.
+
+      Selecting a component set is somebody saying what they are working on, so
+      the plugin stops being about the file's variables and becomes about that
+      component. Nobody should have to set a mode they have already expressed
+      by clicking.
+
+      THREE RULES KEEP IT FROM BEING RUDE.
+
+      It only takes over from the MAIN screen. Import, Compare and Settings are
+      places somebody went on purpose, usually with something half-entered, and
+      a screen that vanished under them because a stray click landed on a
+      component would be the plugin losing their work to be clever.
+
+      It only gives back what it took. Leaving is automatic when the page was
+      opened BY the selection and the selection has gone; a page opened from
+      the button stays until it is closed, because that one was asked for.
+
+      And a different set re-scans rather than reopening, so clicking along a
+      row of components reads as one page changing its subject.
+    */
+    function onSelection(sel) {
+      var onComponentPage = document.getElementById('component-page').classList.contains('visible');
+      var onMain = !document.querySelector('.page.visible');
+      lastSelection = sel;
+      renderComponentEntry();
+
+      if (sel && sel.kind === 'component-set') {
+        if (onComponentPage) {
+          if (sel.id !== componentState.id) openComponent(true);
+          return;
+        }
+        if (onMain) openComponent(true);
+        return;
+      }
+      /* Not a component any more. Only a page this took over gets handed back. */
+      if (onComponentPage && componentState.followed) closeComponent();
+    }
+
+    function openComponent(followed) {
       document.getElementById('main-page').classList.add('hidden');
       document.getElementById('component-page').classList.add('visible');
-      componentState = { capture: null, contract: null, path: '' };
+      componentState = { capture: null, contract: null, path: '', id: null,
+                         followed: !!followed };
       document.getElementById('component-summary').hidden = true;
       document.getElementById('component-actions').hidden = true;
       window.PomComponentResult.clear();
@@ -60359,6 +60425,7 @@ function format(report, opts) {
 
     function renderComponent(capture) {
       componentState.capture = capture;
+      componentState.id = capture.nodeId;
       var contract = window.PomComponentContract.contract(capture);
       componentState.contract = contract;
 
@@ -60447,6 +60514,7 @@ function format(report, opts) {
     window.addEventListener('message', function (event) {
       var m = event.data && event.data.pluginMessage;
       if (!m) return;
+      if (m.type === 'selectionChanged') onSelection(m.selection);
       if (m.type === 'componentCaptured') renderComponent(m.capture);
       if (m.type === 'componentCaptureFailed') {
         document.getElementById('component-summary').hidden = true;
