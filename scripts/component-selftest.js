@@ -390,6 +390,77 @@ function figmaWith(vars, styles) {
        childrenOf(dirs, 'app').length === 0, JSON.stringify(childrenOf(dirs, 'app')));
   }
 
+  /*
+    RECOGNISING THE COMPONENT IN THE REPOSITORY.
+
+    Figma writes "ODS File Upload" and a repository writes FileUpload.tsx. The
+    case, the spaces and the extension are house style on each side, and the
+    words underneath are the same words.
+  */
+  {
+    const tree = {
+      folders: ['packages', 'packages/react', 'packages/react/src',
+                'packages/react/src/panel', 'packages/react/src/panel/node'],
+      files: ['packages/react/src/panel/node/Avatar.tsx',
+              'packages/react/src/panel/node/Button.tsx',
+              'packages/react/src/panel/node/Button.contract.json',
+              'packages/react/src/panel/node/FileUpload.tsx',
+              'packages/react/src/panel/node/Badge.tsx'],
+    };
+    const find = (name) => fileMod.matchInRepo(name, tree);
+    const place = (name) => fileMod.pathForMatch(name, find(name));
+
+    ok('match: two spellings of one name meet in the middle',
+       fileMod.words('ODS File Upload').join(',') === 'ods,file,upload' &&
+       fileMod.words('FileUpload.tsx').join(',') === 'file,upload,tsx',
+       fileMod.words('FileUpload.tsx').join(','));
+    ok('match: a component finds the source file that is named for it',
+       find('ODS Avatar').path === 'packages/react/src/panel/node/Avatar.tsx');
+    ok('match: and camel case is not an obstacle',
+       find('ODS File Upload').path === 'packages/react/src/panel/node/FileUpload.tsx');
+
+    /*
+      THE PREFIX IS OUT-MATCHED RATHER THAN STRIPPED. Hardcoding "ODS" would
+      work for one library and quietly mis-file another's, so a candidate wins
+      by being what the name ENDS with — and the direction is what keeps Badge
+      away from a badge NUMBER.
+    */
+    ok('match: a design-system prefix falls away without being named',
+       find('RADD Avatar').path === 'packages/react/src/panel/node/Avatar.tsx' &&
+       find('Avatar').path === 'packages/react/src/panel/node/Avatar.tsx');
+    ok('match: but a component is not its own first word',
+       find('ODS Badge Number') === null, JSON.stringify(find('ODS Badge Number')));
+    ok('match: and a name the repo has never heard of matches nothing',
+       find('Totally Unknown') === null);
+
+    ok('match: an existing contract outranks the source beside it',
+       find('ODS Button').kind === 'contract' &&
+       place('ODS Button') === 'packages/react/src/panel/node/Button.contract.json');
+    /* A source file gives its folder AND its name — Avatar.tsx makes
+       Avatar.contract.json, which is how the repository would have spelled it. */
+    ok('match: a source file names the contract that goes beside it',
+       place('ODS Avatar') === 'packages/react/src/panel/node/Avatar.contract.json',
+       place('ODS Avatar'));
+
+    /* Two right answers is a fact to report, not a coin to toss. */
+    {
+      const twin = { folders: [], files: ['packages/react/Avatar.tsx', 'packages/vue/Avatar.tsx'] };
+      const m = fileMod.matchInRepo('ODS Avatar', twin);
+      ok('match: the same component in two packages says so rather than choosing quietly',
+         m.alternatives.length === 1, JSON.stringify(m));
+    }
+    /* A folder-per-component repository is the other house style, and it
+       carries no file to take a name from. */
+    {
+      const byFolder = { folders: ['src/Avatar', 'src/Button'], files: [] };
+      const m = fileMod.matchInRepo('ODS Avatar', byFolder);
+      ok('match: a folder named for the component is a home too',
+         m.kind === 'folder' &&
+         fileMod.pathForMatch('ODS Avatar', m) === 'src/Avatar/ods-avatar.contract.json',
+         fileMod.pathForMatch('ODS Avatar', m));
+    }
+  }
+
   /* The exception form's rule reads before its exceptions, which is the order
      a person says it in. */
   const exc = fileMod.orderedMap({ 'Size=S': 'x', '*': 'FIXED', 'Size=L': 'y' });

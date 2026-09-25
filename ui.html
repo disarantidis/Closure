@@ -1256,6 +1256,11 @@
     }
     #component-folder-mount > * { flex: 0 1 auto; min-width: 0; }
 
+    .component-match-line {
+      margin: 6px 0 0; font-size: 10px; line-height: 1.5; color: var(--app-text-muted);
+      overflow-wrap: anywhere;
+    }
+
     /* The contracts this repo already holds. A list rather than a dropdown:
        it is the answer to "what else is here", which is a thing to read before
        it is a thing to choose from. */
@@ -23663,6 +23668,9 @@ html[data-theme=dark] {
         -->
         <span id="component-folder-mount"></span>
         <span id="component-path-mount"></span>
+        <!-- Why the path says what it says. A field that filled itself and did
+             not say why is a field nobody trusts. -->
+        <p class="component-match-line" id="component-match-line" hidden></p>
         <span id="component-found-mount"></span>
         <div class="component-buttons">
           <span id="component-compare-btn-mount"></span>
@@ -57435,7 +57443,127 @@ function parse(text) {
   return doc;
 }
 
+/*
+  FINDING THE COMPONENT IN THE REPOSITORY, BY ITS NAME.
+
+  Browsing is the fallback. The common case is that the component already has
+  a home — "ODS Avatar" in Figma is Avatar.tsx in packages/react/src/panel/node
+  — and making somebody descend five dropdowns to a folder the repository could
+  have named itself is the plugin asking a question it can answer.
+
+  BOTH SIDES ARE REDUCED TO WORDS, because neither spelling is the other's.
+  Figma writes "ODS File Upload" and a repository writes FileUpload.tsx: the
+  case, the spaces and the extension are house style on each side, and the
+  words underneath are the same words.
+
+  A DESIGN-SYSTEM PREFIX IS NOT STRIPPED, it is out-matched. Hardcoding "ODS"
+  would work for one library and quietly mis-file another's; instead a
+  candidate matches when its words are what the component's name ENDS with, so
+  "ods avatar" finds "avatar" and any prefix at all falls away. The direction
+  matters: `Badge` does not match "ODS Badge Number", because the component is
+  not a badge, it is a badge number.
+*/
+function words(text) {
+  return String(text || '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')     // FileUpload -> File Upload
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+function endsWithWords(whole, tail) {
+  if (!tail.length || tail.length > whole.length) return false;
+  var at = whole.length - tail.length;
+  for (var i = 0; i < tail.length; i++) if (whole[at + i] !== tail[i]) return false;
+  return true;
+}
+
+/* The name a path offers for matching: a contract without its suffix, any
+   other file without its extension, a folder by its last segment. */
+function candidateName(path, isFolder) {
+  var base = String(path || '').split('/').pop();
+  if (isFolder) return base;
+  if (isContractPath(path)) return componentOfPath(path);
+  var dot = base.lastIndexOf('.');
+  return dot > 0 ? base.slice(0, dot) : base;
+}
+
+/*
+  matchInRepo(componentName, { files, folders }) -> best | null
+
+  `best` is { path, dir, kind, name, exact, alternatives } where `kind` is
+  'contract' | 'file' | 'folder'. A contract outranks the source beside it —
+  it is the file being looked for, and its name is the house style already
+  settled. An exact name outranks one the component's name merely ends with.
+
+  Alternatives are counted rather than chosen between: a monorepo with the
+  same component in react and vue has two right answers, and picking one
+  silently would be the plugin guessing where it should be saying so.
+*/
+function matchInRepo(componentName, tree) {
+  var want = words(componentName);
+  if (!want.length) return null;
+  var files = (tree && tree.files) || [];
+  var folders = (tree && tree.folders) || [];
+
+  var hits = [];
+  var consider = function (path, isFolder) {
+    var name = candidateName(path, isFolder);
+    var mine = words(name);
+    if (!mine.length) return;
+    var exact = mine.length === want.length && endsWithWords(want, mine);
+    if (!exact && !endsWithWords(want, mine)) return;
+    var kind = isFolder ? 'folder' : (isContractPath(path) ? 'contract' : 'file');
+    hits.push({
+      path: path, name: name, kind: kind, exact: exact,
+      dir: path.indexOf('/') === -1 ? '' : path.slice(0, path.lastIndexOf('/')),
+      /* Contract over source over folder; exact over merely-ends-with; and a
+         longer match over a shorter one, so `FileUpload` beats `Upload`. */
+      score: (kind === 'contract' ? 100 : kind === 'file' ? 50 : 10) +
+             (exact ? 20 : 0) + mine.length,
+    });
+  };
+  files.forEach(function (f) { consider(f, false); });
+  folders.forEach(function (f) { consider(f, true); });
+  if (!hits.length) return null;
+
+  hits.sort(function (a, b) {
+    if (b.score !== a.score) return b.score - a.score;
+    /* Deterministic, and the shallower path is the likelier home. */
+    var da = a.path.split('/').length, db = b.path.split('/').length;
+    if (da !== db) return da - db;
+    return a.path < b.path ? -1 : 1;
+  });
+  var best = hits[0];
+  return {
+    path: best.path, dir: best.dir, kind: best.kind, name: best.name, exact: best.exact,
+    /* Only the ones that could equally have been chosen. A source file beside
+       the contract that won is not an alternative, it is the same answer. */
+    alternatives: hits.filter(function (h) {
+      return h !== best && h.score === best.score;
+    }).map(function (h) { return h.path; }),
+  };
+}
+
+/*
+  WHERE THE CONTRACT GOES, given what was found.
+
+  A contract that already exists IS the answer. A source file gives its folder
+  AND its name — Avatar.tsx makes Avatar.contract.json, which is how the
+  repository would have spelled it. A folder gives only its folder, and the
+  name falls back to the component's own slug.
+*/
+function pathForMatch(componentName, match) {
+  if (!match) return null;
+  if (match.kind === 'contract') return match.path;
+  if (match.kind === 'file') {
+    return (match.dir ? match.dir + '/' : '') + match.name + CONTRACT_SUFFIX;
+  }
+  return (match.path ? match.path + '/' : '') + slugFor(componentName) + CONTRACT_SUFFIX;
+}
+
   var api = { IDENTITY, DEFAULT_PATTERN, CONTRACT_SUFFIX, isContractPath, componentOfPath,
+              words, endsWithWords, candidateName, matchInRepo, pathForMatch,
               slugFor, pathFor,
               orderedMap, orderedLayer, ordered, serialise, parse };
 
@@ -59307,7 +59435,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '92a36f8 19:52:01';
+    var CLOSURE_BUILD = '1e23095 19:55:01';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -60652,8 +60780,57 @@ function format(report, opts) {
           .map(function (f) {
             return { path: f, name: window.PomComponentFile.componentOfPath(f) };
           });
+
+        /*
+          THE COMPONENT'S OWN HOME, IF THE REPOSITORY ALREADY HAS ONE.
+
+          Browsing is the fallback. The common case is that "ODS Avatar" is
+          Avatar.tsx somewhere, and making somebody descend five dropdowns to a
+          folder the repository could have named itself is the plugin asking a
+          question it can answer.
+
+          Only while the path is still the one this page invented. The moment
+          somebody has typed or picked, the path is theirs and a match arriving
+          late must not take it — a control that moves under the hand is worse
+          than one that never helped.
+        */
+        var name = componentState.capture && componentState.capture.name;
+        var match = window.PomComponentFile.matchInRepo(name, got);
+        if (match && window.PomComponentPath.get() === componentState.path) {
+          var matched = window.PomComponentFile.pathForMatch(name, match);
+          if (matched) {
+            componentState.path = matched;
+            window.PomComponentPath.set(matched);
+            window.PomComponentFolder.set(lastFolders, componentFolderOf(matched));
+          }
+        }
+        renderComponentMatch(match);
         window.PomComponentFound.set(lastFoundRows, window.PomComponentPath.get());
       }, function () { /* browsing is a convenience; the default path still works */ });
+    }
+
+    /*
+      WHY THE PATH SAYS WHAT IT SAYS.
+
+      A field that filled itself and did not say why is a field nobody trusts:
+      the reader cannot tell a good match from a coincidence without being told
+      what was matched. So the line names the file it found, and when several
+      matched equally it says that instead of pretending the first was special.
+    */
+    function renderComponentMatch(match) {
+      var el = document.getElementById('component-match-line');
+      if (!el) return;
+      if (!match) {
+        el.textContent = 'No file in the repo matches this name — pick where it should go.';
+        el.hidden = false;
+        return;
+      }
+      var extra = match.alternatives.length;
+      el.textContent =
+        (match.kind === 'contract' ? 'Its contract is already here: ' :
+         match.kind === 'folder' ? 'Matched the folder ' : 'Matched ') + match.path +
+        (extra ? ' — and ' + extra + ' other place' + (extra === 1 ? '' : 's') + ' match as well.' : '.');
+      el.hidden = false;
     }
 
     /* The folder part of a path — everything before the last segment. */
