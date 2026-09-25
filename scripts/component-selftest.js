@@ -588,6 +588,45 @@ function figmaWith(vars, styles) {
        diff({ figma: { key: 'k1' }, layers: {} }, { figma: { key: 'k2' }, layers: {} })
          .pairing.verdict === 'different');
   }
+
+  /*
+    THE TIE, WHICH HAS TO HAPPEN BEFORE EITHER VERB RUNS.
+
+    The push writes a file at the path and the compare reads one, and both are
+    the wrong thing to do to a path that turns out to belong elsewhere. So the
+    question is asked once, in front, and this is what it answers.
+  */
+  {
+    const { linkVerdict, sameName } = require('../src/component-diff.js');
+    const mine = { component: 'ODS Avatar', figma: { key: 'k1', fileKey: 'A', nodeId: '1:1' } };
+    const at = (component, figma) => ({ component, figma: figma || {} });
+
+    ok('tie: nothing at the path is free ground, and claiming it is the easy case',
+       linkVerdict(mine, null).kind === 'free');
+    ok('tie: this component\u2019s own contract is a tie already made',
+       linkVerdict(mine, at('ODS Avatar', { key: 'k1' })).kind === 'mine');
+
+    /* The refusal the tie exists for. Everything else it allows; this one it
+       stops, and stopping it is what lets the name stop being load-bearing. */
+    const theirs = linkVerdict(mine, at('ODS Button', { key: 'k2' }));
+    ok('tie: another component\u2019s contract is refused, and named',
+       theirs.ok === false && theirs.kind === 'theirs' && theirs.component === 'ODS Button');
+    ok('tie: and the refusal says which identity disagreed',
+       theirs.pairing.by === 'key' && theirs.pairing.repo === 'k2');
+
+    /* A contract that never recorded an identity is the migration case. The
+       name is all there is to go on: one that agrees is enough to adopt, one
+       that disagrees is a question rather than a refusal. */
+    ok('tie: an unidentified contract under an agreeing name is adopted',
+       linkVerdict(mine, at('Avatar')).kind === 'adopted');
+    ok('tie: under a name that disagrees it is asked about, not refused outright',
+       linkVerdict(mine, at('Chip')).kind === 'unsure');
+
+    ok('tie: "ODS Avatar" and "Avatar" are one component under two house styles',
+       sameName('ODS Avatar', 'Avatar') === true);
+    ok('tie: "Avatar" and "Avatars" are not',
+       sameName('Avatar', 'Avatars') === false);
+  }
 }
 
 pending.then(() => {

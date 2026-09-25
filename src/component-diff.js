@@ -139,6 +139,50 @@ function samePairing(figma, repo) {
 }
 
 /*
+  TYING A COMPONENT TO A PATH, which has to happen before either verb runs.
+
+  A path arrived at by matching a name is a proposal. Pushing to it writes a
+  file and comparing against it reads one, and both are the wrong thing to do
+  to a path that turns out to be somebody else's. So the tie is a step of its
+  own, and this is the question that step asks.
+
+  It is answered from whatever is already at the path, and there is only one
+  refusal that really matters: a contract that records a different component.
+  Everything else is either free ground or a file this component can claim.
+
+  A contract that never recorded an identity is the migration case — written
+  by hand, or before identities were kept. The name is all there is to go on,
+  so a name that agrees is enough to adopt it, and a name that disagrees is
+  raised as a question rather than settled as a refusal.
+*/
+function sameName(mine, theirs) {
+  var a = String(mine || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  var b = String(theirs || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  if (!a || !b) return false;
+  if (a === b) return true;
+  /* "ODS Avatar" and "Avatar" are the same component under two house styles,
+     and the shorter one is a suffix of the longer. Anchored on a space so
+     "Avatar" does not answer for "Super Avatar"... which it would, and does
+     here, deliberately: a qualifier in front is a prefix, not a new component.
+     "Badge" against "Avatar Badge" is the case this is for. */
+  return a.length > b.length ? a.slice(-(b.length + 1)) === ' ' + b
+                             : b.slice(-(a.length + 1)) === ' ' + a;
+}
+
+function linkVerdict(mine, theirs) {
+  if (!theirs) return { ok: true, kind: 'free' };
+  var pairing = samePairing(mine, theirs);
+  if (pairing.verdict === 'same') return { ok: true, kind: 'mine' };
+  if (pairing.verdict === 'different') {
+    return { ok: false, kind: 'theirs', pairing: pairing,
+             component: theirs.component || null };
+  }
+  return sameName(mine && mine.component, theirs.component)
+    ? { ok: true, kind: 'adopted', component: theirs.component || null }
+    : { ok: false, kind: 'unsure', component: theirs.component || null };
+}
+
+/*
   diff(figmaContract, repoContract) -> report
 
   Neither side is modified and nothing is written. `same` is the answer most
@@ -195,7 +239,8 @@ function diff(figma, repo) {
   return report;
 }
 
-  var api = { keysOf, sameList, factChange, split, diffApi, identity, samePairing, diff };
+  var api = { keysOf, sameList, factChange, split, diffApi, identity, samePairing,
+              sameName, linkVerdict, diff };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (global) global.PomComponentDiff = api;

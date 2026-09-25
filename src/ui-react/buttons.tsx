@@ -618,6 +618,9 @@ declare global {
        column of counts — see mountImportChanges. */
     PomComponentCompareBtn: any;
     PomComponentPushBtn: any;
+    PomComponentLinkBtn: any;
+    PomComponentChangeBtn: any;
+    PomComponentUnlinkBtn: any;
     PomComponentPath: { get: () => string; set: (v: string) => void };
     PomComponentFolder: any;
     PomComponentFound: {
@@ -794,7 +797,35 @@ window.PomImportApplyBtn = mountLiveButton(
 );
 
 /* ── the component contract page ───────────────────────────────────────────
-   Compare first, push second, and the order is the argument: a contract is
+   THE TIE COMES FIRST, and it is a button rather than a consequence. Until a
+   component and a path have been tied, neither verb is offered at all: a push
+   would write a file somewhere nobody confirmed, and a compare would read one.
+   So this is the only control on the page to begin with, and the other two
+   appear once it has been used. */
+window.PomComponentLinkBtn = mountLiveButton(
+  'component-link-btn-mount',
+  { id: 'component-link-btn', variant: 'filled', size: 'medium', label: 'Link this component', block: true },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+
+/* Breaking the tie, and moving it. Quiet, because they are the rare halves of
+   a pair whose common case is that nothing needs doing — but present, because
+   a link that cannot be undone is a trap rather than a guarantee. */
+window.PomComponentChangeBtn = mountLiveButton(
+  'component-change-btn-mount',
+  { id: 'component-change-btn', variant: 'ghost', size: 'small', label: 'Change' },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+window.PomComponentUnlinkBtn = mountLiveButton(
+  'component-unlink-btn-mount',
+  { id: 'component-unlink-btn', variant: 'ghost', size: 'small', label: 'Unlink' },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+
+/* Compare first, push second, and the order is the argument: a contract is
    written after somebody has seen what writing it would change. */
 window.PomComponentCompareBtn = mountLiveButton(
   'component-compare-btn-mount',

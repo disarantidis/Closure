@@ -1281,6 +1281,16 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 10px; opacity: 0.7; overflow-wrap: anywhere; min-width: 0;
     }
+    /* The tie, once it is made. Reads as a statement rather than a control,
+       because that is what it now is. */
+    .component-linked-line {
+      margin: 0; font-size: 11px; line-height: 1.5; color: var(--app-text);
+      overflow-wrap: anywhere;
+    }
+    .component-linked-line b { font-weight: 600; }
+    .component-link-tools { display: flex; gap: 4px; margin-top: 6px; }
+    #component-link-note { color: var(--app-text); font-size: 11px; }
+
     .component-buttons { display: flex; gap: 8px; margin-top: 12px; }
     .component-buttons > span { flex: 1 1 0; min-width: 0; }
     .compare-page { overflow-y: auto; overflow-x: hidden; }
@@ -3778,15 +3788,40 @@
           contracts already written are listed to be jumped to rather than
           retyped.
         -->
-        <span id="component-folder-mount"></span>
-        <span id="component-path-mount"></span>
-        <!-- Why the path says what it says. A field that filled itself and did
-             not say why is a field nobody trusts. -->
-        <p class="component-match-line" id="component-match-line" hidden></p>
-        <span id="component-found-mount"></span>
-        <div class="component-buttons">
-          <span id="component-compare-btn-mount"></span>
-          <span id="component-push-btn-mount"></span>
+        <!--
+          CHOOSING, and nothing else. Neither verb is reachable from here: what
+          this half produces is a proposal, and a proposal is tied before it is
+          acted on.
+        -->
+        <div id="component-choose">
+          <span id="component-folder-mount"></span>
+          <span id="component-path-mount"></span>
+          <!-- Why the path says what it says. A field that filled itself and did
+               not say why is a field nobody trusts. -->
+          <p class="component-match-line" id="component-match-line" hidden></p>
+          <span id="component-found-mount"></span>
+          <p class="component-match-line" id="component-link-note" hidden></p>
+          <div class="component-buttons">
+            <span id="component-link-btn-mount"></span>
+          </div>
+        </div>
+
+        <!--
+          TIED, and now there is something to do. The path stops being a field
+          because it has stopped being a question — it is the address both
+          verbs use, and showing it as editable here would invite an edit that
+          silently unties what was just settled.
+        -->
+        <div id="component-linked" hidden>
+          <p class="component-linked-line" id="component-linked-line"></p>
+          <div class="component-link-tools">
+            <span id="component-change-btn-mount"></span>
+            <span id="component-unlink-btn-mount"></span>
+          </div>
+          <div class="component-buttons">
+            <span id="component-compare-btn-mount"></span>
+            <span id="component-push-btn-mount"></span>
+          </div>
         </div>
       </div>
 
@@ -5333,7 +5368,9 @@
        re-reads the selection every time it is opened rather than watching it,
        because a selection that changes under a contract you are about to push
        is a worse surprise than having to open the page again. */
-    var componentState = { capture: null, contract: null, path: '', id: null, followed: false };
+    var componentState = { capture: null, contract: null, path: '', id: null,
+                           linked: null, linkKind: null, choosing: false,
+                           confirming: null, followed: false };
     var lastSelection = null;
     /* What the last browse found. Held so a folder change or a pick can redraw
        without asking the repo again — the tree has not moved because somebody
@@ -5402,7 +5439,8 @@
       document.getElementById('main-page').classList.add('hidden');
       document.getElementById('component-page').classList.add('visible');
       componentState = { capture: null, contract: null, path: '', id: null,
-                         followed: !!followed };
+                         linked: null, linkKind: null, choosing: false,
+                         confirming: null, followed: !!followed };
       document.getElementById('component-summary').hidden = true;
       document.getElementById('component-actions').hidden = true;
       window.PomComponentResult.clear();
@@ -5436,7 +5474,7 @@
     function renderComponent(capture) {
       componentState.capture = capture;
       componentState.id = capture.nodeId;
-      componentState.locked = capture.contractPath || null;
+      componentState.linked = capture.contractPath || null;
       var contract = window.PomComponentContract.contract(capture);
       componentState.contract = contract;
 
@@ -5456,10 +5494,11 @@
       composes.hidden = !(contract.composes && contract.composes.length);
       if (!composes.hidden) composes.textContent = 'Composes ' + contract.composes.join(', ') + '.';
 
-      componentState.path = componentPath();
+      componentState.path = componentState.linked || componentPath();
       window.PomComponentPath.set(componentState.path);
       document.getElementById('component-summary').hidden = false;
       document.getElementById('component-actions').hidden = false;
+      renderComponentLink();
       browseRepoForContracts();
     }
 
@@ -5518,10 +5557,10 @@
           being able to break the pairing. Matching by name is what happens
           before there is a lock, and what happens if one is ever lost.
         */
-        if (componentState.locked && window.PomComponentPath.get() === componentState.path) {
-          componentState.path = componentState.locked;
-          window.PomComponentPath.set(componentState.locked);
-          window.PomComponentFolder.set(lastFolders, componentFolderOf(componentState.locked));
+        if (componentState.linked && window.PomComponentPath.get() === componentState.path) {
+          componentState.path = componentState.linked;
+          window.PomComponentPath.set(componentState.linked);
+          window.PomComponentFolder.set(lastFolders, componentFolderOf(componentState.linked));
         } else if (match && window.PomComponentPath.get() === componentState.path) {
           var matched = window.PomComponentFile.pathForMatch(name, match);
           if (matched) {
@@ -5530,7 +5569,7 @@
             window.PomComponentFolder.set(lastFolders, componentFolderOf(matched));
           }
         }
-        renderComponentMatch(match, componentState.locked);
+        renderComponentMatch(match);
         window.PomComponentFound.set(lastFoundRows, window.PomComponentPath.get());
       }, function () { /* browsing is a convenience; the default path still works */ });
     }
@@ -5543,15 +5582,9 @@
       what was matched. So the line names the file it found, and when several
       matched equally it says that instead of pretending the first was special.
     */
-    function renderComponentMatch(match, locked) {
+    function renderComponentMatch(match) {
       var el = document.getElementById('component-match-line');
       if (!el) return;
-      if (locked) {
-        el.textContent = 'This component is linked to ' + locked +
-          ' — set when its contract was last pushed.';
-        el.hidden = false;
-        return;
-      }
       if (!match) {
         el.textContent = 'No file in the repo matches this name — pick where it should go.';
         el.hidden = false;
@@ -5596,6 +5629,183 @@
       window.PomComponentFound.set(lastFoundRows, path);
     };
 
+    /*
+      ═══ THE TIE ═══════════════════════════════════════════════════════════
+
+      A path that a name match proposed is a proposal, and both verbs on this
+      page are the wrong thing to do to a proposal. The push writes a file at
+      it; the compare reads one and reports on it. Get the path wrong and the
+      first overwrites a component's contract with another component's, while
+      the second produces a report where every row is true and the whole means
+      nothing.
+
+      So tying comes first and is its own act. Until it has happened there is
+      no compare and no push — not disabled, absent, because a verb that is
+      shown and refuses is a verb that invited the press.
+
+      WHAT THE TIE CHECKS is the one thing worth stopping for: whether the path
+      already belongs to somebody else. Free ground is fine. This component's
+      own contract is fine. A contract that records a different component is
+      refused outright, and that refusal is the guarantee — from here on the
+      name that matched is no longer load-bearing, because both sides have
+      written down who the other is.
+
+      THE TIE IS KEPT IN TWO PLACES, and neither alone would do. Figma holds
+      the path on the component set, so a component knows where its contract
+      lives even when the repo is renamed underneath it. The contract holds the
+      component's published key, so a file knows which component it describes
+      even when it is copied into another Figma document. Each survives the
+      rename the other cannot.
+    */
+    function linkNote(text) {
+      var el = document.getElementById('component-link-note');
+      if (!el) return;
+      el.textContent = text || '';
+      el.hidden = !text;
+    }
+
+    function renderComponentLink() {
+      var showLinked = !!componentState.linked && !componentState.choosing;
+      document.getElementById('component-choose').hidden = showLinked;
+      document.getElementById('component-linked').hidden = !showLinked;
+      if (!showLinked) return;
+      var el = document.getElementById('component-linked-line');
+      el.textContent = '';
+      el.appendChild(document.createTextNode('Linked to '));
+      var b = document.createElement('b');
+      b.textContent = componentState.linked;
+      el.appendChild(b);
+      /* How the tie was arrived at, because "linked" on its own does not say
+         whether anything is there yet — which is the next thing a reader
+         wants and the difference between compare and push being useful. */
+      var why = componentState.linkKind === 'free'
+          ? '. Nothing is there yet — the first push creates it.'
+        : componentState.linkKind === 'mine'
+          ? '. The contract there is already this component’s.'
+        : componentState.linkKind === 'adopted'
+          ? '. Adopting the contract already there; the next push records this component in it.'
+          : ' — set the last time this component was linked.';
+      el.appendChild(document.createTextNode(why));
+    }
+
+    function linkComponentContract() {
+      if (!componentState.contract) return;
+      var which = activeRepoProvider();
+      if (!which) { showToast('Add a repository in Settings first', true); return; }
+      var path = String(window.PomComponentPath.get() || '').trim();
+      if (!path) { linkNote('Give the contract a path first.'); return; }
+      /* The suffix is not decoration: it is how browsing finds contracts at
+         all, so a file linked without it would be invisible to the next
+         person looking for it. */
+      if (!window.PomComponentFile.isContractPath(path)) {
+        linkNote('A contract path ends in ' + window.PomComponentFile.CONTRACT_SUFFIX +
+                 ', which is how the next scan finds it.');
+        return;
+      }
+      linkNote('');
+      window.PomComponentLinkBtn.setLoading(true);
+      var read = which === 'gitlab' ? fetchGitLabFile(path) : fetchGitHubFile(path);
+      read.then(function (got) { settleLink(path, got.text); }, function (err) {
+        /* Nothing there is the commonest answer and the easiest tie to make:
+           free ground, claimed. */
+        if (err && err.status === 404) { settleLink(path, null); return; }
+        window.PomComponentLinkBtn.setLoading(false);
+        linkNote('Could not read the repository: ' + errText(err));
+      });
+    }
+
+    function settleLink(path, text) {
+      window.PomComponentLinkBtn.setLoading(false);
+      var theirs = null;
+      if (text !== null && text !== undefined) {
+        try { theirs = window.PomComponentFile.parse(text); }
+        catch (e) {
+          linkNote('There is a file at ' + path + ' and it is not a contract. ' +
+                   'Linking here would mean overwriting it — pick another path.');
+          return;
+        }
+      }
+      var verdict = window.PomComponentDiff.linkVerdict(componentState.contract, theirs);
+      if (verdict.kind === 'theirs') {
+        componentState.confirming = null;
+        window.PomComponentLinkBtn.setLabel(null);
+        linkNote('That path belongs to another component. ' + path + ' holds the contract ' +
+                 'for ' + (verdict.component || 'a different component') + ' — ' +
+                 (verdict.pairing.by === 'key' ? 'component key ' : 'Figma node ') +
+                 verdict.pairing.repo + ', where this one is ' + verdict.pairing.figma + '.');
+        return;
+      }
+      /*
+        A CONTRACT THAT NEVER SAID WHO IT WAS, under a name that does not
+        agree. Hand-written, or written before identities were recorded, and
+        it might well be this component under the repo's own spelling. That is
+        a question rather than a refusal, so it is asked once and the same
+        button answers it. Asked against THIS path: change the path and the
+        answer no longer applies, which is what keeps a confirmation from
+        carrying over to a file nobody looked at.
+      */
+      if (verdict.kind === 'unsure' && componentState.confirming !== path) {
+        componentState.confirming = path;
+        window.PomComponentLinkBtn.setLabel('Link anyway');
+        linkNote('A contract is already at ' + path + ', named ' +
+                 (verdict.component || 'something else') + ', and it does not record which ' +
+                 'component it came from. If that is this one, link it and the next push ' +
+                 'will say so. If it is not, pick another path.');
+        return;
+      }
+      /* A confirmed 'unsure' is an adoption like any other: the file is there,
+         it is this component's now, and the next push writes the identity into
+         it. Recording the doubt that preceded the answer would be reporting an
+         argument rather than the state. */
+      commitLink(path, verdict.kind === 'unsure' ? 'adopted' : verdict.kind);
+    }
+
+    function commitLink(path, kind) {
+      componentState.linked = path;
+      componentState.path = path;
+      componentState.linkKind = kind;
+      componentState.choosing = false;
+      componentState.confirming = null;
+      window.PomComponentLinkBtn.setLabel(null);
+      linkNote('');
+      window.PomComponentResult.clear();
+      /* Figma's half of the tie. The only thing this plugin ever writes to a
+         component, and it is a path, not a change to the component. */
+      parent.postMessage({ pluginMessage: {
+        type: 'rememberContractPath', nodeId: componentState.id, path: path } }, '*');
+      renderComponentLink();
+      showToast('Linked to ' + path);
+    }
+
+    /* Moving the tie. The stored path is left alone until a new one is
+       settled: abandoning a change halfway should leave things as they were,
+       not unlinked. */
+    function changeComponentLink() {
+      componentState.choosing = true;
+      componentState.confirming = null;
+      window.PomComponentLinkBtn.setLabel(null);
+      linkNote('');
+      window.PomComponentResult.clear();
+      renderComponentLink();
+      browseRepoForContracts();
+    }
+
+    /* Breaking it. An empty path is how Figma is told to forget one, and the
+       component goes back to being matched by name like any other. */
+    function unlinkComponent() {
+      parent.postMessage({ pluginMessage: {
+        type: 'rememberContractPath', nodeId: componentState.id, path: '' } }, '*');
+      componentState.linked = null;
+      componentState.linkKind = null;
+      componentState.choosing = false;
+      componentState.confirming = null;
+      window.PomComponentLinkBtn.setLabel(null);
+      linkNote('');
+      window.PomComponentResult.clear();
+      renderComponentLink();
+      showToast('Unlinked — matched by name again');
+    }
+
     function componentPushMessage() {
       return 'Contract: ' + ((componentState.capture && componentState.capture.name) || 'component');
     }
@@ -5604,21 +5814,19 @@
       if (!componentState.contract) return;
       var which = activeRepoProvider();
       if (!which) { showToast('Add a repository in Settings first', true); return; }
+      if (!componentState.linked) { showToast('Link this component to a path first', true); return; }
       var text = window.PomComponentFile.serialise(componentState.contract);
-      var what = { path: window.PomComponentPath.get(), text: text, message: componentPushMessage() };
+      var what = { path: componentState.linked, text: text, message: componentPushMessage() };
       window.PomComponentPushBtn.setLoading(true);
       var run = which === 'gitlab' ? pushGitLab(null, what) : pushGitHub(null, what);
       run.then(function () {
         window.PomComponentPushBtn.setLoading(false);
         window.PomComponentPushBtn.setSuccess(true);
         showToast('Wrote ' + what.path);
-        /* THE PUSH IS WHAT SETTLES IT. Recorded after the write lands, never
-           before — remembering a path somebody was still choosing would lock
-           in a decision they had not made. */
-        componentState.locked = what.path;
-        parent.postMessage({ pluginMessage: {
-          type: 'rememberContractPath', nodeId: componentState.id, path: what.path } }, '*');
-        renderComponentMatch(null, what.path);
+        /* The tie was already made and the file now exists, so the line that
+           said nothing was there has stopped being true. */
+        componentState.linkKind = 'mine';
+        renderComponentLink();
       }, function (err) {
         window.PomComponentPushBtn.setLoading(false);
         showToast(errText(err), true);
@@ -5634,7 +5842,8 @@
       if (!componentState.contract) return;
       var which = activeRepoProvider();
       if (!which) { showToast('Add a repository in Settings first', true); return; }
-      var path = window.PomComponentPath.get();
+      if (!componentState.linked) { showToast('Link this component to a path first', true); return; }
+      var path = componentState.linked;
       window.PomComponentCompareBtn.setLoading(true);
       var read = which === 'gitlab' ? fetchGitLabFile(path) : fetchGitHubFile(path);
       read.then(function (got) {
@@ -5702,6 +5911,9 @@
     document.getElementById('component-back-btn').addEventListener('click', closeComponent);
     document.getElementById('component-push-btn').addEventListener('click', pushComponentContract);
     document.getElementById('component-compare-btn').addEventListener('click', compareComponentContract);
+    document.getElementById('component-link-btn').addEventListener('click', linkComponentContract);
+    document.getElementById('component-change-btn').addEventListener('click', changeComponentLink);
+    document.getElementById('component-unlink-btn').addEventListener('click', unlinkComponent);
 
     function openCompare(which) {
       which = which || activeRepoProvider();
