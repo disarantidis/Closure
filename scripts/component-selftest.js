@@ -349,6 +349,99 @@ function figmaWith(vars, styles) {
      Object.keys(exc).join(',') === '*,Size=L,Size=S', Object.keys(exc).join(','));
 }
 
+/* ── compare: this component against the contract the repo holds ──────────── */
+{
+  const { factChange, diff } = require('../src/component-diff.js');
+
+  /*
+    THREE KINDS OF DIFFERENCE, and they are not the same news. A value moved
+    is a decision; a shape moved is the architecture, and the same eventual
+    values can arrive through a completely different rule.
+  */
+  ok('compare: two sides stating the same value are not a difference',
+     factChange('a', 'a') === null);
+  ok('compare: two sides stating different values is a value change',
+     factChange('a', 'b') === 'value');
+  ok('compare: a constant on one side and a map on the other is the shape moving',
+     factChange('a', { 'Size=L': 'a' }) === 'shape');
+  ok('compare: the same axes disagreeing about a case is per-variant',
+     factChange({ 'Size=L': 'a' }, { 'Size=L': 'b' }) === 'per-variant');
+  ok('compare: and following a different axis is the shape moving, though every value matched',
+     factChange({ 'Size=L': 'a' }, { 'Variant=A': 'a' }) === 'shape');
+  /* Parsed objects, not text: a contract somebody hand-edited is allowed to be
+     untidy without being reported as changed. */
+  ok('compare: a map written in another key order is the same fact',
+     factChange({ a: 1, b: 2 }, { b: 2, a: 1 }) === null);
+
+  const base = {
+    component: 'A',
+    api: { Size: { type: 'variant', values: ['L', 'S'], default: 'L' } },
+    composes: ['Badge'],
+    layers: { root: { radius: 'radius/full', width: { 'Size=L': 'w14', 'Size=S': 'w10' } } },
+  };
+  const clone = () => JSON.parse(JSON.stringify(base));
+
+  ok('compare: a contract that matches says so, and says it from the rows rather than beside them',
+     diff(base, clone()).same === true);
+
+  /*
+    THE API IS THE PROMISE, reported apart from everything else: an axis losing
+    a value is a promise withdrawn from everyone who used it, and ranking that
+    alongside a padding change would be the report losing its nerve.
+  */
+  {
+    const r = clone(); r.api.Size.values = ['L'];
+    const d = diff(base, r);
+    ok('compare: an axis losing a value is reported as an api change',
+       d.api.values.length === 1 && d.api.values[0].removed.join(',') === 'S',
+       JSON.stringify(d.api.values));
+    ok('compare: and it alone makes the two sides differ',
+       d.same === false && d.summary.apiChanges === 1, JSON.stringify(d.summary));
+  }
+  {
+    const r = clone(); r.api.Size['default'] = 'S';
+    ok('compare: a default moving is named, because it is what every consumer gets',
+       diff(base, r).api.defaults[0].repo === 'S');
+  }
+
+  /* A layer only one side has is reported once, as a layer — listing every
+     fact inside it again would say the same thing forty times. */
+  {
+    const r = clone(); r.layers.Badge = { fills: 'x', radius: 'y' };
+    const d = diff(base, r);
+    ok('compare: a layer the repo has and Figma does not is one row, not one per fact',
+       d.layers.added.join(',') === 'Badge' && d.facts.added.length === 0,
+       JSON.stringify({ l: d.layers, f: d.facts.added }));
+  }
+
+  {
+    const r = clone();
+    r.layers.root.radius = 'radius/2';        // a value
+    r.layers.root.width = 'w14';              // a shape
+    const d = diff(base, r);
+    ok('compare: a value change and a shape change are counted apart',
+       d.summary.valueChanges === 1 && d.summary.shapeChanges === 1, JSON.stringify(d.summary));
+    ok('compare: and each row says which it is, with both sides on it',
+       d.facts.changed.every((c) => c.kind && c.figma !== undefined && c.repo !== undefined));
+  }
+
+  /* Neither side is "before". The repo may be ahead of the file or behind it,
+     and a report that assumed one of those would be wrong half the time. */
+  {
+    const r = clone(); r.layers.root.radius = 'radius/2';
+    const forward = diff(base, r), backward = diff(r, base);
+    ok('compare: the report is symmetric, because neither side is the older one',
+       forward.summary.valueChanges === backward.summary.valueChanges &&
+       forward.facts.changed[0].figma === backward.facts.changed[0].repo);
+  }
+
+  {
+    const r = clone(); r.composes = ['Badge', 'Icon'];
+    ok('compare: a component it did not used to compose is named',
+       diff(base, r).composes.added.join(',') === 'Icon');
+  }
+}
+
 pending.then(() => {
   console.log('');
   console.log(pass + '/' + (pass + fail) + ' passed');
