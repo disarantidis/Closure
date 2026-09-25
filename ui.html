@@ -1246,6 +1246,26 @@
     }
     /* Compare first, push second, and the order is the argument: a contract is
        written after somebody has seen what writing it would change. */
+    /* The contracts this repo already holds. A list rather than a dropdown:
+       it is the answer to "what else is here", which is a thing to read before
+       it is a thing to choose from. */
+    .component-found { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+    .component-found-head {
+      font-size: 11px; font-weight: 600; color: var(--app-text); margin-bottom: 2px;
+    }
+    .component-found-row {
+      display: flex; align-items: baseline; gap: 6px;
+      background: none; border: 0; padding: 3px 0; margin: 0;
+      font: inherit; font-size: 11px; color: var(--app-text-muted);
+      text-align: start; cursor: pointer; min-width: 0;
+    }
+    .component-found-row:hover { color: var(--app-text); }
+    .component-found-row.is-current { color: var(--app-text); }
+    .component-found-name { font-weight: 600; flex: none; }
+    .component-found-path {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px; opacity: 0.7; overflow-wrap: anywhere; min-width: 0;
+    }
     .component-buttons { display: flex; gap: 8px; margin-top: 12px; }
     .component-buttons > span { flex: 1 1 0; min-width: 0; }
     .compare-page { overflow-y: auto; overflow-x: hidden; }
@@ -23623,7 +23643,17 @@ html[data-theme=dark] {
             <p class="json-download-title">In the repo</p>
           </div>
         </div>
+        <!--
+          BROWSING, because a repository's shape is not guessable. The default
+          path puts a contract in the component's own folder, which is right
+          for a repo of folders and wrong for one of flat files — and both
+          exist. So the folder is picked from what is actually there, and the
+          contracts already written are listed to be jumped to rather than
+          retyped.
+        -->
+        <span id="component-folder-mount"></span>
         <span id="component-path-mount"></span>
+        <span id="component-found-mount"></span>
         <div class="component-buttons">
           <span id="component-compare-btn-mount"></span>
           <span id="component-push-btn-mount"></span>
@@ -50665,6 +50695,53 @@ html[data-theme=dark] {
     CARD_LEVEL
   );
   window.PomCompareFolder.onChange = null;
+  window.PomComponentFolder = mountLiveDropdown(
+    "component-folder-mount",
+    { label: "Folder in the repo", icon: IconFolder(16) },
+    (v) => window.PomComponentFolder?.onChange?.(v),
+    CARD_LEVEL
+  );
+  window.PomComponentFolder.onChange = null;
+  (function mountComponentFound() {
+    const container = document.getElementById("component-found-mount");
+    let set = () => {
+    };
+    function View() {
+      const [s, setS] = (0, import_react16.useState)(
+        { rows: [], current: "" }
+      );
+      set = setS;
+      if (!s.rows.length) return null;
+      return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { className: "component-found", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("span", { className: "component-found-head", children: [
+          s.rows.length.toLocaleString(),
+          " contract",
+          s.rows.length === 1 ? "" : "s",
+          " in this repo"
+        ] }),
+        s.rows.map((r) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
+          "button",
+          {
+            type: "button",
+            className: "component-found-row" + (r.path === s.current ? " is-current" : ""),
+            onClick: () => window.PomComponentFound?.onPick?.(r.path),
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "component-found-name", children: r.name }),
+              /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { className: "component-found-path", children: r.path })
+            ]
+          },
+          r.path
+        ))
+      ] });
+    }
+    if (container) (0, import_react_dom.flushSync)(() => (0, import_client.createRoot)(container).render(
+      /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(LevelContext.Provider, { value: CARD_LEVEL, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(View, {}) })
+    ));
+    window.PomComponentFound = {
+      set: (rows, current) => set({ rows, current }),
+      onPick: null
+    };
+  })();
   window.PomRepoReadBtn = mountLiveTitleButton(
     "repo-read-btn-mount",
     /*
@@ -57182,6 +57259,32 @@ function slugFor(name) {
 */
 var DEFAULT_PATTERN = '{dir}/{slug}/{slug}.contract.json';
 
+/*
+  WHAT MAKES A FILE A CONTRACT, from its name alone.
+
+  Used to find the ones a repository already holds without reading any of
+  them — a tree listing gives names, and opening forty files to ask each one
+  what it is would be forty requests to answer a question the name settles.
+
+  The suffix is part of the default pattern rather than a rule, so a
+  repository that writes them some other way is found by browsing instead.
+  This is a shortcut to the common case, not a definition of the format.
+*/
+var CONTRACT_SUFFIX = '.contract.json';
+
+function isContractPath(path) {
+  return typeof path === 'string' &&
+         path.slice(-CONTRACT_SUFFIX.length) === CONTRACT_SUFFIX;
+}
+
+/* The component a contract file is probably for — its own name, minus the
+   suffix and the folders above it. Shown beside the path so a list of forty
+   reads as a list of components rather than of directories. */
+function componentOfPath(path) {
+  var base = String(path || '').split('/').pop();
+  return base.slice(0, -CONTRACT_SUFFIX.length) || base;
+}
+
 function pathFor(componentName, opts) {
   opts = opts || {};
   var slug = slugFor(componentName);
@@ -57273,7 +57376,8 @@ function parse(text) {
   return doc;
 }
 
-  var api = { IDENTITY, DEFAULT_PATTERN, slugFor, pathFor,
+  var api = { IDENTITY, DEFAULT_PATTERN, CONTRACT_SUFFIX, isContractPath, componentOfPath,
+              slugFor, pathFor,
               orderedMap, orderedLayer, ordered, serialise, parse };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
@@ -59144,7 +59248,7 @@ function format(report, opts) {
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '8a163ed 17:44:00';
+    var CLOSURE_BUILD = 'ba7b4bc 19:46:22';
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -60330,6 +60434,11 @@ function format(report, opts) {
        is a worse surprise than having to open the page again. */
     var componentState = { capture: null, contract: null, path: '', id: null, followed: false };
     var lastSelection = null;
+    /* What the last browse found. Held so a folder change or a pick can redraw
+       the list without asking the repo again — the tree has not moved because
+       somebody chose a row in it. */
+    var lastFolderItems = [];
+    var lastFoundRows = [];
 
     /* The main screen's own line about what is selected. Kept in step with the
        selection rather than with the page, because somebody who pressed Back
@@ -60449,7 +60558,74 @@ function format(report, opts) {
       window.PomComponentPath.set(componentState.path);
       document.getElementById('component-summary').hidden = false;
       document.getElementById('component-actions').hidden = false;
+      browseRepoForContracts();
     }
+
+    /*
+      WHAT THE REPOSITORY LOOKS LIKE, so the path does not have to be guessed.
+
+      One tree listing answers both halves — every folder to choose from, and
+      every contract already written. It is the same call and the same cache
+      the push and compare pickers use, so opening this page costs nothing
+      extra when one of them has already looked.
+
+      A failure here is quiet on purpose. Not being able to browse is not a
+      reason to stop: the path field still holds a perfectly good default and
+      both buttons still work, and an error banner over a feature nobody has
+      reached for yet would be the plugin complaining about its own
+      convenience.
+    */
+    function browseRepoForContracts() {
+      var which = activeRepoProvider();
+      if (!which) return;
+      listRepoFolders(which).then(function (got) {
+        var folders = (got.folders || []).slice();
+        /* The repository root is a real answer and has no row of its own in a
+           tree listing — a flat repo keeps its components at the top. */
+        if (folders.indexOf('') === -1) folders.unshift('');
+        var current = componentFolderOf(window.PomComponentPath.get());
+        if (folders.indexOf(current) === -1) folders.push(current);
+        lastFolderItems = folders.map(function (f) {
+          return { value: f, label: f || '(repository root)' };
+        });
+        window.PomComponentFolder.setItems(lastFolderItems, current);
+
+        lastFoundRows = (got.files || [])
+          .filter(window.PomComponentFile.isContractPath)
+          .map(function (f) {
+            return { path: f, name: window.PomComponentFile.componentOfPath(f) };
+          });
+        window.PomComponentFound.set(lastFoundRows, window.PomComponentPath.get());
+      }, function () { /* browsing is a convenience; the default path still works */ });
+    }
+
+    /* The folder part of a path — everything before the last segment. */
+    function componentFolderOf(path) {
+      var at = String(path || '').lastIndexOf('/');
+      return at === -1 ? '' : path.slice(0, at);
+    }
+
+    /*
+      Choosing a folder keeps the FILE and moves it, rather than rebuilding the
+      path from the pattern: somebody who edited the filename and then picked a
+      folder meant to move what they had named, and regenerating it would throw
+      their edit away without saying so.
+    */
+    window.PomComponentFolder.onChange = function (dir) {
+      var path = window.PomComponentPath.get();
+      var file = String(path).split('/').pop();
+      var next = (dir ? dir + '/' : '') + file;
+      window.PomComponentPath.set(next);
+      window.PomComponentFound.set(lastFoundRows, next);
+    };
+
+    /* Choosing an existing contract takes it whole — its folder AND its name,
+       because the name is the house style this repo has already settled. */
+    window.PomComponentFound.onPick = function (path) {
+      window.PomComponentPath.set(path);
+      window.PomComponentFolder.setItems(lastFolderItems, componentFolderOf(path));
+      window.PomComponentFound.set(lastFoundRows, path);
+    };
 
     function componentPushMessage() {
       return 'Contract: ' + ((componentState.capture && componentState.capture.name) || 'component');
@@ -62937,8 +63113,17 @@ function format(report, opts) {
           return e && (e.type === 'tree' || e.type === 'dir');
         }).map(function (e) { return e.path; });
         folders.sort();
+        /* THE SAME TREE ALREADY HELD THE FILES. This call is recursive and
+           returns everything; the folder list was a filter over it. Keeping
+           the files costs one more filter and no second request, and it is
+           what lets somebody find a contract that already exists rather than
+           guessing at the path a previous push chose. */
+        var files = rows.filter(function (e) {
+          return e && (e.type === 'blob' || e.type === 'file');
+        }).map(function (e) { return e.path; });
+        files.sort();
         repoFolderCache = {
-          key: key, folders: folders,
+          key: key, folders: folders, files: files,
           truncated: !Array.isArray(body) && !!(body && body.truncated),
         };
         return repoFolderCache;

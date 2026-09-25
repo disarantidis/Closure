@@ -71,6 +71,32 @@ function slugFor(name) {
 */
 var DEFAULT_PATTERN = '{dir}/{slug}/{slug}.contract.json';
 
+/*
+  WHAT MAKES A FILE A CONTRACT, from its name alone.
+
+  Used to find the ones a repository already holds without reading any of
+  them — a tree listing gives names, and opening forty files to ask each one
+  what it is would be forty requests to answer a question the name settles.
+
+  The suffix is part of the default pattern rather than a rule, so a
+  repository that writes them some other way is found by browsing instead.
+  This is a shortcut to the common case, not a definition of the format.
+*/
+var CONTRACT_SUFFIX = '.contract.json';
+
+function isContractPath(path) {
+  return typeof path === 'string' &&
+         path.slice(-CONTRACT_SUFFIX.length) === CONTRACT_SUFFIX;
+}
+
+/* The component a contract file is probably for — its own name, minus the
+   suffix and the folders above it. Shown beside the path so a list of forty
+   reads as a list of components rather than of directories. */
+function componentOfPath(path) {
+  var base = String(path || '').split('/').pop();
+  return base.slice(0, -CONTRACT_SUFFIX.length) || base;
+}
+
 function pathFor(componentName, opts) {
   opts = opts || {};
   var slug = slugFor(componentName);
@@ -162,7 +188,8 @@ function parse(text) {
   return doc;
 }
 
-  var api = { IDENTITY, DEFAULT_PATTERN, slugFor, pathFor,
+  var api = { IDENTITY, DEFAULT_PATTERN, CONTRACT_SUFFIX, isContractPath, componentOfPath,
+              slugFor, pathFor,
               orderedMap, orderedLayer, ordered, serialise, parse };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

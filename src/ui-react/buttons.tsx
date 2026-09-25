@@ -619,6 +619,11 @@ declare global {
     PomComponentCompareBtn: any;
     PomComponentPushBtn: any;
     PomComponentPath: { get: () => string; set: (v: string) => void };
+    PomComponentFolder: any;
+    PomComponentFound: {
+      set: (rows: { path: string; name: string }[], current: string) => void;
+      onPick: ((path: string) => void) | null;
+    };
     PomComponentStats: { set: (rows: { n: number; label: string }[]) => void };
     PomComponentResult: {
       clear: () => void;
@@ -1298,6 +1303,64 @@ window.PomCompareFolder = mountLiveDropdown(
   CARD_LEVEL,
 ) as any;
 window.PomCompareFolder.onChange = null;
+
+/* The folder a contract goes in, picked from the folders the repo actually
+   has. The same control the compare and push pickers use, for the same reason:
+   a path typed from memory is a path that is wrong on the third component. */
+window.PomComponentFolder = mountLiveDropdown(
+  'component-folder-mount',
+  { label: 'Folder in the repo', icon: IconFolder(16) },
+  (v: string) => window.PomComponentFolder?.onChange?.(v),
+  CARD_LEVEL,
+) as any;
+window.PomComponentFolder.onChange = null;
+
+/*
+  THE CONTRACTS THIS REPOSITORY ALREADY HOLDS.
+
+  A list, not a dropdown: it is the answer to "what else is here", which is a
+  thing to read before it is a thing to choose from. Somebody arriving at a
+  component they have never pushed learns from it what the house style is —
+  where the others went, and under what name — which is the question the path
+  field cannot answer on its own.
+
+  The one that matches the current path is marked rather than moved, because a
+  list that reordered itself as you typed would be a list you could not scan.
+*/
+(function mountComponentFound() {
+  const container = document.getElementById('component-found-mount');
+  let set: (s: any) => void = () => {};
+  function View() {
+    const [s, setS] = useState<{ rows: { path: string; name: string }[]; current: string }>(
+      { rows: [], current: '' });
+    set = setS;
+    if (!s.rows.length) return null;
+    return (
+      <div className="component-found">
+        <span className="component-found-head">
+          {s.rows.length.toLocaleString()} contract{s.rows.length === 1 ? '' : 's'} in this repo
+        </span>
+        {s.rows.map((r) => (
+          <button
+            type="button"
+            className={'component-found-row' + (r.path === s.current ? ' is-current' : '')}
+            key={r.path}
+            onClick={() => window.PomComponentFound?.onPick?.(r.path)}
+          >
+            <span className="component-found-name">{r.name}</span>
+            <span className="component-found-path">{r.path}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(
+    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomComponentFound = {
+    set: (rows, current) => set({ rows, current }),
+    onPick: null,
+  };
+})();
 
 window.PomRepoReadBtn = mountLiveTitleButton(
   'repo-read-btn-mount',

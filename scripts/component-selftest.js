@@ -342,6 +342,21 @@ function figmaWith(vars, styles) {
   ok('file: something that is not a contract is refused rather than half-read',
      /not a component contract/.test(refused || ''), String(refused));
 
+  /*
+    FINDING WHAT A REPOSITORY ALREADY HOLDS, from names alone. A tree listing
+    gives names, and opening forty files to ask each one what it is would be
+    forty requests to answer a question the name settles.
+  */
+  ok('browse: a contract is recognised by its suffix',
+     fileMod.isContractPath('src/panel/node/Avatar.contract.json') === true);
+  ok('browse: and the component beside it is not mistaken for one',
+     fileMod.isContractPath('src/panel/node/Avatar.tsx') === false &&
+     fileMod.isContractPath('package.json') === false &&
+     fileMod.isContractPath(null) === false);
+  ok('browse: a contract names the component it is for, without its folders',
+     fileMod.componentOfPath('src/panel/node/Avatar.contract.json') === 'Avatar',
+     fileMod.componentOfPath('src/panel/node/Avatar.contract.json'));
+
   /* The exception form's rule reads before its exceptions, which is the order
      a person says it in. */
   const exc = fileMod.orderedMap({ 'Size=S': 'x', '*': 'FIXED', 'Size=L': 'y' });
