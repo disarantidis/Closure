@@ -3183,6 +3183,50 @@ function buildResolvedDocument(rawData, options) {
   });
 }
 
+/*
+  WHAT IS SELECTED, WATCHED RATHER THAN ASKED FOR.
+
+  A component set is a different subject from the file's variables, and which
+  one the plugin is about is not a mode somebody should have to set — they
+  already said it by clicking. So the selection is reported as it changes, and
+  the UI decides what to do with that.
+
+  DELIBERATELY CHEAP. This is identity and nothing else: a name, an id, how
+  many variants. The capture is the expensive part and stays a separate,
+  explicit request — a plugin that walked every variant of every set somebody
+  clicked through would be unusable on a real library page.
+
+  A VARIANT COUNTS AS ITS SET, because somebody examining a component clicks
+  the variant they are looking at. Refusing that would be the plugin being
+  pedantic about a distinction it can settle itself.
+*/
+function describeSelection() {
+  var sel = figma.currentPage.selection;
+  if (!sel.length) return { kind: 'none' };
+  var node = sel[0];
+  var set = null;
+  if (node.type === 'COMPONENT_SET') set = node;
+  else if (node.type === 'COMPONENT' && node.parent && node.parent.type === 'COMPONENT_SET') set = node.parent;
+  if (!set) return { kind: 'other', type: node.type, name: node.name };
+  return {
+    kind: 'component-set',
+    id: set.id,
+    name: set.name,
+    variants: set.children.filter(function (c) { return c.type === 'COMPONENT'; }).length,
+  };
+}
+
+function postSelection() {
+  try { figma.ui.postMessage({ type: 'selectionChanged', selection: describeSelection() }); }
+  catch (e) { /* the UI is not listening yet; the next change will say it again */ }
+}
+
+figma.on('selectionchange', postSelection);
+/* Said once at startup too: the plugin can be opened with something already
+   selected, and a UI that only learned on CHANGE would show the wrong subject
+   until the person clicked somewhere else. */
+postSelection();
+
 figma.ui.onmessage = function(msg) {
   if (msg.type === 'resize') {
     figma.ui.resize(PANEL_WIDTH, msg.height);
@@ -3625,6 +3669,84 @@ figma.ui.onmessage = function(msg) {
     promise this code can make — which is why the confirmation in the UI says
     what will go rather than offering to reverse it.
   */
+  /*
+    CAPTURE THE SELECTED COMPONENT SET.
+
+    The selection is resolved here rather than asked for, because the thing a
+    person has selected is usually a variant — they clicked the one they were
+    looking at — and refusing that would be the plugin being pedantic about a
+    distinction it can resolve itself. An INSTANCE is refused, because an
+    instance is a use of a component and its contract belongs to the component.
+
+    Everything after the read is the capture module's, and everything after
+    THAT is the UI's: this handler walks nothing and decides nothing.
+  */
+  if (msg.type === 'captureComponent') {
+    (async function() {
+      try {
+        var sel = figma.currentPage.selection;
+        var set = null, why = '';
+        if (!sel.length) {
+          why = 'Select a component set — or any one of its variants.';
+        } else if (sel[0].type === 'COMPONENT_SET') {
+          set = sel[0];
+        } else if (sel[0].type === 'COMPONENT' && sel[0].parent && sel[0].parent.type === 'COMPONENT_SET') {
+          set = sel[0].parent;
+        } else if (sel[0].type === 'COMPONENT') {
+          why = '"' + sel[0].name + '" is a component on its own, with no variants. ' +
+                'A contract describes a set and the axes it varies over.';
+        } else if (sel[0].type === 'INSTANCE') {
+          why = 'That is an instance. Select the component set it came from — a ' +
+                'contract belongs to the component, not to a use of it.';
+        } else {
+          why = 'Selected a ' + String(sel[0].type).toLowerCase().replace(/_/g, ' ') +
+                '. Select a component set.';
+        }
+        if (!set) {
+          figma.ui.postMessage({ type: 'componentCaptureFailed', reason: why });
+          return;
+        }
+        var capture = await PomComponentCapture.captureComponentSet(set, figma, {});
+        figma.ui.postMessage({ type: 'componentCaptured', capture: capture });
+      } catch (e) {
+        console.error('[Closure] component capture failed:', e);
+        figma.ui.postMessage({ type: 'componentCaptureFailed',
+                               reason: (e && e.message) || String(e) });
+      }
+    })();
+    return;
+  }
+
+  /*
+    LOCK THE COMPONENT TO ITS FILE.
+
+    Sent after a contract has been written, never before: the push is the act
+    that settles which file this component's contract is, and recording it any
+    earlier would be remembering a path somebody was still choosing.
+
+    THE ONLY THING THIS PLUGIN WRITES TO A COMPONENT, and it is metadata — no
+    layer, property or value is touched. Shared plugin data so the answer
+    travels with the component into files that import it, and so a teammate
+    running this plugin is told rather than left to guess again.
+  */
+  if (msg.type === 'rememberContractPath') {
+    (async function() {
+      try {
+        var node = await figma.getNodeByIdAsync(msg.nodeId);
+        if (!node || node.type !== 'COMPONENT_SET') return;
+        node.setSharedPluginData(PomComponentCapture.LOCK_NAMESPACE,
+                                 PomComponentCapture.LOCK_KEY, String(msg.path || ''));
+        figma.ui.postMessage({ type: 'contractPathRemembered', nodeId: msg.nodeId, path: msg.path });
+      } catch (e) {
+        /* Not being able to remember is not a reason to undo a push that has
+           already landed. The next capture falls back to matching by name,
+           which is where this started. */
+        console.warn('[Closure] could not remember the contract path:', e);
+      }
+    })();
+    return;
+  }
+
   if (msg.type === 'clearVariables') {
     (async function() {
       try {

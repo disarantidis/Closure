@@ -616,6 +616,23 @@ declare global {
     PomImportApplyBtn: any;
     /* What the import would do, drawn as headings and tags rather than as a
        column of counts — see mountImportChanges. */
+    PomComponentCompareBtn: any;
+    PomComponentPushBtn: any;
+    PomComponentLinkBtn: any;
+    PomComponentChangeBtn: any;
+    PomComponentUnlinkBtn: any;
+    PomComponentPath: { get: () => string; set: (v: string) => void };
+    PomComponentFolder: any;
+    PomComponentFound: {
+      set: (rows: { path: string; name: string }[], current: string) => void;
+      onPick: ((path: string) => void) | null;
+    };
+    PomComponentStats: { set: (rows: { n: number; label: string }[]) => void };
+    PomComponentResult: {
+      clear: () => void;
+      report: (report: any, path: string) => void;
+      problem: (title: string, message: string, fix: string) => void;
+    };
     PomImportChanges: {
       set: (d: any) => void;
       /* The scope control's answer, read at the moment the run is sent. */
@@ -778,6 +795,213 @@ window.PomImportApplyBtn = mountLiveButton(
   { disabled: false, loading: false, success: false, label: null },
   CARD_LEVEL,
 );
+
+/* ── the component contract page ───────────────────────────────────────────
+   THE TIE COMES FIRST, and it is a button rather than a consequence. Until a
+   component and a path have been tied, neither verb is offered at all: a push
+   would write a file somewhere nobody confirmed, and a compare would read one.
+   So this is the only control on the page to begin with, and the other two
+   appear once it has been used. */
+window.PomComponentLinkBtn = mountLiveButton(
+  'component-link-btn-mount',
+  { id: 'component-link-btn', variant: 'filled', size: 'medium', label: 'Link this component', block: true },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+
+/* Breaking the tie, and moving it. Quiet, because they are the rare halves of
+   a pair whose common case is that nothing needs doing — but present, because
+   a link that cannot be undone is a trap rather than a guarantee. */
+window.PomComponentChangeBtn = mountLiveButton(
+  'component-change-btn-mount',
+  { id: 'component-change-btn', variant: 'ghost', size: 'small', label: 'Change' },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+window.PomComponentUnlinkBtn = mountLiveButton(
+  'component-unlink-btn-mount',
+  { id: 'component-unlink-btn', variant: 'ghost', size: 'small', label: 'Unlink' },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+
+/* Compare first, push second, and the order is the argument: a contract is
+   written after somebody has seen what writing it would change. */
+window.PomComponentCompareBtn = mountLiveButton(
+  'component-compare-btn-mount',
+  { id: 'component-compare-btn', variant: 'tonal', size: 'medium', label: 'Compare with repo', block: true },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+window.PomComponentPushBtn = mountLiveButton(
+  'component-push-btn-mount',
+  { id: 'component-push-btn', variant: 'filled', size: 'medium', label: 'Push contract', block: true },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+
+/*
+  THE PATH, AS A FIELD RATHER THAN A LABEL.
+
+  A repository's layout is its own business, and the default — the component's
+  own folder — is a guess. A guess that cannot be corrected is a guess that has
+  to be right, so this is editable, and what it holds is what both verbs use:
+  the push writes there and the compare reads there, which is what keeps "where
+  we put it" and "what is in the repo" the same sentence.
+*/
+(function mountComponentPath() {
+  const container = document.getElementById('component-path-mount');
+  let setValue: (v: string) => void = () => {};
+  let current = '';
+  function View() {
+    const [value, setV] = useState('');
+    setValue = (v) => { current = v; setV(v); };
+    /* Controlled, like the file-name field and for the same reason: the push
+       reads it synchronously mid-run, and an uncontrolled input would ignore
+       the value this page sets when the capture lands. */
+    return (
+      <PomTextField
+        id="component-path"
+        label="Contract path"
+        value={value}
+        onInput={(e: any) => { current = e.target.value; setV(e.target.value); }}
+      />
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(
+    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomComponentPath = { get: () => current, set: (v) => setValue(v) };
+})();
+
+/* The three numbers that say whether a contract looks right, in the same
+   three-across the comparison page settled on. */
+(function mountComponentStats() {
+  const container = document.getElementById('component-stats');
+  let set: (rows: any[]) => void = () => {};
+  function View() {
+    const [rows, setRows] = useState<any[]>([]);
+    set = setRows;
+    return (
+      <>
+        {rows.map((r) => (
+          /* The same two classes the comparison page's stats use, not a bare
+             <b> and <span>: those carry the size, the weight and the line
+             break, and inventing a second spelling of them here would mean
+             two stat cards that drift apart. */
+          <div className="compare-stat" data-level={SUBCARD_LEVEL} key={r.label}>
+            <div className="compare-stat-n">{r.n.toLocaleString()}</div>
+            <div className="compare-stat-label">{r.label}</div>
+          </div>
+        ))}
+      </>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(
+    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomComponentStats = { set: (rows) => set(rows) };
+})();
+
+/*
+  WHAT THE REPOSITORY'S CONTRACT SAYS, AGAINST THIS COMPONENT.
+
+  The three kinds of change are kept apart on the page as they are in the
+  report, because they are not the same news. A value moved is a decision
+  somebody made. A shape moved — a fact that was constant now following Size —
+  is the architecture, and the same eventual values can arrive through a
+  completely different rule, which is why it reads first and loudest.
+
+  The api is above all of them: a layer's padding is how the component is
+  built, an axis losing a value is a promise withdrawn from everyone who used
+  it.
+*/
+(function mountComponentResult() {
+  const container = document.getElementById('component-result-mount');
+  let set: (s: any) => void = () => {};
+  function View() {
+    const [s, setS] = useState<any>(null);
+    set = setS;
+    if (!s) return null;
+    if (s.problem) {
+      return (
+        <Alert tone="warning" title={s.problem.title}>
+          <p className="closure-warning-subtitle">{s.problem.message}</p>
+          {s.problem.fix ? <p className="closure-warning-more">{s.problem.fix}</p> : null}
+        </Alert>
+      );
+    }
+    const r = s.report;
+    if (r.same) {
+      return (
+        <div className="json-download-card" data-level={4}>
+          <p className="component-status-line">
+            The contract at {s.path} is this component. Nothing differs.
+          </p>
+        </div>
+      );
+    }
+    const rows: { label: string; items: string[]; warn?: boolean }[] = [];
+    const api = r.api;
+    api.removed.forEach((n: string) => rows.push({ label: 'axis gone from the repo', items: [n], warn: true }));
+    api.added.forEach((n: string) => rows.push({ label: 'axis only in the repo', items: [n], warn: true }));
+    api.values.forEach((v: any) => {
+      if (v.removed.length) rows.push({ label: v.axis + ' — values the repo has not', items: v.removed, warn: true });
+      if (v.added.length) rows.push({ label: v.axis + ' — values only the repo has', items: v.added, warn: true });
+    });
+    api.defaults.forEach((d: any) => rows.push({
+      label: d.axis + ' — a different default', items: [d.figma + ' here, ' + d.repo + ' in the repo'], warn: true }));
+    if (r.layers.removed.length) rows.push({ label: 'layers the repo has not', items: r.layers.removed });
+    if (r.layers.added.length) rows.push({ label: 'layers only the repo has', items: r.layers.added });
+    if (r.composes.added.length) rows.push({ label: 'composes, only in the repo', items: r.composes.added });
+    if (r.composes.removed.length) rows.push({ label: 'no longer composes', items: r.composes.removed });
+
+    const kinds = [
+      { kind: 'shape', label: 'follows something different now', warn: true },
+      { kind: 'per-variant', label: 'a case disagrees' },
+      { kind: 'value', label: 'a different value' },
+    ];
+    return (
+      <div className="json-download-card" data-level={4}>
+        <div className="json-download-header">
+          <div className="json-download-title-group">
+            <p className="json-download-title">What differs from {s.path}</p>
+          </div>
+        </div>
+        {rows.map((row, i) => (
+          <div className="import-change-group" key={'r' + i}>
+            <span className={'import-change-heading' + (row.warn ? ' is-warn' : '')}>{row.label}</span>
+            <span className="import-change-tags">
+              {row.items.map((x) => <Tag key={x} variant="tonal" size="small">{x}</Tag>)}
+            </span>
+          </div>
+        ))}
+        {kinds.map((k) => {
+          const hits = r.facts.changed.filter((c: any) => c.kind === k.kind);
+          if (!hits.length) return null;
+          return (
+            <div className="import-change-group" key={k.kind}>
+              <span className={'import-change-heading' + (k.warn ? ' is-warn' : '')}>
+                {hits.length.toLocaleString()} {k.label}
+              </span>
+              <span className="import-detail">
+                {hits.slice(0, 8).map((c: any, i: number) => (
+                  <span key={i}>{c.layer + ' · ' + c.fact}<br /></span>
+                ))}
+                {hits.length > 8 && <>… and {(hits.length - 8).toLocaleString()} more</>}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(
+    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomComponentResult = {
+    clear: () => set(null),
+    report: (report, path) => set({ report, path }),
+    problem: (title, message, fix) => set({ problem: { title, message, fix } }),
+  };
+})();
 
 window.PomButtons = {
   push: mountLiveButton(
@@ -1110,6 +1334,139 @@ window.PomCompareFolder = mountLiveDropdown(
   CARD_LEVEL,
 ) as any;
 window.PomCompareFolder.onChange = null;
+
+/*
+  THE FOLDER, ONE LEVEL AT A TIME.
+
+  A flat list of every folder is fine for a repository with nine of them and
+  unusable for a monorepo with four hundred — which is the shape this is
+  actually for. So each level offers only the folders inside the one above it,
+  and a new level appears when the folder just chosen has folders of its own.
+
+  EVERY LEVEL CAN BE THE DESTINATION. `src/panel/node` is where Pomegranate's
+  components live, and `src` is where another repository's might; a picker that
+  made you descend to a leaf would be wrong about half of them. So each level
+  carries "stay here", and choosing it stops the descent without pretending
+  there is nothing deeper.
+
+  Choosing at a level truncates what was below it, because the folders under
+  the old choice are not under the new one and leaving them would offer a path
+  that does not exist.
+*/
+(function mountComponentFolder() {
+  const container = document.getElementById('component-folder-mount');
+  let set: (s: any) => void = () => {};
+
+  /* The immediate children of a prefix — one segment on, deduplicated. The
+     tree arrives as full paths, and this is the only place that treats them as
+     a hierarchy rather than a list. */
+  const childrenOf = (folders: string[], prefix: string) => {
+    const at = prefix ? prefix + '/' : '';
+    const out: string[] = [];
+    folders.forEach((f) => {
+      if (prefix && f.indexOf(at) !== 0) return;
+      const rest = f.slice(at.length);
+      if (!rest || rest.indexOf('/') !== -1) return;
+      if (out.indexOf(rest) === -1) out.push(rest);
+    });
+    return out.sort();
+  };
+
+  const STAY = '\u0000stay';
+
+  function View() {
+    const [s, setS] = useState<{ folders: string[]; value: string }>({ folders: [], value: '' });
+    set = setS;
+
+    const segments = s.value ? s.value.split('/') : [];
+    const levels: { prefix: string; kids: string[]; chosen: string }[] = [];
+    let prefix = '';
+    for (let depth = 0; ; depth++) {
+      const kids = childrenOf(s.folders, prefix);
+      if (!kids.length) break;
+      const chosen = segments[depth] && kids.indexOf(segments[depth]) !== -1 ? segments[depth] : '';
+      levels.push({ prefix, kids, chosen });
+      if (!chosen) break;
+      prefix = prefix ? prefix + '/' + chosen : chosen;
+    }
+
+    return (
+      <>
+        {levels.map((lv, i) => (
+          <DropDownSelect
+            key={lv.prefix || '(root)'}
+            /* The parent's own name, not its whole path: at this width
+               "Inside packages/react/src" truncates to "Inside pa…", which
+               names nothing. The ladder above it already says where it is. */
+            label={i === 0 ? 'Folder in the repo' : 'Inside ' + lv.prefix.split('/').pop()}
+            value={lv.chosen || STAY}
+            icon={IconFolder(16)}
+            options={[{ value: STAY,
+                        label: lv.prefix ? 'Stay in ' + lv.prefix.split('/').pop() : 'Repository root' }]
+              .concat(lv.kids.map((k) => ({ value: k, label: k })))}
+            onChange={(v: string) => {
+              const next = v === STAY ? lv.prefix : (lv.prefix ? lv.prefix + '/' + v : v);
+              window.PomComponentFolder?.onChange?.(next);
+            }}
+          />
+        ))}
+      </>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(
+    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomComponentFolder = {
+    set: (folders: string[], value: string) => set({ folders, value }),
+    onChange: null as ((v: string) => void) | null,
+  };
+})();
+
+/*
+  THE CONTRACTS THIS REPOSITORY ALREADY HOLDS.
+
+  A list, not a dropdown: it is the answer to "what else is here", which is a
+  thing to read before it is a thing to choose from. Somebody arriving at a
+  component they have never pushed learns from it what the house style is —
+  where the others went, and under what name — which is the question the path
+  field cannot answer on its own.
+
+  The one that matches the current path is marked rather than moved, because a
+  list that reordered itself as you typed would be a list you could not scan.
+*/
+(function mountComponentFound() {
+  const container = document.getElementById('component-found-mount');
+  let set: (s: any) => void = () => {};
+  function View() {
+    const [s, setS] = useState<{ rows: { path: string; name: string }[]; current: string }>(
+      { rows: [], current: '' });
+    set = setS;
+    if (!s.rows.length) return null;
+    return (
+      <div className="component-found">
+        <span className="component-found-head">
+          {s.rows.length.toLocaleString()} contract{s.rows.length === 1 ? '' : 's'} in this repo
+        </span>
+        {s.rows.map((r) => (
+          <button
+            type="button"
+            className={'component-found-row' + (r.path === s.current ? ' is-current' : '')}
+            key={r.path}
+            onClick={() => window.PomComponentFound?.onPick?.(r.path)}
+          >
+            <span className="component-found-name">{r.name}</span>
+            <span className="component-found-path">{r.path}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(
+    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  window.PomComponentFound = {
+    set: (rows, current) => set({ rows, current }),
+    onPick: null,
+  };
+})();
 
 window.PomRepoReadBtn = mountLiveTitleButton(
   'repo-read-btn-mount',
@@ -4124,6 +4481,11 @@ const GROUP_MATES = 12;
 })();
 
 mountIconButton('compare-back-btn-mount', { id: 'compare-back-btn', variant: 'tonal', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
+mountIconButton('component-back-btn-mount', { id: 'component-back-btn', variant: 'tonal', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
+/* Small and tonal: the way in to a page, not an action on this one. */
+mountButton('component-open-btn-mount',
+  { id: 'component-open-btn', variant: 'tonal', size: 'small', label: 'From the selection' },
+  CARD_LEVEL);
 
 /* ── confirm / onboarding dialogs ──────────────────────────────────────────── */
 function confirmDialog(mountId: string, cfg: { title: string; text: string; confirmLabel: string; onConfirm: () => void }, register: (open: () => void) => void) {

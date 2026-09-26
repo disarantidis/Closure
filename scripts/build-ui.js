@@ -97,6 +97,13 @@ async function main() {
     /* After import-diff.js, which it reads: it turns a compiled program and
        that diff into the shorter program that writes only what moved. */
     'src/import-filter.js',
+    /* The component contract's three UI-side modules, in the order they depend
+       on each other: the collapse, then the file it is written as, then the
+       comparison of two of them. The capture that feeds all three is in
+       code.js, because it is the only one that touches a node. */
+    'src/component-contract.js',
+    'src/component-file.js',
+    'src/component-diff.js',
     /* Not part of the import pipeline at all — it is the Compare page's
        engine, and it rides in here because this is the list of modules the
        UI gets. It answers a different question from import-diff.js (document
@@ -139,6 +146,11 @@ function buildCode() {
     'src/emit-resolved.js',
     'src/dtcg-format.js',
     'src/import-apply.js',
+    /* The component capture is the other module that needs a Figma node, so it
+       goes where apply() goes: into the sandbox, not the UI. Everything the
+       capture produces is plain data, and every judgement made about it —
+       collapse, file, diff — happens in the UI on that data. */
+    'src/component-capture.js',
   ];
   const banner =
     '// ---------------------------------------------------------------------------\n' +

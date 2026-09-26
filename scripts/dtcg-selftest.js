@@ -25,6 +25,11 @@ function loadPluginCode() {
     clientStorage: {},
     root: { name: 'selftest' },
     showUI() {},
+    /* The sandbox watches the selection from the moment it loads, and asks once
+       straight away. An empty page answers both, which is what this harness
+       means by "no document". */
+    on() {},
+    currentPage: { selection: [] },
   };
   const quietConsole = { log() {}, warn() {}, error() {} };
   const expose = `

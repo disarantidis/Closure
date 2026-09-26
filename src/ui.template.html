@@ -1236,6 +1236,63 @@
        inset because it stands on the page like the sides do, not inside a
        card. */
     .compare-apply { margin: 0 16px 16px; }
+    /* The contract page. Same scroll behaviour as Compare — it is the same
+       kind of page: a long answer to a question asked once. */
+    .component-page { overflow-y: auto; overflow-x: hidden; }
+    .component-status-line { margin: 0; font-size: 12px; line-height: 1.5; color: var(--app-text); }
+    .component-status-line.is-quiet { color: var(--app-text-muted); }
+    .component-composes {
+      margin: 10px 0 0; font-size: 11px; line-height: 1.5; color: var(--app-text-muted);
+    }
+    /* Compare first, push second, and the order is the argument: a contract is
+       written after somebody has seen what writing it would change. */
+    /* The folder ladder: one dropdown per level, wrapping. Each is as wide as
+       it needs to be rather than sharing the row equally — "node" and
+       "packages" are not the same length and forcing them to be wastes the
+       width the deeper ones need. */
+    #component-folder-mount {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;
+      margin-bottom: 10px;
+    }
+    #component-folder-mount > * { flex: 0 1 auto; min-width: 0; }
+
+    .component-match-line {
+      margin: 6px 0 0; font-size: 10px; line-height: 1.5; color: var(--app-text-muted);
+      overflow-wrap: anywhere;
+    }
+
+    /* The contracts this repo already holds. A list rather than a dropdown:
+       it is the answer to "what else is here", which is a thing to read before
+       it is a thing to choose from. */
+    .component-found { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+    .component-found-head {
+      font-size: 11px; font-weight: 600; color: var(--app-text); margin-bottom: 2px;
+    }
+    .component-found-row {
+      display: flex; align-items: baseline; gap: 6px;
+      background: none; border: 0; padding: 3px 0; margin: 0;
+      font: inherit; font-size: 11px; color: var(--app-text-muted);
+      text-align: start; cursor: pointer; min-width: 0;
+    }
+    .component-found-row:hover { color: var(--app-text); }
+    .component-found-row.is-current { color: var(--app-text); }
+    .component-found-name { font-weight: 600; flex: none; }
+    .component-found-path {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px; opacity: 0.7; overflow-wrap: anywhere; min-width: 0;
+    }
+    /* The tie, once it is made. Reads as a statement rather than a control,
+       because that is what it now is. */
+    .component-linked-line {
+      margin: 0; font-size: 11px; line-height: 1.5; color: var(--app-text);
+      overflow-wrap: anywhere;
+    }
+    .component-linked-line b { font-weight: 600; }
+    .component-link-tools { display: flex; gap: 4px; margin-top: 6px; }
+    #component-link-note { color: var(--app-text); font-size: 11px; }
+
+    .component-buttons { display: flex; gap: 8px; margin-top: 12px; }
+    .component-buttons > span { flex: 1 1 0; min-width: 0; }
     .compare-page { overflow-y: auto; overflow-x: hidden; }
     .compare-page::-webkit-scrollbar { width: 8px; }
     .compare-page::-webkit-scrollbar-track { background: transparent; }
@@ -3205,6 +3262,35 @@
       one button that saves it live here, and everything about the repository
       stays in the repository's card.
     -->
+    <!--
+      THE WAY IN TO A COMPONENT'S CONTRACT.
+
+      Its own card rather than a button on an existing one: everything else on
+      this screen is about the file's variables, and this is about one
+      component somebody has selected. Always visible, because the answer to
+      "nothing is selected" belongs on the page that asks — a button that
+      hides when the selection is wrong teaches nobody what to select.
+    -->
+    <div class="json-file-card" id="component-entry-card" data-level="4">
+      <div class="json-download-header">
+        <div class="json-download-title-group">
+          <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+          </svg>
+          <p class="json-download-title">Component contract</p>
+        </div>
+        <span id="component-open-btn-mount"></span>
+      </div>
+      <!-- What the plugin is currently pointed at. Selecting a component set
+           takes over the screen, so this line is mostly read in the state where
+           nothing is — which is exactly when somebody needs telling what to
+           select. -->
+      <p class="component-status-line is-quiet" id="component-entry-line">
+        Select a component set in Figma and this becomes a contract.
+      </p>
+    </div>
+
     <div class="json-file-card" id="json-file-card" data-level="4" hidden>
         <div class="json-download-header">
           <div class="json-download-title-group">
@@ -3642,6 +3728,104 @@
     </header>
     <div class="settings-page-content">
       <div id="compare-mount"></div>
+    </div>
+  </div>
+
+  <!--
+    THE COMPONENT CONTRACT. Its own page rather than a card on the main screen,
+    for the same reason Compare has one: it answers a question about ONE thing
+    the person selected, and the main screen is about the file as a whole.
+  -->
+  <div class="page component-page" id="component-page">
+    <header class="header-settings">
+      <div class="header-panel">
+        <div class="git-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+          </svg>
+        </div>
+        <h1 class="title">Contract</h1>
+        <span id="component-back-btn-mount"></span>
+      </div>
+    </header>
+    <div class="settings-page-content">
+      <!-- What is selected, or why nothing can be done yet. Always present:
+           this page opens on a selection it did not choose. -->
+      <div class="json-download-card" data-level="4" id="component-status">
+        <p class="component-status-line" id="component-status-line">Reading the selection…</p>
+      </div>
+
+      <!-- The contract, summarised. The file itself is long and nobody reads a
+           290-line JSON to decide whether to push it; these are the numbers
+           that say whether it looks right. -->
+      <div class="json-download-card" data-level="4" id="component-summary" hidden>
+        <div class="json-download-header">
+          <div class="json-download-title-group">
+            <p class="json-download-title" id="component-name">—</p>
+          </div>
+          <span class="compare-side-detail" id="component-variants">—</span>
+        </div>
+        <div class="compare-stats" id="component-stats"></div>
+        <p class="component-composes" id="component-composes" hidden></p>
+      </div>
+
+      <!-- Where it goes, and the two things that can be done with it. The path
+           is shown rather than hidden because it is the half of this feature a
+           repository cares about, and it is editable because a repository's
+           layout is its own business. -->
+      <div class="json-download-card" data-level="4" id="component-actions" hidden>
+        <div class="json-download-header">
+          <div class="json-download-title-group">
+            <p class="json-download-title">In the repo</p>
+          </div>
+        </div>
+        <!--
+          BROWSING, because a repository's shape is not guessable. The default
+          path puts a contract in the component's own folder, which is right
+          for a repo of folders and wrong for one of flat files — and both
+          exist. So the folder is picked from what is actually there, and the
+          contracts already written are listed to be jumped to rather than
+          retyped.
+        -->
+        <!--
+          CHOOSING, and nothing else. Neither verb is reachable from here: what
+          this half produces is a proposal, and a proposal is tied before it is
+          acted on.
+        -->
+        <div id="component-choose">
+          <span id="component-folder-mount"></span>
+          <span id="component-path-mount"></span>
+          <!-- Why the path says what it says. A field that filled itself and did
+               not say why is a field nobody trusts. -->
+          <p class="component-match-line" id="component-match-line" hidden></p>
+          <span id="component-found-mount"></span>
+          <p class="component-match-line" id="component-link-note" hidden></p>
+          <div class="component-buttons">
+            <span id="component-link-btn-mount"></span>
+          </div>
+        </div>
+
+        <!--
+          TIED, and now there is something to do. The path stops being a field
+          because it has stopped being a question — it is the address both
+          verbs use, and showing it as editable here would invite an edit that
+          silently unties what was just settled.
+        -->
+        <div id="component-linked" hidden>
+          <p class="component-linked-line" id="component-linked-line"></p>
+          <div class="component-link-tools">
+            <span id="component-change-btn-mount"></span>
+            <span id="component-unlink-btn-mount"></span>
+          </div>
+          <div class="component-buttons">
+            <span id="component-compare-btn-mount"></span>
+            <span id="component-push-btn-mount"></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="component-result-mount"></div>
     </div>
   </div>
 
@@ -5178,11 +5362,558 @@
       the way to bring a repo's tokens INTO Figma, this is the way to see how
       far the two have drifted.
     */
+    /* ── the component contract ──────────────────────────────────────────────
+       Capture in the sandbox, everything else here. The page holds one
+       component at a time — the one that was selected when it opened — and
+       re-reads the selection every time it is opened rather than watching it,
+       because a selection that changes under a contract you are about to push
+       is a worse surprise than having to open the page again. */
+    var componentState = { capture: null, contract: null, path: '', id: null,
+                           linked: null, linkKind: null, choosing: false,
+                           confirming: null, followed: false };
+    var lastSelection = null;
+    /* What the last browse found. Held so a folder change or a pick can redraw
+       without asking the repo again — the tree has not moved because somebody
+       chose a row in it. */
+    var lastFolders = [];
+    var lastFoundRows = [];
+
+    /* The main screen's own line about what is selected. Kept in step with the
+       selection rather than with the page, because somebody who pressed Back
+       with the component still selected needs the button to still make sense. */
+    function renderComponentEntry() {
+      var line = document.getElementById('component-entry-line');
+      if (!line) return;
+      var sel = lastSelection;
+      if (sel && sel.kind === 'component-set') {
+        line.textContent = sel.name + ' is selected — ' +
+          sel.variants.toLocaleString() + ' variant' + (sel.variants === 1 ? '' : 's') + '.';
+        line.classList.remove('is-quiet');
+      } else {
+        line.textContent = 'Select a component set in Figma and this becomes a contract.';
+        line.classList.add('is-quiet');
+      }
+    }
+
+    /*
+      THE PLUGIN FOLLOWS THE SELECTION.
+
+      Selecting a component set is somebody saying what they are working on, so
+      the plugin stops being about the file's variables and becomes about that
+      component. Nobody should have to set a mode they have already expressed
+      by clicking.
+
+      THREE RULES KEEP IT FROM BEING RUDE.
+
+      It only takes over from the MAIN screen. Import, Compare and Settings are
+      places somebody went on purpose, usually with something half-entered, and
+      a screen that vanished under them because a stray click landed on a
+      component would be the plugin losing their work to be clever.
+
+      It only gives back what it took. Leaving is automatic when the page was
+      opened BY the selection and the selection has gone; a page opened from
+      the button stays until it is closed, because that one was asked for.
+
+      And a different set re-scans rather than reopening, so clicking along a
+      row of components reads as one page changing its subject.
+    */
+    function onSelection(sel) {
+      var onComponentPage = document.getElementById('component-page').classList.contains('visible');
+      var onMain = !document.querySelector('.page.visible');
+      lastSelection = sel;
+      renderComponentEntry();
+
+      if (sel && sel.kind === 'component-set') {
+        if (onComponentPage) {
+          if (sel.id !== componentState.id) openComponent(true);
+          return;
+        }
+        if (onMain) openComponent(true);
+        return;
+      }
+      /* Not a component any more. Only a page this took over gets handed back. */
+      if (onComponentPage && componentState.followed) closeComponent();
+    }
+
+    function openComponent(followed) {
+      document.getElementById('main-page').classList.add('hidden');
+      document.getElementById('component-page').classList.add('visible');
+      componentState = { capture: null, contract: null, path: '', id: null,
+                         linked: null, linkKind: null, choosing: false,
+                         confirming: null, followed: !!followed };
+      document.getElementById('component-summary').hidden = true;
+      document.getElementById('component-actions').hidden = true;
+      window.PomComponentResult.clear();
+      componentStatus('Reading the selection…');
+      parent.postMessage({ pluginMessage: { type: 'captureComponent' } }, '*');
+    }
+
+    function closeComponent() {
+      document.getElementById('component-page').classList.remove('visible');
+      document.getElementById('main-page').classList.remove('hidden');
+    }
+
+    function componentStatus(text, quiet) {
+      var el = document.getElementById('component-status-line');
+      el.textContent = text;
+      el.classList.toggle('is-quiet', !!quiet);
+    }
+
+    /* The path the contract will be written to. Derived from the component's
+       name and the folder already chosen for this provider, and editable —
+       a repository's layout is its own business and a guess that cannot be
+       corrected is a guess that has to be right. */
+    function componentPath() {
+      var which = activeRepoProvider();
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      return window.PomComponentFile.pathFor(
+        (componentState.capture && componentState.capture.name) || 'component',
+        { dir: (c && c.folder) || '' });
+    }
+
+    function renderComponent(capture) {
+      componentState.capture = capture;
+      componentState.id = capture.nodeId;
+      componentState.linked = capture.contractPath || null;
+      var contract = window.PomComponentContract.contract(capture);
+      componentState.contract = contract;
+
+      componentStatus(capture.name + ' — captured from this file.', true);
+      document.getElementById('component-name').textContent = capture.name;
+      document.getElementById('component-variants').textContent =
+        capture.variants.length.toLocaleString() + ' variants';
+
+      var s = contract.summary;
+      window.PomComponentStats.set([
+        { n: s.facts, label: 'facts in the contract' },
+        { n: s.varying, label: 'that depend on a variant axis' },
+        { n: s.unbound, label: 'not bound to a token' },
+      ]);
+
+      var composes = document.getElementById('component-composes');
+      composes.hidden = !(contract.composes && contract.composes.length);
+      if (!composes.hidden) composes.textContent = 'Composes ' + contract.composes.join(', ') + '.';
+
+      componentState.path = componentState.linked || componentPath();
+      window.PomComponentPath.set(componentState.path);
+      document.getElementById('component-summary').hidden = false;
+      document.getElementById('component-actions').hidden = false;
+      renderComponentLink();
+      browseRepoForContracts();
+    }
+
+    /*
+      WHAT THE REPOSITORY LOOKS LIKE, so the path does not have to be guessed.
+
+      One tree listing answers both halves — every folder to choose from, and
+      every contract already written. It is the same call and the same cache
+      the push and compare pickers use, so opening this page costs nothing
+      extra when one of them has already looked.
+
+      A failure here is quiet on purpose. Not being able to browse is not a
+      reason to stop: the path field still holds a perfectly good default and
+      both buttons still work, and an error banner over a feature nobody has
+      reached for yet would be the plugin complaining about its own
+      convenience.
+    */
+    function browseRepoForContracts() {
+      var which = activeRepoProvider();
+      if (!which) return;
+      listRepoFolders(which).then(function (got) {
+        var folders = (got.folders || []).slice();
+        var current = componentFolderOf(window.PomComponentPath.get());
+        /* A folder the tree does not list, because the default path invented
+           it and the first push will create it. Offered anyway — a picker that
+           dropped the value it was given would silently move the file. */
+        if (current && folders.indexOf(current) === -1) folders.push(current);
+        lastFolders = folders.filter(Boolean);
+        window.PomComponentFolder.set(lastFolders, current);
+
+        lastFoundRows = (got.files || [])
+          .filter(window.PomComponentFile.isContractPath)
+          .map(function (f) {
+            return { path: f, name: window.PomComponentFile.componentOfPath(f) };
+          });
+
+        /*
+          THE COMPONENT'S OWN HOME, IF THE REPOSITORY ALREADY HAS ONE.
+
+          Browsing is the fallback. The common case is that "ODS Avatar" is
+          Avatar.tsx somewhere, and making somebody descend five dropdowns to a
+          folder the repository could have named itself is the plugin asking a
+          question it can answer.
+
+          Only while the path is still the one this page invented. The moment
+          somebody has typed or picked, the path is theirs and a match arriving
+          late must not take it — a control that moves under the hand is worse
+          than one that never helped.
+        */
+        var name = componentState.capture && componentState.capture.name;
+        var match = window.PomComponentFile.matchInRepo(name, got);
+        /*
+          A LOCK OUTRANKS A MATCH, because it is not a guess. The component
+          carries the path its contract was last written to, so a rename on
+          either side — the component in Figma, the file in the repo — stops
+          being able to break the pairing. Matching by name is what happens
+          before there is a lock, and what happens if one is ever lost.
+        */
+        if (componentState.linked && window.PomComponentPath.get() === componentState.path) {
+          componentState.path = componentState.linked;
+          window.PomComponentPath.set(componentState.linked);
+          window.PomComponentFolder.set(lastFolders, componentFolderOf(componentState.linked));
+        } else if (match && window.PomComponentPath.get() === componentState.path) {
+          var matched = window.PomComponentFile.pathForMatch(name, match);
+          if (matched) {
+            componentState.path = matched;
+            window.PomComponentPath.set(matched);
+            window.PomComponentFolder.set(lastFolders, componentFolderOf(matched));
+          }
+        }
+        renderComponentMatch(match);
+        window.PomComponentFound.set(lastFoundRows, window.PomComponentPath.get());
+      }, function () { /* browsing is a convenience; the default path still works */ });
+    }
+
+    /*
+      WHY THE PATH SAYS WHAT IT SAYS.
+
+      A field that filled itself and did not say why is a field nobody trusts:
+      the reader cannot tell a good match from a coincidence without being told
+      what was matched. So the line names the file it found, and when several
+      matched equally it says that instead of pretending the first was special.
+    */
+    function renderComponentMatch(match) {
+      var el = document.getElementById('component-match-line');
+      if (!el) return;
+      if (!match) {
+        el.textContent = 'No file in the repo matches this name — pick where it should go.';
+        el.hidden = false;
+        return;
+      }
+      var extra = match.alternatives.length;
+      el.textContent =
+        (match.kind === 'contract' ? 'Its contract is already here: ' :
+         match.kind === 'folder' ? 'Matched the folder ' : 'Matched ') + match.path +
+        (extra ? ' — and ' + extra + ' other place' + (extra === 1 ? '' : 's') + ' match as well.' : '.');
+      el.hidden = false;
+    }
+
+    /* The folder part of a path — everything before the last segment. */
+    function componentFolderOf(path) {
+      var at = String(path || '').lastIndexOf('/');
+      return at === -1 ? '' : path.slice(0, at);
+    }
+
+    /*
+      Choosing a folder keeps the FILE and moves it, rather than rebuilding the
+      path from the pattern: somebody who edited the filename and then picked a
+      folder meant to move what they had named, and regenerating it would throw
+      their edit away without saying so.
+    */
+    window.PomComponentFolder.onChange = function (dir) {
+      var path = window.PomComponentPath.get();
+      var file = String(path).split('/').pop();
+      var next = (dir ? dir + '/' : '') + file;
+      window.PomComponentPath.set(next);
+      /* Redrawn with the new folder so the next level down appears — the point
+         of descending is that choosing a folder reveals what is inside it. */
+      window.PomComponentFolder.set(lastFolders, dir);
+      window.PomComponentFound.set(lastFoundRows, next);
+    };
+
+    /* Choosing an existing contract takes it whole — its folder AND its name,
+       because the name is the house style this repo has already settled. */
+    window.PomComponentFound.onPick = function (path) {
+      window.PomComponentPath.set(path);
+      window.PomComponentFolder.set(lastFolders, componentFolderOf(path));
+      window.PomComponentFound.set(lastFoundRows, path);
+    };
+
+    /*
+      ═══ THE TIE ═══════════════════════════════════════════════════════════
+
+      A path that a name match proposed is a proposal, and both verbs on this
+      page are the wrong thing to do to a proposal. The push writes a file at
+      it; the compare reads one and reports on it. Get the path wrong and the
+      first overwrites a component's contract with another component's, while
+      the second produces a report where every row is true and the whole means
+      nothing.
+
+      So tying comes first and is its own act. Until it has happened there is
+      no compare and no push — not disabled, absent, because a verb that is
+      shown and refuses is a verb that invited the press.
+
+      WHAT THE TIE CHECKS is the one thing worth stopping for: whether the path
+      already belongs to somebody else. Free ground is fine. This component's
+      own contract is fine. A contract that records a different component is
+      refused outright, and that refusal is the guarantee — from here on the
+      name that matched is no longer load-bearing, because both sides have
+      written down who the other is.
+
+      THE TIE IS KEPT IN TWO PLACES, and neither alone would do. Figma holds
+      the path on the component set, so a component knows where its contract
+      lives even when the repo is renamed underneath it. The contract holds the
+      component's published key, so a file knows which component it describes
+      even when it is copied into another Figma document. Each survives the
+      rename the other cannot.
+    */
+    function linkNote(text) {
+      var el = document.getElementById('component-link-note');
+      if (!el) return;
+      el.textContent = text || '';
+      el.hidden = !text;
+    }
+
+    function renderComponentLink() {
+      var showLinked = !!componentState.linked && !componentState.choosing;
+      document.getElementById('component-choose').hidden = showLinked;
+      document.getElementById('component-linked').hidden = !showLinked;
+      if (!showLinked) return;
+      var el = document.getElementById('component-linked-line');
+      el.textContent = '';
+      el.appendChild(document.createTextNode('Linked to '));
+      var b = document.createElement('b');
+      b.textContent = componentState.linked;
+      el.appendChild(b);
+      /* How the tie was arrived at, because "linked" on its own does not say
+         whether anything is there yet — which is the next thing a reader
+         wants and the difference between compare and push being useful. */
+      var why = componentState.linkKind === 'free'
+          ? '. Nothing is there yet — the first push creates it.'
+        : componentState.linkKind === 'mine'
+          ? '. The contract there is already this component’s.'
+        : componentState.linkKind === 'adopted'
+          ? '. Adopting the contract already there; the next push records this component in it.'
+          : ' — set the last time this component was linked.';
+      el.appendChild(document.createTextNode(why));
+    }
+
+    function linkComponentContract() {
+      if (!componentState.contract) return;
+      var which = activeRepoProvider();
+      if (!which) { showToast('Add a repository in Settings first', true); return; }
+      var path = String(window.PomComponentPath.get() || '').trim();
+      if (!path) { linkNote('Give the contract a path first.'); return; }
+      /* The suffix is not decoration: it is how browsing finds contracts at
+         all, so a file linked without it would be invisible to the next
+         person looking for it. */
+      if (!window.PomComponentFile.isContractPath(path)) {
+        linkNote('A contract path ends in ' + window.PomComponentFile.CONTRACT_SUFFIX +
+                 ', which is how the next scan finds it.');
+        return;
+      }
+      linkNote('');
+      window.PomComponentLinkBtn.setLoading(true);
+      var read = which === 'gitlab' ? fetchGitLabFile(path) : fetchGitHubFile(path);
+      read.then(function (got) { settleLink(path, got.text); }, function (err) {
+        /* Nothing there is the commonest answer and the easiest tie to make:
+           free ground, claimed. */
+        if (err && err.status === 404) { settleLink(path, null); return; }
+        window.PomComponentLinkBtn.setLoading(false);
+        linkNote('Could not read the repository: ' + errText(err));
+      });
+    }
+
+    function settleLink(path, text) {
+      window.PomComponentLinkBtn.setLoading(false);
+      var theirs = null;
+      if (text !== null && text !== undefined) {
+        try { theirs = window.PomComponentFile.parse(text); }
+        catch (e) {
+          linkNote('There is a file at ' + path + ' and it is not a contract. ' +
+                   'Linking here would mean overwriting it — pick another path.');
+          return;
+        }
+      }
+      var verdict = window.PomComponentDiff.linkVerdict(componentState.contract, theirs);
+      if (verdict.kind === 'theirs') {
+        componentState.confirming = null;
+        window.PomComponentLinkBtn.setLabel(null);
+        linkNote('That path belongs to another component. ' + path + ' holds the contract ' +
+                 'for ' + (verdict.component || 'a different component') + ' — ' +
+                 (verdict.pairing.by === 'key' ? 'component key ' : 'Figma node ') +
+                 verdict.pairing.repo + ', where this one is ' + verdict.pairing.figma + '.');
+        return;
+      }
+      /*
+        A CONTRACT THAT NEVER SAID WHO IT WAS, under a name that does not
+        agree. Hand-written, or written before identities were recorded, and
+        it might well be this component under the repo's own spelling. That is
+        a question rather than a refusal, so it is asked once and the same
+        button answers it. Asked against THIS path: change the path and the
+        answer no longer applies, which is what keeps a confirmation from
+        carrying over to a file nobody looked at.
+      */
+      if (verdict.kind === 'unsure' && componentState.confirming !== path) {
+        componentState.confirming = path;
+        window.PomComponentLinkBtn.setLabel('Link anyway');
+        linkNote('A contract is already at ' + path + ', named ' +
+                 (verdict.component || 'something else') + ', and it does not record which ' +
+                 'component it came from. If that is this one, link it and the next push ' +
+                 'will say so. If it is not, pick another path.');
+        return;
+      }
+      /* A confirmed 'unsure' is an adoption like any other: the file is there,
+         it is this component's now, and the next push writes the identity into
+         it. Recording the doubt that preceded the answer would be reporting an
+         argument rather than the state. */
+      commitLink(path, verdict.kind === 'unsure' ? 'adopted' : verdict.kind);
+    }
+
+    function commitLink(path, kind) {
+      componentState.linked = path;
+      componentState.path = path;
+      componentState.linkKind = kind;
+      componentState.choosing = false;
+      componentState.confirming = null;
+      window.PomComponentLinkBtn.setLabel(null);
+      linkNote('');
+      window.PomComponentResult.clear();
+      /* Figma's half of the tie. The only thing this plugin ever writes to a
+         component, and it is a path, not a change to the component. */
+      parent.postMessage({ pluginMessage: {
+        type: 'rememberContractPath', nodeId: componentState.id, path: path } }, '*');
+      renderComponentLink();
+      showToast('Linked to ' + path);
+    }
+
+    /* Moving the tie. The stored path is left alone until a new one is
+       settled: abandoning a change halfway should leave things as they were,
+       not unlinked. */
+    function changeComponentLink() {
+      componentState.choosing = true;
+      componentState.confirming = null;
+      window.PomComponentLinkBtn.setLabel(null);
+      linkNote('');
+      window.PomComponentResult.clear();
+      renderComponentLink();
+      browseRepoForContracts();
+    }
+
+    /* Breaking it. An empty path is how Figma is told to forget one, and the
+       component goes back to being matched by name like any other. */
+    function unlinkComponent() {
+      parent.postMessage({ pluginMessage: {
+        type: 'rememberContractPath', nodeId: componentState.id, path: '' } }, '*');
+      componentState.linked = null;
+      componentState.linkKind = null;
+      componentState.choosing = false;
+      componentState.confirming = null;
+      window.PomComponentLinkBtn.setLabel(null);
+      linkNote('');
+      window.PomComponentResult.clear();
+      renderComponentLink();
+      showToast('Unlinked — matched by name again');
+    }
+
+    function componentPushMessage() {
+      return 'Contract: ' + ((componentState.capture && componentState.capture.name) || 'component');
+    }
+
+    function pushComponentContract() {
+      if (!componentState.contract) return;
+      var which = activeRepoProvider();
+      if (!which) { showToast('Add a repository in Settings first', true); return; }
+      if (!componentState.linked) { showToast('Link this component to a path first', true); return; }
+      var text = window.PomComponentFile.serialise(componentState.contract);
+      var what = { path: componentState.linked, text: text, message: componentPushMessage() };
+      window.PomComponentPushBtn.setLoading(true);
+      var run = which === 'gitlab' ? pushGitLab(null, what) : pushGitHub(null, what);
+      run.then(function () {
+        window.PomComponentPushBtn.setLoading(false);
+        window.PomComponentPushBtn.setSuccess(true);
+        showToast('Wrote ' + what.path);
+        /* The tie was already made and the file now exists, so the line that
+           said nothing was there has stopped being true. */
+        componentState.linkKind = 'mine';
+        renderComponentLink();
+      }, function (err) {
+        window.PomComponentPushBtn.setLoading(false);
+        showToast(errText(err), true);
+      });
+    }
+
+    /*
+      COMPARE, which is the half that answers the question worth asking: is the
+      repository's contract still this component? Read at the SAME address the
+      push writes to, so the two can never mean different files.
+    */
+    function compareComponentContract() {
+      if (!componentState.contract) return;
+      var which = activeRepoProvider();
+      if (!which) { showToast('Add a repository in Settings first', true); return; }
+      if (!componentState.linked) { showToast('Link this component to a path first', true); return; }
+      var path = componentState.linked;
+      window.PomComponentCompareBtn.setLoading(true);
+      var read = which === 'gitlab' ? fetchGitLabFile(path) : fetchGitHubFile(path);
+      read.then(function (got) {
+        window.PomComponentCompareBtn.setLoading(false);
+        var theirs;
+        try { theirs = window.PomComponentFile.parse(got.text); }
+        catch (e) {
+          window.PomComponentResult.problem('That file is not a contract',
+            (e && e.message) || String(e),
+            'It is at ' + path + ', which is where this component\'s contract would be written.');
+          return;
+        }
+        var report = window.PomComponentDiff.diff(componentState.contract, theirs);
+        /*
+          A DIFFERENT COMPONENT IS NOT A DIFFERENCE.
+
+          Comparing Avatar against Button's contract produces a long and
+          perfectly coherent report about nothing: every row true, the whole
+          meaningless, and no way for a reader to tell it from a component that
+          has changed beyond recognition. So the pairing is checked first and a
+          mismatch is refused rather than rendered.
+        */
+        if (report.pairing.verdict === 'different') {
+          window.PomComponentResult.problem(
+            'That contract is for another component',
+            'The file at ' + path + ' records a different ' +
+            (report.pairing.by === 'key' ? 'component key' : 'Figma node') + ' — ' +
+            report.pairing.repo + ', where this one is ' + report.pairing.figma + '.',
+            'Point the path at this component\'s own contract, or push to overwrite that file.');
+          return;
+        }
+        window.PomComponentResult.report(report, path);
+      }, function (err) {
+        window.PomComponentCompareBtn.setLoading(false);
+        /* A 404 is the commonest answer and is not a failure: the contract has
+           simply not been written yet, and saying so names the next step. */
+        if (err && err.status === 404) {
+          window.PomComponentResult.problem('No contract there yet',
+            'Nothing is at ' + path + ' on this branch.',
+            'Push it, and this becomes the file the next comparison reads.');
+          return;
+        }
+        window.PomComponentResult.problem('Could not read it', errText(err), '');
+      });
+    }
+
+    window.addEventListener('message', function (event) {
+      var m = event.data && event.data.pluginMessage;
+      if (!m) return;
+      if (m.type === 'selectionChanged') onSelection(m.selection);
+      if (m.type === 'componentCaptured') renderComponent(m.capture);
+      if (m.type === 'componentCaptureFailed') {
+        document.getElementById('component-summary').hidden = true;
+        document.getElementById('component-actions').hidden = true;
+        componentStatus(m.reason || 'Nothing to capture.');
+      }
+    });
+
     function closeCompare() {
       document.getElementById('compare-page').classList.remove('visible');
       document.getElementById('main-page').classList.remove('hidden');
     }
     document.getElementById('compare-back-btn').addEventListener('click', closeCompare);
+    document.getElementById('component-open-btn').addEventListener('click', openComponent);
+    document.getElementById('component-back-btn').addEventListener('click', closeComponent);
+    document.getElementById('component-push-btn').addEventListener('click', pushComponentContract);
+    document.getElementById('component-compare-btn').addEventListener('click', compareComponentContract);
+    document.getElementById('component-link-btn').addEventListener('click', linkComponentContract);
+    document.getElementById('component-change-btn').addEventListener('click', changeComponentLink);
+    document.getElementById('component-unlink-btn').addEventListener('click', unlinkComponent);
 
     function openCompare(which) {
       which = which || activeRepoProvider();
@@ -7588,8 +8319,17 @@
           return e && (e.type === 'tree' || e.type === 'dir');
         }).map(function (e) { return e.path; });
         folders.sort();
+        /* THE SAME TREE ALREADY HELD THE FILES. This call is recursive and
+           returns everything; the folder list was a filter over it. Keeping
+           the files costs one more filter and no second request, and it is
+           what lets somebody find a contract that already exists rather than
+           guessing at the path a previous push chose. */
+        var files = rows.filter(function (e) {
+          return e && (e.type === 'blob' || e.type === 'file');
+        }).map(function (e) { return e.path; });
+        files.sort();
         repoFolderCache = {
-          key: key, folders: folders,
+          key: key, folders: folders, files: files,
           truncated: !Array.isArray(body) && !!(body && body.truncated),
         };
         return repoFolderCache;
@@ -8017,7 +8757,14 @@
     }
 
     function encodeContent(tokens) {
-      return btoa(unescape(encodeURIComponent(JSON.stringify(tokens, null, 2))));
+      return encodeText(JSON.stringify(tokens, null, 2));
+    }
+    /* The same encoding, given text that is already exactly what should land in
+       the file. A component contract is serialised by its own module — its key
+       order is the thing that makes it diffable — so re-stringifying the parsed
+       object here would quietly undo that. */
+    function encodeText(text) {
+      return btoa(unescape(encodeURIComponent(text)));
     }
 
     /*
@@ -8046,13 +8793,14 @@
       Both hosts are already in manifest.json's allowedDomains. A self-hosted
       GitLab is not, and needs adding there — the manifest's own note says so.
     */
-    function fetchGitLabFile() {
+    /* `atPath` as in fetchGitHubFile below. */
+    function fetchGitLabFile(atPath) {
       var c = gitlabConfig();
       if (!c.token || !c.project) return Promise.reject({ message: 'GitLab is not configured' });
       var host = c.host.replace(/\/+$/, '');
       /* repoFilePath, not the push name: this is the file being READ, which
          the repo card picks and which need not be the one we write. */
-      var filePath = repoFilePath('gitlab');
+      var filePath = atPath || repoFilePath('gitlab');
       var url = host + '/api/v4/projects/' + encodeURIComponent(c.project) +
                 '/repository/files/' + encodeURIComponent(filePath) +
                 '/raw?ref=' + encodeURIComponent(c.branch);
@@ -8066,13 +8814,18 @@
         .then(function (text) { return { text: text, where: 'GitLab ' + filePath + ' @ ' + c.branch }; });
     }
 
-    function fetchGitHubFile() {
+    /* `atPath` reads a file this plugin addresses some other way — a component
+       contract lives beside its component, not at the token export's address —
+       and absent it reads exactly what it always has. The pair with pushGitHub's
+       `what` is deliberate: one reader and one writer per provider, so "where
+       we put it" and "what is in the repo" cannot drift apart. */
+    function fetchGitHubFile(atPath) {
       var c = githubConfig();
       if (!c.token || !c.repo) return Promise.reject({ message: 'GitHub is not configured' });
       var parts = c.repo.split('/');
       if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
       /* The READ address — see fetchGitLabFile above. */
-      var filePath = repoFilePath('github');
+      var filePath = atPath || repoFilePath('github');
       var url = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
                 encodeURIComponent(parts[1]) + '/contents/' +
                 filePath.split('/').map(encodeURIComponent).join('/') +
@@ -8092,15 +8845,18 @@
     }
 
     // Push to GitLab (incl. self-hosted). Returns a promise; no button UI here.
-    function pushGitLab(tokens) {
+    /* `what` as in pushGitHub: absent for the token export, present for a
+       component contract, one writer either way. */
+    function pushGitLab(tokens, what) {
+      what = what || {};
       var c = gitlabConfig();
       if (!c.token || !c.project) return Promise.reject({ message: 'GitLab not configured' });
 
       var host = c.host.replace(/\/+$/, '');
-      var filePath = composeFilePath(c.folder, c.filename);
-      var commitMsg = document.getElementById('commit-message').value.trim();
+      var filePath = what.path || composeFilePath(c.folder, c.filename);
+      var commitMsg = what.message || document.getElementById('commit-message').value.trim();
       if (!commitMsg) return Promise.reject({ message: 'Commit message is required' });
-      var content = encodeContent(tokens);
+      var content = what.text ? encodeText(what.text) : encodeContent(tokens);
       // Project id/path and file path must be URL-encoded (slashes -> %2F).
       var base = host + '/api/v4/projects/' + encodeURIComponent(c.project) +
                  '/repository/files/' + encodeURIComponent(filePath);
@@ -8263,7 +9019,24 @@
     // Push to GitHub. Contents API uses PUT for both create and update —
     // whether the body includes `sha` is what decides which (a fetched
     // sha means the file already exists on this branch; 404 = create).
-    function pushGitHub(tokens) {
+    /*
+      `what` IS THE FILE, and every field of it is optional.
+
+      Without it this pushes the token export to the configured path with the
+      commit message from the field — what it has always done, and what every
+      existing caller still gets. With it, the same function writes a different
+      file to a different address: the component contract, whose bytes and path
+      are decided by its own module.
+
+      ONE WRITER, NOT TWO. Everything difficult here is difficult for any file:
+      the sha lookup that decides create-from-update, the two size ceilings and
+      the fallback between them, the error reading that turns a GitHub response
+      into a sentence. A second push would be a second place for all of it to be
+      subtly wrong, and the wrongness would surface the day a contract failed to
+      write for a reason the token push had solved a year earlier.
+    */
+    function pushGitHub(tokens, what) {
+      what = what || {};
       var c = githubConfig();
       if (!c.token || !c.repo) return Promise.reject({ message: 'GitHub not configured' });
       // Exactly two segments — `owner/repo/anything` is a typo, not a repo we
@@ -8271,10 +9044,10 @@
       var parts = c.repo.split('/');
       if (parts.length !== 2 || !parts[0] || !parts[1]) return Promise.reject({ message: 'GitHub repo must be owner/repo' });
 
-      var filePath = composeFilePath(c.folder, c.filename);
-      var commitMsg = document.getElementById('commit-message').value.trim();
+      var filePath = what.path || composeFilePath(c.folder, c.filename);
+      var commitMsg = what.message || document.getElementById('commit-message').value.trim();
       if (!commitMsg) return Promise.reject({ message: 'Commit message is required' });
-      var json = JSON.stringify(tokens, null, 2);
+      var json = what.text || JSON.stringify(tokens, null, 2);
       var apiUrl = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
                    encodeURIComponent(parts[1]) + '/contents/' + filePath.split('/').map(encodeURIComponent).join('/');
       var headers = { 'Authorization': 'token ' + c.token, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' };
@@ -8296,7 +9069,12 @@
         var blobBody = blobPayload(json);
         /* Readable beats compact right up until readable cannot be pushed. */
         if (byteLength(blobBody) > BLOB_API_MAX) {
-          json = JSON.stringify(tokens);
+            /* Compacting is a token-export remedy: that document is one large
+               object whose whitespace is the only thing that can go. A contract
+               is already as short as its own serialiser makes it, and
+               re-stringifying would destroy the key order that makes it
+               diffable — so one too large to push says so instead. */
+            json = what.text ? json : JSON.stringify(tokens);
           blobBody = blobPayload(json);
           if (byteLength(blobBody) > BLOB_API_MAX) {
             return Promise.reject({ message:
@@ -8308,7 +9086,7 @@
         }
         return pushGitHubLarge(parts, c, filePath, json, commitMsg, headers, readErr, blobBody);
       }
-      var content = encodeContent(tokens);
+      var content = what.text ? encodeText(json) : encodeContent(tokens);
 
       // Look up the file's current sha (needed to update it); 404 = doesn't
       // exist yet = create (no sha in the write body).

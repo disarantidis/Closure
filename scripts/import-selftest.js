@@ -3893,7 +3893,11 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
           let posted = null;
           const quiet = () => {};
           const figma = {
-            showUI: quiet, root: { name: 'Stub' }, currentPage: {},
+            showUI: quiet, root: { name: 'Stub' },
+            /* The sandbox registers a selectionchange watcher at load and asks
+               once immediately, so the stub has to answer both — an empty page
+               is a perfectly good answer and is what this harness means. */
+            on: quiet, currentPage: { selection: [] },
             clientStorage: { getAsync: async () => null, setAsync: async () => {} },
             getLocalTextStyles: () => [], getLocalEffectStyles: () => [],
             variables: { getLocalVariableCollectionsAsync: async () => collections,
