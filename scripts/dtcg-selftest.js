@@ -40,6 +40,7 @@ function loadPluginCode() {
       fixLayoutColumnTypes: fixLayoutColumnTypes,
       validateReferenceClosure: validateReferenceClosure,
       completeThemeSelections: completeThemeSelections,
+      defaultModeSetNames: defaultModeSetNames,
     };
   `;
   return new Function('figma', 'console', '__html__', src + expose)(figmaStub, quietConsole, '');
@@ -413,6 +414,49 @@ function run() {
   const pulled = wout.$themes[0].selectedTokenSets;
   check('completeThemeSelections pulls in the "weight" set a theme\'s own tokens reference',
     pulled['weight/light'] === 'source' || pulled['weight/regular'] === 'source' || pulled['weight/bold'] === 'source');
+
+  /*
+    WHICH of those three, when the theme itself does not say (2026-11-13).
+
+    Figma's plugin API cannot reorder modes, so a collection reports them in
+    creation order and its default can sit anywhere inside. Pomegranate
+    Identity's `weight` lists `regular` first and defaults to `light`. Picking
+    the earliest set in tokenSetOrder therefore shipped weight/regular, and
+    every reading-text weight came out 400 where the file says 300.
+  */
+  const orderedRegularFirst = () => ({
+    'weight/regular': weightSet(400, 'Regular'),
+    'weight/light': weightSet(300, 'Light'),
+    'weight/bold': weightSet(700, 'Bold'),
+    uses: { label: { 'style-name': { value: '{weight.style-name}', type: 'string' } } },
+    $themes: [{ id: 't1', name: 'only', selectedTokenSets: { uses: 'enabled' } }],
+    $metadata: { tokenSetOrder: ['weight/regular', 'weight/light', 'weight/bold', 'uses'] },
+  });
+
+  const wDefault = orderedRegularFirst();
+  plugin.completeThemeSelections(wDefault, { 'weight/light': true });
+  const byDefault = wDefault.$themes[0].selectedTokenSets;
+  check('the tie goes to the collection\'s DEFAULT mode, not the first set in order',
+    byDefault['weight/light'] === 'source' && byDefault['weight/regular'] === undefined);
+
+  const wNoHint = orderedRegularFirst();
+  plugin.completeThemeSelections(wNoHint);
+  check('with no default named, document order still breaks the tie',
+    wNoHint.$themes[0].selectedTokenSets['weight/regular'] === 'source');
+
+  // The map that feeds it, read off the collections Figma handed over.
+  const names = plugin.defaultModeSetNames({
+    collections: [
+      { name: 'weight', defaultModeId: 'm2',
+        modes: [{ modeId: 'm1', name: 'regular' }, { modeId: 'm2', name: 'light' }] },
+      { name: '.mode', defaultModeId: 'd1',
+        modes: [{ modeId: 'd1', name: 'light' }, { modeId: 'd2', name: 'dark' }] },
+      { name: 'foundation', defaultModeId: 'f1', modes: [{ modeId: 'f1', name: 'foundation' }] },
+    ],
+  });
+  check('the default-mode map names the default set, strips the helper dot, and keeps a single-mode collection bare',
+    names['weight/light'] === true && names['weight/regular'] === undefined &&
+    names['mode/light'] === true && names['foundation'] === true);
 }
 
 try {

@@ -2225,11 +2225,53 @@ function buildCoreElevationReference() {
 
   Where several sets define the same path they are the modes of one collection
   (the four restriction modes all define restrictions.*), and nothing in the
-  theme says which to take. The tie goes to the earliest in tokenSetOrder,
-  which is built in collection-then-mode order — so this picks the
-  collection's first mode, the one Figma itself falls back to.
+  theme says which to take. The tie goes to the collection's DEFAULT mode —
+  the one Figma itself falls back to — and only to the earliest set in
+  tokenSetOrder when no candidate is a default.
+
+  It used to go to the earliest set outright, on the reasoning that
+  tokenSetOrder is built in collection-then-mode order and so names the first
+  mode, "the one Figma itself falls back to". The first mode is not that one.
+  Figma's plugin API cannot reorder modes, so a collection whose default was
+  changed after it was built reports its modes in creation order with the
+  default somewhere inside — on Pomegranate Identity `weight` lists `regular`
+  first and defaults to `light`, and every theme that reached into it was
+  completed with weight/regular. Seven tokens came out one step too heavy
+  (400 where the file says 300), and every reading-text style with them.
+
+  `defaults` maps a set name to true for each collection's default mode. It is
+  optional: called without it this falls back to the old ordering, which is
+  what the unit tests that build a tree by hand still do.
 */
-function completeThemeSelections(out) {
+/*
+  THE SET NAME OF EVERY COLLECTION'S DEFAULT MODE.
+
+  Named the way the pass-through builder names its sets — "collection/mode"
+  with the leading "." or "_" of a Figma helper collection stripped, and the
+  bare collection name for a single-mode collection, which is Figma's way of
+  saying the collection has no axis.
+
+  Both spellings are recorded rather than worked out from the tree, because
+  this runs before anything has looked at which sets actually exist: a name
+  that matches no set simply never comes up as a candidate.
+*/
+function defaultModeSetNames(rawData) {
+  var names = {};
+  if (!rawData || !rawData.collections) return names;
+  rawData.collections.forEach(function (c) {
+    var modes = c.modes || [];
+    if (!modes.length) return;
+    var def = modes.filter(function (m) { return m.modeId === c.defaultModeId; })[0] || modes[0];
+    var colName = stripIcons(c.name);
+    var base = colName.replace(/^[._]+/, '') || colName;
+    if (modes.length === 1) names[base] = true;
+    names[base + '/' + stripIcons(def.name).replace(/^[._]+/, '')] = true;
+  });
+  return names;
+}
+
+function completeThemeSelections(out, defaults) {
+  defaults = defaults || {};
   var themes = out['$themes'];
   if (!Array.isArray(themes) || !themes.length) return out;
 
@@ -2298,7 +2340,10 @@ function completeThemeSelections(out) {
         });
         if (!candidates.length) return;
         candidates.sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
-        var pick = candidates[0];
+        // A collection's default mode answers before its first one; the
+        // document order only breaks a tie nothing else can.
+        var preferred = candidates.filter(function (n) { return defaults[n]; });
+        var pick = preferred.length ? preferred[0] : candidates[0];
         if (active.indexOf(pick) !== -1) return;
         active.push(pick);
         added.push(pick);
@@ -2924,7 +2969,7 @@ function toTokenFormat(native, rawData) {
 
   // Runs last: every set is final here, so the closure it computes is the one
   // a consumer will actually validate against.
-  completeThemeSelections(out);
+  completeThemeSelections(out, defaultModeSetNames(rawData));
   reportUnhintedReferences(out);
   return out;
 }
