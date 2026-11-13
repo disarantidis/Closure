@@ -19,6 +19,9 @@ const variables = {
   'V:gutters': { id: 'V:gutters', name: 'grid/gutters', variableCollectionId: 'C:f' },
   'V:cols': { id: 'V:cols', name: 'breakpoint/stretch-grid/columns', variableCollectionId: 'C:b' },
   'V:colw': { id: 'V:colw', name: 'breakpoint/fixed-grid/column-width', variableCollectionId: 'C:b' },
+  'V:fill': { id: 'V:fill', name: 'colours/surface/raised', variableCollectionId: 'C:f' },
+  'V:alpha': { id: 'V:alpha', name: 'core-percentage/40', variableCollectionId: 'C:f' },
+  'V:stop': { id: 'V:stop', name: 'colours/base/black', variableCollectionId: 'C:f' },
 };
 const alias = (id) => ({ type: 'VARIABLE_ALIAS', id });
 const figmaMock = {
@@ -53,6 +56,30 @@ const figmaMock = {
     effects: [{ type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.30000001192092896 }, offset: { x: 0, y: 4 }, radius: 8, spread: 1,
                 visible: true, blendMode: 'NORMAL', showShadowBehindNode: false,
                 boundVariables: { color: alias('V:colour'), radius: alias('V:blur') } }],
+  }],
+  /* Shaped like the real file's eight "Gradient/*" styles: a two-stop linear
+     gradient, plus a solid whose colour and opacity are bound separately. */
+  getLocalPaintStylesAsync: async () => [{
+    id: 'S:5', name: 'Gradient/Fade out · down', description: 'edge fade',
+    paints: [{
+      type: 'GRADIENT_LINEAR', visible: true, blendMode: 'NORMAL', opacity: 1,
+      gradientTransform: [[1, 0, 0], [0, 1, 0.5000000596046448]],
+      gradientStops: [
+        { position: 0, color: { r: 0, g: 0, b: 0, a: 0 }, boundVariables: {} },
+        { position: 1, color: { r: 0, g: 0, b: 0, a: 1 }, boundVariables: { color: alias('V:stop') } },
+      ],
+      boundVariables: {},
+    }],
+  }, {
+    id: 'S:6', name: 'Surface/raised', description: '',
+    paints: [{
+      type: 'SOLID', visible: true, blendMode: 'NORMAL',
+      color: { r: 1, g: 1, b: 1 }, opacity: 0.4000000059604645,
+      boundVariables: { color: alias('V:fill'), opacity: alias('V:alpha') },
+    }],
+  }, {
+    id: 'S:7', name: 'Texture/paper', description: '',
+    paints: [{ type: 'IMAGE', visible: true, blendMode: 'NORMAL', scaleMode: 'FILL', imageHash: 'abc123', boundVariables: {} }],
   }],
 };
 
@@ -108,6 +135,43 @@ async function ok(name, fn) {
     assert.ok(!('offset' in g.layoutGrids[1]));                       // a CENTER grid has a section size, not an offset
     assert.deepStrictEqual(g.layoutGrids[1].bound, { sectionSize: '.breakpoint::breakpoint/fixed-grid/column-width' });
   });
+  /* ── paint styles, which this plugin did not read at all until 2026-11-13.
+        Pomegranate Identity's eight "Gradient/Fade out · Edge fade" styles were
+        simply absent from every export, and a single colour could not have said
+        what they are. ──────────────────────────────────────────────────────── */
+  await ok('every paint style is read, with its id and name kept like the other kinds', async () => {
+    assert.deepStrictEqual(got.paintStyles.map((s) => [s.id, s.name, s.type]),
+      [['S:5', 'Gradient/Fade out · down', 'PAINT'], ['S:6', 'Surface/raised', 'PAINT'], ['S:7', 'Texture/paper', 'PAINT']]);
+    assert.strictEqual(got.paintStyles[0].description, 'edge fade');
+  });
+  await ok('a gradient keeps its stops and the transform that places them', async () => {
+    const p = got.paintStyles[0].paints[0];
+    assert.strictEqual(p.type, 'GRADIENT_LINEAR');
+    assert.deepStrictEqual(p.gradientTransform, [[1, 0, 0], [0, 1, 0.5]]);   // float noise rounded
+    assert.deepStrictEqual(p.gradientStops[0], { position: 0, color: [0, 0, 0, 0] });
+  });
+  await ok('a gradient stop names its own bound variable', async () => {
+    assert.deepStrictEqual(got.paintStyles[0].paints[0].gradientStops[1].bound,
+      { color: 'foundation::colours/base/black' });
+  });
+  await ok('a solid binds colour and opacity separately, and its RGB reads as opaque', async () => {
+    const p = got.paintStyles[1].paints[0];
+    assert.deepStrictEqual(p.color, [1, 1, 1, 1]);          // a paint's colour is RGB; alpha is its opacity
+    assert.strictEqual(p.opacity, 0.4);
+    assert.deepStrictEqual(p.bound, { color: 'foundation::colours/surface/raised', opacity: 'foundation::core-percentage/40' });
+  });
+  await ok('an image paint is identified but its bytes are not read', async () => {
+    const p = got.paintStyles[2].paints[0];
+    assert.deepStrictEqual([p.type, p.scaleMode, p.imageHash], ['IMAGE', 'FILL', 'abc123']);
+    assert.ok(!('color' in p) && !('gradientStops' in p));
+  });
+  await ok('a Plugin API without paint styles reads none rather than failing', async () => {
+    const noPaint = Object.assign({}, figmaMock); delete noPaint.getLocalPaintStylesAsync;
+    const r = await S.capture(noPaint);
+    assert.deepStrictEqual(r.paintStyles, []);
+    assert.strictEqual(r.textStyles.length, 2);
+  });
+
   await ok('a Plugin API without grid styles reads none rather than failing', async () => {
     const noGrid = Object.assign({}, figmaMock); delete noGrid.getLocalGridStylesAsync;
     const r = await S.capture(noGrid);

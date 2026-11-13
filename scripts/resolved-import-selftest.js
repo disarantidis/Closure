@@ -174,6 +174,20 @@ const STYLES = {
       type: 'DROP_SHADOW', visible: true, blendMode: 'NORMAL', color: [0, 0, 0, 0.13], offset: { x: 0, y: 4 }, radius: 8, spread: 1,
       bound: { color: 'foundation::Elevation/Level-1/Colour', offsetX: 'foundation::elevation/level-1/x' } }] },
   ],
+  /* Read since 2026-11-13. A gradient's stop binds a variable of its own, so
+     the lowercasing has to reach inside the stop list too, not just the
+     paint's own `bound`. */
+  paintStyles: [
+    { id: 'S:5', name: 'Gradient/Fade Out', type: 'PAINT', description: '', paints: [{
+      type: 'GRADIENT_LINEAR', visible: true, blendMode: 'NORMAL', opacity: 1,
+      gradientTransform: [[1, 0, 0], [0, 1, 0.5]],
+      gradientStops: [
+        { position: 0, color: [0, 0, 0, 0] },
+        { position: 1, color: [0, 0, 0, 1], bound: { color: 'foundation::Colours/Base/Black' } },
+      ],
+      bound: {} }] },
+    { id: 'S:8', name: 'only an id and a name', type: 'PAINT' },
+  ],
 };
 const exported = E.document(clean, { hooks: { toDtcgFormat: D.toDtcgFormat }, restore: true, styles: STYLES });
 const exportedPlain = E.document(clean, { hooks: { toDtcgFormat: D.toDtcgFormat } });
@@ -391,6 +405,19 @@ ok('the definition is carried: font, decoration, values, the layer\'s shape', ()
   assert.deepStrictEqual(r.text[0].fontName, { family: 'Inter', style: 'Bold' });
   assert.strictEqual(r.text[0].textDecoration, 'UNDERLINE');
   assert.deepStrictEqual(r.effect[0].effects[0].offset, { x: 0, y: 4 });
+});
+ok('a paint style is recorded as its list of paints, and an id-and-name entry still is not', () => {
+  const r = doc.$extensions[NS_].restore.styles;
+  assert.deepStrictEqual(r.paint.map((p) => p.name), ['Gradient/Fade Out']);
+  const p = r.paint[0].paints[0];
+  assert.strictEqual(p.type, 'GRADIENT_LINEAR');
+  assert.deepStrictEqual(p.gradientTransform, [[1, 0, 0], [0, 1, 0.5]]);
+  assert.strictEqual(p.gradientStops.length, 2);
+});
+ok('a gradient stop\'s bound variable is lowercased like every other binding', () => {
+  const stops = doc.$extensions[NS_].restore.styles.paint[0].paints[0].gradientStops;
+  assert.deepStrictEqual(stops[1].bound, { color: 'foundation::colours/base/black' });
+  assert.ok(!('bound' in stops[0]));   // an unbound stop is not given an empty one
 });
 ok('the translator reads the styles back, with every binding resolved to a variable that will exist', () => {
   const st = rt.t.ir.styles;

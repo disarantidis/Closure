@@ -3796,6 +3796,9 @@ function handle_extract(msg) {
         }),
         gridStyles: (figma.getLocalGridStyles ? figma.getLocalGridStyles() : []).map(function(style) {
           return { id: style.id, name: style.name, type: 'GRID' };
+        }),
+        paintStyles: (figma.getLocalPaintStyles ? figma.getLocalPaintStyles() : []).map(function(style) {
+          return { id: style.id, name: style.name, type: 'PAINT' };
         })
       };
     };

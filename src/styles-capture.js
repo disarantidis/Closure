@@ -38,8 +38,17 @@
                      'lineHeight', 'paragraphSpacing', 'paragraphIndent'];
   var EFFECT_FIELDS = ['color', 'radius', 'spread', 'offsetX', 'offsetY'];
   var GRID_FIELDS = ['sectionSize', 'count', 'offset', 'gutterSize'];
+  /* A paint binds its colour, and can bind its own opacity separately — the
+     same two-variable shape the variable graph uses for a translucent fill. */
+  var PAINT_FIELDS = ['color', 'opacity'];
 
   function round4(n) { return typeof n === 'number' ? Math.round(n * 1e4) / 1e4 : n; }
+  /* [r,g,b,a]. A paint's own colour is RGB — its alpha lives in the paint's
+     `opacity` — while a gradient stop's is RGBA, so a missing alpha reads as
+     opaque rather than as undefined. */
+  function rgba(c) {
+    return [round4(c.r), round4(c.g), round4(c.b), c.a === undefined ? 1 : round4(c.a)];
+  }
   function unitValue(x) {
     if (!x || typeof x !== 'object') return x;
     var o = { unit: x.unit };
@@ -139,18 +148,79 @@
       });
     }
 
+    /*
+      A PAINT STYLE, which until now this plugin did not read at all.
+
+      A fill is a LIST of paints, each solid, a gradient, or an image, so the
+      style is kept as that list rather than flattened to one colour: the eight
+      "Gradient/Fade out · Edge fade" styles of a real file (Pomegranate
+      Identity) are two-stop linear gradients and a single colour cannot say
+      what they are.
+
+      Each paint carries what its own type uses and nothing else — a solid has
+      a colour, a gradient has its stops and the transform that places them, an
+      image has a scale mode and a hash. A gradient stop can bind a variable of
+      its own, so a stop is named the same way a paint is.
+
+      An image's bytes are NOT read. `imageHash` identifies it inside this file
+      and is worth recording; the pixels are not a design token and would be
+      megabytes in a JSON.
+    */
+    function readPaintLayer(p) {
+      var stopWork = (p.gradientStops || []).map(function (st) {
+        return nameAll(st.boundVariables, ['color']).then(function (bound) {
+          var o = { position: round4(st.position) };
+          if (st.color) o.color = rgba(st.color);
+          if (Object.keys(bound).length) o.bound = bound;
+          return o;
+        });
+      });
+      return Promise.all([
+        nameAll(p.boundVariables, PAINT_FIELDS),
+        Promise.all(stopWork)
+      ]).then(function (parts) {
+        var o = { type: p.type, visible: p.visible !== false,
+                  blendMode: p.blendMode || 'NORMAL', bound: parts[0] };
+        if (p.opacity !== undefined) o.opacity = round4(p.opacity);
+        if (p.color) o.color = rgba(p.color);
+        if (parts[1].length) o.gradientStops = parts[1];
+        if (Array.isArray(p.gradientTransform)) {
+          o.gradientTransform = p.gradientTransform.map(function (row) {
+            return Array.isArray(row) ? row.map(round4) : row;
+          });
+        }
+        if (p.scaleMode !== undefined) o.scaleMode = p.scaleMode;
+        if (p.imageHash !== undefined) o.imageHash = p.imageHash;
+        return o;
+      });
+    }
+
+    function readPaint(s) {
+      return Promise.all((s.paints || []).map(readPaintLayer)).then(function (paints) {
+        return { id: s.id, name: s.name, type: 'PAINT',
+                 description: s.description || '', paints: paints };
+      });
+    }
+
+    /* Guarded like the grid getter: a Plugin API without it yields no paint
+       styles rather than failing the whole read. */
+    var paintList = figmaApi.getLocalPaintStylesAsync
+      ? figmaApi.getLocalPaintStylesAsync() : [];
+
     return Promise.all([
       Promise.resolve(figmaApi.getLocalTextStylesAsync()),
       Promise.resolve(figmaApi.getLocalEffectStylesAsync()),
-      Promise.resolve(figmaApi.getLocalGridStylesAsync ? figmaApi.getLocalGridStylesAsync() : [])
+      Promise.resolve(figmaApi.getLocalGridStylesAsync ? figmaApi.getLocalGridStylesAsync() : []),
+      Promise.resolve(paintList)
     ]).then(function (lists) {
       return Promise.all([
         Promise.all(lists[0].map(readText)),
         Promise.all(lists[1].map(readEffect)),
-        Promise.all(lists[2].map(readGrid))
+        Promise.all(lists[2].map(readGrid)),
+        Promise.all(lists[3].map(readPaint))
       ]);
     }).then(function (all) {
-      return { textStyles: all[0], effectStyles: all[1], gridStyles: all[2] };
+      return { textStyles: all[0], effectStyles: all[1], gridStyles: all[2], paintStyles: all[3] };
     });
   }
 
@@ -164,9 +234,10 @@
   /*
     EVERY LOCAL STYLE, REMOVED — the cleanup that goes with deleting a file's
     variables, so an import can be run again into the same file. Only the kinds
-    this plugin reads and creates (text, effect, grid); a paint style is not
-    touched because nothing here makes one. A style that refuses is counted and
-    named, and does not stop the rest.
+    this plugin CREATES (text, effect, grid). A paint style is read now, but
+    still not written by any import, and deleting a style nothing here can put
+    back is destruction rather than cleanup. A style that refuses is counted
+    and named, and does not stop the rest.
   */
   function removeAll(figmaApi, kinds) {
     var result = { text: 0, effect: 0, grid: 0, failed: [] };

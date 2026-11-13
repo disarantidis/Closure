@@ -6459,7 +6459,7 @@
         var haveVars = (rawData.collections || []).some(function (c) { return (c.variables || []).length; });
         var haveStyles = rawData.styles &&
           (((rawData.styles.textStyles || []).length) + ((rawData.styles.effectStyles || []).length) +
-           ((rawData.styles.gridStyles || []).length)) > 0;
+           ((rawData.styles.gridStyles || []).length) + ((rawData.styles.paintStyles || []).length)) > 0;
         /* A file that already holds variables is UPDATED, not refused — see the
            check after compile: every collection the repo's file names must
            already exist here, or this would make a second copy. Styles are
@@ -9970,6 +9970,8 @@
         names: cols.map(function(c) { return c.name; }),
         list: cols.map(function(c) { return { name: c.name, variables: (c.variables || []).length }; }),
         fileName: lastFigmaFileName || 'this file',
+        /* text, effect, grid only — this summary feeds the CLEAR dialog, and a
+           paint style is read but never deleted (styles-capture.removeAll). */
         styles: { text: (st.textStyles || []).length, effect: (st.effectStyles || []).length, grid: (st.gridStyles || []).length },
         /* Which of the two this press is about. Absent, both are offered with
            styles unticked — what the collections list has always done. */

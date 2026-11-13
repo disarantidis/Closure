@@ -1887,11 +1887,38 @@
                  return o;
                }) };
     });
-    if (!text.length && !effect.length && !grid.length) return null;
+    /*
+      A paint style's fill is a LIST — solid, gradient, image — so it is kept
+      as one, and a gradient stop's own bound variable is named like any other.
+      Recorded for the same reason the other three are: it is what the file
+      holds. No import writes a paint style yet, so this is a record, not a
+      round trip, and restore-slim.js is what will say so when one does.
+    */
+    var paint = (styles.paintStyles || []).filter(function (s) { return s && s.paints; }).map(function (s) {
+      return { name: s.name, description: s.description || '',
+               paints: s.paints.map(function (p) {
+                 var o = {};
+                 Object.keys(p).forEach(function (k) {
+                   if (k === 'bound') { o.bound = low(p.bound); return; }
+                   if (k === 'gradientStops') {
+                     o.gradientStops = p.gradientStops.map(function (st) {
+                       var q = {};
+                       Object.keys(st).forEach(function (f) { q[f] = f === 'bound' ? low(st.bound) : st[f]; });
+                       return q;
+                     });
+                     return;
+                   }
+                   o[k] = p[k];
+                 });
+                 return o;
+               }) };
+    });
+    if (!text.length && !effect.length && !grid.length && !paint.length) return null;
     var out = {};
     if (text.length) out.text = text;
     if (effect.length) out.effect = effect;
     if (grid.length) out.grid = grid;
+    if (paint.length) out.paint = paint;
     return out;
   }
 
