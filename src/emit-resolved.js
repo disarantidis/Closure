@@ -589,12 +589,61 @@
 
     var typeOf = deriveTypes(index, plans, options);
 
+    function isAliasValue(value) {
+      return !!value && typeof value === 'object' && value.type === 'VARIABLE_ALIAS';
+    }
+
+    /*
+      An alias names its target by Figma's internal id ("VariableID:35:111"),
+      which means nothing outside the file it came from. Written out as it
+      stands it is unreadable and unresolvable — so say the target's NAME
+      instead, the same spelling refOrValue() uses.
+
+      The immediate target, not the terminal one: a -> b -> c keeps `a: {b}`,
+      because that is the link the file actually holds and the link a consumer
+      has to follow to see a change in b. Flattening to {c} is what loses it.
+
+      Returns null when the target isn't a primitive — an alias pointing out of
+      the core layer has no {core.*} spelling, and the caller falls back to the
+      resolved literal.
+    */
+    function refToTarget(id) {
+      var target = index.varsById[id];
+      if (!target) return null;                       // another library: not in this extraction
+      var tc = index.collectionOfVar[target.id];
+      if (!tc || !isPrimitive[tc.name]) return null;
+      return '{' + coreGroup + '.' + dotted(target.name) + '}';
+    }
+
     function fmt(value) {
       if (value && typeof value === 'object' && value.r !== undefined && hooks.formatValue) {
         return hooks.formatValue(value, 'COLOR');
       }
       if (typeof value === 'number' && hooks.formatFloatForExport) {
         return hooks.formatFloatForExport(value);
+      }
+      if (isAliasValue(value)) {
+        return refToTarget(value.id) || value;
+      }
+      /*
+        A composite cell: a colour bound through one variable with its opacity
+        bound through a second ({ color: {…}, opacity: {…} }). Figma has no
+        single value for it, so each part is its own alias and each part has to
+        be named separately. Seen on Pomegranate Identity across elevation
+        shadows, gradients and "glass" materials.
+      */
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        var parts = Object.keys(value);
+        var anyAlias = parts.some(function (k) { return isAliasValue(value[k]); });
+        if (anyAlias) {
+          var out = {};
+          parts.forEach(function (k) {
+            out[k] = isAliasValue(value[k])
+              ? (refToTarget(value[k].id) || value[k])
+              : fmt(value[k]);
+          });
+          return out;
+        }
       }
       return value;
     }
@@ -616,7 +665,20 @@
     primitiveNames.forEach(function (name) {
       var coll = index.collsByName[name];
       if (!coll) return;
-      var modeId = (coll.modes[0] || {}).modeId;
+      /*
+        The collection's DEFAULT mode, not its first. Today these are the same
+        answer: a collection with more than one mode is an axis and is emitted
+        per mode, so what reaches this loop is single-mode and its default IS
+        modes[0]. Kept because the rule, not the coincidence, is what is meant
+        here — Figma's plugin API cannot reorder modes, so the two part company
+        the moment a primitive collection grows a second one, and that is a
+        silently wrong value rather than a crash. resolve-architecture's
+        modeIdFor() has always read it this way; this was the one place that
+        spelled it differently.
+      */
+      var modeId = coll.defaultModeId !== undefined
+        ? coll.defaultModeId
+        : (coll.modes[0] || {}).modeId;
       var tree = {};
       (coll.variables || []).forEach(function (v) {
         setDeep(tree, v.name, tokenNode(fmt(v.valuesByMode[modeId]), typeOf(v), v.description));

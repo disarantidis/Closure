@@ -15,6 +15,7 @@
     "import:plan": "node scripts/import-plan.js",
     "component:selftest": "node scripts/component-selftest.js",
     "resolved:selftest": "node scripts/resolved-selftest.js",
+    "primitive-values:selftest": "node scripts/primitive-values-selftest.js",
     "parity:selftest": "node scripts/parity-selftest.js",
     "studio-link:selftest": "node scripts/studio-link-selftest.js",
     "resolved-import:selftest": "node scripts/resolved-import-selftest.js",
