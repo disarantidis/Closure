@@ -1,7 +1,9 @@
 # DTCG output format
 
-Closure can export **DTCG** ([design-tokens.org](https://tr.designtokens.org/format/))
-instead of its default token JSON — toggle **Settings → Output format**.
+Closure exports **DTCG** ([design-tokens.org](https://tr.designtokens.org/format/)).
+Settings → **W3C DTCG** has one choice left, the **Resolved** switch (see
+[The resolved shape](#the-resolved-shape)); the Legacy JSON tree is the
+intermediate this conversion runs over, no longer an output.
 
 ## Where it sits
 
@@ -71,11 +73,10 @@ npm run dtcg:selftest                   # format / description-dedupe / file-nam
 
 ## The resolved shape
 
-Settings → **Output format** offers three: Legacy JSON, W3C DTCG, and
-**Resolved**. Each writes its own file name (`tokens.json`,
-`tokens_dtcg.json`, `tokens_resolved.json`) so switching never overwrites the
-previous one. The same shape is also reachable from the CLI as
-`--shape resolved`, described below.
+The export is always W3C DTCG. Settings → **W3C DTCG** has one card, the
+**Resolved** switch: off writes one document per theme (`tokens_dtcg.json`), on
+writes this shape (`tokens_resolved.json`). The same shape is also reachable
+from the CLI as `--shape resolved`, described below.
 
 Where the three shapes above mirror how a file is *authored* (one document per
 collection x mode, alias hops kept as cross-document references), this one
@@ -223,6 +224,104 @@ typed by whatever happens to consume it — so a plain number consumed through a
 effect slot propagates as a dimension. Where a house document says otherwise,
 `typeHints` states it and wins; inference only fills silence. (`shadows/` and
 `grids/` in the example config are exactly this case.)
+
+## What a resolved document says about itself
+
+**Four roots.** `core` (primitives), `foundation` (the semantic layer, written
+once), `breakpoint.<breakpoint>` and `mode.<mode>.<scheme>`. Every name is
+lowercase. A `foundation` token aliases its default context (the first scheme,
+the light mode, the first breakpoint) and carries
+`$extensions["com.desquared.radd"] = { layer, path }` to re-target itself:
+`layer: "scheme"` resolves to `mode.<mode>.<scheme>.<path>`, `layer:
+"breakpoint"` to `breakpoint.<breakpoint>.<path>`. A token that varies with no
+axis (radius, strokes, component sizes) is a plain alias of `core` or a literal
+and has no such extension.
+
+**The root metadata**, under the same namespace: `modes`, `schemes`,
+`modeIndependentSchemes`, `accentSchemes`, `foundationDefaults` and
+`foundationContext`. It is what lets a reader recognise the shape without a file
+name.
+
+**No build stamp.** A resolved document carries no `com.closure` or
+`$figmaStructure`; the import tells it apart by `foundationDefaults`.
+
+### The `restore` section
+
+Always written, as the last key of the metadata, and small: **what the
+architecture's rules cannot say, and nothing else.** It is read-only and
+advisory — nothing in it is a token — and an import that does not find it still
+rebuilds the file, from the rules.
+
+The rules (`src/architecture-radd.js`, applied by `src/import-resolved.js`)
+already make the variables, their scopes, the text and effect styles, the grid
+style, the underline of the Link styles, the upper-case `FAB` and the one link
+whose variable has another name. So the section holds only the difference
+between that and the file it came from (`src/restore-slim.js` computes it, in
+the plugin panel, on the finished document):
+
+| key | holds |
+|---|---|
+| `architecture` | `{ id, version }`, when the file's collections are the RADD Foundations architecture |
+| `styles.patches` | per style name, only the fields that differ from what the rules make from this document — a `bound` entry of `null` means that field is not bound |
+| `styles.added` / `styles.removed` | a style the rules would not make, and one they would make that the file does not have |
+| `scopes` | only the variables whose scopes are not the rule's |
+| `links` | only the renames that are not the architecture's own |
+
+On the RADD file the full record was 37 KB; the section is now about 350 bytes
+(three text styles bound to a variable the convention would not pick), and the
+document imports to the same variables, scopes and styles.
+
+Because it is a difference, **the document's own values win.** A font size
+changed in Tokens Studio since the export is the new size on import; the section
+only says how a style differs *in kind* (a field left unbound, bound to another
+scale).
+
+Older files carry the full record — `collections`, `scopes`, `links`,
+`synthesized` and `styles` as lists of definitions — and are still read.
+
+## Importing a resolved export
+
+A resolved document has had its routing evaluated away, so it cannot be
+*measured* back into collections. It can be *rebuilt*, because the architecture
+is regular: `src/architecture-radd.js` holds the rules (collection names, modes,
+which palette each scheme and light/dark reads, the `_restricted` permission
+layer, creation order) and `src/import-resolved.js` lays the document's leaves
+back into that chain — core, the four palettes, `_restricted`, `.mode`,
+`.scheme`, `.breakpoint`, `foundation`, `layout` — as rows the ordinary import
+pipeline compiles and applies.
+
+**Any other layering** is rebuilt from `$extensions["com.desquared.radd"].restore.structure`,
+the file's own graph (collections, modes, variables with type, scopes, description, code
+syntax and order, every cell as an alias by name or a literal, and the styles), written by
+the exporter when Restore data is on. It is used only when neither built-in rule set
+recognises the document, and reads nothing of the token tree. Aliases to library variables,
+extended-collection inheritance and empty collections are not part of it. See the README.
+
+Measured on the RADD file: 11 collections, 3,180 variables, 11,486 values;
+11,470 of the original's 11,481 values come back identical, every collection but
+two byte-identical, all 30 styles identical.
+
+What does not come back:
+
+- **Lower case.** Variable names are lowercase, except the five core groups the
+  per-theme export looks up in camel case (`fontFamilies`, `fontSize`,
+  `fontWeights`, `paragraphSpacing`, `paragraphIndent`), which get their capitals
+  back; without them that export reports their references as broken (style names, from
+  `restore.styles`, keep their capitals).
+- **`FONT_VARIATIONS`.** Figma reports the scope but refuses to write it; it is
+  left out and counted.
+- **Ids.** Variables and styles are new ones.
+- **Links to a differently-named variable that two tokens share.** They come
+  back named after the token that reads them, the way the reference document
+  names them.
+- **Quirks of the original that the rules would not choose.** A text style
+  bound to another scale's variable, or a field left unbound, is only restored
+  from the `restore` section; without it the style is bound the way the
+  convention says.
+
+Into an empty file only: the import refuses a file that already has variables or
+styles, and refuses before writing anything if a font a text style needs (Inter
+Bold, Medium) is not available.
 
 ## Diagnostics
 

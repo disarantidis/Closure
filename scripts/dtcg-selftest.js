@@ -38,6 +38,8 @@ function loadPluginCode() {
       toTokenFormat: toTokenFormat,
       fixBreakpointTypes: fixBreakpointTypes,
       fixLayoutColumnTypes: fixLayoutColumnTypes,
+      validateReferenceClosure: validateReferenceClosure,
+      completeThemeSelections: completeThemeSelections,
     };
   `;
   return new Function('figma', 'console', '__html__', src + expose)(figmaStub, quietConsole, '');
@@ -75,6 +77,64 @@ function rawDataFixture() {
             aliasInfo: {},
             codeSyntax: {},
             description: '',
+          },
+        ],
+      },
+    ],
+    styles: { textStyles: [], effectStyles: [] },
+  };
+}
+
+/*
+  A collection named without a leading dot ("weight"), two of whose variables
+  are "weight/value" and "weight/style-name" — the Pomegranate Identity file's
+  own shape, found 2026-11-13. A native-tree group for an undotted multi-mode
+  collection keeps the collection's own name on each variable
+  (normalizeVariableName only strips it for a ".foo" collection), so this
+  group comes out as `{ value: {...}, "style-name": {...} }`: an own property
+  literally called "value" sitting beside a sibling. `'value' in node` alone
+  mistakes that group for a leaf token and never visits "style-name" — the
+  regression this fixture pins. A second collection aliases "weight.style-name",
+  exactly as a typography scale in the real file does, so the closure check has
+  a reference to find broken or not.
+*/
+function weightLikeFixture() {
+  return {
+    collections: [
+      {
+        id: 'w1',
+        name: 'weight',
+        modes: [{ modeId: 'wm1', name: 'light' }, { modeId: 'wm2', name: 'regular' }, { modeId: 'wm3', name: 'bold' }],
+        variables: [
+          {
+            id: 'wv1', name: 'weight/value', type: 'FLOAT',
+            valuesByMode: { wm1: 300, wm2: 400, wm3: 700 },
+            resolvedValuesByMode: { wm1: 300, wm2: 400, wm3: 700 },
+            aliasInfo: {}, codeSyntax: {}, description: '',
+          },
+          {
+            id: 'wv2', name: 'weight/style-name', type: 'STRING',
+            valuesByMode: { wm1: 'Light', wm2: 'Regular', wm3: 'Bold' },
+            resolvedValuesByMode: { wm1: 'Light', wm2: 'Regular', wm3: 'Bold' },
+            aliasInfo: {}, codeSyntax: {}, description: '',
+          },
+        ],
+      },
+      {
+        id: 'u1',
+        name: 'uses',
+        modes: [{ modeId: 'um1', name: 'uses' }],
+        variables: [
+          {
+            id: 'uv1', name: 'label/style-name', type: 'STRING',
+            valuesByMode: { um1: { type: 'VARIABLE_ALIAS', id: 'wv2' } },
+            resolvedValuesByMode: { um1: 'Regular' },
+            /* What buildAliasPath computes for a non-dot collection: the
+               variable's own name, slashes turned to dots — no mode segment,
+               because the reference is by logical path, not by which mode set
+               is enabled (exactly like "scheme.basic.text" for `.scheme`). */
+            aliasInfo: { um1: { isAlias: true, aliasPath: 'weight.style-name', aliasedVarId: 'wv2', aliasedVarCollection: 'weight' } },
+            codeSyntax: {}, description: '',
           },
         ],
       },
@@ -311,6 +371,48 @@ function run() {
     typo.$type === 'typography' && Object.keys(typo.$value).length === 5);
   check('non-DTCG typography sub-values move to $extensions',
     !!typo.$extensions['com.closure.legacyJson'].typography.textCase);
+
+  // --- a variable literally named "value" beside a sibling (Pomegranate's "weight") ---
+  const wraw = weightLikeFixture();
+  const wnative = plugin.transformToFinalFormat(wraw, { includeDescriptions: true }).tokens;
+  check('the native tree really does nest an own "value" property beside a sibling',
+    wnative.weight && wnative.weight.regular &&
+    'value' in wnative.weight.regular.weight && 'style-name' in wnative.weight.regular.weight);
+
+  const wtokens = plugin.toTokenFormat(wnative, wraw);
+  const wclosure = plugin.validateReferenceClosure(wtokens);
+  check('closure: a reference into a "weight"-shaped group with a bare "value" sibling is not broken',
+    wclosure.ok && wclosure.brokenCount === 0);
+
+  const wdtcg = toDtcgFormat(wnative, { shape: 'sets' }).tokens;
+  const wset = wdtcg['weight/regular'] || wdtcg['weight.regular'] || wdtcg['weight']?.regular;
+  check('DTCG: both "value" and "style-name" survive the conversion as separate tokens',
+    !!wset && !!wset.weight && wset.weight.value && wset.weight.value.$type === 'number' &&
+    wset.weight['style-name'] && wset.weight['style-name'].$type === 'string');
+
+  // completeThemeSelections() (2026-11-13): found on Pomegranate Identity — a
+  // theme whose own tokens reference "weight.style-name" never pulled in any
+  // "weight/<mode>" set, because the SAME bare-"value"-property group fooled
+  // this function's own leaf check: at `{ weight: { value: {...}, "style-name":
+  // {...} } }` (the native shape a non-dot collection's "weight/value" and
+  // "weight/style-name" variables produce), the inner object has an own
+  // "value" property without being a token, so the whole group was recorded
+  // as defining just the path "weight" rather than "weight.value" and
+  // "weight.style-name" — no set ever looked like it provided the missing
+  // path, so the fixpoint closed with the reference still dangling.
+  const weightSet = (val, name) => ({ weight: { value: { value: val, type: 'number' }, 'style-name': { value: name, type: 'string' } } });
+  const wout = {
+    'weight/light': weightSet(300, 'Light'),
+    'weight/regular': weightSet(400, 'Regular'),
+    'weight/bold': weightSet(700, 'Bold'),
+    uses: { label: { 'style-name': { value: '{weight.style-name}', type: 'string' } } },
+    $themes: [{ id: 't1', name: 'only', selectedTokenSets: { uses: 'enabled' } }],
+    $metadata: { tokenSetOrder: ['weight/light', 'weight/regular', 'weight/bold', 'uses'] },
+  };
+  plugin.completeThemeSelections(wout);
+  const pulled = wout.$themes[0].selectedTokenSets;
+  check('completeThemeSelections pulls in the "weight" set a theme\'s own tokens reference',
+    pulled['weight/light'] === 'source' || pulled['weight/regular'] === 'source' || pulled['weight/bold'] === 'source');
 }
 
 try {

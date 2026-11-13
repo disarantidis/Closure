@@ -1,74 +1,44 @@
 # Plugin Theming
 
-Closure's UI is **dark-only** and built to the **Pomegranate
-(disarantidis_ReactJS)** design system — the vendored kit in
-`src/vendor/pomegranate` (`tokens.css`, `node.css`, and the components under
-`panel/node/`). There is no light/dark toggle.
+Closure's UI is painted by its own small kit in `src/ui-kit`
+(`tokens.css`, `kit.css`, `index.tsx`) — no external design system. The
+Settings header's toggle flips `<html data-theme>` between `dark` (the starting
+value) and `light`.
 
 ## How it works
 
-Two layers cooperate:
-
-1. **The Pomegranate components paint themselves.** Every control
-   (`Button`, `Switch`, `Checkbox`, `SegmentedControl`, `DropDownSelect`,
-   `Dialog`, `Toast`, `Alert`, `Accordion`, `Tag`, `Skeleton`, and the field
-   adapters) uses the kit's own `.nd-*` classes from `node.css`, which resolve
-   Pomegranate tokens (`--surface`, `--container-1..4`, `--text`, `--accent`,
-   `--stroke`, `--radius-*`, `--spacing-*`, …) defined in `tokens.css`. Both are
-   bundled into `ui.html` by `npm run ui:build`.
-
-2. **The plugin's own chrome** (header, panels, layout in
-   `src/ui.template.html`) uses a small set of `--app-*` variables that are
-   **aliased onto the Pomegranate tokens**, so the plugin's plain CSS and its
-   components always resolve to the same palette:
+1. **Tokens** (`src/ui-kit/tokens.css`) define the palette per theme, the
+   spacing / type / radius scales, and a four-rung **level ladder**.
+2. **Levels.** A surface says which rung it stands on with `data-level="1".."4"`.
+   That element re-declares `--background`, `--background-hover`,
+   `--background-pressed` and `--field-fill` for everything inside it, so a card
+   is just `<div data-level="4">` painting `background: var(--background)`.
+   Fields, tonal buttons and segmented tracks read `--field-fill`, which sits
+   one rung off the ground (and steps back from the top rung, so a field on a
+   card and a field on the page read alike).
+3. **Schemes.** `data-scheme="inverted"` flips the palette for a subtree (the
+   Figma card).
+4. **The plugin's own chrome** (`src/ui.template.html`) uses `--app-*` aliases
+   onto those tokens:
 
    ```css
    :root {
-     --app-bg:           var(--background);        /* the ground */
-     --app-surface:      var(--background);         /* resolves per data-level */
+     --app-bg:           var(--background);
+     --app-surface:      var(--background);
      --app-surface-soft: var(--background-hover);
      --app-border:       var(--stroke);
-     --app-border-strong:var(--stroke-subtle);
      --app-text:         var(--text);
      --app-text-muted:   var(--text-recessive);
-     --app-accent:       var(--accent);
-     /* … */
    }
    ```
 
-   ### Level composition
+   These resolve **once, on `:root`**. Anything that sets its own `data-level`
+   must paint `var(--background)` directly, not an alias.
 
-   Pomegranate has **one** fill name, `--background`, moved by `[data-level]`
-   islands (docs/knowledge-levels.md) — `--surface` / `--container-*` don't
-   exist. Closure's ground is the **darkest** rung:
+## Changing the look
 
-   ```html
-   <html data-theme="dark" data-mode="dark" data-level="1" data-surface="normal">
-   ```
+- Palette, spacing, type: `src/ui-kit/tokens.css`.
+- Component styling: `src/ui-kit/kit.css`.
+- Component behaviour and props: `src/ui-kit/index.tsx`.
 
-   `data-surface="normal"` is required alongside a level-1/3/4 ground — without
-   it the ground paints translucent ("the ground is never glass"; only the
-   default level-2 ground is solid without it). Every mounted React subtree in
-   `buttons.tsx` is wrapped in a `LevelContext.Provider value={1}` so the kit's
-   components compute their fill from that same ground. A field sits one rung
-   above its ground for free (`fieldLevel`), so fields read as level 2 with no
-   extra wiring; the collections `Accordion` sets `level={2}` explicitly to
-   read as the one raised card; dialogs are level 4.
-
-## Dark palette
-
-`<html data-theme="dark">` is set statically, which selects Pomegranate's dark
-values (`html[data-theme='dark']` in `tokens.css`): a `#1A1A1A` ground, warm
-neutral surfaces, and a **monochrome white accent**. Pomegranate's own light
-palette lives on bare `:root`, but nothing in this app switches to it.
-
-## Re-theming
-
-- To change the **palette**, edit the vendored `tokens.css` (or re-vendor it
-  from the kit) and `npm run ui:build`.
-- To change how the plugin's own chrome maps onto the palette, edit the
-  `:root { --app-* }` block in `src/ui.template.html`, then rebuild.
-- Component styling is the kit's — change it in `src/vendor/pomegranate/styles/node.css`.
-
-> `ui.html` is generated. Never hand-edit it; edit the sources and run
-> `npm run ui:build`.
+Then `npm run ui:build` to regenerate `ui.html` and `code.js`.

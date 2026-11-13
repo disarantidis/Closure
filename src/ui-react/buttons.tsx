@@ -3,91 +3,39 @@
   <span id="…-mount"> placeholders, and defines the window.Pom* bridges the
   template's vanilla JS drives them through.
 
-  DESIGN SYSTEM: this is the Pomegranate (disarantidis_ReactJS) build. Every
-  component below is the vendored Pomegranate kit (src/vendor/pomegranate),
-  no other kit anywhere. The window.Pom* bridge names and every rendered
-  element `id` are preserved verbatim, so ui.template.html's vanilla script keeps
-  working unchanged against the same contract.
+  COMPONENTS: every component below comes from this plugin's own small kit,
+  src/ui-kit (plain React + CSS, tokens in src/ui-kit/tokens.css). There is no
+  external design-system dependency. The window.Pom* bridge names and every
+  rendered element `id` are preserved verbatim, so ui.template.html's vanilla
+  script drives them through the same contract.
 
-  THE ONE ADAPTATION WORTH NAMING: Pomegranate's TextField/TextArea are
-  controlled (value/onChange) with an internal useId(), while the template drives
-  every git-config field UNCONTROLLED, by getElementById(id).value. So the text
-  inputs are rendered by thin adapters (PomTextField/PomTextArea) that paint the
-  DS's own field markup/classes (.nd-textfield-wrap / .nd-textfield, from
-  node.css) around a plain uncontrolled <input>/<textarea> carrying the caller's
-  id. The field still paints from the DS; the template still reads it by id.
+  THE ONE ADAPTATION WORTH NAMING: the template drives every git-config field
+  UNCONTROLLED, by getElementById(id).value, so the text inputs are the kit's
+  TextField / TextArea — a plain <input>/<textarea> carrying the caller's id,
+  inside the kit's field chrome (floating label, leading icon).
 */
-import { useState, useRef } from 'react';
+import { useState, useRef, Fragment } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 
-import { Button } from '../vendor/pomegranate/panel/node/Button';
-import { SegmentedControl } from '../vendor/pomegranate/panel/node/SegmentedControl';
-import { Checkbox } from '../vendor/pomegranate/panel/node/Checkbox';
-import { DropDownSelect } from '../vendor/pomegranate/panel/node/DropDownSelect';
-import { Combobox } from '../vendor/pomegranate/panel/node/Combobox';
-import { Dialog } from '../vendor/pomegranate/panel/node/Dialog';
-import { Toast } from '../vendor/pomegranate/panel/node/Toast';
-import { Alert } from '../vendor/pomegranate/panel/node/Alert';
-import { Skeleton } from '../vendor/pomegranate/panel/node/Skeleton';
-import { Tag } from '../vendor/pomegranate/panel/node/Tag';
-import { Table } from '../vendor/pomegranate/panel/node/Table';
-import { SelectableCard } from '../vendor/pomegranate/panel/node/SelectableCard';
-import { FileUploadItem } from '../vendor/pomegranate/panel/node/FileUploadItem';
-import { Spinner } from '../vendor/pomegranate/panel/node/Spinner';
-import { fieldLevel, useLevel, LevelContext, type Level } from '../vendor/pomegranate/panel/node/LevelContext';
+import {
+  Button, SegmentedControl, Checkbox, DropDownSelect, Combobox, Dialog, Toast, Alert, Skeleton, Tag, Table,
+  SelectableCard, FileUploadItem, Spinner, TextField, TextArea, type Level,
+} from '../ui-kit';
 
-/* The plugin GROUND is level 2 — bumped from 1 (the ladder's actual
-   darkest/base rung) so the plugin's own page background reads one step
-   more elevated, on request. <html data-level="2"> (ui.template.html) is
-   the DOM half of this same fact — the two values must move together, or
-   a control mounted here would compute a fill for a ground it isn't
-   actually standing on. Every mounted subtree is wrapped in a LevelContext
-   provider at the ground so the kit's components compute their fill ONE
-   rung above it (a field on the L2 ground is L3), per the composition
-   rule in docs/knowledge-levels.md. */
+/* SURFACE RUNGS. A mount's `level` names the rung of the surface it stands on
+   (1 lowest … 4 highest), mirroring the data-level the template puts on that
+   surface. Rendering reads data-level from the DOM, not this value — it is
+   kept as a named argument so a mount's call site says where it lives:
+   · GROUND      — the plugin page itself (<html data-level="2">)
+   · CARD_LEVEL  — controls inside a card (.provider-card, .export-panel …)
+   · TOP_CARD_LEVEL — the card surfaces themselves (level 4)
+   · SUBCARD_LEVEL  — controls inside a card inside a card (level 3) */
 const GROUND: Level = 2;
-/* Historically "one rung above the ground" and the band .provider-card /
-   .export-panel stood on directly (data-level="2" in the markup, back
-   when GROUND was 1) — both have since moved to data-level="4" (bumped
-   for contrast against the page; see their own comments), but the
-   fields/buttons mounted INSIDE them (gl-token, push-btn, etc.) still
-   pass this unchanged constant, and that's still correct: fieldLevel maps
-   grounds 2 AND 4 to the same field rung (3) by design — the ladder's own
-   top-rung clamp, see LevelContext.tsx — so nothing inside those cards
-   needed to change when either the cards or GROUND moved. Kept under its
-   original name/value since every one of those call sites already
-   expects it; it means "the rung fields inside a level-2-or-4 card
-   compute at" now, not literally "the level those cards paint at". */
 const CARD_LEVEL: Level = 2;
-/* The ladder's highest/most elevated rung — .json-download-card,
-   .export-panel and .provider-card all carry data-level="4" directly in
-   the markup now (bumped from 2 for contrast against the page — see
-   .json-download-card's own HTML comment). Only needed here for the two
-   skeletons that stand in for those cards while loading: recessLevel(2)
-   and recessLevel(4) are NOT the same rung (unlike fieldLevel, which maps
-   both 2 and 4 to 3 by design — see LevelContext.tsx), so Skeleton's own
-   `data-fill={recessLevel(useLevel())}` would compute the wrong rung for
-   bars mounted on what's actually a level-4 island if this weren't
-   threaded through. Every ORDINARY field/button mounted inside those same
-   cards keeps using CARD_LEVEL unchanged and is still correct — Button
-   and TextField both compute their own fill via fieldLevel, where the
-   2-vs-4 distinction doesn't exist. */
 const TOP_CARD_LEVEL: Level = 4;
-/* ONE RUNG IN FROM A CARD — the ground of anything mounted inside a subcard:
-   .provider-subcard, and .json-download-card.is-sub inside the repo card.
-
-   CARD_LEVEL means "the ground is 2-or-4, so compute at 3", which is right in
-   a card and wrong in a card inside one: a control mounted that way on a
-   level-3 subcard painted rgb(37,37,37) onto rgb(37,37,37) and vanished — it
-   read as bare text, which is what a ghost button looks like. Ground 3 lifts
-   to 4 and is visible against the surface it actually stands on. */
 const SUBCARD_LEVEL: Level = 3;
-
-import '../vendor/pomegranate/styles/tokens.css';
-import '../vendor/pomegranate/styles/fonts.css';
-import '../vendor/pomegranate/styles/node.css';
 
 /* ── local inline icons (currentColor, so they take the control's ink) ─────── */
 const svg = (d: string, opts?: { fill?: boolean; fillRule?: 'evenodd'; viewBox?: string }) => (size: number) => {
@@ -95,8 +43,8 @@ const svg = (d: string, opts?: { fill?: boolean; fillRule?: 'evenodd'; viewBox?:
   // aspect ratio rather than being forced square. Every Lucide-shaped glyph
   // here is 24x24, so for them width === size exactly as before — the ratio
   // only does anything for a mark that isn't square, which is why the option
-  // exists at all (IconVariables below is the brand's own 448:512 glyph;
-  // squaring it would squash it).
+  // exists at all (a non-square viewBox keeps its ratio instead of
+  // being squashed).
   const vb = opts?.viewBox ?? '0 0 24 24';
   const parts = vb.split(/\s+/).map(Number);
   const w = Math.round((size * parts[2]) / parts[3] * 100) / 100;
@@ -151,6 +99,7 @@ const IconAdd = svg('M12 5v14M5 12h14');
 const IconSearch = svg('M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-4.5-4.5');
 /* An arrow out of a tray — "send this up there". Distinct from IconSync's two
    arrows, which mean "go and read it again": one writes, the other does not. */
+const IconBranch = svg('M6 3v12 M18 9a3 3 0 100-6 3 3 0 000 6z M6 21a3 3 0 100-6 3 3 0 000 6z M18 9a9 9 0 01-9 9');
 const IconUpload = svg('M12 16V4 M7 9l5-5 5 5 M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2');
 /* Two arrows chasing each other — "go and ask the repo again". Not the plain
    circular arrow, which reads as undo as often as it reads as refresh. */
@@ -172,19 +121,9 @@ const IconMoon = svg('M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z');
 // two rows down, not a lookalike.
 const IconGitLab = svg('M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.423-.867 0L16.418 9.45H7.582L4.919 1.263C4.783.84 4.185.84 4.05 1.264L1.386 9.45.044 13.587c-.121.375.014.789.331 1.023L12 23.054l11.625-8.443c.318-.235.453-.647.33-1.024', { fill: true });
 const IconGitHub = svg('M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z', { fill: true });
-// The Closure brand's own variables glyph (Pomegranate Identity, Figma node
-// 16:31) — a hexagon ring with a centred dot. Same artwork as the main
-// screen's empty state (.empty-state-icon in ui.template.html), so the mark
-// that says "variables" when there are none is the same one that labels them
-// when there are.
-//
-// It led the collections card's TITLE until that title turned out to be the
-// Figma file's name, which is not a set of variables; it rides the token
-// count on the same row now, which is. IconFigma below took the title.
-//
-// A filled path, not a stroked Lucide glyph, and not square — hence the
-// viewBox option on svg() above.
-const IconVariables = svg('M224.291 0C228.861 3.11883 238.191 8.06017 243.27 10.9668L281.556 32.8584L392.028 95.9863L428.185 116.635C434.503 120.242 441.916 124.242 448.033 128.062C448.483 148.142 448.103 169.751 448.101 189.924L448.105 306.543L448.103 360.293L448.098 374.702C448.098 377.135 448.205 381.697 447.82 383.935C443.788 386.807 433.849 392.125 429.188 394.787L392.193 415.928L272.538 484.298L239.216 503.332L229.285 509.01C228.22 509.625 225.181 511.308 224.288 512H223.83C222.29 510.83 217.99 508.542 216.113 507.475L201.5 499.152L151.188 470.4L52.6142 414.065C35.5567 404.318 17.3488 393.465 0.17279 384.202C-0.146659 380.552 0.074087 372.922 0.0770869 369.082L0.0966182 339.25V245.088L0.0917353 165.016L0.07904 140.786C0.07729 137.155 -0.113577 130.988 0.271423 127.627C2.4837 126.682 7.26641 123.797 9.47064 122.538L26.4013 112.864L82.288 80.9268L176.742 26.9512L207.661 9.27637C212.712 6.38948 218.963 3.05347 223.806 0H224.291ZM121.38 132.478L84.4013 153.616C78.0818 157.23 70.2297 161.424 64.2382 165.293C63.7863 169.694 64.0934 181.281 64.0966 186.091L64.0986 227.669L64.0976 306.69C64.0973 319.825 63.8929 333.585 64.1054 346.67C72.8009 352.04 82.9489 357.555 91.8798 362.66L142.331 391.513L195.479 421.912C198.771 423.795 222.196 437.655 224.516 438.027C228.588 435.367 234.108 432.405 238.408 429.947L262.876 415.965L342.681 370.327L368.863 355.367C373.798 352.547 379.263 349.577 384.023 346.582C384.308 334.062 384.093 320.717 384.093 308.125L384.098 237.584V190.074C384.098 182.797 384.408 172.467 384.013 165.405C379.773 162.667 374.738 159.937 370.296 157.402L348.313 144.837L279.016 105.205L241.575 83.8037C238.682 82.1443 225.577 74.3711 223.738 73.959L121.38 132.478ZM220.128 192.146C255.353 189.98 285.681 216.747 287.908 251.97C290.136 287.192 263.42 317.565 228.2 319.853C192.897 322.145 162.434 295.35 160.202 260.043C157.97 224.736 184.816 194.318 220.128 192.146Z', { fill: true, viewBox: '0 0 448.253 512' });
+// A generic "variables" glyph (a box) — the same artwork as the main screen's
+// empty state (.empty-state-icon in ui.template.html).
+const IconVariables = svg('M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16ZM3.3 7l8.7 5 8.7-5M12 22V12');
 
 /*
   THE FIGMA MARK, outline weight — drawn from the node this was taken from
@@ -229,15 +168,9 @@ const IconGitlab = svg('M23.955 13.587l-1.342-4.135-2.664-8.189c-.135-.423-.73-.
 /*
   WHAT KIND OF TOKEN A ROW IS, AS A GLYPH.
 
-  WHY THESE ARE DRAWN HERE AND NOT TAKEN FROM THE KIT. Pomegranate binds 32
-  icons in icons.generated.ts, and not one of the six variable types has a
-  proper entry: the nearest are `colour` (a brush) and `coreRamp` (a swatch
-  stack) for colour, and `text` (a document) for string — pictures of adjacent
-  ideas, not of these. The right drawings DO exist in icons.inventory.ts, the
-  full 5,130-glyph upstream set, but that file says in its own header that
-  nothing in the kit may import it: the supported route is to bind a name
-  through `npm run icons`, which regenerates the kit's own set. That is a
-  change to src/vendor/pomegranate, which is not ours to make.
+  WHY THESE ARE DRAWN HERE. The kit has no icon set of its own, and no
+  general icon library is bundled; the six variable types need pictures of
+  their own (a colour, a number, a string, a boolean …), not adjacent ideas.
 
   So the paths are lifted verbatim from the inventory's own entries — same
   Tabler 24/outline drawings, same stroke weight the kit is drawn at — and
@@ -290,7 +223,7 @@ const TYPE_ICON: Record<string, (size: number) => ReactNode> = {
      none. */
 };
 
-/* ── size / variant maps (mount prop shape → Pomegranate) ───────────────────── */
+/* ── size / variant maps (mount prop shape → kit) ───────────────────── */
 function btnVariant(v?: string): 'primary' | 'tonal' | 'ghost' {
   if (v === 'filled') return 'primary';
   if (v === 'ghost') return 'ghost';
@@ -304,80 +237,14 @@ function btnSize(s?: string): 'small' | 'medium' | 'large' {
 function mountOnce(mountId: string, node: ReactNode, level: Level = GROUND) {
   const container = document.getElementById(mountId);
   if (!container) return;
-  flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}>{node}</LevelContext.Provider>));
+  flushSync(() => createRoot(container).render(<>{node}</>));
 }
 
-/* ── field adapters: DS-painted, uncontrolled, carry the caller's id ───────── */
-function PomTextField(props: any) {
-  const {
-    id, type = 'text', label, placeholder, size = 'small', readonly = false,
-    defaultValue, value, icon, style, tabIndex, title, onInput, onBlur,
-  } = props;
-  /*
-    UNCONTROLLED BY DEFAULT — every field in this app writes through
-    setFieldValue()'s native-setter trick, which needs the input to own its
-    own value. `value` opts one field out of that: the file name field's
-    value lives on window.PomPrimaryFilename (it has to be readable
-    synchronously mid-push), and an uncontrolled input would quietly ignore
-    every programmatic set.
+/* ── field adapters: the kit's fields, uncontrolled, carrying the caller's id ── */
+const PomTextField = TextField;
+const PomTextArea = TextArea;
 
-    onChange, not onInput, on the controlled path: React warns about a
-    `value` with no `onChange` and, more to the point, refuses to let the
-    input show a keystroke the state never came back with.
-  */
-  const controlled = value !== undefined;
-  const wrapClass = ['nd-textfield-wrap', `s-${size}`, 'is-block', readonly ? 'is-readonly' : '']
-    .filter(Boolean).join(' ');
-  const fieldClass = ['nd-textfield', `s-${size}`, readonly ? 'is-readonly' : '']
-    .filter(Boolean).join(' ');
-  return (
-    <span className={wrapClass} data-fill={fieldLevel(useLevel())} style={{ width: '100%', ...style }}>
-      {icon && <span className="nd-textfield-leadbox" aria-hidden>{icon}</span>}
-      {label && <label className="nd-textfield-float" htmlFor={id}>{label}</label>}
-      <input
-        className={fieldClass}
-        id={id}
-        type={type}
-        {...(controlled ? { value: value } : { defaultValue: defaultValue })}
-        placeholder={placeholder}
-        readOnly={readonly}
-        tabIndex={tabIndex}
-        title={title}
-        aria-readonly={readonly || undefined}
-        spellCheck={false}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="none"
-        {...(controlled
-          ? { onChange: (e: any) => onInput?.((e.target as HTMLInputElement).value) }
-          : { onInput: onInput ? (e: any) => onInput((e.target as HTMLInputElement).value) : undefined })}
-        onBlur={onBlur ? (e) => onBlur((e.target as HTMLInputElement).value) : undefined}
-        onPointerDown={(e) => e.stopPropagation()}
-      />
-    </span>
-  );
-}
-
-function PomTextArea(props: any) {
-  const { id, label, placeholder, size = 'small', rows = 2, disabled = false, style } = props;
-  return (
-    <span className={['nd-textfield-wrap', `s-${size}`, 'is-multi', 'is-block', disabled ? 'is-disabled' : ''].filter(Boolean).join(' ')}
-      data-fill={fieldLevel(useLevel())} style={{ width: '100%', ...style }}>
-      {label && <label className="nd-textfield-float" htmlFor={id}>{label}</label>}
-      <textarea
-        className={['nd-textfield', `s-${size}`, 'is-multi', disabled ? 'is-disabled' : ''].filter(Boolean).join(' ')}
-        id={id}
-        rows={rows}
-        placeholder={placeholder}
-        disabled={disabled}
-        spellCheck
-        onPointerDown={(e) => e.stopPropagation()}
-      />
-    </span>
-  );
-}
-
-/* ── Pomegranate Button, from the prop bag the mounts pass ──────── */
+/* ── Button, from the prop bag the mounts pass ──────── */
 function PomButton(props: any) {
   const {
     id, variant, size, label, destructive, icon, leftIcon, buttonLeftIcon,
@@ -449,7 +316,7 @@ function mountLiveButton(mountId: string, base: any, initial: any, level: Level 
       </Button>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><LiveButton /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<LiveButton />));
   return {
     setDisabled: (disabled) => set((s) => ({ ...s, disabled })),
     setTitle: (title) => set((s) => ({ ...s, title })),
@@ -467,7 +334,7 @@ function mountLiveIconButton(mountId: string, base: any, initialDisabled: boolea
     const [disabled, setD] = useState(initialDisabled); set = setD;
     return <PomButton {...base} disabled={disabled} />;
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   return { setDisabled: (v) => set(v) };
 }
 
@@ -497,7 +364,7 @@ function mountLiveTitleButton(mountId: string, base: any, initialTitle: string, 
        so a voice user saying "click Compare" still matches. */
     return <PomButton {...base} title={title} aria-label={title} />;
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   return { setTitle: (t) => set(t) };
 }
 
@@ -516,7 +383,7 @@ function mountLiveBusyButton(mountId: string, base: any, title: string, level: L
        what pressing it does. */
     return <PomButton {...base} label={s.label} loading={s.loading} title={title} aria-label={title} />;
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   return {
     setLoading: (loading) => set((s) => ({ ...s, loading })),
     setLabel: (label) => set((s) => ({ ...s, label })),
@@ -549,7 +416,7 @@ function mountLiveToggleIconButton(
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   return { setMode: (mode) => set(mode) };
 }
 
@@ -561,7 +428,7 @@ function mountLiveTextArea(mountId: string, base: any, initialDisabled: boolean,
     const [disabled, setD] = useState(initialDisabled); set = setD;
     return <PomTextArea {...base} disabled={disabled} />;
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   return { setDisabled: (v) => set(v) };
 }
 
@@ -590,7 +457,7 @@ function mountLiveDropdown(mountId: string, base: any, onSelect: (v: string) => 
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   return { setItems: (items, value) => set(() => ({ items, value })) };
 }
 
@@ -614,6 +481,10 @@ type ImportFileState = { name: string; bytes?: number; busy?: boolean; error?: s
 declare global {
   interface Window {
     PomImportApplyBtn: any;
+    PomClearVarsBtn: any;
+    PomStudioConnectBtn: any;
+    PomStudioConfirm: { ask: (title: string, text: string, label: string, onYes: () => void, onNo: () => void) => void };
+    PomClearStylesBtn: any;
     /* What the import would do, drawn as headings and tags rather than as a
        column of counts — see mountImportChanges. */
     PomComponentCompareBtn: any;
@@ -671,6 +542,24 @@ declare global {
     PomCompareFolder: {
       setItems: (items: any[], selectedValue: string) => void;
       onChange: ((value: string) => void) | null;
+    };
+    /* Compare's branch picker — the repository's branches, read-only. */
+    PomCompareBranch: {
+      setItems: (items: any[], selectedValue: string) => void;
+      onChange: ((value: string) => void) | null;
+    };
+    /* The Import page's own branch picker: the same list and the same pick as Compare's, in the repo card. */
+    PomImportBranch: {
+      setItems: (items: any[], selectedValue: string) => void;
+      onChange: ((value: string) => void) | null;
+    };
+    /* Push's branch picker — an existing branch, or a name to make. */
+    PomPushBranch: {
+      setOptions: (names: string[]) => void;
+      setSaved: (name: string) => void;
+      get: () => string;
+      set: (name: string) => void;
+      onChange: ((name: string) => void) | null;
     };
     PomGithubSyncBtn: LiveBusyHandle;
     PomGitlabSyncBtn: LiveBusyHandle;
@@ -774,8 +663,8 @@ declare global {
     PomRemoveGitlabDialog: { open: () => void; onConfirm: (() => void) | null };
     PomClearTokenDialog: { open: (provider: 'gitlab' | 'github') => void; onConfirm: ((provider: 'gitlab' | 'github') => void) | null };
     PomClearVariablesDialog: {
-      open: (summary: { collections: number; variables: number; names: string[]; fileName: string }) => void;
-      onConfirm: (() => void) | null;
+      open: (summary: { collections: number; variables: number; names: string[]; list?: { name: string; variables: number }[]; fileName: string; styles?: { text: number; effect: number; grid: number }; only?: 'variables' | 'styles' }) => void;
+      onConfirm: ((pick: { collections: string[]; styles: { text: boolean; effect: boolean; grid: boolean } }) => void) | null;
     };
     PomRepoTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
     PomMainProviderTab: { onChange: ((value: 'gitlab' | 'github') => void) | null; setValue: (value: 'gitlab' | 'github') => void };
@@ -793,6 +682,36 @@ window.PomImportApplyBtn = mountLiveButton(
   'import-apply-btn-mount',
   { id: 'import-apply-btn', variant: 'filled', size: 'large', label: 'Import into this file', block: true },
   { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+
+/* Settings → RADD Studio: the pairing code the Studio shows, and the button that connects (or, once
+   connected, disconnects). The label and the disabled state are the UI script's to set. */
+mountTextField('studio-code-mount', { id: 'studio-code', label: 'Code from the Studio', placeholder: '123 456' }, CARD_LEVEL);
+window.PomStudioConnectBtn = mountLiveButton(
+  'studio-connect-btn-mount',
+  { id: 'studio-connect-btn', variant: 'tonal', size: 'small', label: 'Connect' },
+  { disabled: false, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+
+/* Settings → File structure: the structure captured on open, as a file. */
+mountButton('structure-download-mount', { id: 'structure-download', variant: 'tonal', size: 'small', label: 'Download structure' }, CARD_LEVEL);
+
+/* Settings → Clear this file: one button for the variables and one for the
+   styles. A destructive act, so each opens the dialog that names what goes. */
+window.PomClearVarsBtn = mountLiveButton(
+  'clear-vars-btn-mount',
+  { id: 'clear-vars-btn', variant: 'tonal', size: 'medium', label: 'Clear variables…', destructive: true, block: true,
+    leftIcon: true, buttonLeftIcon: IconTrash(16) },
+  { disabled: true, loading: false, success: false, label: null },
+  CARD_LEVEL,
+);
+window.PomClearStylesBtn = mountLiveButton(
+  'clear-styles-btn-mount',
+  { id: 'clear-styles-btn', variant: 'tonal', size: 'medium', label: 'Clear styles…', destructive: true, block: true,
+    leftIcon: true, buttonLeftIcon: IconTrash(16) },
+  { disabled: true, loading: false, success: false, label: null },
   CARD_LEVEL,
 );
 
@@ -869,7 +788,7 @@ window.PomComponentPushBtn = mountLiveButton(
     );
   }
   if (container) flushSync(() => createRoot(container).render(
-    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+    <View />));
   window.PomComponentPath = { get: () => current, set: (v) => setValue(v) };
 })();
 
@@ -897,7 +816,7 @@ window.PomComponentPushBtn = mountLiveButton(
     );
   }
   if (container) flushSync(() => createRoot(container).render(
-    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+    <View />));
   window.PomComponentStats = { set: (rows) => set(rows) };
 })();
 
@@ -995,7 +914,7 @@ window.PomComponentPushBtn = mountLiveButton(
     );
   }
   if (container) flushSync(() => createRoot(container).render(
-    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+    <View />));
   window.PomComponentResult = {
     clear: () => set(null),
     report: (report, path) => set({ report, path }),
@@ -1102,10 +1021,10 @@ window.PomAddGitlabBtn = mountLiveToggleIconButton(
   CARD_LEVEL,
 );
 mountButton('remove-gitlab-btn-mount', { id: 'remove-gitlab-btn', variant: 'ghost', destructive: true, size: 'small', label: 'Remove GitLab' }, CARD_LEVEL);
-// tonal, not ghost — ghost paints `background: none` at rest (node.css's
-// .nd-btn.v-ghost), so bumping this button's own data-level to sit above
+// tonal, not ghost — ghost paints `background: none` at rest (kit.css's
+// .ui-btn.v-ghost), so bumping this button's own data-level to sit above
 // the header would have changed nothing visible; a ghost button has no
-// fill for any level to apply to. tonal DOES paint one (--nd-field-fill),
+// fill for any level to apply to. tonal DOES paint one (--field-fill),
 // and Button already self-computes that fill one rung above whatever
 // LevelContext it's mounted in (data-fill={fieldLevel(useLevel())} in
 // Button.tsx) — so switching material alone, with no level change, is
@@ -1120,6 +1039,7 @@ mountIconButton('settings-btn-mount', { id: 'settings-btn', variant: 'ghost', si
 /* The header's import button is gone on purpose — see the note on the empty
    state's mount in ui.template.html. Nothing mounts into 'import-btn-mount'
    because that span no longer exists. */
+mountIconButton('import-settings-btn-mount', { id: 'import-settings-btn', variant: 'ghost', size: 'large', title: 'Git settings', 'aria-label': 'Git settings', icon: IconSettings(24) });
 mountIconButton('import-back-btn-mount', { id: 'import-back-btn', variant: 'tonal', size: 'large', title: 'Back', 'aria-label': 'Back', icon: IconArrowLeft(24) });
 mountButton('import-copy-btn-mount', { id: 'import-copy-btn', variant: 'outline', size: 'small', label: 'Copy', block: true }, CARD_LEVEL);
 mountButton('import-choose-btn-mount', { id: 'import-choose-btn', variant: 'filled', size: 'large', label: 'Choose a JSON file' });
@@ -1282,19 +1202,19 @@ function mountCompareSides() {
             block
             placeholder={s.all.length ? 'pick a file' : 'no JSON files here yet'}
             value={s.file}
-            options={s.all.length
-              ? s.all.map((o) => ({ value: o, label: o }))
+            options={s.all.length || s.file
+              ? (s.file && s.all.indexOf(s.file) === -1 ? [s.file].concat(s.all) : s.all).map((o) => ({ value: o, label: o }))
               : [{ value: '', label: 'No JSON files in this folder yet' }]}
             onChange={(v: string) => { if (v) window.PomCompareSides.onPick?.(v); }}
           />
       </span>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   const pickEl = document.getElementById('compare-pick-mount');
   /* Both at CARD_LEVEL: the Figma tag stands on the compare card and the picker
      on .export-panel, and both of those are level 4. */
-  if (pickEl) flushSync(() => createRoot(pickEl).render(<LevelContext.Provider value={CARD_LEVEL}><Pick /></LevelContext.Provider>));
+  if (pickEl) flushSync(() => createRoot(pickEl).render(<Pick />));
   window.PomCompareSides = {
     set: (next) => {
       state = { ...state, ...next };
@@ -1313,6 +1233,74 @@ function mountCompareSides() {
   };
 }
 mountCompareSides();
+
+/*
+  THE BRANCH TO PUSH TO — the same control as the JSON name beside it, for the
+  same reason: you either pick what the repository already has, or you write a
+  name it has not got, and writing it is how it gets made.
+
+  Empty means "the branch saved in Settings", which is what it shows until
+  somebody changes it. Whether a typed name is a new branch is not decided here:
+  the list may not have loaded, or may be a minute stale, so the push asks the
+  repository (see makePushBranch in ui.template.html). All this says is what
+  the list says, in the footer.
+*/
+(function mountPushBranch() {
+  const container = document.getElementById('push-branch-mount');
+  type S = { query: string; value: string; all: string[]; saved: string };
+  let state: S = { query: 'main', value: '', all: [], saved: 'main' };
+  let apply: ((s: S) => void) | null = null;
+  const focused = () => !!container && container.contains(document.activeElement);
+  const put = (next: Partial<S>, tell?: boolean) => {
+    state = { ...state, ...next };
+    apply?.(state);
+    if (tell) window.PomPushBranch.onChange?.(state.value || state.saved);
+  };
+  function View() {
+    const [s, setS] = useState<S>(state);
+    apply = setS;
+    const q = s.query.trim().toLowerCase();
+    const chosen = s.value || s.saved;
+    const known = chosen && s.all.indexOf(chosen) === -1 ? [chosen].concat(s.all) : s.all;
+    const options = (q && known.indexOf(s.query.trim()) === -1
+      ? known.filter((n) => n.toLowerCase().indexOf(q) !== -1)
+      : known);
+    const typed = s.query.trim();
+    const isNew = !!typed && s.all.length > 0 && s.all.indexOf(typed) === -1;
+    return (
+      <Combobox
+        label="Branch"
+        icon={IconBranch(16)}
+        size="small"
+        block
+        placeholder={s.saved}
+        value={s.query}
+        /* Typing is choosing, as in the JSON name: the commonest use of the
+           free text is a name nobody has made yet. */
+        onChange={(v: string) => put({ query: v, value: v.trim() === s.saved ? '' : v.trim() }, true)}
+        options={options}
+        getKey={(o: string) => o}
+        onPick={(o: string) => put({ query: o, value: o === s.saved ? '' : o }, true)}
+        renderOption={(o: string, st: { active: boolean }) => (
+          <span style={{ fontWeight: st.active ? 600 : 400 }}>{o}</span>
+        )}
+        footer={isNew ? <span>{`New branch — made from the default branch when you push`}</span> : undefined}
+        selected={chosen}
+        action={{ label: 'Add new branch', onClick: () => put({ query: '', value: '' }, true) }}
+      />
+    );
+  }
+  if (container) flushSync(() => createRoot(container).render(<View />));
+  window.PomPushBranch = {
+    setOptions: (names: string[]) => put({ all: names || [] }),
+    /* The saved branch is the answer while nothing else has been chosen, and
+       the text follows it only while nobody is typing. */
+    setSaved: (name: string) => put({ saved: name, ...(state.value === '' && !focused() ? { query: name } : null) }),
+    get: () => state.value || state.saved,
+    set: (name: string) => put({ value: name === state.saved ? '' : name, query: name }),
+    onChange: null,
+  };
+})();
 
 /*
   THE FOLDER, THE SAME WAY, FOR THE SAME REASON.
@@ -1336,6 +1324,28 @@ window.PomCompareFolder = mountLiveDropdown(
 window.PomCompareFolder.onChange = null;
 
 /*
+  THE BRANCH TO READ FROM. Pushing always writes the branch saved in Settings;
+  comparing (and the lists that feed it) may read another — main, or the one a
+  designer is working on. A closed list of the repository's branches, for the
+  same reason the folder and the file are: there is nothing to invent when you
+  are reading.
+*/
+window.PomCompareBranch = mountLiveDropdown(
+  'compare-branch-mount',
+  { label: 'Branch', icon: IconBranch(16) },
+  (v: string) => window.PomCompareBranch?.onChange?.(v),
+  CARD_LEVEL,
+) as any;
+window.PomCompareBranch.onChange = null;
+window.PomImportBranch = mountLiveDropdown(
+  'import-branch-mount',
+  { label: 'Branch', icon: IconBranch(16) },
+  (v: string) => window.PomImportBranch?.onChange?.(v),
+  CARD_LEVEL,
+) as any;
+window.PomImportBranch.onChange = null;
+
+/*
   THE FOLDER, ONE LEVEL AT A TIME.
 
   A flat list of every folder is fine for a repository with nine of them and
@@ -1343,7 +1353,7 @@ window.PomCompareFolder.onChange = null;
   actually for. So each level offers only the folders inside the one above it,
   and a new level appears when the folder just chosen has folders of its own.
 
-  EVERY LEVEL CAN BE THE DESTINATION. `src/panel/node` is where Pomegranate's
+  EVERY LEVEL CAN BE THE DESTINATION. `src/components` is where one repository's
   components live, and `src` is where another repository's might; a picker that
   made you descend to a leaf would be wrong about half of them. So each level
   carries "stay here", and choosing it stops the descent without pretending
@@ -1414,7 +1424,7 @@ window.PomCompareFolder.onChange = null;
     );
   }
   if (container) flushSync(() => createRoot(container).render(
-    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+    <View />));
   window.PomComponentFolder = {
     set: (folders: string[], value: string) => set({ folders, value }),
     onChange: null as ((v: string) => void) | null,
@@ -1461,7 +1471,7 @@ window.PomCompareFolder.onChange = null;
     );
   }
   if (container) flushSync(() => createRoot(container).render(
-    <LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+    <View />));
   window.PomComponentFound = {
     set: (rows, current) => set({ rows, current }),
     onPick: null,
@@ -1518,7 +1528,7 @@ mountButton('import-pull-github-mount', { id: 'import-pull-github-btn', variant:
   which was fine while the branch was plain text. It is a Tag now, and a Tag is
   not a span with a border: it computes its own fill from the level it stands
   on (fieldLevel(useLevel()), see Tag.tsx) and writes data-fill for the
-  stylesheet to resolve. Hand-writing .nd-tag would be copying a contract
+  stylesheet to resolve. Hand-writing .ui-tag would be copying a contract
   instead of using it, so the row moves here and the real component does it.
 */
 function mountImportRepoWhere() {
@@ -1543,12 +1553,16 @@ function mountImportRepoWhere() {
       </span>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomImportRepoWhere = { set: (rows) => set(rows || []) };
 }
 mountImportRepoWhere();
 
-mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal', size: 'medium', label: 'Import from JSON', leftIcon: true, buttonLeftIcon: IconImport(16) });
+// The empty screen offers two ways to bring tokens in: a file from this
+// computer, or a repository.
+mountButton('import-upload-btn-mount', { id: 'import-upload-btn', variant: 'tonal', size: 'medium', label: 'Upload JSON', leftIcon: true, buttonLeftIcon: IconUpload(16) });
+mountButton('import-connect-btn-mount', { id: 'import-connect-btn', variant: 'tonal', size: 'medium', label: 'Connect a repository', leftIcon: true, buttonLeftIcon: IconBranch(16) });
+mountButton('import-connect-here-mount', { id: 'import-connect-here-btn', variant: 'tonal', size: 'medium', label: 'Connect a repository', leftIcon: true, buttonLeftIcon: IconBranch(16) });
 
 /* ── Settings header: light/dark theme toggle ────────────────────────────── */
 // Flips <html>'s own data-theme attribute directly: every colour in this
@@ -1580,7 +1594,7 @@ mountButton('import-empty-btn-mount', { id: 'import-empty-btn', variant: 'tonal'
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
 })();
 
 /* ── version tag (custom pill) ─────────────────────────────────────────────── */
@@ -1593,7 +1607,7 @@ function mountVersionTag(mountId: string) {
     if (!label) return null;
     return <span className="version-tag-label" title="Plugin version">{label}</span>;
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomVersionTag = { setLabel: (label) => set(label) };
 }
 mountVersionTag('version-tag-mount');
@@ -1657,9 +1671,12 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
        has been finished, not a filter with one hit, so the whole list stays
        open. Same rule as the folder pickers. */
     const q = s.query.trim().toLowerCase();
-    const options = (q && s.all.indexOf(s.query.trim()) === -1
-      ? s.all.filter((n) => n.toLowerCase().indexOf(q) !== -1)
-      : s.all);
+    /* THE CHOSEN NAME IS ALWAYS IN THE LIST, whether or not the folder has such a file yet: the
+       list is where you see what is selected, and a name about to be created is still selected. */
+    const known = s.value && s.all.indexOf(s.value) === -1 ? [s.value].concat(s.all) : s.all;
+    const options = (q && known.indexOf(s.query.trim()) === -1
+      ? known.filter((n) => n.toLowerCase().indexOf(q) !== -1)
+      : known);
     return (
       <Combobox
         label="JSON name"
@@ -1679,15 +1696,20 @@ function mountTextField(mountId: string, props: any, level?: Level) { mountOnce(
         renderOption={(o: string, st: { active: boolean }) => (
           <span style={{ fontWeight: st.active ? 600 : 400 }}>{o}</span>
         )}
-        emptyMessage={s.all.length
-          ? 'No file in this folder matches — this one will be created'
-          : 'Nothing in this folder yet — this one will be created'}
+        /* THE LIST IS WORTH OPENING EVEN WITH ONE NAME IN IT, ALREADY CHOSEN: it shows that choice
+           and the way to write another, which empties the field for typing. */
+        selected={s.value}
+        action={{ label: 'Add new JSON', onClick: () => put({ query: '', value: '' }, true) }}
+        /* NO MESSAGE WHEN NOTHING MATCHES. It said "no file here matches — this one
+           will be created" in a box under the field the moment a name was typed that
+           the folder did not have, which is every new name. The name being typed is
+           the answer; the box only moved the fields around. */
       />
     );
   }
   /* CARD_LEVEL — the address row is back on .export-panel; see the note above
      PomFolderSelect for where it has been. */
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomPrimaryFilename = {
     get: () => state.value,
     /* A set from outside is the app choosing, not the person — it moves the
@@ -1765,7 +1787,7 @@ function mountRepoFileCombo(mountId: string, bridgeKey: 'PomImportRepoFile') {
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window[bridgeKey] = {
     get: () => state.selected,
     /* A set from outside is the app choosing, not the user. There is no typed
@@ -1815,7 +1837,7 @@ window.PomExportMode = { onChange: null };
       />
     );
   }
-  flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  flushSync(() => createRoot(container).render(<View />));
 })();
 
 /* ── onboarding provider pick (GitLab / GitHub checkboxes) ──────────────────
@@ -1834,20 +1856,16 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
 }
 
 /*
-  THE CARD IS THE FORMAT; THE CHECKBOX QUALIFIES IT, AND SITS OUTSIDE.
+  THE EXPORT IS ALWAYS W3C DTCG; THE SWITCH SAYS WHETHER IT IS RESOLVED.
 
-  Resolved is not a third format — it IS DTCG, in a different document shape,
-  and it cannot be chosen while the export is Legacy JSON. So it appears only
-  once the card is on, and disappears with it.
+  There is no Legacy JSON choice any more, so the page's heading names the
+  format and the one card under it is the only question left: one document
+  with routing resolved away (on), or one per theme (off). The card is a
+  SelectableCard with a switch mark; it carries its own description and the
+  file name it will write, so nothing sits beside it.
 
-  IT IS A SIBLING OF THE CARD, NOT A CHILD, and that is structural rather than
-  cosmetic. A SelectableCard IS a `<button>`: a checkbox inside one is a control
-  inside a control, "one press fires BOTH" (SelectableCard.tsx), which the kit
-  refuses. Its `action` slot exists for that case but is absolutely positioned
-  in the mark's corner and documented for a card that "carries no mark of its
-  own to collide with" — no use while a switch occupies that corner. Below the
-  card, the checkbox is an ordinary control: its own tab stop, its own label,
-  no press of the card's to escape.
+  The value crossing into the page stays the shape name — 'themes' or
+  'resolved' — because the rest of the script already speaks it.
 */
 (function mountOutputFormatControl() {
   const container = document.getElementById('output-format-control-mount');
@@ -1855,56 +1873,38 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   let setHint: (hint: string) => void = () => {};
   let setResolvedHint: (hint: string) => void = () => {};
   function View() {
-    // 'legacy' | 'themes' | 'resolved' — one value, so the card and the
-    // checkbox cannot disagree. Each is derived from it, not kept beside it.
-    const [shape, setShape] = useState('legacy');
+    const [shape, setShape] = useState('themes');
     const [hint, setHintState] = useState('');
     const [resolvedHint, setResolvedHintState] = useState('');
     set = setShape;
     setHint = (h) => setHintState(h);
     setResolvedHint = (h) => setResolvedHintState(h);
 
-    const on = shape !== 'legacy';
     const resolved = shape === 'resolved';
     const choose = (next: string) => { setShape(next); window.PomOutputFormat.onChange?.(next); };
 
     return (
       <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-2)' }}>
         <SelectableCard
-          label="W3C DTCG"
-          selected={on}
-          // unticking Resolved is the checkbox's job; turning the card off
-          // drops the whole format, so it returns to Legacy JSON either way
-          onSelect={() => choose(on ? 'legacy' : 'themes')}
+          label="Resolved"
+          selected={resolved}
+          onSelect={() => choose(resolved ? 'themes' : 'resolved')}
           mark="switch"
           level={GROUND}
         >
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>W3C DTCG</span>
+            <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>Resolved</span>
+            {resolvedHint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{resolvedHint}</span>}
             {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
           </span>
         </SelectableCard>
-        {on && (
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Checkbox
-              label="Resolved"
-              checked={resolved}
-              onChange={(v: boolean) => choose(v ? 'resolved' : 'themes')}
-            />
-            {resolvedHint && (
-              <span style={{ fontSize: 12, color: 'var(--app-text-muted)', lineHeight: 1.4, paddingLeft: 24 }}>
-                {resolvedHint}
-              </span>
-            )}
-          </span>
-        )}
       </span>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomOutputFormat = {
     onChange: null,
-    setValue: (v) => set(v),
+    setValue: (v) => set(v === 'resolved' ? 'resolved' : 'themes'),
     setHint: (h) => setHint(h),
     setResolvedHint: (h) => setResolvedHint(h),
   };
@@ -1954,7 +1954,7 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
     // own fill at all (only the plain data-level="3" HTML attribute on the
     // wrapping div does that now); kept only so this mount's own context
     // stays consistent with every other mount in this file.
-    flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+    flushSync(() => createRoot(container).render(<View />));
     setters.push((v) => set(v));
   });
   window.PomRepoTab = { onChange: null, setValue: (v) => setters.forEach((s) => s(v)) };
@@ -2008,7 +2008,7 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomRepoMode = { onChange: null, setValue: (v) => set(v) };
 })();
 
@@ -2034,7 +2034,7 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
   }
   // CARD_LEVEL, matching the real data-level="2" .export-panel already sets
   // on the markup this mounts inside.
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomMainProviderTab = { onChange: null, setValue: (v) => set(v) };
 })();
 
@@ -2110,7 +2110,7 @@ mountOnce('actions-skeleton',
       />
     );
   }
-  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
+  if (container) createRoot(container).render(<View />);
   window.PomToast = { show: (message, isError) => set(() => ({ open: true, tone: isError ? 'error' : 'success', message })) };
 })();
 
@@ -2162,9 +2162,11 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
        the root is searched by the words it MEANS as well — "root" and "repo"
        both find it, which is what someone looking for it would reach for. */
     const hay = (n: string) => (n === '/' ? '/ repo root repository' : n.toLowerCase());
+    /* The chosen path is always a row, in the list or not. */
+    const known = s.selected && s.all.indexOf(s.selected) === -1 ? [s.selected].concat(s.all) : s.all;
     const matches = (!q || s.query === s.selected)
-      ? s.all
-      : s.all.filter((n) => hay(n).indexOf(q) !== -1);
+      ? known
+      : known.filter((n) => hay(n).indexOf(q) !== -1);
     /* A CAP, because a real repo has thousands of directories and a listbox
        is not a scrollbar. The footer says how many were left out, which is
        also the nudge to type another character. */
@@ -2204,6 +2206,10 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
         }}
         options={options}
         getKey={(o: string) => o}
+        selected={s.selected}
+        /* The same last row as the JSON name: it empties the box so a new path can be typed (the + beside
+           the field is what then creates it). */
+        action={{ label: 'Add new path', onClick: () => put({ query: '' }) }}
         onPick={(o: string) => commit(o)}
         renderOption={(o: string, st: { active: boolean }) => (
           <span style={{ fontWeight: st.active ? 600 : 400 }}>
@@ -2216,13 +2222,13 @@ function mountFolderCombo(mountId: string, bridgeKey: string, placeholder: strin
         footer={isNew
           ? <span>{`Press + to use “${typed}” — created on the first push`}</span>
           : hidden > 0 ? <span>{`+${hidden.toLocaleString()} more — type to narrow`}</span> : undefined}
-        emptyMessage={s.all.length
-          ? 'No folder here by that name'
-          : 'No folders in this repo yet'}
+        /* No "no folder here by that name" box: typing a path the repo has not got
+           is the normal way to name a new one, and the box only opened under the
+           field and moved the others. */
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={level}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   /*
     AN UPDATE FROM OUTSIDE MUST NOT TAKE THE FIELD AWAY FROM WHOEVER IS TYPING
     IN IT.
@@ -2326,7 +2332,7 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
     generation += 1;
     const gen = generation;
     root.render(
-      <LevelContext.Provider value={level}><>
+      <>
         {rows.map((row, idx) => (
           <div className="folder-row" key={`${gen}-${idx}`}>
             <PomTextField
@@ -2363,7 +2369,7 @@ function mountFolderList(mountId: string, bridgeKey: 'PomFolderList' | 'PomGithu
             )}
           </div>
         ))}
-      </></LevelContext.Provider>,
+      </>,
     );
   }
   (window as any)[bridgeKey] = { render, onInput: null, onBlur: null, onRemove: null, onCreate: null };
@@ -2432,7 +2438,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
       />
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomFigmaCardTag = {
     set: (next: string) => { value = next; apply?.(next); },
     setTitle: (next: string) => { title = next; applyTitle?.(next); },
@@ -2465,7 +2471,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
             ".magenta-light", "_restricted" — and four-digit counts) read
             cramped at 380px (--surface-width-small, tokens.css), reported
             from the real plugin. large is 760px, but max-inline-size:
-            min(92vw, ...) (node.css's .nd-dialog) clamps it to the plugin
+            min(92vw, ...) (the kit's .ui-dialog) clamps it to the plugin
             panel's own width regardless — so this is "as wide as the panel
             allows," not a fixed 760px, and scales with however wide the
             user's own resizable panel (the drag-handle in this file) is. */}
@@ -2502,10 +2508,10 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
                 <span className="name">{c.name}</span>
                 {/* tonal, not ghost — matched the header's own token/size
                     tags at first, but ghost paints no fill (background:
-                    none, node.css's .nd-tag.v-ghost), so it rendered
+                    none, the kit's .ui-tag.v-ghost), so it rendered
                     pixel-identical to the plain <span> it replaced: a
                     number in muted text, no visible tag. tonal actually
-                    paints a pill (--nd-field-fill), which is the whole
+                    paints a pill (--field-fill), which is the whole
                     point of asking for "the tags" here. */}
                 <Tag variant="tonal" size="small">{c.count}</Tag>
               </div>
@@ -2515,7 +2521,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
       </>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomCollectionsAccordion = {
     setTitle: (title) => {
       window.PomFigmaCardTag?.setTitle(title);
@@ -2552,7 +2558,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     if (!label) return null;
     return <Tag variant="tonal" size="small">{label}</Tag>;
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomRepoSyncTag = { set: (v) => set(v) };
 })();
 
@@ -2580,7 +2586,7 @@ mountFolderList('github-folder-list', 'PomGithubFolderList', 'github-folder-row-
     4 as a subcard inside another, and back to 3 now that it is
     .json-file-card — a card of its own at level 4 again.
   */
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomJsonFileCard = { setSize: (size) => set(size) };
 })();
 
@@ -2707,7 +2713,7 @@ function useClipboard() {
       </Alert>
     );
   }
-  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
+  if (container) createRoot(container).render(<View />);
   window.PomClosureWarning = {
     show: (title, groups, more, note, copyText) =>
       set(() => ({ open: true, title, groups, more: more || 0, note: note || '', copyText: copyText || '' })),
@@ -2826,12 +2832,12 @@ const GROUP_MATES = 12;
         What is left is the comparison itself: two objects and the relation
         between them, standing on the page.
       */
-      <span className="compare-card-sides">
+      <span className="compare-card-sides is-stacked">
         <span className="compare-card-side" data-level={TOP_CARD_LEVEL}>
           {/* The tag inside lifts off THIS card. These stand on the page now
               rather than inside another card, so their ground is 4 and
               CARD_LEVEL is the name for "2-or-4, so compute at 3". */}
-          <LevelContext.Provider value={CARD_LEVEL}>
+          
             <span className="compare-side-title" title={s.sides.figmaDetail}>
               <span className="compare-side-mark" aria-hidden>{IconFigma(13)}</span>
               {s.sides.figmaDetail}
@@ -2839,13 +2845,13 @@ const GROUP_MATES = 12;
             {s.sides.figmaCount && (
               <Tag variant="tonal" size="small">{s.sides.figmaCount}</Tag>
             )}
-          </LevelContext.Provider>
+          
         </span>
         {/* Between the two, because that is what it is between: the relation,
             drawn, where "compared with" used to be written. */}
         <span className="compare-card-vs" aria-hidden>{IconCompare(14)}</span>
         <span className="compare-card-side" data-level={TOP_CARD_LEVEL}>
-          <LevelContext.Provider value={CARD_LEVEL}>
+          
             <span className="compare-side-title" title={s.sides.repoDetail}>
               <span className="compare-side-mark" aria-hidden>
                 {s.sides.provider === 'gitlab' ? IconGitlab(13) : IconGithub(13)}
@@ -2855,7 +2861,7 @@ const GROUP_MATES = 12;
             {s.sides.repoCount && (
               <Tag variant="tonal" size="small">{s.sides.repoCount}</Tag>
             )}
-          </LevelContext.Provider>
+          
         </span>
       </span>
     );
@@ -2863,11 +2869,10 @@ const GROUP_MATES = 12;
     /*
       THE OTHER DIRECTION, WHERE THE DIRECTION IS ESTABLISHED.
 
-      Under the two sides, because that is the one place on this page that
-      names both files and which is which — a button saying "update Figma
-      from GitHub" anywhere else is a claim the reader has to go and check.
-      Not at the foot of the page either: an action nobody finds until they
-      have scrolled five hundred rows is an action nobody finds.
+      At the foot of the page: the report is read first, the decision comes
+      after it. (It used to sit under the two sides, so it could be found
+      without scrolling; the page now ends in it instead, by request.) The
+      label still says the direction out loud, in the repo's own name.
 
       It is a hand-off, not a write. What it opens is the import page, with
       the document this comparison just read already in it, because that page
@@ -2931,15 +2936,62 @@ const GROUP_MATES = 12;
     if (!r) return sides;
 
     if (r.identical) {
+      const count = r.sameCount.toLocaleString();
+      /* A file name with places to break: after `_`, `-`, `.`, `/` and before `@`, so a long name wraps at a
+         separator and not in the middle of a word. The title attribute keeps the name as it is. */
+      const breakable = (name: string) => String(name || '').replace(/([_\-./])/g, '$1\u200b').replace(/@/g, '\u200b@');
+      /* The doc drawn for one side: a page with its lines, which slides in from `side`. */
+      const doc = (side: 'left' | 'right') => (
+        <svg className="compare-insync-doc" viewBox="0 0 56 56" width="56" height="56" aria-hidden>
+          <rect className={'compare-insync-card ' + side} x="1" y="1" width="54" height="54" rx="12" />
+          <path className={'compare-insync-lines ' + side} d="M13 19h30M13 29h22M13 39h28" />
+        </svg>
+      );
       return (
         <>
-          {sides}
-          <Alert tone="success" title="Identical">
-            <p className="closure-warning-subtitle">
-              {`All ${r.sameCount.toLocaleString()} token${r.sameCount === 1 ? '' : 's'} ` +
-               `match${r.sameCount === 1 ? 'es' : ''}. Pushing right now would change nothing.`}
-            </p>
-          </Alert>
+          {/*
+            IN SYNC IS AN EVENT, NOT A FOOTNOTE. Everything else on this page is
+            a list of differences; when there are none, the page says so once and
+            gives it room. And it replaces the two cards that name the sides: the
+            two files are the first half of the sentence — this file, on Figma,
+            and that one, on GitHub — so each is drawn as a document with its mark
+            and name under it, and the check sits where they meet. The motion plays
+            once and is off for anyone who has asked for less of it (see
+            .compare-insync in the template).
+          */}
+          <div className="compare-insync" role="status">
+            <div className="compare-insync-pair">
+              <div className="compare-insync-side">
+                {doc('left')}
+                <span className="compare-side-title" title={s.sides.figmaDetail}>
+                  <span className="compare-side-mark" aria-hidden>{IconFigma(13)}</span>
+                  {breakable(s.sides.figmaDetail)}
+                </span>
+                {s.sides.figmaCount && <Tag variant="tonal" size="small">{s.sides.figmaCount}</Tag>}
+              </div>
+              <svg className="compare-insync-center" viewBox="0 0 56 56" width="56" height="56" aria-hidden>
+                <circle className="compare-insync-ring r1" cx="28" cy="28" r="19" />
+                <circle className="compare-insync-ring r2" cx="28" cy="28" r="19" />
+                <circle className="compare-insync-badge" cx="28" cy="28" r="19" />
+                <path className="compare-insync-check" d="M19 28.5l6.5 6.5L37 22" />
+              </svg>
+              <div className="compare-insync-side">
+                {doc('right')}
+                <span className="compare-side-title" title={s.sides.repoDetail}>
+                  <span className="compare-side-mark" aria-hidden>
+                    {s.sides.provider === 'gitlab' ? IconGitlab(13) : IconGithub(13)}
+                  </span>
+                  {breakable(s.sides.repoDetail)}
+                </span>
+                {s.sides.repoCount && <Tag variant="tonal" size="small">{s.sides.repoCount}</Tag>}
+              </div>
+            </div>
+            <div className="compare-insync-title">In sync</div>
+            <div className="compare-insync-text">
+              {`Figma and ${repoName} hold the same ${count} token${r.sameCount === 1 ? '' : 's'}, value for value.`}
+            </div>
+            <div className="compare-insync-note">Pushing right now would change nothing.</div>
+          </div>
         </>
       );
     }
@@ -3434,7 +3486,7 @@ const GROUP_MATES = 12;
       Stacked rows made the eye travel to compare two values; side-by-side
       cells fixed that, and a real table finishes it — the "repo" and "here"
       labels stop repeating on every row and become column headers, said once
-      where they belong. Pomegranate's own Table, so the column owns its
+      where they belong. the kit's own Table, so the column owns its
       alignment and width rather than every cell restating them.
 
       The one-sided lists get two columns instead of three. A column headed
@@ -4149,10 +4201,117 @@ const GROUP_MATES = 12;
       );
     };
 
+    const causes: any[] = r.causes || [];
+    const total = r.changed.length + r.onlyInFigma.length + r.onlyInRepo.length +
+      (r.repointed || []).length + (r.aliased || []).length + (r.moved || []).length;
+    /* WHERE IT STARTS comes first and is the answer; the rest is the evidence,
+       and is folded away when there is one cause behind it so the page does not
+       print forty rows to say that one thing is wrong. */
+    /* Highlight only the part of the reference that differs: the segments the
+       two share at the head and tail are matched off, what is left is the edit. */
+    const refParts = (x: string, y: string) => {
+      const m = /^\{([^{}]+)\}$/.exec(x), n = /^\{([^{}]+)\}$/.exec(y);
+      if (!m || !n) return null;
+      const A = m[1].split('.'), B = n[1].split('.');
+      const most = Math.min(A.length, B.length) - 1;
+      let h = 0; while (h < most && A[h] === B[h]) h++;
+      let t = 0; while (t < most - h && A[A.length - 1 - t] === B[B.length - 1 - t]) t++;
+      const cut = (P: string[]) => ({
+        head: P.slice(0, h).join('.'), mid: P.slice(h, P.length - t).join('.'),
+        tail: P.slice(P.length - t).join('.') });
+      return { a: cut(A), b: cut(B) };
+    };
+    const refSide = (v: string, parts: any, colour?: string | null) => {
+      const swatch = colour ? (
+        <span className="compare-cause-colour">
+          <span className="compare-swatch-lg" style={{ background: colour }} />
+          <span className="compare-cause-hex">{colour}</span>
+        </span>
+      ) : null;
+      if (!parts) return <><code>{v}</code>{swatch}</>;
+      return (
+        <><code>
+          {'{' + (parts.head ? parts.head + '.' : '')}
+          <mark className="compare-diff">{parts.mid}</mark>
+          {(parts.tail ? '.' + parts.tail : '') + '}'}
+        </code>{swatch}</>
+      );
+    };
+    const repoMark = s.sides.provider === 'gitlab' ? IconGitlab(13) : IconGithub(13);
+    const causeCard = causes.length > 0 && (
+      <div className="json-download-card compare-causes" data-level={4}>
+        <div className="json-download-header">
+          <div className="json-download-title-group">
+            <p className="json-download-title">The differences</p>
+          </div>
+        </div>
+        {causes.slice(0, 6).map((c: any) => {
+          if (c.kind === 'only-figma' || c.kind === 'only-repo') {
+            const inFigma = c.kind === 'only-figma';
+            return (
+              <div className="compare-cause" key={c.kind + c.name}>
+                <div className="compare-cause-name">{c.name}</div>
+                <div className="compare-cause-note">
+                  <span className="compare-cause-label">
+                    {inFigma ? IconFigma(13) : repoMark}{inFigma ? 'Figma' : repoName}
+                  </span>
+                  {c.count.toLocaleString() + (c.count === 1 ? ' token exists only here: ' : ' tokens exist only here: ') +
+                    c.samples.join(', ') + (c.count > c.samples.length ? ', \u2026' : '')}
+                </div>
+              </div>
+            );
+          }
+          const parts = c.kind === 'aliased' ? null : refParts(c.figma, c.repo);
+          return (
+            <div className="compare-cause" key={c.kind + c.name + c.figma + c.repo}>
+              <div className="compare-cause-name">{c.name}</div>
+              <div className="compare-cause-pair">
+                <div className="compare-cause-side">
+                  <span className="compare-cause-label">{IconFigma(13)}Figma</span>
+                  {refSide(c.figma, parts && parts.a, c.figmaColour)}
+                </div>
+                <div className="compare-cause-side">
+                  <span className="compare-cause-label">{repoMark}{repoName}</span>
+                  {refSide(c.repo, parts && parts.b, c.repoColour)}
+                </div>
+              </div>
+              {c.kind === 'aliased' && (
+                <div className="compare-cause-follow">
+                  {'Same value \u2014 ' + (/^\{/.test(c.figma) ? 'GitHub holds it as a plain value, Figma links to a token' :
+                    'Figma holds it as a plain value, GitHub links to a token')}
+                </div>
+              )}
+              {c.downstream > 0 && (
+                <div className="compare-cause-follow">
+                  {c.downstream.toLocaleString() + ' more ' + (c.downstream === 1 ? 'token follows' : 'tokens follow') + ' from this one'}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {causes.length > 6 && (
+          <p className="compare-more">{'\u2026 and ' + (causes.length - 6) + ' more'}</p>
+        )}
+      </div>
+    );
+    /* Only what the causes do NOT explain is worth a fold. */
+    const other = (r.moved || []).length + (r.renamed || []).length + (r.swapped || []).length;
+    /* The card says what is wrong; the long tables are only for what it cannot say. */
+    const hideAll = causes.length > 0 && other === 0 && causes.length <= 6;
+    const foldDetails = causes.length > 0 && !hideAll;
+    const Fold: any = foldDetails ? 'details' : Fragment;
+    const foldProps: any = foldDetails ? { className: 'compare-fold' } : {};
+
     return (
       <>
         {sides}
-        {applyRow}
+        {causeCard}
+        {!hideAll && <Fold {...foldProps}>
+        {foldDetails && (
+          <summary className="compare-fold-summary">
+            {'More detail'}
+          </summary>
+        )}
 
         <div className="json-download-card" data-level={4}>
           {/*
@@ -4204,7 +4363,7 @@ const GROUP_MATES = 12;
                     rgb(37,37,37) onto rgb(37,37,37): four chips with no chip,
                     only text. Their ground is 3, so they lift to 4.
                   */
-                  <LevelContext.Provider value={SUBCARD_LEVEL}>
+                  
                     <div className="compare-types">
                       {r.changedByType.map((t: any) => {
                         const icon = TYPE_ICON[t.type];
@@ -4218,7 +4377,7 @@ const GROUP_MATES = 12;
                         );
                       })}
                     </div>
-                  </LevelContext.Provider>
+                  
                 )}
               </div>
             </div>
@@ -4440,33 +4599,13 @@ const GROUP_MATES = 12;
             headers were changed to stop using. */}
         {leaves('Architecture \u2014 only in Figma', r.onlyInFigma, false, undefined, 'figma')}
         {leaves('Architecture \u2014 only in ' + repoWhere, r.onlyInRepo, false, undefined, 'repo')}
+        </Fold>}
 
-        <div className="json-download-card" data-level={4}>
-          <PomButton
-            id="compare-copy-btn"
-            variant="tonal"
-            size="medium"
-            block
-            label={clip.label}
-            leftIcon
-            buttonLeftIcon={clip.icon}
-            onClick={() => clip.copy(s.copyText)}
-          />
-          {clip.copied === 'fail' && (
-            <textarea
-              ref={clip.taRef}
-              className="compare-copybox"
-              readOnly
-              value={s.copyText}
-              onFocus={(e) => e.currentTarget.select()}
-              aria-label="The full comparison, ready to copy"
-            />
-          )}
-        </div>
+        {applyRow}
       </>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomCompare = {
     setBusy: (label) => set((s) => ({ ...s, busy: label, problem: null, report: null })),
     setSides: (figma, figmaDetail, repo, repoDetail, provider, figmaCount, repoCount) =>
@@ -4510,9 +4649,49 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
       >{null}</Dialog>
     );
   }
-  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
+  if (container) createRoot(container).render(<View />);
   register(() => setOpen(true));
 }
+
+/*
+  THE STUDIO ASKS, THE DESIGNER ANSWERS. Send to Figma writes into this file, so the Studio's request waits here
+  for a yes: the title and the sentence say what will be written, and Cancel (or closing it) is a no the Studio
+  is told about. One of the two callbacks runs, once. Not the red confirm of the removal dialogs: this adds
+  and overwrites, it deletes nothing.
+*/
+window.PomStudioConfirm = { ask: () => {} };
+(function mountStudioConfirm() {
+  const container = document.getElementById('studio-confirm-dialog-mount');
+  if (!container) return;
+  let show: (s: any) => void = () => {};
+  function View() {
+    const [s, setS] = useState<any>(null);
+    show = setS;
+    const settle = (yes: boolean) => {
+      if (!s) return;
+      const cb = yes ? s.onYes : s.onNo;
+      setS(null);
+      cb();
+    };
+    return (
+      <Dialog
+        open={!!s}
+        onClose={() => settle(false)}
+        size="small"
+        title={s ? s.title : ''}
+        description={s ? s.text : ''}
+        actions={
+          <div style={{ display: 'flex', flexDirection: 'row', gap: 12, width: '100%' }}>
+            <Button variant="tonal" size="large" style={{ flex: 1 }} onClick={() => settle(false)}>Cancel</Button>
+            <Button variant="primary" size="large" style={{ flex: 1 }} onClick={() => settle(true)}>{s ? s.label : ''}</Button>
+          </div>
+        }
+      >{null}</Dialog>
+    );
+  }
+  createRoot(container).render(<View />);
+  window.PomStudioConfirm.ask = (title, text, label, onYes, onNo) => show({ title, text, label, onYes, onNo });
+})();
 
 /* ── which depth of a path is an axis ───────────────────────────────────────
 
@@ -4811,7 +4990,7 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
      which is rung 3 now. At CARD_LEVEL they would compute rung 3 as well and
      paint the colour of the card behind them — the same disappearance Compare's
      file picker was measured doing on the main screen. */
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={SUBCARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomImportLevels = {
     set: (c, a, cols, gc, ord) => set(c, a, cols || [], gc || [], ord || []),
     onToggle: null,
@@ -4987,6 +5166,37 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
           </span>
         )}
 
+        {/*
+          THE STYLES, BY KIND. Not variables and not in the diff — an import
+          creates them, never matches them — so they are named here as they will
+          arrive: how many of each, and which. Left out of an "only values" run,
+          and said to be.
+        */}
+        {(s.willCreateStyles || 0) > 0 && (
+          <span className="import-change-group">
+            <span className={'import-change-heading' + (narrow ? ' is-off' : '')}>
+              {s.willCreateStyles.toLocaleString()} {plural(s.willCreateStyles, 'style', 'styles')} {narrow ? 'not in this run' : 'created'}
+            </span>
+            {[
+              { kind: 'text', one: 'text style', many: 'text styles', names: d.styles?.text || [] },
+              { kind: 'effect', one: 'effect style', many: 'effect styles', names: d.styles?.effect || [] },
+              { kind: 'grid', one: 'grid style', many: 'grid styles', names: d.styles?.grid || [] },
+            ].filter((k) => k.names.length > 0).map((k) => (
+              <span key={k.kind} className="import-change-group">
+                <span className="import-change-note">
+                  <b>{k.names.length.toLocaleString()}</b> {plural(k.names.length, k.one, k.many)}
+                </span>
+                <span className="import-change-tags">
+                  {k.names.slice(0, 8).map((name: string) => (
+                    <Tag key={name} variant="tonal" size="small">{name}</Tag>
+                  ))}
+                  {k.names.length > 8 && <Tag variant="tonal" size="small">{'+ ' + (k.names.length - 8) + ' more'}</Tag>}
+                </span>
+              </span>
+            ))}
+          </span>
+        )}
+
         {s.willAddModes > 0 && (
           <span className="import-change-group">
             <span className="import-change-heading">
@@ -5043,7 +5253,7 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
       </span>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomImportChanges = { set: (d) => set(d), scope: () => readScope() };
 })();
 
@@ -5097,8 +5307,7 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
 
       A DETERMINATE RING around the glyph is what was actually asked for and
       the kit has no such component: Spinner is circular but indeterminate,
-      ProgressBar is determinate but a bar. Raised as disarantidis/pomegranate#93
-      rather than hand-drawn here — an arc with its own dash keyframes would be
+      ProgressBar is determinate but a bar. Not hand-drawn here: — an arc with its own dash keyframes would be
       a second, unowned spinner living in this file, with none of Spinner's
       pathLength normalisation and none of its reasoning about --accent. So
       the swap below is a cut rather than a motion, on purpose, until the kit
@@ -5124,18 +5333,13 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
           act on a row that names what is being removed; reading what arrived
           is the reason the card exists.
 
-          ITS VARIANT IS A PROP NOW. `ghost` was pinned into FileUploadItem's
-          own render with nothing that reached it, which is half of
-          disarantidis/pomegranate#92 and is answered upstream by
-          `removeVariant`. `tonal` is the case that prop was added for, in its
-          own words: a row that is the only content of a raised card, where a
+          ITS VARIANT IS A PROP. FileUploadItem takes `removeVariant`, and
+          `tonal` is the case it exists for: a row that is the only content of a raised card, where a
           ghost control has no ground of its own and sits at the same value as
           the surface behind it.
 
-          Its GLYPH is still the kit's ✕ and still has no prop, so the trash is
-          painted over it from this app's stylesheet — see the
-          #import-file-item-mount block in ui.template.html. A dismiss means
-          "put this away"; this throws the document out. The other half of #92.
+          Its GLYPH is a trash can: removing this throws the document out and
+          starts the page over, which a plain dismiss mark would understate.
         */
         removeVariant="tonal"
         onRemove={() => window.PomImportFile.onRemove?.()}
@@ -5143,7 +5347,7 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
     );
   }
 
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomImportFile = {
     set: (name, bytes, opts) => set(name ? { name, bytes, busy: !!(opts && opts.busy), error: opts && opts.error } : null),
     onRemove: null,
@@ -5216,7 +5420,7 @@ function confirmDialog(mountId: string, cfg: { title: string; text: string; conf
       </span>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={CARD_LEVEL}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomImportQuestions = { set: (qs) => set(qs), onAnswer: null };
 })();
 
@@ -5340,7 +5544,7 @@ function mountFolderDiscovery() {
       </Dialog>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomFolderDiscovery = {
     /* query cleared on every open: a filter left over from the last time hides
        rows that are on the list, which reads as a list that lost them. */
@@ -5469,7 +5673,7 @@ function mountFolderRemove() {
       </Dialog>
     );
   }
-  if (container) flushSync(() => createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>));
+  if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomFolderRemove = {
     open: (info) => put({ ...FRESH, ...info, open: true }),
     close: () => put({ open: false, busy: false }),
@@ -5515,7 +5719,7 @@ confirmDialog('remove-gitlab-dialog-mount',
       >{null}</Dialog>
     );
   }
-  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
+  if (container) createRoot(container).render(<View />);
   window.PomClearTokenDialog = {
     open: (provider) => { flushSync(() => setProvider(provider)); setOpen(true); },
     onConfirm: null,
@@ -5548,43 +5752,111 @@ confirmDialog('remove-gitlab-dialog-mount',
   const container = document.getElementById('clear-variables-dialog-mount');
   let setOpen: (v: boolean) => void = () => {};
   let setSummary: (s: any) => void = () => {};
+  type Summary = { collections: number; variables: number; names: string[]; list?: { name: string; variables: number }[];
+                   fileName: string; styles?: { text: number; effect: number; grid: number }; only?: 'variables' | 'styles' };
+  type StyleKind = 'text' | 'effect' | 'grid';
+  const KINDS: { kind: StyleKind; word: string }[] = [
+    { kind: 'text', word: 'text style' }, { kind: 'effect', word: 'effect style' }, { kind: 'grid', word: 'grid style' },
+  ];
   function View() {
     const [open, setO] = useState(false);
-    const [s, setS] = useState<{ collections: number; variables: number; names: string[]; fileName: string }>(
-      { collections: 0, variables: 0, names: [], fileName: '' });
-    setOpen = setO; setSummary = setS;
+    const [s, setS] = useState<Summary>({ collections: 0, variables: 0, names: [], fileName: '' });
+    /* ONE BOX PER THING THAT CAN BE REMOVED: each collection, and each kind of
+       style. What is ticked is exactly what goes — the confirm button counts
+       it. Pressed from "Clear variables" or "Clear styles", only that group is
+       offered and all of it is ticked; from the collections list the variables
+       are ticked and the styles offered and left alone, as it always was. */
+    const [picked, setPicked] = useState<Record<string, boolean>>({});
+    const [pickedStyles, setPickedStyles] = useState<Record<string, boolean>>({});
+    setOpen = (v) => { setO(v); }; setSummary = (next: Summary) => {
+      setS(next);
+      const list = next.list || next.names.map((name) => ({ name, variables: 0 }));
+      const cols: Record<string, boolean> = {};
+      list.forEach((c) => { cols[c.name] = next.only !== 'styles'; });
+      setPicked(cols);
+      const st: Record<string, boolean> = {};
+      KINDS.forEach((k) => { st[k.kind] = next.only === 'styles' && !!next.styles && next.styles[k.kind] > 0; });
+      setPickedStyles(st);
+    };
     const n = (x: number) => x.toLocaleString();
-    const plural = (x: number, word: string) => x + ' ' + word + (x === 1 ? '' : 's');
-    /* Every name while they fit, then a count — a list that scrolls is not
-       read, and the number is the part that has to land. */
-    const names = s.names.length <= 8
-      ? s.names.join(', ')
-      : s.names.slice(0, 8).join(', ') + ' and ' + (s.names.length - 8) + ' more';
+    const list = s.list || s.names.map((name) => ({ name, variables: 0 }));
+    const chosenCols = list.filter((c) => picked[c.name]);
+    const chosenVars = chosenCols.reduce((sum, c) => sum + c.variables, 0);
+    const chosenStyles = KINDS.reduce((sum, k) => sum + (pickedStyles[k.kind] && s.styles ? s.styles[k.kind] : 0), 0);
+    const nothing = chosenCols.length === 0 && chosenStyles === 0;
+    /* Short on purpose: the button is half a small dialog wide, and a label that
+       is cut off ("Delete 270 va…") says less than a number. The boxes above
+       say what the numbers are. */
+    const parts: string[] = [];
+    if (chosenCols.length) parts.push(n(chosenVars));
+    if (chosenStyles) parts.push(n(chosenStyles));
+    const label = nothing ? 'Nothing selected' : 'Delete ' + parts.join(' + ');
+    const showVars = s.only !== 'styles';
+    const showStyles = s.only !== 'variables';
+    const heading = { fontSize: 12, fontWeight: 600, color: 'var(--app-text-muted)', marginTop: 4 } as const;
     return (
       <Dialog
         open={open}
         onClose={() => setO(false)}
         size="small"
-        title={'Delete all variables in ' + (s.fileName || 'this file') + '?'}
+        title={s.only === 'variables' ? 'Delete variables in ' + (s.fileName || 'this file') + '?'
+             : s.only === 'styles' ? 'Delete styles in ' + (s.fileName || 'this file') + '?'
+             : 'Clear ' + (s.fileName || 'this file') + '?'}
         description={
-          'This removes ' + plural(s.collections, 'collection') + ' and ' + n(s.variables) +
-          ' variable' + (s.variables === 1 ? '' : 's') + ' from the Figma file — ' + names + '. ' +
-          'Any layer, style or component using one of them loses that binding and keeps ' +
-          'the raw value it was showing. Nothing is exported or saved first.'
+          'Tick what to remove from the Figma file. Any layer, style or component using a deleted ' +
+          'variable loses that binding and keeps the raw value it was showing. Nothing is exported or ' +
+          'saved first.'
         }
         actions={
           <div style={{ display: 'flex', flexDirection: 'row', gap: 12, width: '100%' }}>
             <Button variant="tonal" size="large" style={{ flex: 1 }} onClick={() => setO(false)}>Cancel</Button>
-            <Button variant="primary" size="large" style={{ flex: 1 }} data-scheme="error"
-                    onClick={() => { setO(false); window.PomClearVariablesDialog.onConfirm?.(); }}>
-              {'Delete ' + n(s.variables)}
+            <Button variant="primary" size="large" style={{ flex: 1 }} data-scheme="error" disabled={nothing}
+                    onClick={() => {
+                      setO(false);
+                      window.PomClearVariablesDialog.onConfirm?.({
+                        collections: chosenCols.map((c) => c.name),
+                        styles: { text: !!pickedStyles.text, effect: !!pickedStyles.effect, grid: !!pickedStyles.grid },
+                      });
+                    }}>
+              {label}
             </Button>
           </div>
         }
-      >{null}</Dialog>
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-2)', maxHeight: 320, overflowY: 'auto' }}>
+          {showVars && (list.length === 0
+            ? <Checkbox label="No variables in this file" checked={false} disabled onChange={() => {}} />
+            : <>
+                {showStyles && <span style={heading}>Variable collections</span>}
+                {list.map((c) => (
+                  <Checkbox
+                    key={c.name}
+                    label={c.name + (c.variables ? ' — ' + n(c.variables) + ' variable' + (c.variables === 1 ? '' : 's') : '')}
+                    checked={!!picked[c.name]}
+                    onChange={(v: boolean) => setPicked({ ...picked, [c.name]: v })}
+                  />
+                ))}
+              </>)}
+          {showStyles && (
+            <>
+              {showVars && <span style={heading}>Styles</span>}
+              {KINDS.every((k) => !s.styles || s.styles[k.kind] === 0)
+                ? <Checkbox label="No styles in this file" checked={false} disabled onChange={() => {}} />
+                : KINDS.filter((k) => s.styles && s.styles[k.kind] > 0).map((k) => (
+                    <Checkbox
+                      key={k.kind}
+                      label={n(s.styles![k.kind]) + ' ' + k.word + (s.styles![k.kind] === 1 ? '' : 's')}
+                      checked={!!pickedStyles[k.kind]}
+                      onChange={(v: boolean) => setPickedStyles({ ...pickedStyles, [k.kind]: v })}
+                    />
+                  ))}
+            </>
+          )}
+        </div>
+      </Dialog>
     );
   }
-  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
+  if (container) createRoot(container).render(<View />);
   window.PomClearVariablesDialog = {
     open: (summary) => { flushSync(() => setSummary(summary)); setOpen(true); },
     onConfirm: null,
@@ -5598,7 +5870,7 @@ const PROVIDER_LOGO_PATH: Record<'gitlab' | 'github', string> = {
 };
 /* This used to be a hand-rolled <div role="checkbox">, styling itself off
    var(--app-accent) — a token that is never actually declared anywhere in
-   tokens.css/node.css, only mentioned in prose comments there. Its checked
+   tokens.css/kit.css, only mentioned in prose comments there. Its checked
    state (border: 1px solid var(--app-accent)) was therefore an INVALID
    declaration, so the whole shorthand dropped (computed border: 0px none)
    while the unchecked state's `1px solid transparent` stayed valid at 1px —
@@ -5608,7 +5880,7 @@ const PROVIDER_LOGO_PATH: Record<'gitlab' | 'github', string> = {
    — real <button> semantics (Enter/Space for free, no hand-rolled
    onKeyDown), a selection ring painted from --mark (a real, always-defined
    token, unlike --app-accent), and the same 1px border at rest and
-   selected (node.css's .nd-selcard: border always present; .is-selected
+   selected (the kit's .ui-selcard: border always present; .is-selected
    only recolors it via border-color + box-shadow, never adds/removes it —
    the whole class of "shorthand silently invalidates" bug this hit isn't
    reachable through it). Swapped to it instead of just patching the color,
@@ -5693,6 +5965,6 @@ function ProviderChoiceCard({ which, label, checked, onToggle }: { which: 'gitla
       </Dialog>
     );
   }
-  if (container) createRoot(container).render(<LevelContext.Provider value={GROUND}><View /></LevelContext.Provider>);
+  if (container) createRoot(container).render(<View />);
   window.PomOnboardingDialog = { open: () => setOpen(true), onConfirm: null };
 })();

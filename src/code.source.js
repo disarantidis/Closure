@@ -1146,7 +1146,7 @@ function addElevationCompositesDeep(node, dottedPath, canonical) {
   Object.keys(node).forEach(function(key) {
     var child = node[key];
     if (!child || typeof child !== 'object') return;
-    if ('value' in child || '$value' in child) return; // leaf token
+    if (isLeafTokenNode(child)) return; // leaf token
     var childPath = dottedPath ? dottedPath + '.' + key : key;
     if (key === 'elevation') {
       injectElevationComposites(child, childPath, canonical);
@@ -2248,7 +2248,7 @@ function completeThemeSelections(out) {
     var refs = {};
     (function walk(node, path) {
       if (!node || typeof node !== 'object') return;
-      if (Object.prototype.hasOwnProperty.call(node, 'value')) {
+      if (isLeafTokenNode(node)) {
         paths[path] = true;
         var v = node.value;
         var str = typeof v === 'string' ? v : JSON.stringify(v);
@@ -2999,13 +2999,29 @@ function reportUnhintedReferences(out) {
   reference anywhere else is a bug to find, not a line to quietly delete, and
   validateReferenceClosure still reports it.
 */
+/*
+  IS THIS NODE A TOKEN, OR A GROUP THAT HAPPENS TO HAVE A CHILD CALLED
+  "value"? `'value' in node` alone answers wrong for a Figma variable that is
+  itself named exactly "value" — "weight/value" beside "weight/style-name"
+  produces a native group `{ value: {...}, "style-name": {...} }`, which has
+  an own property "value" without being one. Every real leaf this codebase
+  builds carries `type` (native) or `$type` (DTCG) alongside `value` /
+  `$value` — tokenNode() and every inline `{ type: …, value: … }` literal
+  write them together — so requiring the pair is free of that collision and
+  changes nothing for an actual token.
+*/
+function isLeafTokenNode(node) {
+  return !!node && typeof node === 'object' &&
+    (('value' in node && 'type' in node) || ('$value' in node && '$type' in node));
+}
+
 function pruneSynthesisedFoundationRefs(out) {
   var index = {};
   Object.keys(out).forEach(function (setName) {
     if (setName.charAt(0) === '$') return;
     (function walk(node, path) {
       if (!node || typeof node !== 'object') return;
-      if (('value' in node) || ('$value' in node)) { index[path.replace(/\//g, '.')] = true; return; }
+      if (isLeafTokenNode(node)) { index[path.replace(/\//g, '.')] = true; return; }
       for (var k in node) if (node.hasOwnProperty(k)) walk(node[k], path ? path + '/' + k : k);
     })(out[setName], '');
   });
@@ -3052,7 +3068,7 @@ function tokenPathIndex(tokens) {
     if (setName.charAt(0) === '$') return;
     (function walk(node, path) {
       if (!node || typeof node !== 'object') return;
-      if (('value' in node) || ('$value' in node)) { index[path.replace(/\//g, '.')] = true; return; }
+      if (isLeafTokenNode(node)) { index[path.replace(/\//g, '.')] = true; return; }
       for (var k in node) if (node.hasOwnProperty(k)) walk(node[k], path ? path + '/' + k : k);
     })(tokens[setName], '');
   });
@@ -3070,7 +3086,7 @@ function validateReferenceClosure(tokens) {
     if (META[setName] || setName.charAt(0) === '$') return;
     (function walk(node, path) {
       if (!node || typeof node !== 'object') return;
-      if (('value' in node) || ('$value' in node)) {
+      if (isLeafTokenNode(node)) {
         index[path.replace(/\//g, '.')] = true;
         return;
       }
@@ -3106,7 +3122,7 @@ function validateReferenceClosure(tokens) {
     if (META[setName]) return;
     (function walk(node, path) {
       if (!node || typeof node !== 'object') return;
-      if (('value' in node) || ('$value' in node)) {
+      if (isLeafTokenNode(node)) {
         var val = ('value' in node) ? node.value : node.$value;
         refsOf(val).forEach(function(r) {
           totalRefs++;
@@ -3179,7 +3195,9 @@ function buildResolvedDocument(rawData, options) {
     axes: options.axes,
     renameMode: options.renameMode,
     renameToken: options.renameToken,
-    typeHints: options.typeHints
+    typeHints: options.typeHints,
+    restore: options.restore,
+    styles: options.styles
   });
 }
 
@@ -3227,673 +3245,1069 @@ figma.on('selectionchange', postSelection);
    until the person clicked somewhere else. */
 postSelection();
 
-figma.ui.onmessage = function(msg) {
-  if (msg.type === 'resize') {
-    figma.ui.resize(PANEL_WIDTH, msg.height);
-    return;
-  }
+/*
+  ONE SMALL FUNCTION PER MESSAGE. These were the bodies of a single
+  figma.ui.onmessage, which grew with every feature until one handler (clearing
+  a file) silently did nothing on Figma Desktop for Mac: its sandbox compiles
+  each function to bytecode with 16-bit jump offsets, and a function whose body
+  runs past 32 KB gets branch targets that wrap — the handlers that happen to sit
+  past the line are skipped or crash, and on Windows and Web (other engines)
+  nothing is wrong, which is why no test run here ever caught it. Splitting by
+  message keeps every function far below the line, and keeps it there as handlers
+  are added.
+*/
 
-  // Lightweight: report the current file name immediately, without waiting for
-  // the (slow) variable extraction — used to auto-select the target folder.
-  if (msg.type === 'GET_FILE_INFO') {
-    figma.ui.postMessage({ type: 'fileInfo', fileName: (figma.root && figma.root.name) || '' });
-    return;
-  }
+/* ── message: resize ─ its own function, so the sandbox compiles each handler separately (see the note on figma.ui.onmessage) ── */
+function handle_resize(msg) {
+  figma.ui.resize(PANEL_WIDTH, msg.height);
+  return;
+}
 
-  if (msg.type === 'LOAD_GIT_SETTINGS') {
-    figma.clientStorage.getAsync(GIT_CONFIG_KEY).then(function(stored) {
-      var config = stored && typeof stored === 'object' ? stored : {};
-      figma.ui.postMessage({ type: 'GIT_SETTINGS_LOADED', config: config });
-    }).catch(function(e) {
-      figma.ui.postMessage({ type: 'GIT_SETTINGS_LOADED', config: {} });
+/* ── message: GET_FILE_INFO ─ its own function, so the sandbox compiles each handler separately (see the note on figma.ui.onmessage) ── */
+// Lightweight: report the current file name immediately, without waiting for
+// the (slow) variable extraction — used to auto-select the target folder.
+function handle_GET_FILE_INFO(msg) {
+  figma.ui.postMessage({ type: 'fileInfo', fileName: (figma.root && figma.root.name) || '' });
+  return;
+}
+
+/* ── message: LOAD_GIT_SETTINGS ─ its own function, so the sandbox compiles each handler separately (see the note on figma.ui.onmessage) ── */
+function handle_LOAD_GIT_SETTINGS(msg) {
+  figma.clientStorage.getAsync(GIT_CONFIG_KEY).then(function(stored) {
+    var config = stored && typeof stored === 'object' ? stored : {};
+    figma.ui.postMessage({ type: 'GIT_SETTINGS_LOADED', config: config });
+  }).catch(function(e) {
+    figma.ui.postMessage({ type: 'GIT_SETTINGS_LOADED', config: {} });
+  });
+  return;
+}
+
+/* ── message: SAVE_GIT_SETTINGS ─ its own function, so the sandbox compiles each handler separately (see the note on figma.ui.onmessage) ── */
+function handle_SAVE_GIT_SETTINGS(msg) {
+  var config = msg.config || {};
+  figma.clientStorage.setAsync(GIT_CONFIG_KEY, config).then(function() {
+    figma.ui.postMessage({ type: 'GIT_SETTINGS_SAVED' });
+  }).catch(function(e) {
+    figma.ui.postMessage({ type: 'GIT_SETTINGS_SAVED', error: e.message });
+  });
+  return;
+}
+
+/* ── message: extract ─ its own function, so the sandbox compiles each handler separately (see the note on figma.ui.onmessage) ── */
+function handle_extract(msg) {
+  figma.variables.getLocalVariableCollectionsAsync().then(function(collections) {
+
+    var variableIdToCollection = new Map();
+
+    collections.forEach(function(col) {
+      col.variableIds.forEach(function(vid) {
+        variableIdToCollection.set(vid, stripIcons(col.name));
+      });
     });
-    return;
-  }
 
-  if (msg.type === 'SAVE_GIT_SETTINGS') {
-    var config = msg.config || {};
-    figma.clientStorage.setAsync(GIT_CONFIG_KEY, config).then(function() {
-      figma.ui.postMessage({ type: 'GIT_SETTINGS_SAVED' });
-    }).catch(function(e) {
-      figma.ui.postMessage({ type: 'GIT_SETTINGS_SAVED', error: e.message });
+    /*
+      WHICH COLLECTION A VARIABLE ACTUALLY LIVES IN.
+
+      Not variableIdToCollection, which cannot answer this: an extended
+      collection lists every variable it INHERITS in its own variableIds, so
+      one primitive appears in the ids of every collection that extends its
+      owner, and the loop above keeps whichever came last. For a file where
+      eleven collections extend one base that is an arbitrary borrower, and
+      it is arbitrary for exactly the variables this matters for.
+
+      variable.variableCollectionId is the owner, stated by Figma. Mapped
+      through this rather than inferred.
+    */
+    var collectionIdToName = new Map();
+    collections.forEach(function(col) {
+      collectionIdToName.set(col.id, stripIcons(col.name));
     });
-    return;
-  }
 
-  if (msg.type === 'extract') {
-    figma.variables.getLocalVariableCollectionsAsync().then(function(collections) {
+    /* See the note beside where these are counted. */
+    var skipStats = { seen: 0, noOwner: 0, owned: 0, pruned: 0, borrowedButChanged: 0, examples: [] };
 
-      var variableIdToCollection = new Map();
+    // --- DIAGNOSTIC: log each collection's extended-collection properties ---
+    collections.forEach(function(col) {
+      var isExt = !!col.isExtension;
+      var hasParent = !!col.parentVariableCollectionId;
+      var hasRoot = !!col.rootVariableCollectionId;
+      var hasOverrides = !!col.variableOverrides;
+      console.log('[Closure v8] Collection "' + col.name + '"' +
+        ' | isExtension=' + isExt +
+        ' | parentId=' + (col.parentVariableCollectionId || 'none') +
+        ' | rootId=' + (col.rootVariableCollectionId || 'none') +
+        ' | hasOverrides=' + hasOverrides +
+        ' | modes=' + col.modes.length +
+        ' | vars=' + col.variableIds.length);
+    });
 
-      collections.forEach(function(col) {
-        col.variableIds.forEach(function(vid) {
-          variableIdToCollection.set(vid, stripIcons(col.name));
+    // Check if valuesByModeForCollectionAsync exists (needs Figma Update 121+)
+    var sampleVarId = collections[0] && collections[0].variableIds[0];
+    var methodCheckPromise = sampleVarId
+      ? figma.variables.getVariableByIdAsync(sampleVarId).then(function(v) {
+          var hasMethod = v && typeof v.valuesByModeForCollectionAsync === 'function';
+          console.log('[Closure v8] valuesByModeForCollectionAsync available: ' + hasMethod);
+          return hasMethod;
+        })
+      : Promise.resolve(false);
+
+    return methodCheckPromise.then(function(hasAsyncMethod) {
+
+      var promises = collections.map(function(col) {
+        // Detect extended collection using multiple checks
+        var isExtended = !!(col.isExtension || col.parentVariableCollectionId || col.rootVariableCollectionId);
+
+        var varPromises = col.variableIds.map(function(vid) {
+          return figma.variables.getVariableByIdAsync(vid).then(function(variable) {
+            if (!variable) return null;
+
+            // For extended collections: use valuesByModeForCollectionAsync if available
+            // This returns values WITH overrides keyed by the collection's OWN mode IDs.
+            if (isExtended && hasAsyncMethod) {
+              return variable.valuesByModeForCollectionAsync(col).then(function(colValues) {
+                return { variable: variable, collectionValues: colValues };
+              });
+            }
+
+            // Fallback for extended collections when async method is not available:
+            // Manually merge parent values + overrides from variableOverrides
+            if (isExtended && col.variableOverrides) {
+              var parentValues = variable.valuesByMode;
+              var overridesForVar = col.variableOverrides[variable.id];
+              if (overridesForVar) {
+                // Build merged values: start with parent, keyed by child mode IDs
+                var merged = {};
+                col.modes.forEach(function(mode) {
+                  if (mode.parentModeId && overridesForVar[mode.modeId] !== undefined) {
+                    // Use override value
+                    merged[mode.modeId] = overridesForVar[mode.modeId];
+                  } else if (mode.parentModeId && parentValues[mode.parentModeId] !== undefined) {
+                    // Inherit from parent mode
+                    merged[mode.modeId] = parentValues[mode.parentModeId];
+                  }
+                });
+                return { variable: variable, collectionValues: merged };
+              }
+              // No overrides for this variable — inherit all from parent
+              var inherited = {};
+              col.modes.forEach(function(mode) {
+                if (mode.parentModeId && parentValues[mode.parentModeId] !== undefined) {
+                  inherited[mode.modeId] = parentValues[mode.parentModeId];
+                }
+              });
+              return { variable: variable, collectionValues: inherited };
+            }
+
+            // Regular (non-extended) collection: use valuesByMode directly
+            return { variable: variable, collectionValues: variable.valuesByMode };
+          });
+        });
+
+        // Log first variable's mode IDs for the first extended collection
+        return Promise.all(varPromises).then(function(varPairs) {
+          if (isExtended && varPairs.length > 0 && varPairs[0]) {
+            var firstVarModeIds = Object.keys(varPairs[0].collectionValues);
+            var colModeIds = col.modes.map(function(m) { return m.modeId; });
+            console.log('[Closure v8] Extended "' + col.name + '" first var modeIds: ' + JSON.stringify(firstVarModeIds.slice(0, 3)));
+            console.log('[Closure v8] Extended "' + col.name + '" collection modeIds: ' + JSON.stringify(colModeIds.slice(0, 3)));
+            // Log first alias to verify override detection
+            var firstAlias = null;
+            for (var i = 0; i < varPairs.length && !firstAlias; i++) {
+              if (!varPairs[i]) continue;
+              var vals = varPairs[i].collectionValues;
+              var keys = Object.keys(vals);
+              for (var j = 0; j < keys.length && !firstAlias; j++) {
+                var v = vals[keys[j]];
+                if (v && v.type === 'VARIABLE_ALIAS') {
+                  firstAlias = { varName: varPairs[i].variable.name, modeId: keys[j], aliasId: v.id };
+                }
+              }
+            }
+            if (firstAlias) {
+              console.log('[Closure v8] Extended "' + col.name + '" first alias: ' + JSON.stringify(firstAlias));
+            }
+          }
+
+          var variables = [];
+          var resolvePromises = [];
+
+          varPairs.forEach(function(pair) {
+            if (!pair) return;
+            var variable = pair.variable;
+            var collectionValues = pair.collectionValues;
+
+            /*
+              IS THIS COLLECTION THE VARIABLE'S HOME, OR IS IT BORROWING IT?
+
+              An extended collection lists every variable it inherits in its
+              own variableIds, so walking collections and writing what each
+              one can see emits a single primitive once per collection. On a
+              real file that was one colour written into 38 documents, 45% of
+              a 40 MB export — and, worse, it is what made references to it
+              ambiguous on the way back in: 38 definitions of a path, and a
+              "{path}" naming none of them.
+
+              So: written where it lives, plus anywhere it is actually
+              OVERRIDDEN, because an override is a real value that exists
+              nowhere else. Never written where it is merely visible.
+            */
+            var ownerCollection = collectionIdToName.get(variable.variableCollectionId) || null;
+            var borrowed = !!(ownerCollection && ownerCollection !== stripIcons(col.name));
+            /*
+              COUNTED, BECAUSE THE FIRST VERSION OF THIS PRUNED NOTHING AT ALL
+              and there was no way to tell which of three things was true: the
+              owner was not being found, nothing was borrowed, or the
+              unchanged test was rejecting everything. A real file went out at
+              exactly the same 111,554 rows it had before the change, and the
+              only way to tell the three apart was to guess. Three counters
+              and a log line settle it in one export.
+            */
+            skipStats.seen++;
+            if (!ownerCollection) skipStats.noOwner++;
+            else if (!borrowed) skipStats.owned++;
+            if (borrowed) {
+              if (inheritsUnchanged(collectionValues, variable.valuesByMode, col.modes)) {
+                skipStats.pruned++;
+                return;                         // visible here, but it lives elsewhere
+              }
+              skipStats.borrowedButChanged++;
+              if (skipStats.examples.length < 3) {
+                skipStats.examples.push(stripIcons(col.name) + '/' + variable.name +
+                  ' lives in ' + ownerCollection +
+                  ', here ' + Object.keys(collectionValues).length + ' mode(s)' +
+                  ', there ' + Object.keys(variable.valuesByMode || {}).length + ' mode(s)');
+              }
+            }
+
+            var valuesByMode = {}, resolvedValuesByMode = {}, aliasInfo = {};
+
+            Object.entries(collectionValues).forEach(function(entry) {
+              var mId = entry[0], val = entry[1];
+              valuesByMode[mId] = val;
+
+              if (val && val.type === 'VARIABLE_ALIAS') {
+                resolvePromises.push(
+                  (async function() {
+                    var currentVal = val;
+                    var firstAliasedVar = await figma.variables.getVariableByIdAsync(currentVal.id);
+                    if (firstAliasedVar) {
+                      /* The owner, not a borrower — see collectionIdToName. */
+                      var aliasedVarCollection =
+                            collectionIdToName.get(firstAliasedVar.variableCollectionId) ||
+                            variableIdToCollection.get(firstAliasedVar.id);
+                      var aliasPath = buildAliasPath(firstAliasedVar, aliasedVarCollection, col.name, collections);
+                      aliasInfo[mId] = {
+                        isAlias: true,
+                        aliasPath: aliasPath,
+                        aliasedVarId: firstAliasedVar.id,
+                        aliasedVarCollection: aliasedVarCollection
+                      };
+                    }
+                    
+                    // Resolve the full alias chain for THIS specific mode's value
+                    var maxDepth = 10;
+                    while (currentVal && currentVal.type === 'VARIABLE_ALIAS' && maxDepth-- > 0) {
+                      var nextVar = await figma.variables.getVariableByIdAsync(currentVal.id);
+                      if (!nextVar) break;
+                      // Get the value - use first available mode since primitive vars typically have one mode
+                      var nextModes = Object.keys(nextVar.valuesByMode);
+                      currentVal = nextVar.valuesByMode[nextModes[0]] || null;
+                    }
+                    resolvedValuesByMode[mId] = currentVal;
+                  })()
+                );
+              } else {
+                resolvedValuesByMode[mId] = val;
+              }
+            });
+
+            variables.push({
+              id: variable.id,
+              name: variable.name,
+              type: variable.resolvedType,
+              valuesByMode: valuesByMode,
+              resolvedValuesByMode: resolvedValuesByMode,
+              aliasInfo: aliasInfo,
+              /* Where it lives, and whether this collection is only holding
+                 an override of it — carried so the export can say so. */
+              ownerCollection: ownerCollection,
+              borrowed: borrowed,
+              codeSyntax: variable.codeSyntax,
+              // Where Figma allows this variable to be used (CORNER_RADIUS, GAP,
+              // FONT_SIZE, ...). It is the same semantic distinction the token
+              // types key off, stated as metadata rather than inferred from a
+              // name, so the resolved shape can derive types instead of being
+              // handed a naming table. Nothing in the default export reads it.
+              scopes: variable.scopes || [],
+              description: variable.description || ''
+            });
+          });
+
+          return Promise.all(resolvePromises).then(function() {
+            return {
+              id: col.id,
+              name: col.name,
+              modes: col.modes,
+              // Which mode answers when nothing has chosen one. Resolving a
+              // graph without it has to guess modes[0], which is the only
+              // answer for a single-mode collection and a guess for the rest.
+              defaultModeId: col.defaultModeId,
+              // Kept in the structure record (restore.structure) so an import can put it back.
+              hiddenFromPublishing: col.hiddenFromPublishing,
+              variables: variables
+            };
+          });
         });
       });
 
       /*
-        WHICH COLLECTION A VARIABLE ACTUALLY LIVES IN.
-
-        Not variableIdToCollection, which cannot answer this: an extended
-        collection lists every variable it INHERITS in its own variableIds, so
-        one primitive appears in the ids of every collection that extends its
-        owner, and the loop above keeps whichever came last. For a file where
-        eleven collections extend one base that is an arbitrary borrower, and
-        it is arbitrary for exactly the variables this matters for.
-
-        variable.variableCollectionId is the owner, stated by Figma. Mapped
-        through this rather than inferred.
+        REPORTED HERE, WHICH IS WHERE THE COUNTERS EXIST. The first version of
+        this logged from the NEXT .then in the chain — a sibling of the
+        callback that declares them, not a child of it — so reading skipStats
+        threw a ReferenceError and took the whole extract down with it. The
+        plugin showed a cheerful mascot and "Error: 'skipStats' is not
+        defined", which is a fair summary of the mistake.
       */
-      var collectionIdToName = new Map();
-      collections.forEach(function(col) {
-        collectionIdToName.set(col.id, stripIcons(col.name));
+      return Promise.all(promises).then(function (cols) {
+        console.log('[Closure] variables seen ' + skipStats.seen +
+          ' — owned here ' + skipStats.owned +
+          ', inherited and identical (not written) ' + skipStats.pruned +
+          ', inherited but differing (written) ' + skipStats.borrowedButChanged +
+          ', owner unknown ' + skipStats.noOwner);
+        skipStats.examples.forEach(function (e) { console.log('[Closure]     e.g. ' + e); });
+        return cols;
       });
-
-      /* See the note beside where these are counted. */
-      var skipStats = { seen: 0, noOwner: 0, owned: 0, pruned: 0, borrowedButChanged: 0, examples: [] };
-
-      // --- DIAGNOSTIC: log each collection's extended-collection properties ---
-      collections.forEach(function(col) {
-        var isExt = !!col.isExtension;
-        var hasParent = !!col.parentVariableCollectionId;
-        var hasRoot = !!col.rootVariableCollectionId;
-        var hasOverrides = !!col.variableOverrides;
-        console.log('[Closure v8] Collection "' + col.name + '"' +
-          ' | isExtension=' + isExt +
-          ' | parentId=' + (col.parentVariableCollectionId || 'none') +
-          ' | rootId=' + (col.rootVariableCollectionId || 'none') +
-          ' | hasOverrides=' + hasOverrides +
-          ' | modes=' + col.modes.length +
-          ' | vars=' + col.variableIds.length);
-      });
-
-      // Check if valuesByModeForCollectionAsync exists (needs Figma Update 121+)
-      var sampleVarId = collections[0] && collections[0].variableIds[0];
-      var methodCheckPromise = sampleVarId
-        ? figma.variables.getVariableByIdAsync(sampleVarId).then(function(v) {
-            var hasMethod = v && typeof v.valuesByModeForCollectionAsync === 'function';
-            console.log('[Closure v8] valuesByModeForCollectionAsync available: ' + hasMethod);
-            return hasMethod;
-          })
-        : Promise.resolve(false);
-
-      return methodCheckPromise.then(function(hasAsyncMethod) {
-
-        var promises = collections.map(function(col) {
-          // Detect extended collection using multiple checks
-          var isExtended = !!(col.isExtension || col.parentVariableCollectionId || col.rootVariableCollectionId);
-
-          var varPromises = col.variableIds.map(function(vid) {
-            return figma.variables.getVariableByIdAsync(vid).then(function(variable) {
-              if (!variable) return null;
-
-              // For extended collections: use valuesByModeForCollectionAsync if available
-              // This returns values WITH overrides keyed by the collection's OWN mode IDs.
-              if (isExtended && hasAsyncMethod) {
-                return variable.valuesByModeForCollectionAsync(col).then(function(colValues) {
-                  return { variable: variable, collectionValues: colValues };
-                });
-              }
-
-              // Fallback for extended collections when async method is not available:
-              // Manually merge parent values + overrides from variableOverrides
-              if (isExtended && col.variableOverrides) {
-                var parentValues = variable.valuesByMode;
-                var overridesForVar = col.variableOverrides[variable.id];
-                if (overridesForVar) {
-                  // Build merged values: start with parent, keyed by child mode IDs
-                  var merged = {};
-                  col.modes.forEach(function(mode) {
-                    if (mode.parentModeId && overridesForVar[mode.modeId] !== undefined) {
-                      // Use override value
-                      merged[mode.modeId] = overridesForVar[mode.modeId];
-                    } else if (mode.parentModeId && parentValues[mode.parentModeId] !== undefined) {
-                      // Inherit from parent mode
-                      merged[mode.modeId] = parentValues[mode.parentModeId];
-                    }
-                  });
-                  return { variable: variable, collectionValues: merged };
-                }
-                // No overrides for this variable — inherit all from parent
-                var inherited = {};
-                col.modes.forEach(function(mode) {
-                  if (mode.parentModeId && parentValues[mode.parentModeId] !== undefined) {
-                    inherited[mode.modeId] = parentValues[mode.parentModeId];
-                  }
-                });
-                return { variable: variable, collectionValues: inherited };
-              }
-
-              // Regular (non-extended) collection: use valuesByMode directly
-              return { variable: variable, collectionValues: variable.valuesByMode };
-            });
-          });
-
-          // Log first variable's mode IDs for the first extended collection
-          return Promise.all(varPromises).then(function(varPairs) {
-            if (isExtended && varPairs.length > 0 && varPairs[0]) {
-              var firstVarModeIds = Object.keys(varPairs[0].collectionValues);
-              var colModeIds = col.modes.map(function(m) { return m.modeId; });
-              console.log('[Closure v8] Extended "' + col.name + '" first var modeIds: ' + JSON.stringify(firstVarModeIds.slice(0, 3)));
-              console.log('[Closure v8] Extended "' + col.name + '" collection modeIds: ' + JSON.stringify(colModeIds.slice(0, 3)));
-              // Log first alias to verify override detection
-              var firstAlias = null;
-              for (var i = 0; i < varPairs.length && !firstAlias; i++) {
-                if (!varPairs[i]) continue;
-                var vals = varPairs[i].collectionValues;
-                var keys = Object.keys(vals);
-                for (var j = 0; j < keys.length && !firstAlias; j++) {
-                  var v = vals[keys[j]];
-                  if (v && v.type === 'VARIABLE_ALIAS') {
-                    firstAlias = { varName: varPairs[i].variable.name, modeId: keys[j], aliasId: v.id };
-                  }
-                }
-              }
-              if (firstAlias) {
-                console.log('[Closure v8] Extended "' + col.name + '" first alias: ' + JSON.stringify(firstAlias));
-              }
-            }
-
-            var variables = [];
-            var resolvePromises = [];
-
-            varPairs.forEach(function(pair) {
-              if (!pair) return;
-              var variable = pair.variable;
-              var collectionValues = pair.collectionValues;
-
-              /*
-                IS THIS COLLECTION THE VARIABLE'S HOME, OR IS IT BORROWING IT?
-
-                An extended collection lists every variable it inherits in its
-                own variableIds, so walking collections and writing what each
-                one can see emits a single primitive once per collection. On a
-                real file that was one colour written into 38 documents, 45% of
-                a 40 MB export — and, worse, it is what made references to it
-                ambiguous on the way back in: 38 definitions of a path, and a
-                "{path}" naming none of them.
-
-                So: written where it lives, plus anywhere it is actually
-                OVERRIDDEN, because an override is a real value that exists
-                nowhere else. Never written where it is merely visible.
-              */
-              var ownerCollection = collectionIdToName.get(variable.variableCollectionId) || null;
-              var borrowed = !!(ownerCollection && ownerCollection !== stripIcons(col.name));
-              /*
-                COUNTED, BECAUSE THE FIRST VERSION OF THIS PRUNED NOTHING AT ALL
-                and there was no way to tell which of three things was true: the
-                owner was not being found, nothing was borrowed, or the
-                unchanged test was rejecting everything. A real file went out at
-                exactly the same 111,554 rows it had before the change, and the
-                only way to tell the three apart was to guess. Three counters
-                and a log line settle it in one export.
-              */
-              skipStats.seen++;
-              if (!ownerCollection) skipStats.noOwner++;
-              else if (!borrowed) skipStats.owned++;
-              if (borrowed) {
-                if (inheritsUnchanged(collectionValues, variable.valuesByMode, col.modes)) {
-                  skipStats.pruned++;
-                  return;                         // visible here, but it lives elsewhere
-                }
-                skipStats.borrowedButChanged++;
-                if (skipStats.examples.length < 3) {
-                  skipStats.examples.push(stripIcons(col.name) + '/' + variable.name +
-                    ' lives in ' + ownerCollection +
-                    ', here ' + Object.keys(collectionValues).length + ' mode(s)' +
-                    ', there ' + Object.keys(variable.valuesByMode || {}).length + ' mode(s)');
-                }
-              }
-
-              var valuesByMode = {}, resolvedValuesByMode = {}, aliasInfo = {};
-
-              Object.entries(collectionValues).forEach(function(entry) {
-                var mId = entry[0], val = entry[1];
-                valuesByMode[mId] = val;
-
-                if (val && val.type === 'VARIABLE_ALIAS') {
-                  resolvePromises.push(
-                    (async function() {
-                      var currentVal = val;
-                      var firstAliasedVar = await figma.variables.getVariableByIdAsync(currentVal.id);
-                      if (firstAliasedVar) {
-                        /* The owner, not a borrower — see collectionIdToName. */
-                        var aliasedVarCollection =
-                              collectionIdToName.get(firstAliasedVar.variableCollectionId) ||
-                              variableIdToCollection.get(firstAliasedVar.id);
-                        var aliasPath = buildAliasPath(firstAliasedVar, aliasedVarCollection, col.name, collections);
-                        aliasInfo[mId] = {
-                          isAlias: true,
-                          aliasPath: aliasPath,
-                          aliasedVarId: firstAliasedVar.id,
-                          aliasedVarCollection: aliasedVarCollection
-                        };
-                      }
-                      
-                      // Resolve the full alias chain for THIS specific mode's value
-                      var maxDepth = 10;
-                      while (currentVal && currentVal.type === 'VARIABLE_ALIAS' && maxDepth-- > 0) {
-                        var nextVar = await figma.variables.getVariableByIdAsync(currentVal.id);
-                        if (!nextVar) break;
-                        // Get the value - use first available mode since primitive vars typically have one mode
-                        var nextModes = Object.keys(nextVar.valuesByMode);
-                        currentVal = nextVar.valuesByMode[nextModes[0]] || null;
-                      }
-                      resolvedValuesByMode[mId] = currentVal;
-                    })()
-                  );
-                } else {
-                  resolvedValuesByMode[mId] = val;
-                }
-              });
-
-              variables.push({
-                id: variable.id,
-                name: variable.name,
-                type: variable.resolvedType,
-                valuesByMode: valuesByMode,
-                resolvedValuesByMode: resolvedValuesByMode,
-                aliasInfo: aliasInfo,
-                /* Where it lives, and whether this collection is only holding
-                   an override of it — carried so the export can say so. */
-                ownerCollection: ownerCollection,
-                borrowed: borrowed,
-                codeSyntax: variable.codeSyntax,
-                // Where Figma allows this variable to be used (CORNER_RADIUS, GAP,
-                // FONT_SIZE, ...). It is the same semantic distinction the token
-                // types key off, stated as metadata rather than inferred from a
-                // name, so the resolved shape can derive types instead of being
-                // handed a naming table. Nothing in the default export reads it.
-                scopes: variable.scopes || [],
-                description: variable.description || ''
-              });
-            });
-
-            return Promise.all(resolvePromises).then(function() {
-              return {
-                id: col.id,
-                name: col.name,
-                modes: col.modes,
-                // Which mode answers when nothing has chosen one. Resolving a
-                // graph without it has to guess modes[0], which is the only
-                // answer for a single-mode collection and a guess for the rest.
-                defaultModeId: col.defaultModeId,
-                variables: variables
-              };
-            });
-          });
-        });
-
-        /*
-          REPORTED HERE, WHICH IS WHERE THE COUNTERS EXIST. The first version of
-          this logged from the NEXT .then in the chain — a sibling of the
-          callback that declares them, not a child of it — so reading skipStats
-          threw a ReferenceError and took the whole extract down with it. The
-          plugin showed a cheerful mascot and "Error: 'skipStats' is not
-          defined", which is a fair summary of the mistake.
-        */
-        return Promise.all(promises).then(function (cols) {
-          console.log('[Closure] variables seen ' + skipStats.seen +
-            ' — owned here ' + skipStats.owned +
-            ', inherited and identical (not written) ' + skipStats.pruned +
-            ', inherited but differing (written) ' + skipStats.borrowedButChanged +
-            ', owner unknown ' + skipStats.noOwner);
-          skipStats.examples.forEach(function (e) { console.log('[Closure]     e.g. ' + e); });
-          return cols;
+    });
+  }).then(function(result) {
+    // How many variables actually carry a Figma description, counted on the RAW
+    // extraction — upstream of transformToFinalFormat, the the token format fixups
+    // and the DTCG conversion. If this says 0, the descriptions are not in the
+    // file; if it says N > 0 but the export has none, the loss is ours.
+    (function logDescriptionCoverage() {
+      var total = 0, described = 0;
+      result.forEach(function(col) {
+        col.variables.forEach(function(v) {
+          total++;
+          if (v.description) described++;
         });
       });
-    }).then(function(result) {
-      // How many variables actually carry a Figma description, counted on the RAW
-      // extraction — upstream of transformToFinalFormat, the the token format fixups
-      // and the DTCG conversion. If this says 0, the descriptions are not in the
-      // file; if it says N > 0 but the export has none, the loss is ours.
-      (function logDescriptionCoverage() {
-        var total = 0, described = 0;
-        result.forEach(function(col) {
-          col.variables.forEach(function(v) {
-            total++;
-            if (v.description) described++;
-          });
-        });
-        var pct = total ? Math.round((described / total) * 100) : 0;
-        console.log('[Closure] Figma descriptions: ' + described + ' of ' +
-          total + ' variables (' + pct + '%)');
-        if (!described && total) {
-          console.log('[Closure] No variable in this file has a description — ' +
-            'nothing for the DTCG export to carry into $description.');
-        }
-      })();
+      var pct = total ? Math.round((described / total) * 100) : 0;
+      console.log('[Closure] Figma descriptions: ' + described + ' of ' +
+        total + ' variables (' + pct + '%)');
+      if (!described && total) {
+        console.log('[Closure] No variable in this file has a description — ' +
+          'nothing for the DTCG export to carry into $description.');
+      }
+    })();
 
-      // Also extract local styles (text styles and effect styles) for $figmaStyleReferences
-      var textStyles = figma.getLocalTextStyles().map(function(style) {
-        return {
-          id: style.id,
-          name: style.name,
-          type: 'TEXT'
-        };
+    /*
+      THE FILE'S STYLES, as definitions (src/styles-capture.js): font, case,
+      decoration, values, and the variable each field is bound to. The id and
+      name every consumer of this list has always read are still the first
+      two fields of each entry. If reading a definition fails for any reason
+      the list falls back to id and name alone, which is what it was before —
+      a style that cannot be read must not take the whole extract with it.
+    */
+    var idAndName = function () {
+      return {
+        textStyles: figma.getLocalTextStyles().map(function(style) {
+          return { id: style.id, name: style.name, type: 'TEXT' };
+        }),
+        effectStyles: figma.getLocalEffectStyles().map(function(style) {
+          return { id: style.id, name: style.name, type: 'EFFECT' };
+        }),
+        gridStyles: (figma.getLocalGridStyles ? figma.getLocalGridStyles() : []).map(function(style) {
+          return { id: style.id, name: style.name, type: 'GRID' };
+        })
+      };
+    };
+    /* Flat if/else, not a conditional holding a callback: Figma Desktop for Mac
+       compiles a function literal inside a conditional or logical expression
+       wrongly. */
+    var readStyles;
+    if (typeof PomStylesCapture !== 'undefined') {
+      readStyles = PomStylesCapture.capture(figma).catch(function (e) {
+        console.warn('[Closure] styles read as id and name only: ' + (e && e.message));
+        return idAndName();
       });
-      var effectStyles = figma.getLocalEffectStyles().map(function(style) {
-        return {
-          id: style.id,
-          name: style.name,
-          type: 'EFFECT'
-        };
-      });
-      
+    } else {
+      readStyles = Promise.resolve(idAndName());
+    }
+
+    return readStyles.then(function (styles) {
       figma.ui.postMessage({
         type: 'extracted',
         collections: result,
         fileName: (figma.root && figma.root.name) || '',
-        styles: {
-          textStyles: textStyles,
-          effectStyles: effectStyles
+        styles: styles
+      });
+    });
+  }).catch(function(e) {
+    console.error('[Closure v8] Extract error:', e);
+    figma.ui.postMessage({ type: 'error', message: e.message });
+  });
+}
+
+/* ── message: applyImport ─ its own function, so the sandbox compiles each handler separately (see the note on figma.ui.onmessage) ── */
+/*
+  THE ONLY WRITE PATH IN THE PLUGIN.
+
+  Everything that decided WHAT to write happened in the UI — reading the
+  file, projecting it, refusing what it could not know, and showing the diff.
+  By the time a program arrives here every decision is already made, which is
+  why this handler is short and has no judgement in it.
+
+  snapshot() first, so names in the program resolve to the objects already in
+  this document: that is what makes the run an upsert rather than a duplicate
+  factory, and it is what the diff has been describing.
+*/
+function handle_applyImport(msg) {
+  (async function() {
+    try {
+      var existing = await PomImportApply.snapshot(figma);
+
+      /*
+        ASK THE DOCUMENT BEFORE TOUCHING IT. Figma has no transaction, and
+        this program is ordered in phases — every createVariable runs before
+        any setValue — so a limit discovered PART WAY THROUGH leaves a file
+        full of variables holding nothing. That is not hypothetical: a real
+        import created 6,192 of them before stopping on the 5,001st variable
+        of a collection Figma caps at 5,000.
+
+        Refusing up front costs one read and cannot half-write.
+      */
+      var pre = await PomImportApply.preflight(msg.program, figma, { existing: existing });
+      if (!pre.ok) {
+        console.warn('[Import] refused before writing: ' +
+          pre.problems.map(function(p) { return p.message; }).join('; '));
+        figma.ui.postMessage({ type: 'importRefused', problems: pre.problems });
+        return;
+      }
+
+      var report = PomImportApply.apply(msg.program, figma, { existing: existing });
+      console.log('[Import] ' + report.applied + ' applied, ' + report.failed + ' failed; ' +
+        report.variables + ' created, ' + (report.reusedVariables || 0) + ' reused, ' +
+        (report.modesAdded || 0) + ' modes added');
+      figma.ui.postMessage({ type: 'importApplied', report: report });
+    } catch (e) {
+      console.error('[Import] apply failed:', e);
+      figma.ui.postMessage({ type: 'importApplied',
+        report: { applied: 0, failed: 1, variables: 0, errors: [{ error: e.message || String(e) }] } });
+    }
+  })();
+  return;
+}
+
+/* ── message: captureComponent ─ its own function, so the sandbox compiles each handler separately (see the note on figma.ui.onmessage) ── */
+/*
+  DELETE EVERY LOCAL VARIABLE COLLECTION IN THIS FILE.
+
+  The most destructive thing this plugin can do, and the only handler that
+  removes rather than adds. Three things make it survivable:
+
+    IT ONLY EVER SEES LOCAL COLLECTIONS. getLocalVariableCollectionsAsync
+    returns what this file owns; a collection consumed from a library is not
+    in the list and has no remove() to call, so a shared design system cannot
+    be deleted from a file that merely uses it.
+
+    IT COUNTS BEFORE IT CUTS. variableIds is read while the collection still
+    exists — after remove() the object is gone and the number with it, so a
+    report gathered afterwards would be a report of nothing.
+
+    IT DOES NOT STOP ON ONE FAILURE. A collection that refuses is recorded
+    and the rest still go; the alternative is a half-cleared file whose
+    remaining contents depend on iteration order, which is the state hardest
+    to reason about afterwards.
+
+  NOT UNDONE BY THIS PLUGIN. Figma keeps plugin edits on its own undo stack,
+  so Cmd-Z may bring them back, but that is Figma's behaviour and not a
+  promise this code can make — which is why the confirmation in the UI says
+  what will go rather than offering to reverse it.
+*/
+/*
+  CAPTURE THE SELECTED COMPONENT SET.
+
+  The selection is resolved here rather than asked for, because the thing a
+  person has selected is usually a variant — they clicked the one they were
+  looking at — and refusing that would be the plugin being pedantic about a
+  distinction it can resolve itself. An INSTANCE is refused, because an
+  instance is a use of a component and its contract belongs to the component.
+
+  Everything after the read is the capture module's, and everything after
+  THAT is the UI's: this handler walks nothing and decides nothing.
+*/
+function handle_captureComponent(msg) {
+  (async function() {
+    try {
+      var sel = figma.currentPage.selection;
+      var set = null, why = '';
+      if (!sel.length) {
+        why = 'Select a component set — or any one of its variants.';
+      } else if (sel[0].type === 'COMPONENT_SET') {
+        set = sel[0];
+      } else if (sel[0].type === 'COMPONENT' && sel[0].parent && sel[0].parent.type === 'COMPONENT_SET') {
+        set = sel[0].parent;
+      } else if (sel[0].type === 'COMPONENT') {
+        why = '"' + sel[0].name + '" is a component on its own, with no variants. ' +
+              'A contract describes a set and the axes it varies over.';
+      } else if (sel[0].type === 'INSTANCE') {
+        why = 'That is an instance. Select the component set it came from — a ' +
+              'contract belongs to the component, not to a use of it.';
+      } else {
+        why = 'Selected a ' + String(sel[0].type).toLowerCase().replace(/_/g, ' ') +
+              '. Select a component set.';
+      }
+      if (!set) {
+        figma.ui.postMessage({ type: 'componentCaptureFailed', reason: why });
+        return;
+      }
+      var capture = await PomComponentCapture.captureComponentSet(set, figma, {});
+      figma.ui.postMessage({ type: 'componentCaptured', capture: capture });
+    } catch (e) {
+      console.error('[Closure] component capture failed:', e);
+      figma.ui.postMessage({ type: 'componentCaptureFailed',
+                             reason: (e && e.message) || String(e) });
+    }
+  })();
+  return;
+}
+
+/* ── message: rememberContractPath ─ its own function, so the sandbox compiles each handler separately (see the note on figma.ui.onmessage) ── */
+/*
+  LOCK THE COMPONENT TO ITS FILE.
+
+  Sent after a contract has been written, never before: the push is the act
+  that settles which file this component's contract is, and recording it any
+  earlier would be remembering a path somebody was still choosing.
+
+  THE ONLY THING THIS PLUGIN WRITES TO A COMPONENT, and it is metadata — no
+  layer, property or value is touched. Shared plugin data so the answer
+  travels with the component into files that import it, and so a teammate
+  running this plugin is told rather than left to guess again.
+*/
+function handle_rememberContractPath(msg) {
+  (async function() {
+    try {
+      var node = await figma.getNodeByIdAsync(msg.nodeId);
+      if (!node || node.type !== 'COMPONENT_SET') return;
+      node.setSharedPluginData(PomComponentCapture.LOCK_NAMESPACE,
+                               PomComponentCapture.LOCK_KEY, String(msg.path || ''));
+      figma.ui.postMessage({ type: 'contractPathRemembered', nodeId: msg.nodeId, path: msg.path });
+    } catch (e) {
+      /* Not being able to remember is not a reason to undo a push that has
+         already landed. The next capture falls back to matching by name,
+         which is where this started. */
+      console.warn('[Closure] could not remember the contract path:', e);
+    }
+  })();
+  return;
+}
+
+/* ── messages: studioSyncLoad, studioSyncSave ─ each its own function (see the note on figma.ui.onmessage) ── */
+/*
+  WHAT THIS FILE REMEMBERS OF ITS LAST SYNC WITH THE STUDIO.
+
+  Two places, because the two things are different sizes. Where the file was last synced from (repo, branch, path,
+  commit) is a few dozen bytes and belongs to the file, so it is shared plugin data on the document root and
+  travels with it. The values both sides agreed on then (the baseline the Studio parity needs to tell who changed
+  a token) is tens of thousands of entries, over what a document's plugin data can hold, so it lives in this
+  user's clientStorage under an id the file carries. A teammate without the baseline gets a report that says
+  it cannot tell who moved (see classify in studio-link.js), never a wrong one.
+
+  Reading writes nothing. The file id is made on the first save, which only a sync does.
+*/
+var STUDIO_NS = 'radd-studio-link';
+var STUDIO_BASELINE_PREFIX = 'json-exporter-studio-baseline:';
+
+function handle_studioSyncLoad(msg) {
+  (async function() {
+    var out = { type: 'studioSync', lastSync: null, baseline: null };
+    try {
+      var raw = figma.root.getSharedPluginData(STUDIO_NS, 'lastSync');
+      var id = figma.root.getSharedPluginData(STUDIO_NS, 'fileId');
+      if (raw) out.lastSync = JSON.parse(raw);
+      if (id) {
+        var stored = await figma.clientStorage.getAsync(STUDIO_BASELINE_PREFIX + id);
+        if (stored && typeof stored === 'object') out.baseline = stored;
+      }
+    } catch (e) {
+      console.warn('[Closure] could not read the Studio sync point:', e);
+    }
+    figma.ui.postMessage(out);
+  })();
+  return;
+}
+
+function handle_studioSyncSave(msg) {
+  (async function() {
+    var out = { type: 'studioSyncSaved', ok: false };
+    try {
+      var id = figma.root.getSharedPluginData(STUDIO_NS, 'fileId');
+      if (!id) {
+        id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        figma.root.setSharedPluginData(STUDIO_NS, 'fileId', id);
+      }
+      figma.root.setSharedPluginData(STUDIO_NS, 'lastSync', JSON.stringify(msg.lastSync || null));
+      await figma.clientStorage.setAsync(STUDIO_BASELINE_PREFIX + id, msg.baseline || {});
+      out.ok = true;
+    } catch (e) {
+      out.error = String(e && e.message ? e.message : e);
+    }
+    figma.ui.postMessage(out);
+  })();
+  return;
+}
+
+/* Collections in the order they can be removed cheaply: one that no remaining
+   collection aliases into goes before the ones it points at. Cycles and
+   unreadable values fall back to the order Figma gave. */
+async function clearOrder(cols) {
+  try {
+    var vars = await figma.variables.getLocalVariablesAsync();
+    var collOf = {};
+    vars.forEach(function(v) { collOf[v.id] = v.variableCollectionId; });
+    var uses = {};                        // collection id -> {collection ids it aliases}
+    cols.forEach(function(c) { uses[c.id] = {}; });
+    vars.forEach(function(v) {
+      var by = v.valuesByMode || {};
+      Object.keys(by).forEach(function(m) {
+        var val = by[m];
+        if (val && typeof val === 'object' && val.type === 'VARIABLE_ALIAS') {
+          var target = collOf[val.id];
+          if (target && target !== v.variableCollectionId && uses[v.variableCollectionId]) uses[v.variableCollectionId][target] = true;
         }
       });
-    }).catch(function(e) {
-      console.error('[Closure v8] Extract error:', e);
-      figma.ui.postMessage({ type: 'error', message: e.message });
     });
-  }
-
-  /*
-    THE ONLY WRITE PATH IN THE PLUGIN.
-
-    Everything that decided WHAT to write happened in the UI — reading the
-    file, projecting it, refusing what it could not know, and showing the diff.
-    By the time a program arrives here every decision is already made, which is
-    why this handler is short and has no judgement in it.
-
-    snapshot() first, so names in the program resolve to the objects already in
-    this document: that is what makes the run an upsert rather than a duplicate
-    factory, and it is what the diff has been describing.
-  */
-  if (msg.type === 'applyImport') {
-    (async function() {
-      try {
-        var existing = await PomImportApply.snapshot(figma);
-
-        /*
-          ASK THE DOCUMENT BEFORE TOUCHING IT. Figma has no transaction, and
-          this program is ordered in phases — every createVariable runs before
-          any setValue — so a limit discovered PART WAY THROUGH leaves a file
-          full of variables holding nothing. That is not hypothetical: a real
-          import created 6,192 of them before stopping on the 5,001st variable
-          of a collection Figma caps at 5,000.
-
-          Refusing up front costs one read and cannot half-write.
-        */
-        var pre = await PomImportApply.preflight(msg.program, figma, { existing: existing });
-        if (!pre.ok) {
-          console.warn('[Import] refused before writing: ' +
-            pre.problems.map(function(p) { return p.message; }).join('; '));
-          figma.ui.postMessage({ type: 'importRefused', problems: pre.problems });
-          return;
-        }
-
-        var report = PomImportApply.apply(msg.program, figma, { existing: existing });
-        console.log('[Import] ' + report.applied + ' applied, ' + report.failed + ' failed; ' +
-          report.variables + ' created, ' + (report.reusedVariables || 0) + ' reused, ' +
-          (report.modesAdded || 0) + ' modes added');
-        figma.ui.postMessage({ type: 'importApplied', report: report });
-      } catch (e) {
-        console.error('[Import] apply failed:', e);
-        figma.ui.postMessage({ type: 'importApplied',
-          report: { applied: 0, failed: 1, variables: 0, errors: [{ error: e.message || String(e) }] } });
+    var left = cols.slice(), out = [];
+    while (left.length) {
+      var pick = -1;
+      for (var i = 0; i < left.length && pick < 0; i++) {
+        var id = left[i].id, pointedAt = false;
+        for (var j = 0; j < left.length; j++) { if (j !== i && uses[left[j].id][id]) pointedAt = true; }
+        if (!pointedAt) pick = i;
       }
-    })();
-    return;
+      if (pick < 0) pick = 0;
+      out.push(left.splice(pick, 1)[0]);
+    }
+    return out;
+  } catch (e) {
+    return cols;
   }
+}
 
-  /*
-    DELETE EVERY LOCAL VARIABLE COLLECTION IN THIS FILE.
-
-    The most destructive thing this plugin can do, and the only handler that
-    removes rather than adds. Three things make it survivable:
-
-      IT ONLY EVER SEES LOCAL COLLECTIONS. getLocalVariableCollectionsAsync
-      returns what this file owns; a collection consumed from a library is not
-      in the list and has no remove() to call, so a shared design system cannot
-      be deleted from a file that merely uses it.
-
-      IT COUNTS BEFORE IT CUTS. variableIds is read while the collection still
-      exists — after remove() the object is gone and the number with it, so a
-      report gathered afterwards would be a report of nothing.
-
-      IT DOES NOT STOP ON ONE FAILURE. A collection that refuses is recorded
-      and the rest still go; the alternative is a half-cleared file whose
-      remaining contents depend on iteration order, which is the state hardest
-      to reason about afterwards.
-
-    NOT UNDONE BY THIS PLUGIN. Figma keeps plugin edits on its own undo stack,
-    so Cmd-Z may bring them back, but that is Figma's behaviour and not a
-    promise this code can make — which is why the confirmation in the UI says
-    what will go rather than offering to reverse it.
-  */
-  /*
-    CAPTURE THE SELECTED COMPONENT SET.
-
-    The selection is resolved here rather than asked for, because the thing a
-    person has selected is usually a variant — they clicked the one they were
-    looking at — and refusing that would be the plugin being pedantic about a
-    distinction it can resolve itself. An INSTANCE is refused, because an
-    instance is a use of a component and its contract belongs to the component.
-
-    Everything after the read is the capture module's, and everything after
-    THAT is the UI's: this handler walks nothing and decides nothing.
-  */
-  if (msg.type === 'captureComponent') {
-    (async function() {
-      try {
-        var sel = figma.currentPage.selection;
-        var set = null, why = '';
-        if (!sel.length) {
-          why = 'Select a component set — or any one of its variants.';
-        } else if (sel[0].type === 'COMPONENT_SET') {
-          set = sel[0];
-        } else if (sel[0].type === 'COMPONENT' && sel[0].parent && sel[0].parent.type === 'COMPONENT_SET') {
-          set = sel[0].parent;
-        } else if (sel[0].type === 'COMPONENT') {
-          why = '"' + sel[0].name + '" is a component on its own, with no variants. ' +
-                'A contract describes a set and the axes it varies over.';
-        } else if (sel[0].type === 'INSTANCE') {
-          why = 'That is an instance. Select the component set it came from — a ' +
-                'contract belongs to the component, not to a use of it.';
-        } else {
-          why = 'Selected a ' + String(sel[0].type).toLowerCase().replace(/_/g, ' ') +
-                '. Select a component set.';
-        }
-        if (!set) {
-          figma.ui.postMessage({ type: 'componentCaptureFailed', reason: why });
-          return;
-        }
-        var capture = await PomComponentCapture.captureComponentSet(set, figma, {});
-        figma.ui.postMessage({ type: 'componentCaptured', capture: capture });
-      } catch (e) {
-        console.error('[Closure] component capture failed:', e);
-        figma.ui.postMessage({ type: 'componentCaptureFailed',
-                               reason: (e && e.message) || String(e) });
+/* ── message: clearVariables ─ its own function, so the sandbox compiles each handler separately (see the note on figma.ui.onmessage) ── */
+function handle_clearVariables(msg) {
+  /* Said in Figma's own toast, outside the plugin's iframe: if this appears the
+     message arrived and this handler is running, whatever the UI then shows. */
+  figma.notify('Clearing the file… (plugin build ' + CLOSURE_BUILD + ')');
+  (async function() {
+    try {
+      /* `includeVariables` defaults to true: an older UI that only knows
+         "clear variables" sends no such field and gets what it always got. */
+      var cols = [];
+      if (msg.includeVariables !== false) cols = await figma.variables.getLocalVariableCollectionsAsync();
+      /* `collections` names the ones to remove; a message without it (an older
+         panel) means all of them, as it always did. */
+      if (Array.isArray(msg.collections)) {
+        cols = cols.filter(function(c) { return msg.collections.indexOf(c.name) !== -1; });
       }
-    })();
-    return;
-  }
-
-  /*
-    LOCK THE COMPONENT TO ITS FILE.
-
-    Sent after a contract has been written, never before: the push is the act
-    that settles which file this component's contract is, and recording it any
-    earlier would be remembering a path somebody was still choosing.
-
-    THE ONLY THING THIS PLUGIN WRITES TO A COMPONENT, and it is metadata — no
-    layer, property or value is touched. Shared plugin data so the answer
-    travels with the component into files that import it, and so a teammate
-    running this plugin is told rather than left to guess again.
-  */
-  if (msg.type === 'rememberContractPath') {
-    (async function() {
-      try {
-        var node = await figma.getNodeByIdAsync(msg.nodeId);
-        if (!node || node.type !== 'COMPONENT_SET') return;
-        node.setSharedPluginData(PomComponentCapture.LOCK_NAMESPACE,
-                                 PomComponentCapture.LOCK_KEY, String(msg.path || ''));
-        figma.ui.postMessage({ type: 'contractPathRemembered', nodeId: msg.nodeId, path: msg.path });
-      } catch (e) {
-        /* Not being able to remember is not a reason to undo a push that has
-           already landed. The next capture falls back to matching by name,
-           which is where this started. */
-        console.warn('[Closure] could not remember the contract path:', e);
-      }
-    })();
-    return;
-  }
-
-  if (msg.type === 'clearVariables') {
-    (async function() {
-      try {
-        var cols = await figma.variables.getLocalVariableCollectionsAsync();
-        var removed = [], failed = [], variables = 0;
-        cols.forEach(function(c) {
-          var n = (c.variableIds || []).length;   // read BEFORE remove()
-          var name = c.name;
-          try {
-            c.remove();
-            removed.push({ name: name, variables: n });
-            variables += n;
-          } catch (e) {
-            failed.push({ name: name, error: (e && e.message) || String(e) });
+      var removed = [], failed = [], variables = 0;
+      /*
+        CONSUMERS FIRST, ONE COLLECTION AT A TIME, WITH A BREATH BETWEEN.
+        Removing a collection that other collections alias makes Figma
+        re-resolve every alias that pointed into it; doing that for `.core`
+        while 3,000 variables still reference it froze the plugin. So the order
+        is: collections nothing else points at go first, the base ones last,
+        and the event loop gets a turn between them so the panel can repaint.
+      */
+      var order = await clearOrder(cols);
+      for (var ci = 0; ci < order.length; ci++) {
+        var c = order[ci];
+        var n = (c.variableIds || []).length;   // read BEFORE remove()
+        var name = c.name;
+        figma.ui.postMessage({ type: 'clearProgress', done: ci, total: order.length, name: name });
+        await new Promise(function(resolve) { setTimeout(resolve, 30); });
+        try {
+          /* A big collection is emptied in small batches first, so no single
+             call holds the sandbox for long and the panel can say where it is. */
+          var ids = (c.variableIds || []).slice();
+          if (!figma.variables.getVariableByIdAsync) ids = [];
+          for (var k = 0; k < ids.length; k += 100) {
+            var batch = ids.slice(k, k + 100);
+            for (var b = 0; b < batch.length; b++) {
+              var one = await figma.variables.getVariableByIdAsync(batch[b]);
+              if (one) { try { one.remove(); } catch (e1) { /* the collection's own remove() below settles it */ } }
+            }
+            figma.ui.postMessage({ type: 'clearProgress', done: ci, total: order.length, name: name, inner: Math.min(k + 100, ids.length), innerTotal: ids.length });
+            await new Promise(function(resolve) { setTimeout(resolve, 20); });
           }
-        });
-        console.log('[Closure] cleared ' + removed.length + ' collection(s), ' +
-          variables + ' variable(s)' + (failed.length ? '; ' + failed.length + ' refused' : ''));
-        figma.ui.postMessage({ type: 'variablesCleared',
-          removed: removed, failed: failed, variables: variables });
-      } catch (e) {
-        console.error('[Closure] clear failed:', e);
-        figma.ui.postMessage({ type: 'variablesCleared',
-          removed: [], failed: [{ name: null, error: (e && e.message) || String(e) }], variables: 0 });
+          c.remove();
+          removed.push({ name: name, variables: n });
+          variables += n;
+        } catch (e) {
+          failed.push({ name: name, error: (e && e.message) || String(e) });
+        }
       }
-    })();
-    return;
-  }
+      console.log('[Closure] cleared ' + removed.length + ' collection(s), ' +
+        variables + ' variable(s)' + (failed.length ? '; ' + failed.length + ' refused' : ''));
+      /* STYLES ONLY WHEN ASKED FOR. They are not variables, and a person who
+         pressed "delete variables" has agreed to that and nothing more; the
+         dialog has a box for the rest, off until it is ticked. */
+      var stylesRemoved = null;
+      if (msg.includeStyles && typeof PomStylesCapture !== 'undefined') {
+        stylesRemoved = await PomStylesCapture.removeAll(figma, msg.styles);
+        console.log('[Closure] cleared styles: ' + stylesRemoved.text + ' text, ' +
+          stylesRemoved.effect + ' effect, ' + stylesRemoved.grid + ' grid' +
+          (stylesRemoved.failed.length ? '; ' + stylesRemoved.failed.length + ' refused' : ''));
+      }
+      /*
+        WHAT IS STILL THERE, read back rather than assumed. Removing is not
+        the same as the file being empty — a collection Figma refuses to
+        drop, or a style that is locked, stays — and a report built from the
+        calls that were made says "done" in exactly the case where it is not.
+        Counted from the document after the fact, and carried to the UI so the
+        answer to "did it clear?" is the file's, not this code's.
+      */
+      var remaining = null;
+      try {
+        var leftCols = await figma.variables.getLocalVariableCollectionsAsync();
+        var leftText = await figma.getLocalTextStylesAsync();
+        var leftEffect = await figma.getLocalEffectStylesAsync();
+        var leftGrid = [];
+        if (figma.getLocalGridStylesAsync) leftGrid = await figma.getLocalGridStylesAsync();
+        /* Counted over what was ASKED for: a collection or a kind of style the
+           person left unticked is meant to still be there. */
+        if (msg.includeVariables === false) leftCols = [];
+        else if (Array.isArray(msg.collections)) {
+          leftCols = leftCols.filter(function(c) { return msg.collections.indexOf(c.name) !== -1; });
+        }
+        var ks = msg.styles || { text: !!msg.includeStyles, effect: !!msg.includeStyles, grid: !!msg.includeStyles };
+        remaining = { collections: leftCols.length, text: ks.text ? leftText.length : 0,
+                      effect: ks.effect ? leftEffect.length : 0, grid: ks.grid ? leftGrid.length : 0 };
+      } catch (e) { /* not being able to count is not a reason to hide the result */ }
+      console.log('[Closure] after clearing: ' + JSON.stringify(remaining));
+      if (remaining) {
+        figma.notify('Cleared. Left of what was selected: ' + remaining.collections + ' collections, ' +
+          (remaining.text + remaining.effect + remaining.grid) + ' styles');
+      } else {
+        figma.notify('Cleared.');
+      }
+      figma.ui.postMessage({ type: 'variablesCleared',
+        removed: removed, failed: failed, variables: variables, stylesRemoved: stylesRemoved,
+        asked: { variables: msg.includeVariables !== false, styles: !!msg.includeStyles },
+        remaining: remaining });
+    } catch (e) {
+      console.error('[Closure] clear failed:', e);
+      figma.notify('Clearing failed: ' + ((e && e.message) || String(e)), { error: true });
+      figma.ui.postMessage({ type: 'variablesCleared',
+        removed: [], failed: [{ name: null, error: (e && e.message) || String(e) }], variables: 0 });
+    }
+  })();
+  return;
+}
 
-  if (msg.type === 'transform') {
-    var nativeResult = transformToFinalFormat(msg.raw, {
-      includeDescriptions: !!msg.includeDescriptions
-    });
-    var exportMode = msg.exportMode || 'legacy';
-    var finalTokens;
-    var resolvedReport = null;
+/* ── message: transform ─ its own function, so the sandbox compiles each handler separately (see the note on figma.ui.onmessage) ── */
+function handle_transform(msg) {
+  var nativeResult = transformToFinalFormat(msg.raw, {
+    includeDescriptions: !!msg.includeDescriptions
+  });
+  var exportMode = msg.exportMode || 'legacy';
+  var finalTokens;
+  var resolvedReport = null;
+  /*
+    The resolved shape reads the RAW graph, not the transformed tree — the
+    alias hops it resolves are exactly what transformToFinalFormat has
+    already collapsed. So it is built here from msg.raw and handed to the UI
+    finished, rather than being a post-transform the UI could apply.
+
+    nativeResult is still computed above for its token count, which the
+    validation panel reports either way.
+  */
+  if (msg.resolvedShape) {
     /*
-      The resolved shape reads the RAW graph, not the transformed tree — the
-      alias hops it resolves are exactly what transformToFinalFormat has
-      already collapsed. So it is built here from msg.raw and handed to the UI
-      finished, rather than being a post-transform the UI could apply.
-
-      nativeResult is still computed above for its token count, which the
-      validation panel reports either way.
+      No vocabulary passed, deliberately. pin / renameMode / renameToken /
+      typeHints are facts about one design system, and the plugin has nowhere
+      for a user to state them yet — so this emits the file's own mode names,
+      keeps every axis as a branch, and types from Figma's scopes. Correct and
+      complete; it is not yet somebody's house naming. Settings is where that
+      would go, and that decision is still open.
     */
-    if (msg.resolvedShape) {
-      /*
-        No vocabulary passed, deliberately. pin / renameMode / renameToken /
-        typeHints are facts about one design system, and the plugin has nowhere
-        for a user to state them yet — so this emits the file's own mode names,
-        keeps every axis as a branch, and types from Figma's scopes. Correct and
-        complete; it is not yet somebody's house naming. Settings is where that
-        would go, and that decision is still open.
-      */
-      var built = buildResolvedDocument(msg.raw, {});
-      finalTokens = built.document;
-      console.log('[Resolved] ' + built.shape + ' shape, ' + built.total + ' tokens, ' +
-        built.emit.axes.length + ' axes: ' + built.emit.axisOrder.join(' > '));
-      console.log('[Resolved] roles: ' + (built.roles
-        ? 'breakpoint=' + built.roles.breakpoint + '  scheme=' + built.roles.scheme +
-          '  light/dark=' + built.roles.mode
-        : 'none detected — emitted the derived shape'));
-      if (built.layoutCollisions) {
-        console.warn('[Resolved] the named layout collided on ' + built.layoutCollisions +
-          ' paths (no level for: ' + built.unplacedAxes.join(', ') + ') — emitted the complete ' +
-          'derived shape instead');
-      }
-      /*
-        Travel with the document. Why it came out in one shape rather than the
-        other is the first thing asked of any export, and reading it off a
-        console someone has to have open at the time has not worked.
-      */
-      resolvedReport = {
-        shape: built.shape,
-        roles: built.roles || null,
-        axes: built.emit.axisOrder,
-        collisions: built.layoutCollisions || 0,
-        unplacedAxes: built.unplacedAxes || [],
-        autoPinned: built.autoPinned || null
-      };
-
-      /*
-        HOW TO READ THIS BACK, written by the thing that wrote it.
-
-        The resolved shape denormalises axes into nesting — light/dark and the
-        schemes stop being collections and become path depths — and until now
-        an importer had to work out which depths those were by measuring, or
-        ask a person. It never had to: the layout above just DECIDED where each
-        axis went, so it can say so. `built.levels` is that decision.
-
-        This is the gap the export side was missing. $figmaStructure already
-        recorded the collections a file came out of, which survives a
-        non-resolved export unchanged; a resolved one flattens them, and the
-        flattening is exactly what needed declaring.
-
-        Only the axes given a level of their own are here. The scheme axis ends
-        up naming a leaf rather than a level, so nothing is claimed about it and
-        the import still asks — saying nothing beats declaring a reading that
-        was never made.
-      */
-      if (built.levels && Object.keys(built.levels).length) {
-        /* finalTokens, not `out` — that one is a local of toTokenFormat and
-           belongs to the legacy tree. This is the resolved document. */
-        finalTokens['$figmaStructure'] = {
-          version: 1,
-          collections: (msg.raw.collections || []).map(function (c) {
-            return {
-              figmaName: c.name,
-              modes: (c.modes || []).map(function (m) { return m.name; }),
-              variables: (c.variables || []).length
-            };
-          }),
-          levels: built.levels
-        };
-      }
-      if (built.autoPinned) {
-        console.warn('[Resolved] held at their default mode so the layout fits: ' +
-          Object.keys(built.autoPinned).map(function (k) {
-            return k + '=' + built.autoPinned[k];
-          }).join(', ') + ' — their other readings are not in this export');
-      }
-    } else if (exportMode === 'legacy') {
-      finalTokens = toTokenFormat(nativeResult.tokens, msg.raw);
-    } else {
-      finalTokens = nativeResult.tokens;
+    /* `restore` is the read-only section at the end of the metadata — what the
+       export evaluates away, written down for an import to read back. Off
+       only when the person turned it off; a message without the field (an
+       older UI) gets it. */
+    var built = buildResolvedDocument(msg.raw, { restore: msg.includeRestore !== false, styles: msg.raw && msg.raw.styles });
+    finalTokens = built.document;
+    console.log('[Resolved] ' + built.shape + ' shape, ' + built.total + ' tokens, ' +
+      built.emit.axes.length + ' axes: ' + built.emit.axisOrder.join(' > '));
+    console.log('[Resolved] roles: ' + (built.roles
+      ? 'breakpoint=' + built.roles.breakpoint + '  scheme=' + built.roles.scheme +
+        '  light/dark=' + built.roles.mode
+      : 'none detected — emitted the derived shape'));
+    if (built.layoutCollisions) {
+      console.warn('[Resolved] the named layout collided on ' + built.layoutCollisions +
+        ' paths (no level for: ' + built.unplacedAxes.join(', ') + ') — emitted the complete ' +
+        'derived shape instead');
     }
-    var closure = (exportMode === 'legacy' && !msg.resolvedShape)
-      ? validateReferenceClosure(finalTokens)
-      : { ok: true, brokenCount: 0, totalRefs: 0, byRoot: {}, missingRoots: [], sampleBroken: [], broken: [] };
-    if (!closure.ok) {
-      console.warn('[Closure] ⚠ ' + closure.brokenCount + ' broken references. Missing sets: ' + closure.missingRoots.join(', '));
-      console.warn('[Closure] sample:', closure.sampleBroken);
+    /*
+      Travel with the document. Why it came out in one shape rather than the
+      other is the first thing asked of any export, and reading it off a
+      console someone has to have open at the time has not worked.
+    */
+    resolvedReport = {
+      shape: built.shape,
+      roles: built.roles || null,
+      axes: built.emit.axisOrder,
+      collisions: built.layoutCollisions || 0,
+      unplacedAxes: built.unplacedAxes || [],
+      autoPinned: built.autoPinned || null
+    };
+
+    /*
+      NO $figmaStructure IN THIS SHAPE. It used to be written here, so an
+      importer could read where each axis went (`built.levels`) instead of
+      asking. The reference document carries nothing of the kind, a resolved
+      export is refused by the import anyway, and the root's own
+      com.desquared.radd metadata already names the modes, schemes and
+      defaults. The layout decision stays available as `built.levels` for the
+      preview scripts.
+    */
+    if (built.autoPinned) {
+      console.warn('[Resolved] held at their default mode so the layout fits: ' +
+        Object.keys(built.autoPinned).map(function (k) {
+          return k + '=' + built.autoPinned[k];
+        }).join(', ') + ' — their other readings are not in this export');
     }
-    figma.ui.postMessage({
-      type: 'transformed',
-      // Echoed so the UI can tell this reply's request from a later one.
-      seq: msg.seq,
-      payload: { tokens: finalTokens, count: nativeResult.count, resolvedReport: resolvedReport },
-      validation: {
-        actual: {
-          totalTokens: nativeResult.count,
-          topLevelCollections: Object.keys(finalTokens).length
-        },
-        matchPercentage: 100,
-        closure: closure
-      }
-    });
+  } else if (exportMode === 'legacy') {
+    finalTokens = toTokenFormat(nativeResult.tokens, msg.raw);
+  } else {
+    finalTokens = nativeResult.tokens;
   }
+  var closure = (exportMode === 'legacy' && !msg.resolvedShape)
+    ? validateReferenceClosure(finalTokens)
+    : { ok: true, brokenCount: 0, totalRefs: 0, byRoot: {}, missingRoots: [], sampleBroken: [], broken: [] };
+  if (!closure.ok) {
+    console.warn('[Closure] ⚠ ' + closure.brokenCount + ' broken references. Missing sets: ' + closure.missingRoots.join(', '));
+    console.warn('[Closure] sample:', closure.sampleBroken);
+  }
+  figma.ui.postMessage({
+    type: 'transformed',
+    // Echoed so the UI can tell this reply's request from a later one.
+    seq: msg.seq,
+    payload: { tokens: finalTokens, count: nativeResult.count, resolvedReport: resolvedReport },
+    validation: {
+      actual: {
+        totalTokens: nativeResult.count,
+        topLevelCollections: Object.keys(finalTokens).length
+      },
+      matchPercentage: 100,
+      closure: closure
+    }
+  });
+}
 
+/*
+  THE STRUCTURE OF THIS FILE'S VARIABLES, CAPTURED WITHOUT BEING ASKED.
+
+  Runs once when the plugin opens, in the background, and never writes to the
+  file. What it keeps lives in this user's clientStorage, and that is the thing
+  to be careful with: figma.clientStorage holds about 5 MB for the whole plugin,
+  shared with the git settings and the Studio baselines (tens of thousands of
+  entries each). A full structure is over a megabyte on a big file, so it is not
+  stored the way a setting is.
+
+    AN INDEX, SMALL, FOR EVERY FILE SEEN. One line per file: its key, a signature
+    of its layering, the layers, the totals. A few hundred bytes. This is what
+    "which saved structure is this document's" is answered from (see match in
+    src/structure-capture.js), so it is kept for up to STRUCTURE_INDEX_MAX files.
+
+    THE FULL STRUCTURE, FOR THE FEW MOST RECENT. It is what Download hands out. A
+    file that has fallen out of the newest STRUCTURE_FULL_MAX keeps its index line
+    and loses the bulk; opening it again rebuilds it.
+
+    NOTHING ELSE IS TOUCHED. Eviction only deletes this feature's own keys. If a
+    write is refused anyway (the quota), every other full structure is dropped and
+    the write retried once; if that fails too, the index line alone is kept.
+
+  The key is made from the ids of the file's collections, so one file is one key
+  and two files that share a name do not collide. A file is read again only when
+  something that shapes the structure moved: `stamp` is the collections, their
+  modes and their variable counts. The same file opened twice costs one read of
+  the collection list, not a walk of every variable.
+
+  Kept as small separate functions for the Mac sandbox (see the note on
+  figma.ui.onmessage).
+*/
+var STRUCTURE_INDEX_KEY = 'json-exporter-structure-index';
+var STRUCTURE_FULL_PREFIX = 'json-exporter-structure-full:';
+var STRUCTURE_OLD_PREFIX = 'json-exporter-structure:';
+var STRUCTURE_INDEX_MAX = 40;
+var STRUCTURE_FULL_MAX = 3;
+
+/* Two 32-bit hashes of one string, so a storage key stays short however many
+   collections the file has, and a collision needs both to meet. */
+function shortHash(text) {
+  var h1 = 5381, h2 = 52711;
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charCodeAt(i);
+    h1 = ((h1 * 33) ^ c) >>> 0;
+    h2 = ((h2 * 31) + c) >>> 0;
+  }
+  return h1.toString(36) + h2.toString(36);
+}
+
+function structureKeyAndStamp(cols) {
+  var ids = [], stamp = [];
+  cols.forEach(function(c) {
+    ids.push(c.id);
+    stamp.push(c.id + ':' + c.variableIds.length + ':' + c.modes.map(function(m) { return m.modeId; }).join(','));
+  });
+  ids.sort();
+  stamp.sort();
+  return { key: shortHash(ids.join('|')), stamp: stamp.join(';') };
+}
+
+async function readStructureGraph(cols) {
+  var vars = await figma.variables.getLocalVariablesAsync();
+  var byCol = {};
+  vars.forEach(function(v) {
+    if (!byCol[v.variableCollectionId]) byCol[v.variableCollectionId] = [];
+    byCol[v.variableCollectionId].push({ id: v.id, name: v.name, resolvedType: v.resolvedType, valuesByMode: v.valuesByMode });
+  });
+  return cols.map(function(c) {
+    return { id: c.id, name: stripIcons(c.name), modes: c.modes, hiddenFromPublishing: c.hiddenFromPublishing,
+             parentVariableCollectionId: c.parentVariableCollectionId, variables: byCol[c.id] || [] };
+  });
+}
+
+async function loadStructureIndex() {
+  var stored = await figma.clientStorage.getAsync(STRUCTURE_INDEX_KEY);
+  return Array.isArray(stored) ? stored : [];
+}
+
+/* The first build of this feature stored whole structures under one key per
+   file. They are a megabyte each and nothing reads them now: remove them. */
+async function dropOldStructureKeys() {
+  var keys = await figma.clientStorage.keysAsync();
+  for (var i = 0; i < keys.length; i++) {
+    if (keys[i].indexOf(STRUCTURE_OLD_PREFIX) === 0) await figma.clientStorage.deleteAsync(keys[i]);
+  }
+}
+
+/* Newest first; keep the bulk for the first few and the line for the rest. */
+async function trimStructureIndex(index) {
+  index.sort(function(a, b) { return String(b.capturedAt).localeCompare(String(a.capturedAt)); });
+  while (index.length > STRUCTURE_INDEX_MAX) {
+    var gone = index.pop();
+    await figma.clientStorage.deleteAsync(STRUCTURE_FULL_PREFIX + gone.key);
+  }
+  for (var i = STRUCTURE_FULL_MAX; i < index.length; i++) {
+    if (index[i].full) {
+      await figma.clientStorage.deleteAsync(STRUCTURE_FULL_PREFIX + index[i].key);
+      index[i].full = false;
+    }
+  }
+}
+
+async function saveStructure(index, entry, structure) {
+  var rest = index.filter(function(e) { return e.key !== entry.key; });
+  rest.push(entry);
+  try {
+    await figma.clientStorage.setAsync(STRUCTURE_FULL_PREFIX + entry.key, structure);
+    entry.full = true;
+  } catch (e) {
+    /* The quota. Free every other full structure and try once more. */
+    for (var i = 0; i < rest.length; i++) {
+      if (rest[i].key !== entry.key && rest[i].full) {
+        await figma.clientStorage.deleteAsync(STRUCTURE_FULL_PREFIX + rest[i].key);
+        rest[i].full = false;
+      }
+    }
+    try {
+      await figma.clientStorage.setAsync(STRUCTURE_FULL_PREFIX + entry.key, structure);
+      entry.full = true;
+    } catch (e2) {
+      entry.full = false;
+    }
+  }
+  await trimStructureIndex(rest);
+  try { await figma.clientStorage.setAsync(STRUCTURE_INDEX_KEY, rest); } catch (e3) { console.warn('[Closure] could not save the structure index:', e3); }
+  return rest;
+}
+
+/* What the UI needs to match an imported JSON to a saved structure: the small
+   index lines (file, layers, name[modes] per layer), never the bulk. */
+function knownStructures(index) {
+  return index.map(function(e) { return { file: e.file, items: e.items, layers: e.layers }; });
+}
+
+async function runStructureCapture(force) {
+  var out = { type: 'structureCaptured', ok: false, structure: null, fresh: false, match: null, saved: 0 };
+  try {
+    var cols = await figma.variables.getLocalVariableCollectionsAsync();
+    if (!cols.length) { out.ok = true; figma.ui.postMessage(out); return; }
+    await dropOldStructureKeys();
+    var ks = structureKeyAndStamp(cols);
+    var index = await loadStructureIndex();
+    var here = null;
+    index.forEach(function(e) { if (e.key === ks.key) here = e; });
+    var structure = null;
+    if (!force && here && here.stamp === ks.stamp && here.full) {
+      structure = await figma.clientStorage.getAsync(STRUCTURE_FULL_PREFIX + ks.key);
+    }
+    /* A structure saved by an older version of the capture is read again: it may not say what this one says. */
+    if (structure && structure.format === PomStructureCapture.FORMAT && structure.version === PomStructureCapture.VERSION) {
+      out.fresh = false;
+    } else {
+      var graph = await readStructureGraph(cols);
+      structure = PomStructureCapture.capture(graph, { fileName: (figma.root && figma.root.name) || '', capturedAt: new Date().toISOString() });
+      var sig = PomStructureCapture.signature(structure);
+      var entry = { key: ks.key, stamp: ks.stamp, file: structure.file, capturedAt: structure.capturedAt, sig: sig.id,
+                    items: sig.items, layers: structure.layers, totals: structure.totals, full: false };
+      /* Matched against what was saved BEFORE this file, so "same architecture"
+         means another file's, not this one's own line. */
+      out.match = PomStructureCapture.match(index.filter(function(e) { return e.key !== ks.key; }), { key: ks.key, sig: sig.id, items: sig.items });
+      index = await saveStructure(index, entry, structure);
+      out.fresh = true;
+    }
+    if (!out.match) {
+      var sg = PomStructureCapture.signature(structure);
+      out.match = PomStructureCapture.match(index.filter(function(e) { return e.key !== ks.key; }), { key: ks.key, sig: sg.id, items: sg.items });
+    }
+    out.ok = true;
+    out.structure = structure;
+    out.saved = index.length;
+    out.known = knownStructures(index);
+    if (out.match && out.match.entry) out.match = { kind: out.match.kind, file: out.match.entry.file, score: out.match.score };
+    else if (out.match) out.match = { kind: out.match.kind, file: null, score: out.match.score };
+  } catch (e) {
+    out.error = (e && e.message) || String(e);
+    console.warn('[Closure] structure capture failed:', e);
+  }
+  figma.ui.postMessage(out);
+}
+
+/* The UI asks again on mount, because it may have loaded after the capture posted. */
+function handle_structureGet(msg) {
+  runStructureCapture(false);
+  return;
+}
+
+figma.ui.onmessage = function(msg) {
+  if (msg.type === 'resize') { handle_resize(msg); return; }
+  if (msg.type === 'GET_FILE_INFO') { handle_GET_FILE_INFO(msg); return; }
+  if (msg.type === 'LOAD_GIT_SETTINGS') { handle_LOAD_GIT_SETTINGS(msg); return; }
+  if (msg.type === 'SAVE_GIT_SETTINGS') { handle_SAVE_GIT_SETTINGS(msg); return; }
+  if (msg.type === 'extract') { handle_extract(msg); return; }
+  if (msg.type === 'applyImport') { handle_applyImport(msg); return; }
+  if (msg.type === 'captureComponent') { handle_captureComponent(msg); return; }
+  if (msg.type === 'rememberContractPath') { handle_rememberContractPath(msg); return; }
+  if (msg.type === 'clearVariables') { handle_clearVariables(msg); return; }
+  if (msg.type === 'transform') { handle_transform(msg); return; }
+  if (msg.type === 'studioSyncLoad') { handle_studioSyncLoad(msg); return; }
+  if (msg.type === 'studioSyncSave') { handle_studioSyncSave(msg); return; }
+  if (msg.type === 'structureGet') { handle_structureGet(msg); return; }
 };
+
+/* On open, with nobody asking. After the dispatcher so every function it uses is defined. */
+runStructureCapture(false);

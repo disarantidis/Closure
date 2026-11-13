@@ -36,6 +36,25 @@
   "rolled back" is "here is exactly what exists now".
 */
 
+/*
+  THE SCOPES FIGMA WILL ACCEPT ON A WRITE.
+
+  A file READS some it will not WRITE: the live RADD file reports
+  FONT_VARIATIONS on 331 of its variables, and assigning it back is refused
+  ("Invalid option: expected one of ALL_SCOPES | TEXT_CONTENT | …") — which, on
+  a real import, stopped the run at the first such variable, 2,870 operations in,
+  with every value still unwritten. So the list the Plugin API names (typings
+  1.123) is held here, anything outside it is left out and COUNTED, and a write
+  that is refused for any other reason costs that one variable its scopes, not
+  the import.
+*/
+const WRITABLE_SCOPES = new Set([
+  'ALL_SCOPES', 'TEXT_CONTENT', 'CORNER_RADIUS', 'WIDTH_HEIGHT', 'GAP', 'ALL_FILLS', 'FRAME_FILL',
+  'SHAPE_FILL', 'TEXT_FILL', 'STROKE_COLOR', 'STROKE_FLOAT', 'EFFECT_FLOAT', 'EFFECT_COLOR', 'OPACITY',
+  'FONT_FAMILY', 'FONT_STYLE', 'FONT_WEIGHT', 'FONT_SIZE', 'LINE_HEIGHT', 'LETTER_SPACING',
+  'PARAGRAPH_SPACING', 'PARAGRAPH_INDENT',
+]);
+
 function apply(program, figma, opts) {
   opts = opts || {};
   const report = {
@@ -119,6 +138,7 @@ function apply(program, figma, opts) {
              an addMode by accident — that would leave a junk mode behind and
              spend one of the plan's mode allowance. */
           c.renameMode(c.defaultModeId, op.firstMode);
+          if (op.hidden) c.hiddenFromPublishing = true;
           cols.set(op.collection, c);
           modeIds.set(K(op.collection, op.firstMode), c.defaultModeId);
           report.collections.push(op.collection);
@@ -150,9 +170,104 @@ function apply(program, figma, opts) {
           }
           const v = figma.variables.createVariable(op.name, c, op.type);
           if (op.description) v.description = op.description;
-          if (op.scopes && op.scopes.length) v.scopes = op.scopes;
+          if (op.codeSyntax) {
+            Object.keys(op.codeSyntax).forEach((platform) => {
+              try { v.setVariableCodeSyntax(platform, op.codeSyntax[platform]); }
+              catch (e) { report.codeSyntaxFailed = (report.codeSyntaxFailed || 0) + 1; }
+            });
+          }
+          /* An empty list is a decision (hidden from every picker), not an
+             absence, so it is written too — but only when it was EMPTY to begin
+             with: a list that held nothing Figma can write is left at its
+             default rather than turned into "hidden". */
+          if (Array.isArray(op.scopes)) {
+            const writable = op.scopes.filter((x) => WRITABLE_SCOPES.has(x));
+            op.scopes.forEach((x) => {
+              if (WRITABLE_SCOPES.has(x)) return;
+              report.scopesDropped = report.scopesDropped || {};
+              report.scopesDropped[x] = (report.scopesDropped[x] || 0) + 1;
+            });
+            if (writable.length || !op.scopes.length) {
+              try { v.scopes = writable; }
+              catch (e) { report.scopesFailed = (report.scopesFailed || 0) + 1; }
+            }
+          }
           vars.set(K(op.collection, op.name), v);
           report.variables++;
+          break;
+        }
+        case 'createTextStyle': {
+          /* The font must already be LOADED — preflight does that, once, before
+             anything is written, because loading is async and this is not. */
+          const st = figma.createTextStyle();
+          st.name = op.name;
+          if (op.description) st.description = op.description;
+          if (op.fontName) st.fontName = { family: op.fontName.family, style: op.fontName.style };
+          if (op.textCase) st.textCase = op.textCase;
+          if (op.textDecoration) st.textDecoration = op.textDecoration;
+          const v = op.values || {};
+          if (v.fontSize !== undefined) st.fontSize = v.fontSize;
+          if (v.lineHeight) st.lineHeight = v.lineHeight;
+          if (v.letterSpacing) st.letterSpacing = v.letterSpacing;
+          if (v.paragraphSpacing !== undefined) st.paragraphSpacing = v.paragraphSpacing;
+          if (v.paragraphIndent !== undefined) st.paragraphIndent = v.paragraphIndent;
+          /* Bound after the values: a binding replaces the number it stands in
+             for, and one Figma refuses costs that field its binding, not the
+             style — or the import. */
+          Object.keys(op.bound || {}).forEach((field) => {
+            const variable = vars.get(K(op.bound[field].collection, op.bound[field].name));
+            if (!variable) { report.styleBindingsFailed = (report.styleBindingsFailed || 0) + 1; return; }
+            try { st.setBoundVariable(field, variable); report.styleBindings = (report.styleBindings || 0) + 1; }
+            catch (e) { report.styleBindingsFailed = (report.styleBindingsFailed || 0) + 1; }
+          });
+          report.textStyles = (report.textStyles || 0) + 1;
+          break;
+        }
+        case 'createEffectStyle': {
+          const st = figma.createEffectStyle();
+          st.name = op.name;
+          if (op.description) st.description = op.description;
+          const layers = (op.effects || []).map((e) => {
+            let eff = { type: e.type, visible: e.visible !== false, blendMode: e.blendMode || 'NORMAL' };
+            if (e.color) eff.color = { r: e.color[0], g: e.color[1], b: e.color[2], a: e.color[3] };
+            if (e.offset) eff.offset = { x: e.offset.x, y: e.offset.y };
+            if (e.radius !== undefined) eff.radius = e.radius;
+            if (e.spread !== undefined) eff.spread = e.spread;
+            if (e.showShadowBehindNode !== undefined) eff.showShadowBehindNode = e.showShadowBehindNode;
+            /* setBoundVariableForEffect RETURNS the effect with the binding on
+               it; the one passed in is not changed. */
+            Object.keys(e.bound || {}).forEach((field) => {
+              const variable = vars.get(K(e.bound[field].collection, e.bound[field].name));
+              if (!variable) { report.styleBindingsFailed = (report.styleBindingsFailed || 0) + 1; return; }
+              try { eff = figma.variables.setBoundVariableForEffect(eff, field, variable); report.styleBindings = (report.styleBindings || 0) + 1; }
+              catch (err) { report.styleBindingsFailed = (report.styleBindingsFailed || 0) + 1; }
+            });
+            return eff;
+          });
+          st.effects = layers;
+          report.effectStyles = (report.effectStyles || 0) + 1;
+          break;
+        }
+        case 'createGridStyle': {
+          const st = figma.createGridStyle();
+          st.name = op.name;
+          if (op.description) st.description = op.description;
+          const grids = (op.layoutGrids || []).map((x) => {
+            let g = { pattern: x.pattern, visible: x.visible !== false };
+            if (x.alignment !== undefined) g.alignment = x.alignment;
+            ['count', 'gutterSize', 'offset', 'sectionSize'].forEach((k) => { if (x[k] !== undefined) g[k] = x[k]; });
+            if (x.color) g.color = { r: x.color[0], g: x.color[1], b: x.color[2], a: x.color[3] };
+            /* Like an effect: the call returns the grid with the binding on it. */
+            Object.keys(x.bound || {}).forEach((field) => {
+              const variable = vars.get(K(x.bound[field].collection, x.bound[field].name));
+              if (!variable) { report.styleBindingsFailed = (report.styleBindingsFailed || 0) + 1; return; }
+              try { g = figma.variables.setBoundVariableForLayoutGrid(g, field, variable); report.styleBindings = (report.styleBindings || 0) + 1; }
+              catch (err) { report.styleBindingsFailed = (report.styleBindingsFailed || 0) + 1; }
+            });
+            return g;
+          });
+          st.layoutGrids = grids;
+          report.gridStyles = (report.gridStyles || 0) + 1;
           break;
         }
         case 'setValue': {
@@ -249,6 +364,46 @@ async function preflight(program, figma, opts) {
         message: 'collection "' + name + '" would hold ' + total.toLocaleString() +
                  ' variables and Figma allows ' + VARIABLE_CEILING.toLocaleString() + ' in one',
       });
+    }
+  }
+
+  /*
+    STYLES NEED TWO THINGS THE VARIABLES DO NOT: the fonts, and an empty field.
+
+    A text style cannot be given a font that is not LOADED, and loading is async,
+    so it happens here, once, before a single write — which is also the only
+    moment a missing font can refuse the import cleanly rather than leave a file
+    with its variables and no styles. And styles are created, never matched: a
+    file that already has some would get a second set beside them, so for now it
+    is refused, as a file that already has variables is.
+  */
+  const styleOps = program.ops.filter((op) => op.op === 'createTextStyle' || op.op === 'createEffectStyle' || op.op === 'createGridStyle');
+  if (styleOps.length) {
+    const have = [];
+    try {
+      const t = await figma.getLocalTextStylesAsync();
+      const e = await figma.getLocalEffectStylesAsync();
+      const gr = figma.getLocalGridStylesAsync ? await figma.getLocalGridStylesAsync() : [];
+      if (t.length) have.push(t.length + ' text');
+      if (e.length) have.push(e.length + ' effect');
+      if (gr.length) have.push(gr.length + ' grid');
+    } catch (err) { /* cannot be read: not a reason to refuse */ }
+    if (have.length) {
+      out.ok = false;
+      out.problems.push({ kind: 'styles-exist',
+        message: 'this file already has ' + have.join(' and ') + ' style(s), and an import creates its styles rather than ' +
+                 'updating them — it would make a second set beside them' });
+    }
+    const fonts = new Map();
+    styleOps.forEach((op) => { if (op.fontName) fonts.set(op.fontName.family + '\u0000' + op.fontName.style, op.fontName); });
+    for (const f of fonts.values()) {
+      try { await figma.loadFontAsync({ family: f.family, style: f.style }); }
+      catch (err) {
+        out.ok = false;
+        out.problems.push({ kind: 'font-missing',
+          message: 'the font ' + f.family + ' ' + f.style + ' is not available in this file, and the text styles that use it ' +
+                   'cannot be created. Nothing was imported — install or enable the font and try again' });
+      }
     }
   }
 

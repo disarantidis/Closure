@@ -65,6 +65,18 @@ const split = (key) => {
   shape import-verify.fromRawGraph() consumes. `program` is what compile()
   produced. Neither is modified and nothing is written.
 */
+/*
+  Figma stores numbers as 32-bit floats, so 75.3333 comes back as 75.333298.
+  That is the same number, and listing it as "overwritten" is a lie that makes
+  a file already in step look as if it had nine edits waiting. Numbers within
+  a thousandth are the same; anything else is compared as written.
+*/
+function sameValue(a, b) {
+  if (a === b) return true;
+  if (!/^-?\d+(\.\d+)?$/.test(String(a)) || !/^-?\d+(\.\d+)?$/.test(String(b))) return false;
+  return Math.abs(Number(a) - Number(b)) <= 1e-3;
+}
+
 function diff(existingRawGraph, program) {
   const before = fromRawGraph(existingRawGraph || []);
   const after = materialise(program);
@@ -76,12 +88,20 @@ function diff(existingRawGraph, program) {
     collections: { added: [], touched: [], untouched: [] },
     modes: { added: [] },
     variables: { added: new Set(), changed: new Set() },
+    /* Styles are never matched against the document — an import creates them —
+       so they are listed by kind, as they will arrive. */
+    styles: { text: [], effect: [], grid: [] },
     summary: {},
   };
+  for (const op of program.ops) {
+    if (op.op === 'createTextStyle') report.styles.text.push(op.name);
+    else if (op.op === 'createEffectStyle') report.styles.effect.push(op.name);
+    else if (op.op === 'createGridStyle') report.styles.grid.push(op.name);
+  }
 
   for (const [k, v] of B) {
     if (!A.has(k)) { report.added.push({ key: k, value: v }); continue; }
-    if (A.get(k) !== v) report.changed.push({ key: k, from: A.get(k), to: v });
+    if (!sameValue(A.get(k), v)) report.changed.push({ key: k, from: A.get(k), to: v });
     else report.unchangedCount++;
   }
   for (const k of A.keys()) if (!B.has(k)) report.untouched.push(k);
@@ -115,14 +135,16 @@ function diff(existingRawGraph, program) {
     willCreateCollections: report.collections.added.length,
     willAddModes: report.modes.added.length,
     willCreateVariables: report.variables.added.length,
+    willCreateStyles: report.styles.text.length + report.styles.effect.length + report.styles.grid.length,
     willChangeVariables: report.variables.changed.length,
     valuesAdded: report.added.length,
     valuesChanged: report.changed.length,
     valuesUnchanged: report.unchangedCount,
     valuesLeftAlone: report.untouched.length,
     /* Nothing to do is a real and useful answer — it means the document
-       already matches the file. */
-    noop: report.added.length === 0 && report.changed.length === 0,
+       already matches the file. Styles are something to do. */
+    noop: report.added.length === 0 && report.changed.length === 0 &&
+          report.styles.text.length + report.styles.effect.length + report.styles.grid.length === 0,
   };
 
   return report;
@@ -149,6 +171,9 @@ function format(report, limit) {
   push('collection(s)', report.collections.added, (x) => x);
   push('mode(s) on an existing collection', report.modes.added, (x) => x);
   push('variable(s)', report.variables.added, (x) => x.replace('|', ' / '));
+  push('text style(s)', report.styles.text, (x) => x);
+  push('effect style(s)', report.styles.effect, (x) => x);
+  push('grid style(s)', report.styles.grid, (x) => x);
   out.push('');
   if (report.changed.length) {
     out.push('  WOULD OVERWRITE');

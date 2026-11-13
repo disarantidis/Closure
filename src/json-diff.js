@@ -64,7 +64,21 @@ function isToken(node) {
   a reference) would be this function deciding two tokens are the same when
   they are not, which is the one thing a diff must never do.
 */
+/* Set for the length of one comparison between two resolved documents, null
+   otherwise — see compare(). A number is then rendered to this many decimals,
+   because Figma stores a float32: it hands back 22.870001 for a 22.87 that was
+   written into it, and two files that say the same thing must not differ by
+   that. Notation only, as the rest of this function: three decimals is finer
+   than any value a design file holds on purpose. */
+var NUM_DECIMALS = null;
+function roundedNumber(n) {
+  if (NUM_DECIMALS === null || !isFinite(n)) return String(n);
+  var f = Math.pow(10, NUM_DECIMALS);
+  return String(Math.round(n * f) / f);
+}
+
 function renderValue(v) {
+  if (typeof v === 'number') return roundedNumber(v);
   if (v === null || v === undefined) return String(v);
   if (typeof v === 'object') {
     if (Array.isArray(v)) return '[' + v.map(renderValue).join(',') + ']';
@@ -75,7 +89,7 @@ function renderValue(v) {
   }
   var s = String(v);
   if (/^#[0-9a-fA-F]{3,8}$/.test(s)) return s.toLowerCase();
-  if (s !== '' && !isNaN(Number(s))) return String(Number(s));
+  if (s !== '' && !isNaN(Number(s))) return roundedNumber(Number(s));
   return s;
 }
 
@@ -240,6 +254,11 @@ function countTokens(doc) { return flatten(doc).size; }
 */
 var MARKER_FORMAT = { legacy: 'legacy', dtcg: 'dtcg', themes: 'dtcg', resolved: 'resolved' };
 
+function isResolvedDocument(doc) {
+  var m = doc && doc.$extensions && doc.$extensions['com.desquared.radd'];
+  return !!(m && typeof m === 'object' && (m.foundationDefaults || (m.restore && m.restore.structure)));
+}
+
 function detectFormat(doc) {
   var ext = doc && doc.$extensions && doc.$extensions['com.closure'];
   /* A marker this file does not know is NOT believed — it falls through to
@@ -247,6 +266,9 @@ function detectFormat(doc) {
      it. A future build naming a fourth shape should read as whatever it
      actually is, not as "unrecognised". */
   if (ext && ext.format && MARKER_FORMAT[ext.format]) return MARKER_FORMAT[ext.format];
+  /* A resolved export carries no build stamp, but it says what it is in its own
+     root metadata: the foundation defaults only that layout writes. */
+  if (isResolvedDocument(doc)) return 'resolved';
   var found = null;
   (function walk(node) {
     if (found || !node || typeof node !== 'object' || Array.isArray(node)) return;
@@ -796,6 +818,8 @@ function compare(figmaDoc, repoDoc) {
        decision and a font-family decision are different acts and the page
        separates them. */
     changedByType: [],
+    /* The few edits behind the changed rows — see findCauses. */
+    causes: [],
     sameCount: 0,
     figmaTokens: 0, repoTokens: 0,
     groups: [],
@@ -809,19 +833,36 @@ function compare(figmaDoc, repoDoc) {
     report every dimension as changed. Producing a diff in either case would
     be answering a question nobody asked.
   */
-  if (figmaFormat === 'resolved' || repoFormat === 'resolved') {
+  if ((figmaFormat === 'resolved') !== (repoFormat === 'resolved')) {
     report.comparable = false;
     report.problem = {
       kind: 'resolved',
       message: (figmaFormat === 'resolved' ? 'This file is set to export the resolved shape' :
                                              'The repo holds a resolved export') +
-               ', and a resolved document has had its references evaluated away — its tree is a ' +
-               'cross-product of every mode rather than the document it came from, so comparing it ' +
-               'leaf by leaf reports a rewrite of everything.',
-      fix: 'Switch the output format to Legacy JSON or DTCG on both sides and compare those.',
+               ', and the other side is not. A resolved document has had its references evaluated ' +
+               'away — its tree is a cross-product of every mode rather than the document it came ' +
+               'from, so comparing it leaf by leaf against a different shape reports a rewrite of ' +
+               'everything.',
+      fix: 'Put both sides in the same shape: switch the Resolved option to match the file in the repo.',
     };
     return report;
   }
+  /*
+    TWO RESOLVED DOCUMENTS ARE COMPARABLE, and now that is the ordinary case.
+    The resolved export has the layout the Studio's own token file has
+    (core / foundation / breakpoint / mode), so the two are the same kind of
+    document and a leaf-by-leaf comparison is meaningful. Numbers are compared
+    to three decimals for the length of it — see NUM_DECIMALS.
+  */
+  if (figmaFormat === 'resolved' && repoFormat === 'resolved') NUM_DECIMALS = 3;
+  try {
+    return compareLeaves(figmaDoc, repoDoc, report, figmaFormat, repoFormat);
+  } finally {
+    NUM_DECIMALS = null;
+  }
+}
+
+function compareLeaves(figmaDoc, repoDoc, report, figmaFormat, repoFormat) {
   var F = flatten(figmaDoc), R = flatten(repoDoc);
   report.figmaTokens = F.size;
   report.repoTokens = R.size;
@@ -1538,6 +1579,8 @@ function compare(figmaDoc, repoDoc) {
     .map(function (e) { return { type: e[0], count: e[1] }; })
     .sort(function (a, b) { return b.count - a.count || (a.type < b.type ? -1 : 1); });
 
+  report.causes = findCauses(report, figmaDoc, repoDoc);
+
   report.identical = report.onlyInFigma.length === 0 &&
                      report.onlyInRepo.length === 0 &&
                      report.changed.length === 0 &&
@@ -1545,6 +1588,137 @@ function compare(figmaDoc, repoDoc) {
                      report.aliased.length === 0 &&
                      report.moved.length === 0;
   return report;
+}
+
+/*
+  WHERE IT STARTS.
+
+  One edit in an alias chain turns every token downstream of it into a changed
+  row, and a list of forty rows says "forty things are wrong" when one is. This
+  finds the one.
+
+  Two steps, neither of which guesses:
+
+    1. A changed row whose reference — on either side — points at a token that
+       is itself a changed row is a CONSEQUENCE of that token, not a finding of
+       its own. Follow it up to the row that points at nothing changed: that is
+       the root. Rows are counted under their root, never listed again.
+
+    2. Roots that are the same edit in a different place are one cause. The
+       light/dark × scheme cross-product of a resolved export spells one edit
+       four times over — mode.light.neutral.X, mode.light.white.X,
+       mode.dark.inverted.X, mode.dark.white.X — so the mode and scheme are taken
+       off the front and kept as WHERE, and the rest plus the (from, to) pair is
+       the cause.
+
+  Values and re-pointed rows are both edits; a token that exists on one side
+  only is not (it has no "from"), so it is not here.
+*/
+function colourOf(doc, path, shown) {
+  /* The colour a value comes to, whether it is written out or reached through
+     references — what a swatch has to show. Null when it is not a colour. */
+  try {
+    var raw = rawOf(doc, path);
+    var v = isReference(raw) ? resolveRef(doc, rootOf(path), raw) : raw;
+    var t = renderValue(v);
+    var m = /hex:(#[0-9a-f]{3,8})/i.exec(t) || /^(#[0-9a-f]{3,8})$/i.exec(t);
+    return m ? m[1] : null;
+  } catch (e) { return null; }
+}
+
+function findCauses(report, figmaDoc, repoDoc) {
+  var rows = (report.changed || []).concat(report.repointed || []);
+  var byPath = new Map();
+  rows.forEach(function (r) { byPath.set(r.path, r); });
+  var target = function (v) {
+    var m = /^\{([^}]+)\}$/.exec(String(v));
+    return m ? m[1] : null;
+  };
+  var parentOf = function (r) {
+    var sides = [target(r.figma), target(r.repo)];
+    for (var i = 0; i < sides.length; i++) {
+      var t = sides[i];
+      if (t && t !== r.path && byPath.has(t)) return byPath.get(t);
+    }
+    return null;
+  };
+  var rootOfRow = function (r) {
+    var seen = 0;
+    while (seen++ < 12) {
+      var p = parentOf(r);
+      if (!p) return r;
+      r = p;
+    }
+    return r;
+  };
+  var downstream = new Map();
+  rows.forEach(function (r) {
+    var root = rootOfRow(r);
+    if (root === r) return;
+    if (!downstream.has(root.path)) downstream.set(root.path, []);
+    downstream.get(root.path).push(r.path);
+  });
+  var causeBy = new Map();
+  rows.forEach(function (r) {
+    if (rootOfRow(r) !== r) return;
+    var segs = r.path.split('.');
+    var where = null, name = r.path;
+    if (segs[0] === 'mode' && segs.length > 4) {
+      where = segs[1] + '.' + segs[2];
+      name = segs.slice(3).join('.');
+    }
+    var k = name + '␟' + String(r.figma) + '␟' + String(r.repo);
+    if (!causeBy.has(k)) {
+      causeBy.set(k, { name: name, figma: String(r.figma), repo: String(r.repo), type: r.type,
+                       figmaColour: figmaDoc ? colourOf(figmaDoc, r.path) : null,
+                       repoColour: repoDoc ? colourOf(repoDoc, r.path) : null,
+                       kind: 'value',
+                       where: [], paths: [], downstream: 0, downstreamSample: [] });
+    }
+    var c = causeBy.get(k);
+    c.paths.push(r.path);
+    if (where) c.where.push(where);
+    var d = downstream.get(r.path) || [];
+    c.downstream += d.length;
+    d.slice(0, 3 - c.downstreamSample.length).forEach(function (x) { c.downstreamSample.push(x); });
+  });
+  var out = Array.from(causeBy.values()).sort(function (a, b) {
+    return (b.downstream + b.paths.length) - (a.downstream + a.paths.length);
+  });
+
+  /* The same value, held as a plain value on one side and as a link on the
+     other. One edit however many modes it is spelled in. */
+  var aliasBy = new Map();
+  (report.aliased || []).forEach(function (r) {
+    var segs = r.path.split('.');
+    var name = segs[0] === 'mode' && segs.length > 4 ? segs.slice(3).join('.') : r.path;
+    var k = name + '\u241f' + String(r.figma) + '\u241f' + String(r.repo);
+    if (!aliasBy.has(k)) {
+      aliasBy.set(k, { kind: 'aliased', name: name, figma: String(r.figma), repo: String(r.repo), type: r.type,
+                       figmaColour: figmaDoc ? colourOf(figmaDoc, r.path) : null,
+                       repoColour: repoDoc ? colourOf(repoDoc, r.path) : null,
+                       where: [], paths: [], downstream: 0, downstreamSample: [] });
+    }
+    aliasBy.get(k).paths.push(r.path);
+  });
+  out = out.concat(Array.from(aliasBy.values()));
+
+  /* Tokens on one side only, by the group that holds them: "12 tokens only in
+     Figma, in core.colours" is one finding, twelve lines are not. */
+  [['only-figma', report.onlyInFigma], ['only-repo', report.onlyInRepo]].forEach(function (pair) {
+    var by = new Map();
+    (pair[1] || []).forEach(function (r) {
+      var segs = r.path.split('.');
+      var group = segs.length > 1 ? segs.slice(0, -1).join('.') : r.path;
+      if (!by.has(group)) by.set(group, { kind: pair[0], name: group, count: 0, samples: [], paths: [], where: [], downstream: 0 });
+      var g = by.get(group);
+      g.count++;
+      g.paths.push(r.path);
+      if (g.samples.length < 3) g.samples.push(segs[segs.length - 1]);
+    });
+    out = out.concat(Array.from(by.values()).sort(function (a, b) { return b.count - a.count; }));
+  });
+  return out;
 }
 
 /*
@@ -1598,6 +1772,21 @@ function format(report, opts) {
   var bothSides = function (r) { return r.path + '\n      repo:  ' + r.repo + '\n      here:  ' + r.figma; };
   var side = function (r) { return r.path + '  =  ' + r.value; };
 
+  if (report.causes && report.causes.length) {
+    out.push('WHERE IT STARTS');
+    out.push('');
+    report.causes.forEach(function (c) {
+      if (c.kind === 'only-figma' || c.kind === 'only-repo') {
+        out.push('  ' + c.count + ' token(s) only ' + (c.kind === 'only-figma' ? 'in Figma' : 'in the repo') + ' under ' + c.name);
+        return;
+      }
+      out.push('  ' + c.name + (c.where.length ? '  (in ' + c.where.join(', ') + ')' : ''));
+      out.push('      here:  ' + c.figma);
+      out.push('      repo:  ' + c.repo);
+      if (c.downstream) out.push('      ' + c.downstream.toLocaleString() + ' more token(s) follow from it');
+    });
+    out.push('');
+  }
   out.push('VALUES — someone chose differently');
   out.push('');
   list('  changed', report.changed, bothSides);
@@ -1620,7 +1809,15 @@ function format(report, opts) {
   /* findDuplicateNames is exported because it does not need a comparison: it
      is a reading of ONE document, and the export and import paths both have a
      document and nothing to compare it against. */
-  var api = { compare, flatten, countTokens, detectFormat, formatLabel, renderValue, isToken, format,
+  /* The same walk as flatten, with numbers read to three decimals for its length: Figma hands back
+     22.870001 for a 22.87 it was given, and the Studio link compares a Figma document with a token file
+     that never went through Figma. */
+  function flattenRounded(doc) {
+    NUM_DECIMALS = 3;
+    try { return flatten(doc); } finally { NUM_DECIMALS = null; }
+  }
+
+  var api = { compare, flatten, flattenRounded, countTokens, detectFormat, isResolvedDocument, formatLabel, renderValue, isToken, format,
               findDuplicateNames };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

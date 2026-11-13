@@ -8,261 +8,41 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    /* Excludes Pomegranate's own elements: this plugin's pre-existing reset is
-       unlayered author CSS, same as every rule in this file, while Pomegranate's
-       component rules live inside @layer pom.components — and unlayered
-       CSS always beats layered CSS regardless of specificity. Left
-       unscoped, `padding: 0` and `margin: 0` here silently zero out EVERY
-       Pomegranate component's own padding/margin tokens (confirmed on Button,
-       IconButton, TextField, TextArea, SegmentedControl — all computed to
-       0px despite real, non-zero padding tokens). Pom sets box-sizing:
-       border-box on its own elements already (@layer pom.reset), so
-       excluding them from that part too is redundant, not harmful. */
-    *:not([class*="Pom"]) { margin: 0; padding: 0; box-sizing: border-box; }
+    /* Plain reset. Specificity 0, so every class rule (the kit's included) wins. */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    /* Pomegranate components set `display` unconditionally on their own class
-       (e.g. .PomButton { display: flex }), which — being an author style —
-       silently beats the browser's built-in `[hidden] { display: none }` UA
-       rule. Restated as an author rule (with !important so it always wins
-       regardless of source order) so `.hidden = true` keeps working on them. */
+    /* Component rules set `display` on their own class, which — being an author
+       style — beats the browser's built-in `[hidden] { display: none }`.
+       Restated with !important so `.hidden = true` keeps working on them. */
     [hidden] { display: none !important; }
 
-    /* Pomegranate's TextArea "standard" status border resolves to
-       --colours-basic-stroke, which is pure white in dark mode — a stark
-       1px line next to --colours-basic-stroke-subtle, which --app-border
-       (and so every other border in this app) uses. Re-pointed at that
-       subtler stroke token, per the README's token-override pattern. */
-    .PomTextArea {
-      --PomTextArea-InputField-before-border--status-standard: var(--strokes-1) solid var(--colours-basic-stroke-subtle);
-    }
-
-    /* the Pomegranate kit@3.0.1 wires the *typed text* font for
-       size="small" on both TextField and TextArea to --body-m-bold (700
-       weight) — confirmed against the package's own typography.css, which
-       also defines a --body-m-regular (500 weight) at the same 1rem size
-       that every other component's body copy uses. Any text a user types
-       renders bold, which reads as broken rather than a design choice.
-       Re-pointed at the regular weight; only fixes the input's own text,
-       not the field label (Pomegranate's bold label is a normal, intentional
-       pattern this app already otherwise follows). */
-    .PomTextField, .PomTextArea {
-      --PomTextField-Input-font--size-small: var(--body-m-regular);
-      --PomTextArea-Input-font--size-small: var(--body-m-regular);
-    }
-
-    /* Pomegranate's own TextField.css collapses .PomTextField-InputContainer to
-       height:0/overflow:hidden until its own internal "filled" state (true
-       when focused OR has a value OR is readonly — see the compiled
-       TextField source) adds --filled, expanding it back to height:unset.
-       That's a floating-label pattern: while empty and unfocused, the
-       label sits where the input normally would, and the real input+icon
-       stay invisibly collapsed until focus. None of this app's fields rely
-       on that — so every empty, unfocused field (leading icon, placeholder,
-       cursor) was invisibly clipped away until clicked, confirmed via the
-       real computed style/DOM, not a screenshot-rendering artifact. */
-    .PomTextField-InputContainer {
-      height: unset;
-      overflow: unset;
-    }
-
-    /* Same upstream pattern as the TextField/TextArea fix above: Pom wires
-       PomDialogContent's body `text` to --body-m-bold (700 weight) — the
-       title correctly uses --subtitle (also 700, by design for a heading),
-       but the body copy has no such reasoning and just reads as broken.
-       Re-pointed at --body-m-regular (500 weight). */
-    .PomDialog {
-      --PomDialog-Text-font: var(--body-m-regular);
-    }
-
-    /* PomDialogContent's title container renders unconditionally (fixed
-       min-height + padding) even with no `title` passed — only the heading
-       span inside it is conditional. The token-modal dialog below skips
-       `title` so it can render its own icon+heading row instead (`title`
-       is a plain string prop — no slot for an icon), so this collapses the
-       resulting empty container rather than leaving a blank gap above that
-       row. Self-scoping: only matches a dialog with no title at all. */
-    .PomDialog-TitleContainer:empty {
-      display: none;
-    }
-
-    /* Pomegranate's own spacing puts a 24px bottom pad on contentSlot's own
-       container PLUS another 24px top pad on the action buttons' container
-       — 48px total between the token field and the buttons, clearly too
-       much in this compact dialog. Trimmed via `className="token-modal-dialog"`
-       on this dialog only. Two DIFFERENT tokens control that second gap
-       depending on the panel's current height at render time:
-       PomDialogContent's own `stickyButton` prop defaults true, so at this
-       plugin's own panel it's `--PomDialog-SlotContainer3-padding--stickyButton`
-       (confirmed via the real DOM: the action row's padded ancestor is
-       `.PomDialog-SlotContainer3--stickyButton`, not SlotContainer2) — but
-       stickyButton turns itself off below a 600px-tall viewport
-       (`isSmallViewport`, DialogContent's own internal check), which is
-       reachable here since the panel's height is user-resizable (the
-       drag-handle in ui.template.html), and that shorter-panel case renders
-       through `--PomDialog-SlotContainer2-padding` instead. Both are
-       overridden together so the gap stays trimmed either way — this was
-       originally only SlotContainer2 (a plain guess at which token
-       applied), which turned out to be the wrong one for this plugin's own
-       actual default height, caught later while fixing the same mistake
-       for .remove-confirm-dialog below.
-
-       Both tokens are set via the 4-value `padding` shorthand (top only
-       reduced, right/bottom/left left at the normal --spacing-component-7)
-       — NOT a single value. A single value applies to all four sides, which
-       first shipped here by mistake and visibly squashed the button row's
-       LEFT/RIGHT inset far tighter than the field/text above it (caught
-       from a real screenshot: the buttons read flush with the dialog's
-       outer edge while the field above still had its normal margin). */
-    .token-modal-dialog {
-      /* Field→buttons gap = this bottom value + SlotContainer2/3's own top
-         value below (4px + 4px = 8px total) — bumped +16px by increasing
-         just this side, spacing-component-2 (4px) -> spacing-component-6
-         (20px, exactly +16px), landing on a real token instead of an
-         arbitrary px value. New total: 20 + 4 = 24px. */
-      --PomDialog-SlotContainer-padding: 0 var(--spacing-component-7) var(--spacing-component-6) var(--spacing-component-7);
-      --PomDialog-SlotContainer2-padding: var(--spacing-component-2) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
-      --PomDialog-SlotContainer3-padding--stickyButton: var(--spacing-component-2) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
-    }
-
-    /* The GitHub/GitLab "Remove?" confirm dialogs use `text` (not
-       contentSlot), so their own version of the same double-padding stack
-       is --PomDialog-TextSection's bottom pad plus whichever of the two
-       tokens above actually renders for the current panel height — see the
-       long comment on .token-modal-dialog for why both are needed, and why
-       each is a top-only 4-value override rather than a single value. */
-    .remove-confirm-dialog {
-      --PomDialog-SlotContainer2-padding: var(--spacing-component-4) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
-      --PomDialog-SlotContainer3-padding--stickyButton: var(--spacing-component-4) var(--spacing-component-7) var(--spacing-component-7) var(--spacing-component-7);
-    }
-
-    /* Two app-level overrides on top of the vendored SelectableCard
-       (ProviderChoiceCard, buttons.tsx) — both scoped to this one mount
-       rather than touching src/vendor/pomegranate, since neither is this
-       app's call to make for every future SelectableCard, only this one's
-       known, measured behaviour.
-
-       1) node.css's .nd-selcard-mark is `position: absolute;
-          inset-block-start: var(--nd-card-pad)` — a fixed offset from the
-          card's own top edge, not a true vertical center. It only lands on
-          center for whatever single-line content height the token math
-          assumes; measured against this card's actual content (a 24px logo
-          badge + label, not the bare microcopy row it was tuned for), the
-          mark's own centerY sat 3px above the logo/label's — visible as a
-          slight vertical misalignment between the checkbox and the row it
-          belongs to. True-centered with top/transform instead of the fixed
-          inset. */
-    #onboarding-dialog-mount .nd-selcard-mark {
-      inset-block-start: 50%;
-      transform: translateY(-50%);
-    }
-    /* 2) A checked mark's REST colour comes from .nd-checkmark.is-checked's
-       own base rule (`background: var(--background)`, node.css) — dark at
-       this card's level (#494949, confirmed via computed style). Its HOVER
-       colour comes from a *different* token family entirely
-       (`background: var(--mark-hover)`, the SelectableCard-specific hover
-       rule) — and in this exact context (dark theme, data-tense="strong",
-       level 1) --mark and --mark-hover both resolve to #FFFFFF. The two
-       rules were never authored to agree with each other; they just
-       happened to here. Result: hovering a checked card flashes its mark
-       from dark to solid white, and the tick's own ink
-       (.nd-checkmark-tick { color: var(--text) }, unconditional, no hover
-       variant) stays white throughout — a white tick on a white mark,
-       genuinely invisible. This is a token-authoring gap in the vendored
-       kit for this specific level/theme/tense combination, not a misuse
-       here (mark="checkbox", level={1} are exactly the documented props);
-       worked around at the app level by keeping the SAME token family
-       (--background-hover, not --mark-hover) the rest state already uses,
-       so hovering only steps one rung darker instead of jumping families. */
-    #onboarding-dialog-mount .nd-selcard:not(.is-inert):hover .nd-selcard-mark > .nd-checkmark.is-checked {
-      background: var(--background-hover);
-      border-color: var(--background-hover);
-    }
-    /* 3) More room around the "Push destination" step's content (the
-       GitLab/GitHub cards) — node.css's .nd-dialog-content defaults to
-       --spacing-component-2 --spacing-component-4 (10px/16px), noticeably
-       tighter than the cards' own now-18px internal padding, so the cards
-       read closer to the dialog's edge than to each other. First pass
-       bumped all four sides to a uniform --spacing-component-5 (18px) —
-       wrong call, caught before it looked right: .nd-dialog-content's TOP
-       padding stacks with .nd-dialog-head's own bottom padding
-       (--spacing-component-2, 10px) to form the title-to-content gap, so
-       raising it ALSO pushed the title away from its content, which
-       wasn't asked for and wasn't the problem. Left/right/bottom-only:
-       top stays the untouched default (--spacing-component-2, 10px), so
-       that gap is exactly what it was — only the outer left/right/bottom
-       frame around the content grew. Scoped the same way as the two rules
-       above — Dialog.tsx takes no className prop to hang a scoped class
-       on (only `style`, which lands on the dialog root, not its content
-       box), but showModal() doesn't reparent the element, so the mount id
-       still reaches it as a plain descendant selector.
-       (Note for whoever next touches dialog spacing: .token-modal-dialog /
-       .remove-confirm-dialog below both override --PomDialog-SlotContainer*
-       variables that Dialog.tsx never reads — it has no "PomDialog"
-       anything, only nd-dialog-* classes — and neither classname is ever
-       applied to any Dialog in this file. Both rules are dead; left alone,
-       out of scope here.) */
-    #onboarding-dialog-mount .nd-dialog-content {
-      padding: var(--spacing-component-2) var(--spacing-component-5) var(--spacing-component-5);
-    }
-    /* Same treatment, same reasoning, for the "scanned collections" modal
-       (buttons.tsx's mountCollectionsAccordion, at #collections-dialog-mount)
-       — node.css's .nd-dialog-content default (10px/16px) read tight around
-       the per-collection rows on left/right/bottom; top is left at its
-       default so the title-to-list gap doesn't move, same fix as above. */
-    #collections-dialog-mount .nd-dialog-content {
+    /* A little more room around the content of two dialogs than the kit's
+       default. Left/right/bottom only: the top stays at the default so the
+       title-to-content gap does not move. */
+    #onboarding-dialog-mount .ui-dialog-content,
+    #collections-dialog-mount .ui-dialog-content {
       padding: var(--spacing-component-2) var(--spacing-component-5) var(--spacing-component-5);
     }
 
-    /* This app's own chrome vars are aliases onto the Pomegranate
-       (disarantidis_ReactJS) design tokens from src/vendor/pomegranate
-       (tokens.css / node.css, bundled into ui.html), so the plugin's plain
-       CSS and its Pomegranate components resolve to the same palette.
-       data-theme="dark" on <html> is just the STARTING attribute value, not
-       a static one: the Settings header's theme toggle (buttons.tsx,
-       mountThemeToggle) flips it to "light" at runtime, which lands on
-       Pomegranate's own light palette on bare :root (the
-       [data-theme='dark'] rules simply stop matching) — no separate light
-       styling exists in this file because none is needed; every var()
-       below re-resolves against whichever theme is current. */
+    /* This app's own chrome vars are aliases onto the tokens in
+       src/ui-kit/tokens.css (bundled into this file), so the plugin's plain
+       CSS and its components resolve to the same palette.
+       data-theme="dark" on <html> is only the STARTING value: the Settings
+       header's theme toggle (buttons.tsx, mountThemeToggle) flips it to
+       "light" at runtime and every var() below re-resolves.
+
+       The ground is level 2 (<html data-level="2">); cards and wells set
+       their own data-level and paint var(--background) directly.
+
+       --app-bg / --app-surface / --app-surface-soft ARE NOT LIVE ALIASES.
+       They resolve var(--background) once, on :root, against :root's own
+       level. A custom property inherits its already-resolved value, so an
+       element that sets its own data-level and paints through these aliases
+       keeps the ground's colour. Anything that sets, or may ever set, its
+       own data-level MUST paint var(--background) / var(--background-hover)
+       directly. The aliases are safe only on elements that stay at the
+       root's level for their whole life (body itself). */
     :root {
-      /* Pomegranate's LEVEL model (docs/knowledge-levels.md + LAYOUT-RULES.md):
-         the collapse left ONE fill name, --background, moved by [data-level]
-         islands; --surface / --container-* are gone. So:
-         · the ground is level 2 here — set on <html> with data-surface="normal"
-           (harmless now that level 2 already paints solid on its own, unlike
-           levels 1/3/4, but left in place rather than special-cased away).
-           Bumped up from the ladder's actual darkest rung (1) on request, so
-           the plugin's own page background reads one step more elevated —
-           see buttons.tsx's own GROUND constant, which must always match
-           this value exactly;
-         · a field sits ONE rung above its ground for free (fieldLevel), so a
-           field on this L2 ground is L3, and a field on an L4 card (every
-           .provider-card / .export-panel / .json-download-card — bumped
-           from L2 for contrast, see their own comments) is also L3, the
-           ladder's own top-rung clamp; buttons.tsx threads the right ground
-           into every mount's own LevelContext.Provider (GROUND=2,
-           CARD_LEVEL=2 — CARD_LEVEL's own comment explains why it stayed 2
-           even though the cards it names moved to 4) so this computes
-           correctly instead of being hand-typed.
-
-         --app-bg / --app-surface / --app-surface-soft BELOW ARE NOT LIVE
-         ALIASES — READ THIS BEFORE REACHING FOR THEM ON A NEW SURFACE.
-         They resolve `var(--background)` exactly ONCE, here on :root, against
-         :root's OWN level (1). Custom-property inheritance carries that
-         already-resolved colour down as a plain value — it does not re-run
-         var(--background) per descendant — so a DEEPER element that sets its
-         own data-level (a card at 2, a well at 1 inside an L4 dialog) still
-         inherits :root's frozen colour through --app-surface, NOT its own
-         rung's. This bit exactly this file: .provider-card / .export-panel
-         painted `background: var(--app-surface)` and stayed the ground's
-         colour even after gaining `data-level="2"`, because the alias never
-         saw it. --background itself has no such trap (the DS's own .nd-card
-         paints it directly and tracks every level correctly) — so any
-         element that sets, or may ever set, its own data-level MUST paint
-         `var(--background)` / `var(--background-hover)` directly, never
-         through these three. They stay safe to use only on elements that are
-         guaranteed to remain at the ROOT's level for their whole life
-         (nothing below currently qualifies except body itself). */
       --app-bg: var(--background);
       --app-surface: var(--background);
       --app-surface-soft: var(--background-hover);
@@ -280,10 +60,6 @@
          looking at, not an error. */
       --app-warning: #D9A441;
 
-      /* Lucide's trash-2, as a mask rather than a file — the one place this
-         plugin has to paint an icon into a kit component that draws its own.
-         See the #import-file-item-mount block for why, and for when it goes. */
-      --closure-trash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/%3E%3Cpath d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3C/svg%3E");
     }
 
     html, body {
@@ -345,32 +121,20 @@
       min-width: 0;
     }
 
-    /* The Closure lockup (Pomegranate Identity, Figma node 16:24) — the
-       badge and the word together, replacing the older bracketed
-       wordmark (node 6:18) this used to carry.
-       currentColor on every path, not the export's own fill="white"
-       (which would have vanished against a light-theme header): color:
-       var(--app-heading), so the mark stays theme-adaptive like
-       everything else here rather than being pinned to one theme. The
-       badge's own glyph is a HOLE in its path, not a painted shape, so
-       it shows the header behind it and reads correctly in both themes
-       without needing a second colour. height set, width left to the
-       viewBox's own 462.315:108 ratio, so it scales proportionally at
-       whatever height matches the header. */
-    .header-logo {
+    /* The plugin's name, set as text in the header. */
+    .header-wordmark {
       display: block;
-      height: 30px;
-      width: auto;
+      font: 700 18px/30px var(--font-sans);
+      letter-spacing: -0.01em;
       color: var(--app-heading);
-      flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .version-tag-mount {
       flex-shrink: 0;
     }
 
-    /* Custom pill, not a Pomegranate component — same look the old .app-version
-       span had. */
+    /* Custom pill — same look the old .app-version span had. */
     .version-tag-label {
       font-size: 10px;
       font-weight: 500;
@@ -505,7 +269,7 @@
     }
     .folder-paths-title {
       margin: 0;
-      /* One step up from --body-s-bold (the size Pomegranate's own TextField label
+      /* One step up from --body-s-bold (the size the kit's own field label
          renders at for size:'small' — the sibling "GitLab Token" etc.
          labels on this same page): this class now labels genuine page
          SECTIONS ("Push destination", "Repository settings", "GitLab" /
@@ -516,7 +280,7 @@
          destination" alone; now shared by every section title for a
          consistent hierarchy across the whole page.
          --body-m-bold / --body-m-bold-letter-spacing (used here until now)
-         are not defined anywhere — not in the vendored kit, not in this
+         are not defined anywhere — not in the kit, not in this
          file's own :root — so `font: var(--body-m-bold)` silently failed
          and every section title was inheriting the PAGE's default
          (16px/400), never the intended 16px/700. Identical bug to the one
@@ -536,7 +300,7 @@
     .folder-paths-subtitle {
       margin: 2px 0 0;
       /* --microcopy-regular / --microcopy-regular-letter-spacing (used here
-         until now) are not defined anywhere — not in the vendored kit, not
+         until now) are not defined anywhere — not in the kit, not
          in this file's own :root — so `font: var(--microcopy-regular)`
          silently failed and this text was inheriting the PAGE's default
          (16px/400), never the intended 12px microcopy size. Spelled out in
@@ -610,14 +374,14 @@
     /* Unlike .token-row / .folder-add, this field has no id'd mount span of
        its own to carry `flex: 1` — buttons.tsx renders it straight into
        .folder-row (mountFolderList remounts the whole list on every
-       change). node.css's `.nd-textfield-wrap.is-block` sets `flex: none`
+       change). the kit's `.ui-textfield-wrap.is-block` sets `flex: none`
        + `width: stretch`, which — with nothing to shrink it — claims the
        row's full width and squeezes the remove button down to its 24px
        floor on the cross axis, stretched tall by its own block-size (the
        aspect-ratio-1 square it should have had no room to keep). Beating
        that rule needs the extra ">" for specificity (is-block alone ties
-       it and loses on source order — node.css loads after this block). */
-    .folder-row > .nd-textfield-wrap.is-block {
+       it and loses on source order — kit.css loads after this block). */
+    .folder-row > .ui-textfield-wrap.is-block {
       flex: 1;
       min-width: 0;
     }
@@ -711,7 +475,7 @@
     */
     .folder-remove-tree {
       margin: 0 0 16px; padding: 10px 12px;
-      border-radius: 12px; background: var(--nd-field-fill, rgba(255,255,255,0.04));
+      border-radius: 12px; background: var(--field-fill, rgba(255,255,255,0.04));
     }
     .folder-remove-path,
     .folder-remove-child {
@@ -745,10 +509,10 @@
     /* Both of these dialogs are about one provider card, so they stand as wide
        as it does — set from the card's measured width (matchDialogToCard), with
        the fallback only covering the moment before one has been measured. */
-    #folder-discovery-dialog-mount .nd-dialog,
-    #folder-remove-dialog-mount .nd-dialog {
-      --nd-dialog-width: var(--closure-dialog-width, 360px);
-      inline-size: min(92vw, var(--closure-dialog-width, 360px));
+    #folder-discovery-dialog-mount .ui-dialog,
+    #folder-remove-dialog-mount .ui-dialog {
+      --ui-dialog-width: var(--dialog-width, 360px);
+      inline-size: min(92vw, var(--dialog-width, 360px));
     }
 
     /* Only above FOLDER_SEARCH_MIN — see mountFolderDiscovery. */
@@ -769,7 +533,7 @@
       display: flex; align-items: center; gap: 8px;
       padding: 10px 12px;
       border-radius: 12px;
-      background: var(--nd-field-fill, rgba(255,255,255,0.04));
+      background: var(--field-fill, rgba(255,255,255,0.04));
       font-size: 12px;
       overflow-wrap: anywhere;
     }
@@ -984,13 +748,50 @@
     .output-format {
       margin: 0 0 40px;
     }
+    .structure-capture[hidden] { display: none; }
+    /* Inset like the Resolved card above and the heading over both (see .output-format
+       > .folder-paths-title): all three share --spacing-component-3. */
+    .structure-note {
+      margin: 0 var(--spacing-component-3) 12px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--app-text-muted);
+    }
+    .structure-download-mount {
+      display: block;
+      margin: 0 var(--spacing-component-3);
+    }
+    /* "Clear this file" — the last block of Settings, a section of its own. */
+    .clear-file {
+      margin: 40px var(--spacing-component-3) 0;
+    }
+    .clear-file > .folder-paths-title {
+      margin-left: calc(var(--spacing-component-3) * -1);
+      padding-left: var(--spacing-component-3);
+      margin-bottom: 8px;
+    }
+    .clear-file-actions {
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+    }
+    .clear-file-actions > span { flex: 1; display: block; }
+    .clear-file-build { margin-top: 12px; margin-bottom: 0; opacity: 0.7; }
+    /* A file with nothing in it has nothing to clear: the title, the note and the buttons go, the build line stays. */
+    .clear-file [hidden] { display: none !important; }
+    .clear-file-note {
+      margin: 0 0 12px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--app-text-muted);
+    }
     .output-format > .folder-paths-title {
       padding-left: var(--spacing-component-3);
       margin-bottom: 16px;
     }
     /* The control itself is a SelectableCard now (buttons.tsx) — a real
-       card, with its own border/background/padding on every side (node.css's
-       .nd-selcard-content), not a bare row that needs the container to
+       card, with its own border/background/padding on every side (kit.css's
+       .ui-selcard-content), not a bare row that needs the container to
        supply its indent. So this gets the same edge treatment
        .provider-card/.provider-add-row use below: margin, not padding,
        insetting the whole card box from the panel edge to align with
@@ -1226,6 +1027,7 @@
     /* Sits under the hint, with enough space that it reads as an offer
        rather than part of the sentence above it. */
     .empty-state-action { margin-top: 18px; }
+    .empty-state-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
 
     /* ── Import page ──────────────────────────────────────────────────────
        Borrows .settings-page's scrolling and content inset wholesale — it is
@@ -1333,7 +1135,7 @@
     .compare-stat {
       border-radius: 12px;
       padding: 10px 12px;
-      background: var(--nd-field-fill, var(--app-surface-soft));
+      background: var(--field-fill, var(--app-surface-soft));
     }
     .compare-stat-n { font-size: 18px; font-weight: 700; line-height: 1.2; }
     .compare-stat-label { font-size: 11px; opacity: 0.7; margin-top: 2px; }
@@ -1612,6 +1414,25 @@
       border: 1px solid var(--app-border);
     }
     .compare-more { font-size: 11px; opacity: 0.6; margin: 2px 0 0; }
+    .compare-cause-colour { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .compare-swatch-lg { width: 28px; height: 28px; border-radius: 6px; flex: none; border: 1px solid var(--app-border); }
+    .compare-cause-hex { font-size: 11px; opacity: .7; font-family: ui-monospace, monospace; }
+    .compare-cause { padding: 4px 0 16px; display: flex; flex-direction: column; gap: 8px; }
+    .compare-cause + .compare-cause { border-top: 1px solid var(--ui-border-subtle, rgba(255,255,255,.08)); padding-top: 16px; }
+    .compare-cause:last-child { padding-bottom: 0; }
+    .compare-cause-name { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+    .compare-cause-where { font-size: 11px; opacity: .6; }
+    .compare-cause-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .compare-cause-side { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.04); }
+    .compare-cause-label { display: flex; align-items: center; gap: 5px; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; opacity: .6; }
+    .compare-cause-side code { font-size: 12px; overflow-wrap: anywhere; }
+    .compare-cause-note { display: flex; flex-direction: column; gap: 4px; font-size: 12px; opacity: .85; overflow-wrap: anywhere; }
+    .compare-cause-follow { font-size: 11px; opacity: .7; }
+    .compare-fold { margin: 0; }
+    .compare-fold-summary { cursor: pointer; list-style: none; margin: 0 16px 12px; padding: 12px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; opacity: .85; background: rgba(255,255,255,.04); }
+    .compare-fold-summary::-webkit-details-marker { display: none; }
+    .compare-fold-summary::before { content: '\25B8  '; }
+    .compare-fold[open] > .compare-fold-summary::before { content: '\25BE  '; }
     .compare-copybox {
       width: 100%;
       min-height: 72px;
@@ -1662,11 +1483,13 @@
       font-size: var(--type-body-m-size);
     }
     .import-drop-hint { margin: 0 0 10px; font-size: 11px; opacity: 0.75; }
+    .import-no-repo { margin-top: 12px; display: flex; justify-content: center; }
+    .import-no-repo[hidden] { display: none; }
 
     /* Sits under the drop target as the second route in, quieter than it —
        the drop zone is the thing to try first on a file you already have. */
     .import-repo {
-      margin-top: 16px;
+      margin-bottom: 16px;
       /* The same surface the cards above it stand on: one fill name moved by
          [data-level] (THEMING.md), never a border drawn round the ground. An
          outline here made this the only card on the page that was a box
@@ -1709,6 +1532,8 @@
        name the plugin happens to push to. Same picker as the repo card, same
        selection behind it. */
     .import-repo-file { margin: 0; }
+    .import-repo-branch { margin: 0 0 8px; }
+    .import-repo-branch[hidden] { display: none; }
     .import-repo-pickers { display: flex; gap: 8px; }
     .import-repo-pickers > .repo-file-half { flex: 1 1 0; min-width: 0; }
     .import-repo-file-label {
@@ -1769,6 +1594,21 @@
       color: var(--app-text);
       font-variant-numeric: tabular-nums;
     }
+    /* The summary of a resolved import: one ready line, what is worth a look in
+       plain words (each with its detail folded away), and how it was rebuilt,
+       folded. */
+    .rs-ready { font-size: 13px; color: var(--app-text); line-height: 1.5; }
+    .rs-ready b { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .rs-heading { margin-top: 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--app-text-muted); }
+    .rs-item { margin-top: 8px; padding-left: 10px; border-left: 2px solid #d9a441; }
+    .rs-item.is-info { border-left-color: var(--app-text-muted); }
+    .rs-title { font-size: 12px; font-weight: 600; color: var(--app-text); line-height: 1.4; }
+    .rs-text { margin-top: 2px; font-size: 12px; color: var(--app-text-muted); line-height: 1.5; }
+    .rs-ok { margin-top: 10px; font-size: 12px; color: var(--app-text-muted); }
+    details.rs-details { margin-top: 4px; font-size: 11px; color: var(--app-text-muted); }
+    details.rs-details summary { cursor: pointer; width: fit-content; opacity: 0.8; }
+    details.rs-details summary:hover { opacity: 1; }
+    details.rs-details ul { margin: 4px 0 0; padding-left: 16px; line-height: 1.55; }
     .import-fact.is-quiet { opacity: 0.65; }
     /* The one fact that is allowed to shout. See renderImportSummary. */
     .import-fact.is-warn, .import-fact.is-warn b { color: #d9a441; }
@@ -1897,45 +1737,6 @@
     }
 
     .import-repo-loaded[hidden] { display: none; }
-    /*
-      THE ROW'S REMOVER, SQUARED UP AND GIVEN THE RIGHT GLYPH.
-
-      TWO CORRECTIONS, BOTH FROM THIS SIDE OF THE KIT RATHER THAN INSIDE IT.
-
-      1. The inset. ListItem pulls its trailing slot out by 6px —
-         `margin: 0 -6px 0 0` — which is the optical alignment a ghost icon
-         button wants when the row runs to the edge of a list. This row does
-         not: it sits in a padded card where the file glyph, the counts under
-         it and the card's own edge all agree at 16, and the ✕ alone measured
-         10. Zeroed here, where the row is, rather than for every ListItem in
-         the plugin.
-
-      2. The glyph. FileUploadItem draws DismissIcon and exposes no prop that
-         reaches it, and src/vendor/pomegranate is not ours to edit — so the
-         kit's own mark is hidden and a trash is painted in its place, as a
-         mask over currentColor so it inherits the button's colour, its hover
-         and its disabled state exactly as the ✕ did. A dismiss means "put this
-         away"; this throws the document out and starts the page over, and the
-         two should not look the same.
-
-      HALF OF THIS IS ALREADY OVER. disarantidis/pomegranate#92 asked for both
-      the variant and the icon; the variant landed as `removeVariant`, which the
-      caller passes now, so nothing here touches it any more. The icon is still
-      pinned, and this block is still the only route to it — which is exactly
-      the fragility that prop's own note warns about for a vendored kit, so it
-      is worth asking for `removeIcon` rather than living here indefinitely.
-    */
-    #import-file-item-mount .nd-item-trailing { margin-inline-end: 0; }
-    #import-file-item-mount .nd-item-trailing .nd-btn-slot > svg { display: none; }
-    #import-file-item-mount .nd-item-trailing .nd-btn-slot::after {
-      content: '';
-      display: block;
-      inline-size: 14px;
-      block-size: 14px;
-      background: currentColor;
-      -webkit-mask: var(--closure-trash) center / contain no-repeat;
-      mask: var(--closure-trash) center / contain no-repeat;
-    }
     /* The counts, once they are inside the file's card rather than being one
        of their own. No surface, no inset, no gap above — the card around them
        supplies all three, and the row they sit under is what they are about. */
@@ -2300,7 +2101,7 @@
     /* Read-only per-collection row, inside the modal Dialog's own content
        (buttons.tsx) — no checkbox, no hover/pointer: nothing here is
        interactive anymore. No left/right padding: the Dialog's own
-       .nd-dialog-content already insets left/right, so adding more here
+       .ui-dialog-content already insets left/right, so adding more here
        would double that inset — vertical padding only. */
     .collection-item {
       display: flex;
@@ -2323,7 +2124,7 @@
        paints its own colour/size off the DS's tokens, so only the layout
        fact this row needs to state is that it must not shrink in a flex
        row beside .name's flex:1. */
-    .collection-item .nd-tag {
+    .collection-item .ui-tag {
       flex-shrink: 0;
     }
 
@@ -2344,7 +2145,7 @@
     /*
       THE COLLECTIONS DIALOG, AS WIDE AS THE CARDS BEHIND IT.
 
-      .nd-dialog sets max-inline-size and no inline-size, so it shrinks to its
+      .ui-dialog sets max-inline-size and no inline-size, so it shrinks to its
       content — a list of short collection names and three-digit counts came
       out about 180px, a narrow column floating over cards four hundred wide.
 
@@ -2353,7 +2154,7 @@
       max- is overridden too: the kit's min(92vw, …) would otherwise clamp two
       pixels narrower and the edges would not line up.
     */
-    #collections-dialog-mount .nd-dialog {
+    #collections-dialog-mount .ui-dialog {
       inline-size: calc(100vw - 32px);
       max-inline-size: calc(100vw - 32px);
     }
@@ -2401,13 +2202,13 @@
 
     /* Was `font: var(--subtitle); letter-spacing: var(--subtitle-letter-
        spacing); color: var(--app-heading);` — --subtitle is not defined
-       ANYWHERE in tokens.css/node.css, the same "undefined custom property
+       ANYWHERE in tokens.css/kit.css, the same "undefined custom property
        invalidates the whole shorthand" bug fixed repeatedly elsewhere in
        this file (.folder-paths-title, .folder-paths-subtitle) — so
        this, the plugin's single most prominent
        piece of text (the Figma file name), was silently rendering at
        whatever default inherited font applied, never a deliberate style.
-       Was then briefly matched to --type-title-s-* (20px/600, .nd-dialog-
+       Was then briefly matched to --type-title-s-* (20px/600, .ui-dialog-
        title's own size) since this card is a collapsed view of the same
        heading the modal shows expanded — asked instead to read at the
        same size as every OTHER title on this screen ("GitHub", "Json
@@ -2438,15 +2239,15 @@
       gap: 6px;
     }
 
-    /* Tag's own small-rung default (node.css's .nd-tag.s-small:
+    /* Tag's own small-rung default (the kit's .ui-tag.s-small:
        --spacing-component-0/-2 padding) — no override. There used to be
        one here asking for more breathing room, restored from a dead
-       .PomTagStatic hook that never actually matched the vendored
+       .PomTagStatic hook that never actually matched the
        component (see git history); once these tags were actually visible
        for the first time (ghost → tonal, plus the window.PomDtcg fix),
        that padding read as too large in the real plugin. Dropped rather
        than tuned smaller still, so these match the per-row count tags
-       below (.collection-item .nd-tag), which never had an override. */
+       below (.collection-item .ui-tag), which never had an override. */
 
     /* The read-only per-collection rows — now the modal's own body
        (buttons.tsx's Dialog, opened from the InteractiveCard), not an
@@ -2473,7 +2274,7 @@
        depends on it"). Monospace (not used anywhere else in this app,
        deliberately) so a token path reads as a path — something to go
        find and click on in Figma — rather than as regular copy. Inherits
-       .nd-alert-text's own --text-recessive color (Alert.tsx wraps
+       .ui-alert-text's own --text-recessive color (Alert.tsx wraps
        children in that div) as its baseline; .closure-warning-missing
        overrides back to full --text (below) so the actual root cause is
        the one line in the whole alert that isn't dimmed. */
@@ -2556,8 +2357,8 @@
       /* Was a hand-picked 16px 12px 12px, not on the token ladder at all —
          noticeably tighter than the collections card right above it
          (InteractiveCard size="large", buttons.tsx), whose own CardBody
-         pads at --nd-card-pad = --spacing-component-6 (22px, node.css's
-         .nd-card.s-large). Both cards' OUTER boxes already share the same
+         pads at --spacing-component-6 = --spacing-component-6 (22px, kit.css's
+         .ui-card.s-large). Both cards' OUTER boxes already share the same
          16px inset from the panel edge (.actions / .collections-wrap), so
          the mismatch was purely in each card's OWN internal padding — the
          folder-path field sat ~10px further left than "ODS Test
@@ -2679,6 +2480,7 @@
     .json-download-title-group {
       display: flex;
       align-items: center;
+      min-width: 0;
       gap: 6px;
       color: var(--app-text);
     }
@@ -2744,6 +2546,12 @@
        hides with the provider — see applyRepoMode — because there is nothing
        to push to or read from until one is added. */
     #repo-mode-mount[hidden] { display: none; }
+    /* Both words are shown whole. The segments are flex:1 1 0 with a minimum of
+       nothing, which is right for a control that fills a card and wrong here:
+       sharing a row with the title they were the first thing to give way, and
+       "Compare" came out as "Com…". The title gives way instead. */
+    #repo-mode-mount { flex: none; }
+    #repo-mode-mount .ui-seg-item { flex: 0 0 auto; }
 
     .compare-card {
       background: var(--background);
@@ -2808,7 +2616,7 @@
       picker was losing its last character to a tag that had a spare copy of
       itself two inches up.
     */
-    .compare-card-sides .nd-tag { max-width: 100%; }
+    .compare-card-sides .ui-tag { max-width: 100%; }
     /* .compare-card-main, .compare-card and #compare-card-icon-mount went with
        the main screen's own compare card and then with the wrapper on this
        page. Nothing renders any of them; what is left of the pattern is
@@ -2902,7 +2710,7 @@
       margin takes the slack instead: the title stays at the top, the tag stays
       at the bottom, and the two tags line up with each other.
     */
-    .compare-card-side > .nd-tag { margin-top: auto; }
+    .compare-card-side > .ui-tag { margin-top: auto; }
     /* The file, which is what the card is about. Smaller than the document's
        name above it and heavier than the tag below — it sits between them in
        the hierarchy and should read that way. */
@@ -2918,16 +2726,81 @@
       font-weight: 600;
       color: var(--app-text);
     }
-    .compare-side-title .compare-side-mark { margin-top: 2px; }
-    .compare-card-sides .nd-tag { min-width: 0; height: auto; }
     /*
-      THE ELLIPSIS LIVES ON .nd-tag-label, NOT ON THE TAG — which is why setting
+      THE "IN SYNC" STATE of the Compare page. A short sequence, once: the two
+      documents settle in from either side, the link between them draws, the
+      badge pops and the check is drawn, and two rings go out from it. Colours are
+      the success status colour on the page's own surfaces, so it follows the
+      theme. prefers-reduced-motion gets the finished picture and nothing moving.
+    */
+    .compare-insync {
+      position: relative;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      gap: 4px;
+      /* the same inset as the two cards it replaces (.compare-card-sides), so the edges line up */
+      margin: 0 16px 16px; padding: 20px 16px 20px;
+      border-radius: 16px;
+      border: 1px solid color-mix(in srgb, var(--status-success) 38%, transparent);
+      background:
+        radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--status-success) 20%, transparent) 0%, transparent 62%),
+        color-mix(in srgb, var(--status-success) 7%, transparent);
+      overflow: hidden;
+    }
+    .compare-insync-pair {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: start; width: 100%; gap: 6px; margin-bottom: 10px;
+    }
+    .compare-insync-side { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+    /* The mark runs in line with the name, so a name that wraps stays one centred block with its mark
+       in front of the first line, instead of the mark parked at the edge of the column. */
+    .compare-insync-side .compare-side-title { display: block; text-align: center; max-width: 100%; overflow-wrap: break-word; }
+    .compare-insync-side .compare-side-mark { display: inline-flex; height: auto; vertical-align: -2px; margin-inline-end: 6px; }
+    .compare-insync-center { align-self: start; }
+    .compare-insync-doc, .compare-insync-center { display: block; overflow: visible; flex: none; }
+    .compare-insync .ui-tag { min-width: 0; height: auto; max-width: 100%; }
+    .compare-insync-card { fill: color-mix(in srgb, var(--app-text) 7%, transparent); stroke: color-mix(in srgb, var(--status-success) 55%, var(--app-text-muted)); stroke-width: 1.5; }
+    .compare-insync-lines { fill: none; stroke: color-mix(in srgb, var(--app-text) 38%, transparent); stroke-width: 2.5; stroke-linecap: round; }
+    .compare-insync-badge { fill: var(--status-success); }
+    .compare-insync-check { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 32; }
+    .compare-insync-ring { fill: none; stroke: var(--status-success); stroke-width: 1.5; opacity: 0; transform-origin: 28px 28px; }
+    .compare-insync-title { font-size: 18px; font-weight: 700; line-height: 1.2; color: var(--app-text); }
+    .compare-insync-text { font-size: 13px; line-height: 1.45; color: var(--app-text); max-width: 34ch; }
+    .compare-insync-note { font-size: 12px; line-height: 1.4; color: var(--app-text-muted); }
+    @keyframes insync-card-l { from { transform: translateX(-22px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes insync-card-r { from { transform: translateX(22px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes insync-draw { from { stroke-dashoffset: 36; } to { stroke-dashoffset: 0; } }
+    @keyframes insync-check { from { stroke-dashoffset: 32; } to { stroke-dashoffset: 0; } }
+    @keyframes insync-pop { 0% { transform: scale(0); } 70% { transform: scale(1.14); } 100% { transform: scale(1); } }
+    @keyframes insync-ring { 0% { transform: scale(0.8); opacity: 0.55; } 100% { transform: scale(2); opacity: 0; } }
+    @keyframes insync-rise { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: no-preference) {
+      .compare-insync-card.left, .compare-insync-lines.left { animation: insync-card-l 0.5s cubic-bezier(.2,.8,.2,1) both; }
+      .compare-insync-card.right, .compare-insync-lines.right { animation: insync-card-r 0.5s cubic-bezier(.2,.8,.2,1) both; }
+      .compare-insync-badge { transform-box: fill-box; transform-origin: center; animation: insync-pop 0.45s cubic-bezier(.3,1.4,.5,1) 0.55s both; }
+      .compare-insync-check { animation: insync-check 0.3s ease-out 0.85s both; }
+      .compare-insync-ring.r1 { animation: insync-ring 1.1s ease-out 0.7s 1 both; }
+      .compare-insync-ring.r2 { animation: insync-ring 1.1s ease-out 0.95s 1 both; }
+      .compare-insync-title, .compare-insync-text, .compare-insync-note { animation: insync-rise 0.4s ease-out 0.7s both; }
+      .compare-insync-text { animation-delay: 0.8s; }
+      .compare-insync-note { animation-delay: 0.9s; }
+    }
+    /* The mark is centred on the title's FIRST LINE, whatever size the icon is:
+       its box is one line tall and the icon sits in the middle of it, instead of
+       being pushed down by a fixed margin that was right for one icon only. */
+    .compare-side-title .compare-side-mark {
+      height: calc(var(--type-body-s-size) * 1.5);
+      height: 1lh;
+      align-items: center;
+    }
+    .compare-card-sides .ui-tag { min-width: 0; height: auto; }
+    /*
+      THE ELLIPSIS LIVES ON .ui-tag-label, NOT ON THE TAG — which is why setting
       white-space on the tag changed nothing. The kit pins the label to one line
       and cuts it, which is right for a tag that sits in a row of them and wrong
       for a tag that IS one of two things being compared: what it cuts is the
       tail, and the tail is the branch on one side and the count on both.
     */
-    .compare-card-sides .nd-tag-label {
+    .compare-card-sides .ui-tag-label {
       white-space: normal;
       overflow: visible;
       text-overflow: clip;
@@ -2939,6 +2812,10 @@
     /* The mark keeps its own alignment: the cards stretch, and a relation
        drawn between them belongs halfway up, not stretched to their height. */
     .compare-card-vs { display: flex; opacity: 0.55; flex: none; align-self: center; }
+    /* One under the other — the Figma side, the relation, then the repository —
+       with the mark turned to point down the page between them. */
+    .compare-card-sides.is-stacked { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .compare-card-sides.is-stacked .compare-card-vs { justify-self: center; transform: rotate(90deg); }
     /* .compare-file-name named the Figma document over the pair. It went with
        the card that held it: the left-hand side IS that document's export, so
        the row was the same name twice. */
@@ -3017,7 +2894,16 @@
     }
     .json-file-card[hidden] { display: none; }
 
-    .json-download-fields { display: flex; align-items: center; gap: 8px; }
+    /* Wraps, for Compare: the branch and the folder share the first line and the
+       JSON name takes the whole of the second. In Push nothing is wide enough
+       to wrap, so it stays one line there. */
+    .json-download-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .json-download-fields:has(#compare-pick-mount:not([hidden])) .repo-file-row { flex: 1 1 0; }
+    .json-download-fields:has(#compare-pick-mount:not([hidden])) #compare-pick-mount { flex: 1 1 100%; }
+    /* Push with a branch: the same two lines as Compare. */
+    .json-download-fields:has(#push-branch-mount:not([hidden])) .repo-file-row { flex: 1 1 0; }
+    .json-download-fields:has(#push-branch-mount:not([hidden])) #primary-filename-mount { flex: 1 1 100%; }
+    #push-branch-mount[hidden] { display: none; }
     /* Each may still be narrower than its content — min-width: 0 is what lets
        a flex item shrink below its intrinsic size and truncate inside the card
        rather than overflowing it. */
@@ -3058,8 +2944,8 @@
       opacity: 1;
     }
   </style>
-  <!-- Bundled by scripts/build-ui.js: Pom design tokens + PomButton CSS. -->
-  <style>__Pom_BUTTONS_STYLE__</style>
+  <!-- Bundled by scripts/build-ui.js: src/ui-kit tokens + component CSS. -->
+  <style>__UI_BUTTONS_STYLE__</style>
 </head>
 <body>
   <div class="main-page" id="main-page">
@@ -3067,16 +2953,7 @@
       <div class="header-panel">
         <div class="header-title-row">
           <h1 class="title">
-            <svg class="header-logo" role="img" aria-label="Closure" viewBox="0 0 462.315 108" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M169.81 88.425C150.335 88.425 137.32 74.555 137.32 54.415C137.32 32.85 151 19.075 171.71 19.075C180.925 19.075 188.525 21.545 193.94 26.295V38.74C189.95 32.47 181.78 28.48 172.565 28.48C157.27 28.48 147.865 38.075 147.865 53.56C147.865 68.57 157.84 78.545 173.04 78.545C183.015 78.545 191.09 74.27 195.08 65.91C195.08 80.73 186.245 88.425 169.81 88.425Z" fill="currentColor"/>
-              <path d="M206.865 87V17.65H216.46V87H206.865Z" fill="currentColor"/>
-              <path d="M253.002 88.425C239.037 88.425 228.492 78.45 228.492 63.725C228.492 49.095 239.037 39.31 253.002 39.31C266.967 39.31 277.512 49.095 277.512 63.725C277.512 78.45 266.967 88.425 253.002 88.425ZM238.372 63.725C238.372 73.035 244.357 79.495 253.002 79.495C261.552 79.495 267.632 73.035 267.632 63.725C267.632 54.605 261.647 48.335 253.002 48.335C244.262 48.335 238.372 54.605 238.372 63.725Z" fill="currentColor"/>
-              <path d="M302.634 88.425C295.794 88.425 290.379 86.335 286.199 82.06V71.8C290.094 77.025 296.649 80.445 302.539 80.445C307.099 80.445 309.474 78.355 309.474 75.03C309.474 72.085 308.144 70.47 304.914 69.14L296.364 65.435C290.189 62.775 287.149 58.785 287.149 52.8C287.149 45.01 293.894 39.31 303.394 39.31C308.904 39.31 313.559 40.83 317.264 43.775V53.465C314.414 49.95 308.524 47.1 303.679 47.1C299.594 47.1 297.029 49.095 297.029 52.04C297.029 54.89 298.644 56.41 301.969 57.74L310.614 61.54C316.409 64.01 319.354 68.095 319.354 74.175C319.354 82.63 312.419 88.425 302.634 88.425Z" fill="currentColor"/>
-              <path d="M361.306 40.735H370.901V87H361.306V81.68C358.456 85.955 353.611 88.425 347.056 88.425C336.321 88.425 330.051 81.3 330.051 70.755V40.735H339.551V67.81C339.551 75.03 343.541 79.305 350.096 79.305C355.701 79.305 359.216 76.74 361.306 71.8V40.735Z" fill="currentColor"/>
-              <path d="M386.475 87V40.735H395.215V49.38C397.21 43.3 401.865 39.785 408.23 39.785C409.94 39.785 411.65 40.07 412.41 40.45V49.475C411.175 49.19 409.37 49 407.47 49C402.15 49 397.685 51.85 396.07 57.93V87H386.475Z" fill="currentColor"/>
-              <path d="M441.696 88.425C427.256 88.425 417.471 79.495 417.471 64.105C417.471 49.57 425.736 39.31 439.986 39.31C454.616 39.31 462.501 48.43 462.311 64.96H427.351C427.921 74.84 435.521 79.21 445.401 79.21C452.336 79.21 458.701 76.645 461.551 72.085C461.551 82.155 454.236 88.425 441.696 88.425ZM427.446 58.31H452.241C452.241 51.945 448.156 46.15 439.986 46.15C432.576 46.15 428.016 50.995 427.446 58.31Z" fill="currentColor"/>
-              <path d="M84 0C97.2548 0 108 10.7452 108 24V84C108 97.2548 97.2548 108 84 108H24C10.7452 108 9.66449e-08 97.2548 0 84V24C0 10.7452 10.7452 9.66386e-08 24 0H84ZM69.4463 26.6523C65.3384 26.6345 61.0298 26.5886 56.9326 26.6523L62.8027 37.2656C64.4167 40.1913 65.9215 43.2448 68.0352 45.8584C70.5773 49.0021 73.5213 50.1473 77.5244 50.2178C77.5244 52.3797 77.5456 54.5765 77.5225 56.7354C77.1968 56.7459 76.8694 56.7641 76.5449 56.7734C68.8552 56.9872 65.9207 64.1372 62.752 69.9521L56.9395 80.6133L69.4512 80.6201C69.9419 79.6294 70.7901 78.2661 71.3633 77.2871L85.1826 53.6387L71.2529 29.7939C70.7574 28.9458 69.8533 27.4967 69.4463 26.6523ZM37.7871 26.6436C36.6798 28.7368 35.0968 31.2854 33.8691 33.3877L26.2158 46.499C24.8646 48.811 23.3272 51.3178 22.0566 53.6416L36.0996 77.7002C36.6328 78.6136 37.308 79.705 37.7949 80.6172L50.2881 80.6182L44.1455 69.499C41.6627 64.9974 39.0685 59.1768 33.6709 57.5811C32.3331 57.1858 31.0865 57.0666 29.6953 57.042L29.6992 50.5332C36.7525 50.3041 39.357 46.7168 42.46 41.0195C43.206 39.6497 43.9708 38.237 44.7168 36.8633L50.2842 26.6543C46.1541 26.6339 41.8966 26.7126 37.7871 26.6436Z" fill="currentColor"/>
-            </svg>
+            <span class="header-wordmark">Closure</span>
           </h1>
           <div id="version-tag-mount" class="version-tag-mount"></div>
         </div>
@@ -3086,9 +2963,9 @@
       </div>
     </header>
 
-    <!-- Format toggle hidden: export is locked to Legacy JSON by default.
-         Kept in the DOM (display:none) so the existing exportMode logic still
-         works. The Legacy JSON ↔ DTCG choice lives in Settings instead
+    <!-- Format toggle hidden. Kept in the DOM (display:none) so the existing
+         exportMode logic still works. The export is always W3C DTCG; the one
+         choice left, Resolved or not, lives in Settings
          (see #output-format-control-mount). -->
     <div id="export-mode-control-mount" style="display:none;"></div>
 
@@ -3189,27 +3066,28 @@
 
 
     <div class="empty-state" id="empty-state" style="display: none;">
-      <!-- The Closure variable mark (Pomegranate Identity, node 16:31) — a
-           hexagon with a centred dot, the same glyph the brand uses for "a
-           variable". Inline rather than React-mounted for the same reason
-           the Json file card's own title icon is: this block is static
-           markup, not a React root. fill="currentColor" so it takes
-           .empty-state's own --app-text-muted and follows the theme. -->
-      <svg class="empty-state-icon" viewBox="0 0 448.253 512" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M224.291 0C228.861 3.11883 238.191 8.06017 243.27 10.9668L281.556 32.8584L392.028 95.9863L428.185 116.635C434.503 120.242 441.916 124.242 448.033 128.062C448.483 148.142 448.103 169.751 448.101 189.924L448.105 306.543L448.103 360.293L448.098 374.702C448.098 377.135 448.205 381.697 447.82 383.935C443.788 386.807 433.849 392.125 429.188 394.787L392.193 415.928L272.538 484.298L239.216 503.332L229.285 509.01C228.22 509.625 225.181 511.308 224.288 512H223.83C222.29 510.83 217.99 508.542 216.113 507.475L201.5 499.152L151.188 470.4L52.6142 414.065C35.5567 404.318 17.3488 393.465 0.17279 384.202C-0.146659 380.552 0.074087 372.922 0.0770869 369.082L0.0966182 339.25V245.088L0.0917353 165.016L0.07904 140.786C0.07729 137.155 -0.113577 130.988 0.271423 127.627C2.4837 126.682 7.26641 123.797 9.47064 122.538L26.4013 112.864L82.288 80.9268L176.742 26.9512L207.661 9.27637C212.712 6.38948 218.963 3.05347 223.806 0H224.291ZM121.38 132.478L84.4013 153.616C78.0818 157.23 70.2297 161.424 64.2382 165.293C63.7863 169.694 64.0934 181.281 64.0966 186.091L64.0986 227.669L64.0976 306.69C64.0973 319.825 63.8929 333.585 64.1054 346.67C72.8009 352.04 82.9489 357.555 91.8798 362.66L142.331 391.513L195.479 421.912C198.771 423.795 222.196 437.655 224.516 438.027C228.588 435.367 234.108 432.405 238.408 429.947L262.876 415.965L342.681 370.327L368.863 355.367C373.798 352.547 379.263 349.577 384.023 346.582C384.308 334.062 384.093 320.717 384.093 308.125L384.098 237.584V190.074C384.098 182.797 384.408 172.467 384.013 165.405C379.773 162.667 374.738 159.937 370.296 157.402L348.313 144.837L279.016 105.205L241.575 83.8037C238.682 82.1443 225.577 74.3711 223.738 73.959L121.38 132.478ZM220.128 192.146C255.353 189.98 285.681 216.747 287.908 251.97C290.136 287.192 263.42 317.565 228.2 319.853C192.897 322.145 162.434 295.35 160.202 260.043C157.97 224.736 184.816 194.318 220.128 192.146Z"/>
+      <!-- A generic "variables" glyph (a box). Inline rather than React-mounted:
+           this block is static markup, not a React root. currentColor, so it
+           takes .empty-state's own --app-text-muted and follows the theme. -->
+      <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+        <path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
       </svg>
       <p>No variable collections found.</p>
-      <p class="hint">Add variables in Figma to see them here.</p>
+      <p class="hint">Add variables in Figma, or bring tokens in from a JSON file.</p>
       <!-- The one screen where importing is unambiguously the right next
            move, and now the only place it is offered: the header carried an
            icon-only twin of this button and it read as a second download
-           control, so it was removed rather than relabelled. -->
-      <span id="import-empty-btn-mount" class="empty-state-action"></span>
+           control, so it was removed rather than relabelled. Two ways in: a
+           file from this computer, or a repository. -->
+      <span class="empty-state-action empty-state-actions">
+        <span id="import-upload-btn-mount"></span>
+        <span id="import-connect-btn-mount"></span>
+      </span>
     </div>
   </div>
   
   <div id="closure-warning-mount"></div>
-  <div id="clear-variables-dialog-mount"></div>
 
     <!-- Between the file-variables card above and push settings below: the
          one JSON file name, editable here directly (see primary-filename's
@@ -3271,7 +3149,7 @@
       "nothing is selected" belongs on the page that asks — a button that
       hides when the selection is wrong teaches nobody what to select.
     -->
-    <div class="json-file-card" id="component-entry-card" data-level="4">
+    <div class="json-file-card" id="component-entry-card" data-level="4" hidden>
       <div class="json-download-header">
         <div class="json-download-title-group">
           <svg class="json-download-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -3446,6 +3324,13 @@
             folder and the file share one line instead of being separated by
             a block boundary.
           -->
+          <!-- Compare only, GitHub only: which branch to read from. Saved
+               push settings are untouched by this. -->
+          <span id="compare-branch-mount" class="repo-file-half" hidden></span>
+          <!-- Push, GitHub only: the branch to write to — one that exists, or a
+               name to make. Sits where the Compare branch sits, so the card has
+               the same shape in both. See src/github-branch.js. -->
+          <span id="push-branch-mount" class="repo-file-half" hidden></span>
           <span class="repo-file-row" id="repo-file-row" hidden>
             <!-- The push side: a combobox, because the folder you are about
                  to push into may not exist yet, and the + beside it is how
@@ -3498,7 +3383,7 @@
              SVGs (not React-mounted), same reasoning as the settings-page
              header's own decorative icon: inline SVG icons has no
              third-party brand marks, and these exact monochrome path
-             shapes are this project's own pre-Pom icons (see git history —
+             shapes are this project's own pre-kit icons (see git history —
              this repo used to show the GitHub one here before it became
              GitLab-only, then GitLab's own). When a provider has zero saved
              folder paths the whole block hides rather than showing an empty,
@@ -3547,25 +3432,15 @@
           </svg>
         </div>
         <h1 class="title">Import</h1>
+        <span id="import-settings-btn-mount" hidden></span>
         <span id="import-back-btn-mount"></span>
       </div>
     </header>
     <div class="settings-page-content">
 
-      <!-- Step 1. A drop target that is also a button — the input itself is
-           hidden and clicked through, which is the only way to get a native
-           file dialog behind a styled control. -->
-      <div class="import-drop" id="import-drop">
-        <svg class="import-drop-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <path d="M14 2v6h6"/>
-        </svg>
-        <p class="import-drop-title">Drop a token JSON here</p>
-        <p class="import-drop-hint">Tokens Studio, W3C DTCG, or a plain token tree</p>
-        <span id="import-choose-btn-mount"></span>
-        <input type="file" id="import-file" accept=".json,application/json" hidden>
-      </div>
-
+      <!-- THE REPOSITORY COMES FIRST. It is the way in when there is one: the settings already name the repo, the
+           folder and the file, so the page opens on them and the drop zone below is the other route (a file from this
+           computer). With no repository set up the card is hidden and the drop zone leads, with a button to add one. -->
       <!-- The other way in. The repo settings already name a file, a folder and
            a branch, and the push already writes there — so "what is in the
            repo" is an address this plugin knows. Both providers get their own
@@ -3586,6 +3461,10 @@
              folder and file are pickers, and the button reads "Import from
              GitHub". The repository IS the heading now. -->
         <span id="import-repo-where-mount"></span>
+        <!-- Which branch the file is read from: the repository's branches, the same list Compare offers. GitHub only. -->
+        <div class="import-repo-branch" id="import-repo-branch" hidden>
+          <span id="import-branch-mount"></span>
+        </div>
         <!--
           THE PATH, AS TWO CONTROLS RATHER THAN A SENTENCE. The folder used to
           be a word in the line above, which says where the file is without
@@ -3614,6 +3493,25 @@
           <span id="import-pull-gitlab-mount"></span>
           <span id="import-pull-github-mount"></span>
         </div>
+      </div>
+
+      <!-- Step 1. A drop target that is also a button — the input itself is
+           hidden and clicked through, which is the only way to get a native
+           file dialog behind a styled control. -->
+      <div class="import-drop" id="import-drop">
+        <svg class="import-drop-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6"/>
+        </svg>
+        <p class="import-drop-title">Drop a token JSON here</p>
+        <p class="import-drop-hint">Tokens Studio, W3C DTCG, or a plain token tree</p>
+        <span id="import-choose-btn-mount"></span>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+      </div>
+
+      <!-- No repository set up yet: the way to add one, since the page an empty file opens on has no settings button. -->
+      <div class="import-no-repo" id="import-no-repo" hidden>
+        <span id="import-connect-here-mount"></span>
       </div>
 
       <!-- Step 2. What arrived. -->
@@ -3855,23 +3753,29 @@
       </div>
     </header>
     <div class="settings-page-content">
-      <!-- Output format. Always visible and leads the page: it decides what
-           every download and push actually contains, so it outranks the
-           destination settings below it. Off = the Legacy JSON this
-           plugin has always produced; on = W3C DTCG (design-tokens.org) —
-           one fully resolved document per theme, dtcgShape 'themes', not
-           the 'partial' shape that still needs an external finishing step
-           (see the note on toDtcg() below) — written to a _dtcg file name
-           so the two never overwrite each other. -->
+      <!-- W3C DTCG. Always visible and leads the page: it decides what every
+           download and push actually contains, so it outranks the destination
+           settings below it. The export is always W3C DTCG (design-tokens.org);
+           the one card under the heading is the Resolved switch. Off =
+           dtcgShape 'themes', one document per theme; on = 'resolved', one
+           document with routing resolved away, built by
+           buildResolvedDocument() in the sandbox where the raw variable graph
+           and the formatters live. -->
       <div class="output-format">
-        <p class="folder-paths-title">Output format</p>
-        <!-- A SelectableCard for DTCG (buttons.tsx) and, once it is on, a
-             Checkbox BELOW it — a sibling, not a child: the card is a
-             <button>, and a control inside one fires both. Resolved is a DTCG
-             document in a different shape rather than a format of its own,
-             built by buildResolvedDocument() in the sandbox where the raw
-             variable graph and the formatters live. -->
+        <p class="folder-paths-title">W3C DTCG</p>
         <span id="output-format-control-mount"></span>
+      </div>
+
+      <!-- The structure of this file's variables — which collections, which
+           modes, and how they route into each other — read by the plugin when
+           it opens (see runStructureCapture in code.source.js). Shown only while
+           Resolved is on: a Resolved export is the one that evaluates the
+           structure away, so it is the one that needs it kept. One line, and
+           the file as a small Tonal button. -->
+      <div class="output-format structure-capture" id="structure-capture" hidden>
+        <p class="folder-paths-title">File structure</p>
+        <p class="structure-note">A Resolved export evaluates the routing away: which collections, modes and aliases a value came through is no longer in the document. The structure is read when the plugin opens and kept on this computer, so the file can be rebuilt as it was when you import it again.</p>
+        <span class="structure-download-mount" id="structure-download-mount"></span>
       </div>
 
       <!-- Always-visible heading for whichever provider's connection fields
@@ -3933,7 +3837,7 @@
                whichever card is actually showing, rather than a separate
                pill floating above both. data-level="3", one rung under
                this card's own 4 — same "recessed, not raised" nesting
-               .provider-subcard below already uses — so .nd-seg's own
+               .provider-subcard below already uses — so .ui-seg's own
                background reads as its own surface against the card behind
                it instead of vanishing into it. -->
           <div id="repo-settings-tabs-row" data-level="3" hidden>
@@ -4070,6 +3974,42 @@
         </div>
       </div>
 
+      <!-- RADD STUDIO. Another place tokens go, so it sits with the connections, above the one setting that
+           acts on the file itself. The Studio shows a code (File > Connect to Figma...), it is typed here. -->
+      <div id="studio-link-block" hidden>
+        <div class="provider-card" data-level="4">
+          <div class="provider-section-heading">
+            <p class="folder-paths-title">RADD Studio</p>
+            <div class="provider-heading-actions">
+              <span id="studio-connect-btn-mount"></span>
+            </div>
+          </div>
+          <p class="provider-sync-status" id="studio-status"></p>
+          <div id="studio-link-fields">
+            <span id="studio-code-mount"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CLEAR THIS FILE. Last, and apart from the connection settings above:
+           it acts on the Figma file, not on where tokens go. It is here because
+           an import only runs into a file with no variables and no styles, and
+           the other way to the same dialog (the collections list) is not there
+           when the file has styles and no variables. -->
+      <div class="clear-file">
+        <p class="folder-paths-title" id="clear-file-title">Clear this file</p>
+        <p class="clear-file-note" id="clear-file-note">Delete this file's variables and styles, so a JSON can be imported into it.</p>
+        <!-- Two buttons, because they are two things: an import needs a file with
+             neither, and either can be present without the other. -->
+        <div class="clear-file-actions" id="clear-file-actions">
+          <span id="clear-vars-btn-mount"></span>
+          <span id="clear-styles-btn-mount"></span>
+        </div>
+        <!-- Which build this panel is: a plugin that is not the one just built
+             (Figma keeps a copy of the package) explains every "nothing happened". -->
+        <p class="clear-file-note clear-file-build" id="build-stamp"></p>
+      </div>
+
     </div>
   </div>
 
@@ -4085,21 +4025,27 @@
   <div id="folder-discovery-dialog-mount"></div>
   <div id="folder-remove-dialog-mount"></div>
   <div id="remove-github-dialog-mount"></div>
+  <div id="studio-confirm-dialog-mount"></div>
   <div id="remove-gitlab-dialog-mount"></div>
   <!-- First-run nudge — opened from the GIT_SETTINGS_LOADED handler
        whenever nothing is configured yet (computePushReadiness().needsBigSetup). -->
   <div id="clear-token-dialog-mount"></div>
   <div id="onboarding-dialog-mount"></div>
+  <!-- Outside every page. This dialog is opened from the collections list (main page)
+       AND from Settings; inside #main-page it opened invisibly when Settings was
+       showing (display:none ancestor) and, being modal, left the whole panel inert —
+       "nothing happens, and then it cannot do anything". -->
+  <div id="clear-variables-dialog-mount"></div>
 
   <div id="toast-mount"></div>
 
   <!-- Bundled by scripts/build-ui.js from src/ui-react/buttons.tsx. Must run
        before the script below: it mounts the real <button> nodes that the
        vanilla code looks up by id (push-btn, download-btn, etc). -->
-  <script>__Pom_BUTTONS_SCRIPT__</script>
+  <script>__UI_BUTTONS_SCRIPT__</script>
   <!-- src/dtcg-format.js, inlined by scripts/build-ui.js. Defines window.PomDtcg
        (the DTCG post-transform over the Legacy JSON tree). -->
-  <script>__Pom_DTCG_SCRIPT__</script>
+  <script>__UI_DTCG_SCRIPT__</script>
 
   <!-- The import pipeline (src/import-*.js), inlined by scripts/build-ui.js.
        Defines window.PomImportIR / PomImportManifest / PomImportDerive /
@@ -4111,11 +4057,9 @@
        questions an import has to answer, so it belongs on the side that can
        ask them. Only the finished program crosses to the sandbox, once, after
        the user has seen the diff and agreed to it. -->
-  <script>__Pom_IMPORT_SCRIPT__</script>
+  <script>__UI_IMPORT_SCRIPT__</script>
 
   <script>
-    // Plugin version — single source of truth in the UI. Keep in sync with
-    // package.json via `npm run version:set <x.y.z>` (scripts/set-version.js).
     var APP_VERSION = '1.4.0';
     (function renderVersion() {
       window.PomVersionTag.setLabel('v' + APP_VERSION);
@@ -4184,7 +4128,8 @@
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '__Pom_BUILD_STAMP__';
+    var CLOSURE_BUILD = '__UI_BUILD_STAMP__';
+    (function () { var el = document.getElementById('build-stamp'); if (el) el.textContent = 'Plugin build ' + CLOSURE_BUILD; })();
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
     var DEFAULT_FILENAME = 'tokens.json';
@@ -4364,8 +4309,7 @@
     // saved configs still load) since it's a real preference, not a
     // session-only view toggle any more.
     var mainProviderTab = 'gitlab';
-    // null = ship the Legacy JSON tree as-is; 'themes' runs the DTCG
-    // post-transform (src/dtcg-format.js) over it — see getTokensToExport.
+    // 'themes' runs the DTCG post-transform (src/dtcg-format.js) over it — see getTokensToExport.
     // 'themes' (not 'partial') is what the Output format switch drives: one
     // fully resolved, self-contained, standards-mapped document per theme —
     // genuinely W3C DTCG on its own, no downstream finishing step required.
@@ -4379,7 +4323,15 @@
     // script and reads it (via defaultFilename()), and a var declared further
     // down would be hoisted but still unassigned at that point — and worse,
     // would reset it when its own line was finally reached.
-    var dtcgShape = null;
+    var dtcgShape = 'themes';
+    /*
+      THE BRANCH A READ COMES FROM. Pushing always writes the branch in
+      Settings; reading — Compare, the folder and file lists, Import from
+      GitHub — may be pointed at another one, so a designer can check or pull
+      the branch they are working on without touching where they push. null
+      means "the one in Settings". GitHub only for now.
+    */
+    var compareBranch = null;
     // Declared this early (not just above updateActionUI, where it's used)
     // because gitSettings.setState({}) runs near the top of this script,
     // synchronously reaching updateActionUI on its very first call — a var
@@ -4486,6 +4438,14 @@
         folder: ghActiveFolder,
         activeFolder: ghActiveFolder
       };
+    }
+    /* The address a READ uses: the saved config, with the branch swapped for
+       the one picked in Compare when there is one. A copy — githubConfig()
+       stays what Push writes to. */
+    function readConfig(which) {
+      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      if (which !== 'gitlab' && compareBranch) c.branch = compareBranch;
+      return c;
     }
     // Ready to push once a token and an owner/repo are present.
     function isGitHubReady() { var c = githubConfig(); return !!(c.token && c.repo); }
@@ -4897,14 +4857,12 @@
         var previousDtcgShape = dtcgShape;
         // outputFormat when present; otherwise the old boolean, which only ever
         // meant 'themes'. Anything unrecognised falls back to Legacy JSON.
-        if (config.outputFormat === 'themes' || config.outputFormat === 'resolved') {
-          dtcgShape = config.outputFormat;
-        } else if (config.outputFormat === 'legacy') {
-          dtcgShape = null;
-        } else {
-          dtcgShape = config.dtcg === true ? 'themes' : null;
-        }
-        window.PomOutputFormat.setValue(dtcgShape || 'legacy');
+        /* Always DTCG now: 'resolved' is the one thing a config can still ask
+           for, and every other value — including 'legacy' from a config saved
+           before Legacy JSON was dropped — reads as the per-theme shape. */
+        dtcgShape = config.outputFormat === 'resolved' ? 'resolved' : 'themes';
+        window.PomOutputFormat.setValue(dtcgShape);
+        syncStructureBox();
         // No filename rewrite here: a config saved with dtcg on already stored
         // the suffixed name, and defaultFilename() (read below when a provider
         // has none saved) follows dtcgShape, which is why this block runs
@@ -5014,6 +4972,13 @@
         updateOutputFormatHint();
 
         refreshSettingsControls();
+
+        /* THE FIRST READING OF THE REPOSITORY HAPPENS NOW, not two minutes from
+           now. The saved settings are in the fields at this point, so the quiet
+           sync can run and "Synced just now" is on the card from the start
+           rather than after the first thing somebody does. Once: this also runs
+           on a Cancel-restore, which is not a start. */
+        if (!startupSynced) { startupSynced = true; autoSyncTick(); }
       },
       init: function() {
         parent.postMessage({ pluginMessage: { type: 'LOAD_GIT_SETTINGS' } }, '*');
@@ -5047,11 +5012,52 @@
        warning's own note. */
     var justImported = false;
     var importState = { doc: null, fileName: null, ir: null, plan: null,
-                        compiled: null, changes: null, decisions: {}, levels: {}, manifest: null };
+                        compiled: null, changes: null, decisions: {}, levels: {}, manifest: null,
+                        resolvedReport: null, collectionOrder: null, sourceQuality: null };
 
+    /*
+      AN EMPTY FILE OPENS ON THIS PAGE. There is nothing to export from it, so the screen that said "no variable
+      collections" and offered two buttons was a step in front of the page those buttons open. Once per empty spell:
+      Back still reaches that screen (and the settings button on it) without being thrown forward again, and a file
+      that has collections again starts the count over.
+    */
+    var landedOnImport = false;
+    function landOnImportWhenEmpty() {
+      if (landedOnImport) return;
+      var main = document.getElementById('main-page');
+      if (!main || main.classList.contains('hidden')) return;
+      landedOnImport = true;
+      openImport();
+    }
+    /*
+      WHEN THE FILE IS EMPTY THIS PAGE IS HOME. Nothing to export means the main screen has nothing on it but two
+      buttons that lead here, so it is not shown at all: no Back arrow to it, and the settings button (which the main
+      screen carried) sits in this header instead. Coming back from Settings lands here too (showHome).
+    */
+    function isEmptyFile() {
+      return !!rawData && (rawData.collections || []).length === 0;
+    }
+    function applyImportHeader() {
+      var home = isEmptyFile();
+      var back = document.getElementById('import-back-btn-mount');
+      var gear = document.getElementById('import-settings-btn-mount');
+      if (back) back.hidden = home;
+      if (gear) gear.hidden = !home;
+    }
+    function showHome() {
+      if (isEmptyFile()) {
+        document.getElementById('main-page').classList.add('hidden');
+        document.getElementById('import-page').classList.add('visible');
+        applyImportHeader();
+        refreshImportRepoRow();
+      } else {
+        document.getElementById('main-page').classList.remove('hidden');
+      }
+    }
     function openImport() {
       document.getElementById('main-page').classList.add('hidden');
       document.getElementById('import-page').classList.add('visible');
+      applyImportHeader();
       refreshImportRepoRow();
     }
 
@@ -5130,7 +5136,11 @@
       var gl = isGitLabReady(), gh = isGitHubReady();
       document.getElementById('import-pull-gitlab-mount').hidden = !gl;
       document.getElementById('import-pull-github-mount').hidden = !gh;
-      row.hidden = !gl && !gh;
+      /* A file already in is the point of the card done: the repo options step aside until it is removed. */
+      var loaded = !!importState.fileName;
+      row.hidden = (!gl && !gh) || loaded;
+      var noRepo = document.getElementById('import-no-repo');
+      if (noRepo) noRepo.hidden = loaded || gl || gh;
       if (row.hidden) { applyImportRepoMode(); return; }
       /* SAY WHOSE REPOSITORY THIS IS, not just which path inside it. The line
          here used to be a bare folder/file, which is checkable about the file
@@ -5141,6 +5151,13 @@
       if (gl) rows.push(repoIdentity('gitlab'));
       if (gh) rows.push(repoIdentity('github'));
       window.PomImportRepoWhere.set(rows);
+      /* A branch to choose is a GitHub feature here (the listing is GitHub's); the list is the one Compare shares. */
+      var branchRow = document.getElementById('import-repo-branch');
+      if (branchRow) {
+        var branchable = activeRepoProvider() === 'github';
+        branchRow.hidden = !branchable;
+        if (branchable) loadCompareBranches();
+      }
       renderImportFolderSelect();
       /* The listing is what fills the file picker, and it is the repo card's
          listing — the same folder, the same branch, cached under the same key,
@@ -5172,7 +5189,7 @@
         name: which === 'gitlab'
           ? (String(c.host || '').replace(/^https?:\/\//, '').replace(/\/$/, '') + '/' + c.project)
           : c.repo,
-        branch: c.branch,
+        branch: which === 'gitlab' ? c.branch : readConfig(which).branch,
       };
     }
 
@@ -5239,6 +5256,16 @@
       }
       label.textContent = '';
       setRepoFileOptions(names);
+      /*
+        THE PAGE OPENS ON A FILE, NOT ON "pick a file". The name this plugin exports under is often not one the
+        repository's folder has (a DTCG export is called tokens_dtcg.json, the repo holds tokens_resolved.json), and
+        the box then said "pick a file" with an Import button under it that could only fail with a 404. So when the
+        folder has been listed and the current name is not in it, the first JSON there is the one on offer. It is
+        only this page's choice: the name the export writes under (what Push uses) is not changed by it. Picking by
+        hand does change it, as it always did.
+      */
+      if (names.indexOf(primaryFilename()) === -1) importFilePick = names.indexOf(importFilePick) !== -1 ? importFilePick : names[0];
+      else importFilePick = '';
       if (window.PomImportRepoFile) window.PomImportRepoFile.set(repoSelectedFile());
     }
 
@@ -5301,12 +5328,15 @@
     }
 
     /*
-      A RESOLVED EXPORT CANNOT BE IMPORTED, and saying so is the only honest
-      answer. It is a materialised cross-product: the aliases that carried the
-      architecture were evaluated away, so reading it back reconstructs a
-      DIFFERENT shape — one real file came back as 2 collections where the
-      document has 14. Applying that would rewrite a file nobody has touched,
-      which is not a change, it is an artefact of the format.
+      A RESOLVED EXPORT CAN BE IMPORTED ONLY WHEN THE ARCHITECTURE IS KNOWN, and
+      saying so is the only honest answer otherwise. It is a materialised
+      cross-product: the aliases that carried the architecture were evaluated
+      away, so MEASURING it reconstructs a DIFFERENT shape — one real file came
+      back as 2 collections where the document has 14. A document that
+      src/architecture-radd.js recognises is rebuilt by rule instead (runImport);
+      any other is refused here, because applying a wrong reading would rewrite a
+      file nobody has touched, which is not a change, it is an artefact of the
+      format.
 
       The export says which it is, so this is a fact rather than a guess.
 
@@ -5315,7 +5345,12 @@
     */
     function refuseResolved(doc) {
       var ext = doc && doc.$extensions && doc.$extensions['com.closure'];
-      if (ext && ext.format === 'resolved') {
+      var resolvedDoc = (ext && ext.format === 'resolved') ||
+        (window.PomJsonDiff && window.PomJsonDiff.isResolvedDocument && window.PomJsonDiff.isResolvedDocument(doc));
+      /* One the architecture recognises is not refused here — runImport rebuilds
+         it, and says why when it cannot. */
+      if (resolvedDoc && window.PomImportResolved && window.PomImportResolved.recognise(doc).ok) return false;
+      if (resolvedDoc) {
         importProblem('That is a resolved export',
           'A resolved document has had its references evaluated away, so the collections and ' +
           'modes it came from cannot be read back out of it — importing it would rewrite ' +
@@ -5417,7 +5452,17 @@
       And a different set re-scans rather than reopening, so clicking along a
       row of components reads as one page changing its subject.
     */
+    /*
+      THE COMPONENT CONTRACT IS SWITCHED OFF. Its entry card is hidden (see
+      #component-entry-card) and the plugin no longer follows the selection into
+      the contract page. Everything behind it — the page, the capture in
+      code.js, the file format, the compare — is intact and unreachable, so
+      turning this on and removing `hidden` from the card brings it back.
+    */
+    var COMPONENT_CONTRACT_ENABLED = false;
+
     function onSelection(sel) {
+      if (!COMPONENT_CONTRACT_ENABLED) return;
       var onComponentPage = document.getElementById('component-page').classList.contains('visible');
       var onMain = !document.querySelector('.page.visible');
       lastSelection = sel;
@@ -5902,6 +5947,7 @@
       }
     });
 
+
     function closeCompare() {
       document.getElementById('compare-page').classList.remove('visible');
       document.getElementById('main-page').classList.remove('hidden');
@@ -5959,12 +6005,84 @@
     /* json-diff names formats the way a person would; the output-format
        control names them the way it stores them. One map, at the one place
        the two meet. */
-    var SHAPE_FOR_FORMAT = { legacy: null, dtcg: 'themes' };
+    var SHAPE_FOR_FORMAT = { dtcg: 'themes', resolved: 'resolved' };
 
+    /*
+      THE FIGMA SIDE OF A COMPARISON, IN THE SHAPE OF THE FILE IT IS COMPARED WITH.
+
+      Compare is a question about two files that exist, not about how this plugin
+      is set to export. The Resolved switch in Settings decides what Download and
+      Push write; it has nothing to say about what is already in the repo. So the
+      repo's file is read first, its shape is detected, and the Figma side is
+      built in that shape — here, without touching the setting or the document
+      Push would send.
+
+      The bytes are still the ones Push would write in that shape: the same
+      getTokensToExport(), with the shape borrowed for the length of the call.
+    */
+    var compareTransforms = {};
+    var compareSeq = 0;
+    function exportInShape(shape, tokens) {
+      var savedShape = dtcgShape, savedData = transformedData;
+      dtcgShape = shape;
+      transformedData = { tokens: tokens };
+      try { return getTokensToExport(); }
+      finally { dtcgShape = savedShape; transformedData = savedData; }
+    }
+    /* 'resolved' | 'dtcg' | 'legacy' | 'unknown' -> the value dtcgShape takes for it */
+    function shapeOfFormat(format) {
+      if (format === 'resolved') return 'resolved';
+      if (format === 'legacy') return null;
+      return 'themes';
+    }
+    function figmaDocForCompare(format, done) {
+      var shape = format === 'unknown' ? dtcgShape : shapeOfFormat(format);
+      /* What is already built, when it is the shape asked for. */
+      var seq = 'compare-' + (++compareSeq);
+      compareTransforms[seq] = function (tokens) {
+        if (!tokens) { done(null); return; }
+        if (shape === 'resolved' && window.PomRestoreSlim) {
+          try { tokens = window.PomRestoreSlim.slim(tokens).document; } catch (e) { /* the full record is fine */ }
+        }
+        done(exportInShape(shape, tokens));
+      };
+      parent.postMessage({
+        pluginMessage: {
+          type: 'transform',
+          seq: seq,
+          raw: rawData,
+          exportMode: exportMode,
+          resolvedShape: shape === 'resolved',
+          includeDescriptions: shape !== null,
+          selectedCollections: selectedCollections.length > 0 ? selectedCollections : null
+        }
+      }, '*');
+    }
+
+    /*
+      THE FIGMA SIDE IS READ AGAIN EVERY TIME. The plugin reads the file once,
+      when it opens, and the person keeps it open while editing variables — so a
+      second Compare against that old read says "in sync" about a file that has
+      since changed. A fresh extract is one round trip; its answer lands in the
+      'extracted' handler, which hands over to runCompareNow.
+    */
+    var compareAfterExtract = null, compareKeepSel = null;
     function runCompare(which) {
+      var window_ = window;
+      window_.PomCompare.setBusy('Reading this Figma file\u2026');
+      compareKeepSel = selectedCollections.slice();
+      var fired = false;
+      var go = function () { if (fired) return; fired = true; compareAfterExtract = null; runCompareNow(which); };
+      compareAfterExtract = go;
+      /* If the sandbox does not answer, compare what was read before rather than hang. */
+      setTimeout(go, 15000);
+      parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+    }
+
+    function runCompareNow(which) {
       var key = repoAddressKey(which);
       var label = which === 'gitlab' ? 'GitLab' : 'GitHub';
-      var branch = (which === 'gitlab' ? gitlabConfig() : githubConfig()).branch;
+      var branch = readConfig(which).branch;
       /* Two files, named separately, because they are two files: the one this
          plugin would write, and the one already in the repo. They are usually
          the same name and the page must not imply that they always are. */
@@ -5973,13 +6091,7 @@
       window.PomCompare.setSides(
         lastFigmaFileName || 'This Figma file', figmaWhere, label, repoWhere, which);
 
-      /*
-        THE EXACT BYTES DOWNLOAD WRITES AND PUSH SENDS — getTokensToExport(),
-        not a second rendering of the same variables. If this page compared
-        anything else, it would be answering about a file that does not exist.
-      */
-      var figmaDoc = getTokensToExport();
-      if (!figmaDoc) {
+      if (!rawData) {
         window.PomCompare.setProblem(
           'Nothing to compare yet',
           'This file has not finished producing its export — or it holds no variables at all, in ' +
@@ -5992,6 +6104,23 @@
       /* Free when the check on open already pulled it, which is the usual
          case — see fetchRepoDoc's cache. */
       fetchRepoDoc(which, key).then(function (got) {
+        var repoShape = window.PomJsonDiff.detectFormat(got.doc);
+        window.PomCompare.setBusy(repoShape === 'resolved' ? 'Building the resolved document…' : 'Preparing this file…');
+        figmaDocForCompare(repoShape, function (figmaDoc) { compareWith(got, figmaDoc); });
+      }, function (err) {
+        window.PomCompare.setProblem('Could not read ' + label,
+          (err && err.message) || 'the request failed',
+          'Check the repo settings, then try again.');
+      });
+      function compareWith(got, figmaDoc) {
+        if (!figmaDoc) {
+          window.PomCompare.setProblem(
+            'Nothing to compare yet',
+            'This file has not finished producing its export — or it holds no variables at all, in ' +
+            'which case there is nothing on this side of the comparison.',
+            'Close this page and wait for the file to finish loading.');
+          return;
+        }
         window.PomCompare.setBusy('Comparing…');
         /* The same yield the import page needs: comparing two documents of
            30,000 leaves is real work, and without letting a frame through
@@ -6010,7 +6139,7 @@
                document on either side is not a setting to change — it is a
                different kind of file — and an unrecognised one has nothing to
                switch to. */
-            var canSwitch = report.problem.kind === 'format-mismatch' &&
+            var canSwitch = (report.problem.kind === 'format-mismatch' || report.problem.kind === 'resolved') &&
                             Object.prototype.hasOwnProperty.call(SHAPE_FOR_FORMAT, report.repoFormat);
             window.PomCompare.onAction = canSwitch ? function () {
               switchFormatAndCompare(which, SHAPE_FOR_FORMAT[report.repoFormat], report.repoFormatLabel);
@@ -6057,8 +6186,13 @@
             until it has happened.
           */
           window.PomCompare.onApply = report.identical ? null : function () {
-            closeCompare();
-            openImport();
+            /* From here the person has already read what differs: the write
+               goes straight through, with no second review page — and no
+               page change either. The import page is opened only if
+               something stops the run (see importProblem). */
+            importState.autoApply = true;
+            importState.silent = true;
+            showToast('Updating Figma\u2026');
             startImportFromRepo(got.doc, got.where, got.bytes);
           };
           window.PomCompare.setReport(report, window.PomJsonDiff.format(report, {
@@ -6066,11 +6200,7 @@
             repoLabel: label + ' ' + repoWhere,
           }));
         }, 0); });
-      }, function (err) {
-        window.PomCompare.setProblem('Could not read ' + label,
-          (err && err.message) || 'the request failed',
-          'Check the repo settings, then try again.');
-      });
+      }
     }
     function closeImport() {
       document.getElementById('import-page').classList.remove('visible');
@@ -6082,8 +6212,43 @@
        addEventListener on the null it returns throws, which would take out
        every listener registered after this line. */
     document.getElementById('import-back-btn').addEventListener('click', closeImport);
-    var importEmptyBtn = document.getElementById('import-empty-btn');
-    if (importEmptyBtn) importEmptyBtn.addEventListener('click', openImport);
+    /*
+      THE EMPTY SCREEN'S TWO WAYS IN.
+
+      Upload opens the import page and the file picker in the same press — the
+      picker needs the click that asked for it, so it cannot wait for a second
+      one on the page. Connect reads straight from a repository when exactly one
+      is set up, shows the page with both pull buttons when both are, and sends
+      a person with none to the settings where they are added.
+    */
+    var importUploadBtn = document.getElementById('import-upload-btn');
+    if (importUploadBtn) importUploadBtn.addEventListener('click', function () {
+      openImport();
+      var input = document.getElementById('import-file');
+      if (input) input.click();
+    });
+    var importConnectBtn = document.getElementById('import-connect-btn');
+    if (importConnectBtn) importConnectBtn.addEventListener('click', function () {
+      var gl = isGitLabReady(), gh = isGitHubReady();
+      if (gl && gh) { openImport(); return; }
+      if (gl || gh) { openImport(); pullFromRepo(gl ? 'gitlab' : 'github'); return; }
+      document.getElementById('main-page').classList.add('hidden');
+      document.getElementById('settings-page').classList.add('visible');
+      loadRepoFolders();
+    });
+
+    /* The same way in as on the empty screen, from the page an empty file now opens on: no repository yet, so settings. */
+    function openSettingsFromImport() {
+      document.getElementById('import-page').classList.remove('visible');
+      document.getElementById('main-page').classList.add('hidden');
+      document.getElementById('settings-page').classList.add('visible');
+      updateClearFileButton();
+      loadRepoFolders();
+    }
+    var importConnectHere = document.getElementById('import-connect-here-btn');
+    if (importConnectHere) importConnectHere.addEventListener('click', openSettingsFromImport);
+    var importSettingsBtn = document.getElementById('import-settings-btn');
+    if (importSettingsBtn) importSettingsBtn.addEventListener('click', openSettingsFromImport);
 
     var importFileInput = document.getElementById('import-file');
     var importDrop = document.getElementById('import-drop');
@@ -6096,6 +6261,7 @@
       document.getElementById('import-file-card').hidden = false;
       window.PomImportFile.set(importState.fileName, importState.fileBytes, opts || {});
       applyImportRepoMode();
+      refreshImportRepoRow();
     }
 
     /*
@@ -6114,6 +6280,7 @@
       importState.ir = null; importState.plan = null; importState.compiled = null;
       importState.changes = null; importState.manifest = null;
       importState.decisions = {}; importState.levels = {};
+      importState.resolvedReport = null; importState.collectionOrder = null; importState.sourceQuality = null; importState.updateMode = false;
       ['import-file-card', 'import-summary', 'import-levels', 'import-questions',
        'import-changes', 'import-manifest', 'import-problem'].forEach(function(id) {
         var el = document.getElementById(id);
@@ -6156,6 +6323,7 @@
     });
 
     function importProblem(title, body) {
+      if (importState.silent) { importState.silent = false; closeCompare(); openImport(); }
       /*
         THE ROW FAILS TOO. Every way an import can go wrong funnels through
         here, so this is the one place that can guarantee the file's own row
@@ -6233,6 +6401,7 @@
     }
 
     function runImport(doc, fileName) {
+      var autoApply = importState.autoApply; importState.autoApply = false;
       document.getElementById('import-problem').hidden = true;
       importState.doc = doc;
       /*
@@ -6250,11 +6419,72 @@
       showImportFile({ busy: false });
 
       var ir, plan, compiled;
-      try {
-        ir = window.PomImportIR.toIR(doc);
-      } catch (err) {
-        importProblem('Could not read that as tokens', String(err.message || err));
-        return;
+      importState.resolvedReport = null; importState.sourceQuality = null; importState.updateMode = false;
+      importState.collectionOrder = null;
+      /*
+        A RESOLVED EXPORT IS READ BY WHAT IT SAYS ABOUT ITSELF, not measured.
+
+        Its routing was evaluated away at export, so derive() cannot recover the
+        architecture from the tokens — but the architecture is regular, and
+        src/architecture-radd.js holds the rules. A document those rules
+        recognise is translated back into rows (import-resolved.js) and goes
+        through the same derive and compile as any other file. One they do not
+        recognise is refused, as before.
+
+        Into a file with no variables it builds; into one that already holds
+        these collections it UPDATES them (names are matched, nothing is
+        deleted, styles are left alone). A file whose collections are named
+        differently is refused, because that would make a second copy.
+      */
+      var resolvedDoc = window.PomJsonDiff && window.PomJsonDiff.isResolvedDocument &&
+                        window.PomJsonDiff.isResolvedDocument(doc);
+      if (resolvedDoc) {
+        var rec = window.PomImportResolved.recognise(doc);
+        var structureNote = structureNoteFor(doc);
+        if (!rec.ok) {
+          importProblem('That is a resolved export this plugin cannot rebuild',
+            'A resolved document has had its references evaluated away, so its collections and modes ' +
+            'can only be put back by a structure this plugin knows, or from the structure record a newer export carries ' +
+            '(Settings \u2192 W3C DTCG \u2192 Resolved, with Restore data on). ' + rec.reason + '. ' +
+            (structureNote ? structureNote + ' The import rebuilds only the architectures it has rules for (RADD Foundations and ODS Foundations), or a file whose export carries its structure record. ' : '') +
+            'Export that file again with Restore data on, or import the legacy or DTCG shape instead.');
+          return;
+        }
+        if (!rawData) {
+          importProblem('Still reading this file\'s variables',
+            'A resolved export is imported only into a file with no variables, and this file has not ' +
+            'finished loading. Try again in a moment.');
+          return;
+        }
+        var haveVars = (rawData.collections || []).some(function (c) { return (c.variables || []).length; });
+        var haveStyles = rawData.styles &&
+          (((rawData.styles.textStyles || []).length) + ((rawData.styles.effectStyles || []).length) +
+           ((rawData.styles.gridStyles || []).length)) > 0;
+        /* A file that already holds variables is UPDATED, not refused — see the
+           check after compile: every collection the repo's file names must
+           already exist here, or this would make a second copy. Styles are
+           left alone either way. */
+        if (haveStyles && !haveVars) {
+          importProblem('This file already has styles',
+            'A resolved export creates its styles, so here it would make a second set beside them. ' +
+            'Open an empty file, or clear this one in Settings \u2192 Clear this file.');
+          return;
+        }
+        importState.updateMode = !!haveVars;
+        var tr = window.PomImportResolved.translate(doc);
+        if (!tr.ok) { importProblem('Could not read that as a resolved export', tr.reason); return; }
+        ir = tr.ir;
+        importState.resolvedReport = tr.report;
+        tr.report.structureNote = structureNote;
+        importState.collectionOrder = tr.collectionOrder;
+        importState.sourceQuality = window.PomSourceQuality ? window.PomSourceQuality.check(doc) : null;
+      } else {
+        try {
+          ir = window.PomImportIR.toIR(doc);
+        } catch (err) {
+          importProblem('Could not read that as tokens', String(err.message || err));
+          return;
+        }
       }
       if (!ir.rows.length) {
         importProblem('No tokens in that file',
@@ -6263,7 +6493,27 @@
       }
       plan = window.PomImportDerive.derive(ir, { decisions: importState.decisions,
                                                  levels: importState.levels });
-      compiled = window.PomImportCompile.compile(ir, plan, { evaluateExpressions: true });
+      compiled = window.PomImportCompile.compile(ir, plan, { evaluateExpressions: true,
+                                                              collectionOrder: importState.collectionOrder });
+
+      if (importState.resolvedReport && importState.updateMode && compiled.ok) {
+        var have = {};
+        ((rawData && rawData.collections) || []).forEach(function (c) { have[c.name] = true; });
+        var missingCols = compiled.program.ops
+          .filter(function (o) { return o.op === 'createCollection' && !have[o.collection]; })
+          .map(function (o) { return o.collection; });
+        if (missingCols.length) {
+          importProblem('This file does not hold the same collections',
+            'To update a file it must already have the collections the repo\'s file names. Missing here: ' +
+            missingCols.slice(0, 6).join(', ') + (missingCols.length > 6 ? ', \u2026' : '') +
+            '. Importing would build a second copy beside what exists. Open an empty file, or clear this one in Settings \u2192 Clear this file.');
+          return;
+        }
+        /* Variables only: styles are created, never matched, so they are left as they are. */
+        compiled.program.ops = compiled.program.ops.filter(function (o) {
+          return o.op !== 'createTextStyle' && o.op !== 'createEffectStyle' && o.op !== 'createGridStyle';
+        });
+      }
 
       importState.ir = ir;
       importState.plan = plan;
@@ -6271,6 +6521,10 @@
 
       renderImportSummary(fileName, ir, plan, compiled);
       renderImportLevels(plan);
+      /* A resolved export is rebuilt by the architecture's rules, so there is
+         nothing about its depths to ask — and offering the choice would invite
+         a reading that undoes them. */
+      if (importState.resolvedReport) document.getElementById('import-levels').hidden = true;
       renderImportQuestions(plan, compiled);
 
       renderImportManifest(compiled);
@@ -6283,6 +6537,10 @@
         var existing = (rawData && rawData.collections) ? rawData.collections : [];
         importState.changes = window.PomImportDiff.diff(existing, compiled.program);
         renderImportChanges(importState.changes);
+        if (autoApply) {
+          if (importState.changes.summary.noop) { showToast('Figma already matches the file'); importState.silent = false; closeCompare(); closeImport(); }
+          else document.getElementById('import-apply-btn').click();
+        }
       } else {
         document.getElementById('import-changes').hidden = true;
       }
@@ -6297,12 +6555,121 @@
        keeping a hand-rolled one here would be a second answer to a question
        nothing asks any more. */
 
+    /*
+      THE SUMMARY OF A RESOLVED IMPORT, in words a designer reads.
+
+      Three layers. One line says what will be created. Under "Worth knowing",
+      only what a person might want to act on, each as a sentence with its detail
+      folded away. And "How this was rebuilt", folded, for everything that is the
+      importer doing its job (scopes, relinking, helper values) — true, and not
+      something to read before pressing Import.
+
+      Nothing here blocks the import. A file that comes with problems of its own
+      is still imported as written; the point is to say so BEFORE, so that a
+      plain colour in Figma is not mistaken for a plugin mistake.
+    */
+    function resolvedSummaryHtml(rr, sq, compiled, ir) {
+      var esc = function (x) { return String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;'); };
+      var n = function (x) { return Number(x).toLocaleString(); };
+      var plural = function (x, one, many) { return n(x) + ' ' + (x === 1 ? one : (many || one + 's')); };
+      var cap = function (x) { return x.charAt(0).toUpperCase() + x.slice(1); };
+      var ss = rr.styles || {};
+      var styleCount = (ss.text || 0) + (ss.effect || 0) + (ss.grid || 0);
+      var html = '<div class="rs-ready"><b>' + n(compiled.stats.variables) + '</b> variables in ' + plural(rr.collections, 'collection') +
+                 (styleCount ? ', and <b>' + n(styleCount) + '</b> styles (' + (ss.text || 0) + ' text, ' + (ss.effect || 0) + ' effect' +
+                               (ss.grid ? ', ' + ss.grid + ' grid' : '') + ')' : '') + '.</div>';
+
+      var items = '';
+      var item = function (title, text, detailSummary, detailItems, info) {
+        var h = '<div class="rs-item' + (info ? ' is-info' : '') + '"><div class="rs-title">' + title + '</div>';
+        if (text) h += '<div class="rs-text">' + text + '</div>';
+        if (detailItems && detailItems.length) {
+          h += '<details class="rs-details"><summary>' + detailSummary + '</summary><ul>' +
+               detailItems.map(function (d) { return '<li>' + d + '</li>'; }).join('') + '</ul></details>';
+        }
+        return h + '</div>';
+      };
+
+      /* Colours the file wrote as plain values where its other schemes link to the palette */
+      var rl = rr.relinked || {};
+      var stay = (rl.none || 0) + (rl.ambiguous || 0);
+      if (stay) {
+        var flat = sq && sq.flattened && sq.flattened.length === 1 ? sq.flattened[0] : null;
+        var where = flat ? 'the ' + esc(cap(flat.scheme)) + ' scheme' : 'this file';
+        var det = [];
+        if (rl.none) det.push(plural(rl.none, 'colour') + ' ' + (rl.none === 1 ? 'has' : 'have') + ' no palette colour with that value (for example ' +
+                              (rl.noneCells || []).slice(0, 4).map(esc).join(', ') + (rl.none > 4 ? ', …' : '') + ').');
+        if (rl.ambiguous) det.push(plural(rl.ambiguous, 'colour') + ' could be any of several palette colours: ' +
+                              (rl.ambiguousCells || []).slice(0, 3).map(function (c) { return esc(c.cell) + ' (' + c.candidates.map(esc).join(' or ') + ')'; }).join('; ') + '.');
+        det.push('The link to the palette was already missing in the file you uploaded, so it cannot be recovered from it. To keep it, fix it in Tokens Studio and export again.');
+        items += item(plural(stay, 'colour') + ' in ' + where + ' will be plain colours, not links to the palette',
+                      flat ? 'In this file ' + n(flat.literal) + ' of the scheme\'s ' + n(flat.cells) + ' colours are plain colours, while the other schemes link to the palette. ' +
+                             n((rl.linked || 0)) + ' matched a palette colour exactly and are linked again.'
+                           : 'The file stores them as plain colours.',
+                      'Which ones and why', det);
+      }
+      if (rr.holes && rr.holes.length) {
+        var hl = rr.holes;
+        items += item(plural(hl.length, 'value') + ' missing for some modes',
+                      hl.length === 1 ? '“' + esc(hl[0].name) + '” has no value for ' + esc(hl[0].modes.join(', ')) + '. Figma will use its own default there (0 for a number).'
+                                      : 'Figma will use its own default (0 for a number) in those modes.',
+                      'Which ones', hl.length > 1 ? hl.slice(0, 8).map(function (h) { return esc(h.name) + ': ' + esc(h.modes.join(', ')); }) : null);
+      }
+      if (sq && sq.broken && sq.broken.length) {
+        items += item(plural(sq.broken.length, 'link') + ' point' + (sq.broken.length === 1 ? 's' : '') + ' at something this file does not have',
+                      'Those values cannot be resolved.', 'Which ones',
+                      sq.broken.slice(0, 8).map(function (b) { return esc(b.token) + ' → ' + esc(b.target); }));
+      }
+      if (sq && sq.modeHoles && sq.modeHoles.length) {
+        items += item(plural(sq.modeHoles.length, 'token') + (sq.modeHoles.length === 1 ? ' is' : 's are') + ' missing from some schemes',
+                      'The other schemes have them.', 'Which ones',
+                      sq.modeHoles.slice(0, 8).map(function (h) { return esc(h.token) + ': ' + esc(h.missingIn.slice(0, 4).join(', ')); }));
+      }
+      if (ss.bindingsMissing && ss.bindingsMissing.length) {
+        items += item(plural(ss.bindingsMissing.length, 'style field') + ' will be left unbound',
+                      'They point at a variable this file does not have.', 'Which ones',
+                      ss.bindingsMissing.slice(0, 8).map(esc));
+      }
+      if (rr.missing && rr.missing.length) {
+        items += item(plural(rr.missing.length, 'value') + ' the file does not carry',
+                      'Those variables will be incomplete.', 'Which ones', rr.missing.slice(0, 8).map(esc));
+      }
+      html += items
+        ? '<div class="rs-heading">Worth knowing</div>' + items
+        : '<div class="rs-ok">Nothing in this file needs attention.</div>';
+
+      /* The importer doing its job, folded */
+      var back = (rl.linked || 0) + ((rl.numbers && rl.numbers.linked) || 0);
+      var how = [];
+      if (back) how.push(n(back) + ' plain colour' + (back === 1 ? '' : 's') + ' or size' + (back === 1 ? '' : 's') + ' linked back to the palette ' + (back === 1 ? 'it matches' : 'they match') + '.');
+      var fromStructure = rr.architecture === 'structure';
+      if (fromStructure) how.push('Rebuilt from the structure record the export carries: every collection, mode, variable, scope, description, code syntax and link, as the file had them. No architecture rules were used.');
+      how.push(n(rr.scopes.restore + rr.scopes.rules) + ' variables set up for where Figma offers them (colours, spacing, text…).');
+      if (rr.external) how.push(plural(rr.external, 'link') + ' to variables of a library, which this file does not have — left out.');
+      if (rr.skipped && rr.skipped.synthesized) how.push(plural(rr.skipped.synthesized, 'helper value') + ' the export adds ' + (rr.skipped.synthesized === 1 ? 'is' : 'are') + ' left out.');
+      if (compiled.stats.aliases) how.push(n(compiled.stats.aliases) + ' values are links to other variables.');
+      if (!fromStructure) how.push('Names are written in lower case, except five core groups that keep their capitals (fontFamilies, fontSize, fontWeights, paragraphSpacing, paragraphIndent).');
+      if (!fromStructure) how.push('The hidden permissions layer is rebuilt from the RADD Foundations structure.');
+      how.push('Styles come from ' + (ss.source === 'structure' ? 'the structure record.' : ss.source === 'rules+patches' ? 'the structure, adjusted by the file’s restore data.' : ss.source === 'restore' ? 'the file’s restore data.' : 'the structure.'));
+      html += '<details class="rs-details"><summary>How this was rebuilt</summary><ul>' +
+              how.map(function (h) { return '<li>' + h + '</li>'; }).join('') + '</ul></details>';
+      return html;
+    }
+
     function renderImportSummary(fileName, ir, plan, compiled) {
       /* The file's name is the FileUploadItem's job now (runImport sets it);
          there is no 'import-summary-name' element to write to any more. */
       var format = ir.source === 'legacy' ? 'Tokens Studio / Legacy'
+                 : ir.source === 'resolved' ? 'W3C DTCG, resolved'
                  : ir.source === 'dtcg' ? 'W3C DTCG' : 'plain token tree';
       var html = '';
+      /* A resolved file gets its own, plainer summary. */
+      if (importState.resolvedReport && compiled && compiled.ok) {
+        document.getElementById('import-facts').innerHTML =
+          resolvedSummaryHtml(importState.resolvedReport, importState.sourceQuality, compiled, ir);
+        document.getElementById('import-summary').hidden = false;
+        return;
+      }
       html += fact(ir.rows.length, 'tokens read, as ' + format);
       html += fact(plan.collections.length, 'collection' + (plan.collections.length === 1 ? '' : 's') +
                    (plan.usedManifest ? ' — declared by the file itself' : ' — worked out from the file'));
@@ -6347,6 +6714,76 @@
       }
       if (plan.losses.composites.length) {
         html += fact(plan.losses.composites.length, 'shadows and type styles — not variables in Figma', true);
+      }
+      /* What a resolved export gets back, and what it does not — said once, in
+         the same quiet register as the other asides. */
+      var rr = importState.resolvedReport;
+      if (rr) {
+        html += fact(rr.collections, 'collections rebuilt — ' + (rr.architecture === 'structure' ? 'from the file\'s own structure record' : rr.architecture.replace('radd-foundations', 'RADD Foundations').replace('ods-foundations', 'ODS Foundations')) +
+                     (rr.declared ? ', declared by the file' : ', recognised from the file'));
+        if (rr.structureNote) html += fact('○', rr.structureNote + ' The rebuild uses the rules of ' + rr.architecture.replace('radd-foundations', 'RADD Foundations').replace('ods-foundations', 'ODS Foundations') + '.', true);
+        html += fact(rr.scopes.restore + rr.scopes.rules, 'variables given their scopes — ' +
+                     (rr.scopes.restore ? 'from the architecture\'s rules and the file\'s restore data' : 'from the architecture\'s rules'), true);
+        if (rr.skipped.synthesized) html += fact(rr.skipped.synthesized, 'values the export made up for itself — left out', true);
+        /* Styles, and where they came from — and the font they need, which the
+           import refuses without rather than discovering halfway. */
+        var ss = rr.styles || {};
+        if (ss.text || ss.effect || ss.grid) {
+          html += fact((ss.text || 0) + (ss.effect || 0) + (ss.grid || 0), 'styles to create (' + (ss.text || 0) + ' text, ' + (ss.effect || 0) +
+                       ' effect' + (ss.grid ? ', ' + ss.grid + ' grid' : '') + ') — ' +
+                       (ss.source === 'restore' ? 'from the file\'s restore data' : ss.source === 'rules+patches' ? 'from the architecture\'s rules, as the file\'s restore data corrects them' : 'from the architecture\'s rules'));
+          if (ss.bindingsMissing && ss.bindingsMissing.length) {
+            html += fact(ss.bindingsMissing.length, 'style fields point at a variable this file does not have — left unbound', true);
+          }
+        }
+        /* What the file wrote as a bare value where the rest of it uses a reference.
+           Said in numbers, with the names of the cells that could not be settled. */
+        var rl = rr.relinked;
+        if (rl) {
+          var back = (rl.linked || 0) + ((rl.numbers && rl.numbers.linked) || 0);
+          if (back) html += fact(back, 'colours and sizes written as plain values went back to the core token that holds them', true);
+          if (rl.ambiguous) {
+            var cells = (rl.ambiguousCells || []).map(function (c) { return c.cell + ' (' + c.value + ' is ' + c.candidates.join(' and ') + ')'; });
+            html += '<div class="import-warn-note">' + rl.ambiguous + ' colour' + (rl.ambiguous === 1 ? '' : 's') +
+                    ' could be either of several core colours and stay plain values: ' +
+                    cells.slice(0, 4).join('; ').replace(/</g, '&lt;') + (cells.length > 4 ? '; …' : '') + '</div>';
+          }
+          if (rl.none) html += fact(rl.none, 'colours stay plain values — no core colour has them', true);
+        }
+        /* THE FILE, READ ON ITS OWN. What looks like an import error and is
+           already in the file: a scheme written as plain values where its sibling
+           schemes use references, a reference to a token the file does not
+           have, a token missing from some cells. Said before anything is written. */
+        var sq = importState.sourceQuality;
+        if (sq && !sq.clean) {
+          var sqHtml = '';
+          sq.flattened.forEach(function (sc) {
+            var eg = sc.examples.map(function (e) { return e.replace(/</g, '&lt;'); }).join(', ');
+            sqHtml += '<div class="import-warn-note"><b>' + sc.literal.toLocaleString() + ' of ' + sc.cells.toLocaleString() +
+                      '</b> colour cells of the "' + sc.scheme.replace(/</g, '&lt;') + '" scheme are plain values; the other schemes use references (' + eg +
+                      '). The reference was lost before this file, so it cannot be restored from it' +
+                      (rr.relinked && (rr.relinked.linked) ? ' — those that match one core colour exactly (' + rr.relinked.linked + ') are relinked' : '') + '.</div>';
+          });
+          if (sq.broken.length) {
+            sqHtml += '<div class="import-warn-note"><b>' + sq.broken.length + '</b> reference' + (sq.broken.length === 1 ? '' : 's') +
+                      ' point at a token this file does not have (' + sq.broken.slice(0, 2).map(function (b) { return (b.token + ' → ' + b.target).replace(/</g, '&lt;'); }).join('; ') + (sq.broken.length > 2 ? '; …' : '') + ').</div>';
+          }
+          if (sq.modeHoles.length) {
+            sqHtml += '<div class="import-warn-note"><b>' + sq.modeHoles.length + '</b> token' + (sq.modeHoles.length === 1 ? ' is' : 's are') +
+                      ' missing from some scheme or mode (' + sq.modeHoles.slice(0, 2).map(function (h) { return (h.token + ': ' + h.missingIn.slice(0, 3).join(', ')).replace(/</g, '&lt;'); }).join('; ') + (sq.modeHoles.length > 2 ? '; …' : '') + ').</div>';
+          }
+          html += sqHtml;
+        }
+        if (rr.holes && rr.holes.length) {
+          html += '<div class="import-warn-note">' + rr.holes.length + ' variable' + (rr.holes.length === 1 ? ' has' : 's have') +
+                  ' no value in some modes (' + rr.holes.slice(0, 2).map(function (h) { return h.name.replace(/</g, '&lt;') + ': ' + h.modes.join(', '); }).join('; ') +
+                  (rr.holes.length > 2 ? '; …' : '') + '). Figma will give those modes its own default.</div>';
+        }
+        html += '<div class="import-warn-note">Names come back in lower case, and the permission layer is ' +
+                'rebuilt from the architecture\'s rules rather than read from the file.</div>';
+        if (rr.missing && rr.missing.length) {
+          html += fact(rr.missing.length, 'values the file does not carry — those variables are incomplete');
+        }
       }
       /*
         SETTLED, NOT HIDDEN. Each of these is a path several collections define
@@ -6595,10 +7032,10 @@
     /*
       WHEN IT LAST ASKED, on the button that asks.
 
-      In memory rather than persisted: after a reload nothing has been synced
-      IN THIS SESSION, and the plain "Sync" that shows then is the true answer.
-      A remembered timestamp would claim knowledge of a repository this run has
-      never looked at.
+      In memory rather than persisted: a remembered timestamp would claim
+      knowledge of a repository this run has never looked at. Instead the first
+      sync runs as soon as the saved settings are loaded (see startupSynced), so
+      the label is true within a moment of opening the plugin.
     */
     var lastSyncedAt = { gitlab: null, github: null };
 
@@ -6686,6 +7123,7 @@
       refusing us for four minutes is a fact, and an error banner nobody asked
       for on a screen they are working in is not.
     */
+    var startupSynced = false;
     var syncInFlight = {};
     function syncRepo(which, quiet) {
       var btn = which === 'gitlab' ? window.PomGitlabSyncBtn : window.PomGithubSyncBtn;
@@ -6787,7 +7225,7 @@
     /*
       THE DIALOG STANDS AS WIDE AS THE CARD IT CAME OUT OF.
 
-      .nd-dialog sets max-inline-size, which is a ceiling and not a size, so a
+      .ui-dialog sets max-inline-size, which is a ceiling and not a size, so a
       dialog holding four short paths shrank to 193px beside a 366px card and
       read as a tooltip that had lost its way. Measured rather than guessed:
       the card's own width is whatever the panel is minus its gutters, and the
@@ -6798,7 +7236,7 @@
       var anchor = document.getElementById(which === 'gitlab' ? 'gl-sync-btn-mount' : 'gh-sync-btn-mount');
       var card = anchor && anchor.closest ? anchor.closest('.provider-card') : null;
       var w = card ? Math.round(card.getBoundingClientRect().width) : 0;
-      if (w > 0) document.documentElement.style.setProperty('--closure-dialog-width', w + 'px');
+      if (w > 0) document.documentElement.style.setProperty('--dialog-width', w + 'px');
     }
 
     function openFolderDiscovery(which) {
@@ -7144,13 +7582,14 @@
     document.getElementById('settings-btn').addEventListener('click', function() {
       document.getElementById('main-page').classList.add('hidden');
       document.getElementById('settings-page').classList.add('visible');
+      updateClearFileButton();
       loadRepoFolders();
     });
 
     document.getElementById('back-btn').addEventListener('click', function() {
       flushSettingsSave();
       document.getElementById('settings-page').classList.remove('visible');
-      document.getElementById('main-page').classList.remove('hidden');
+      showHome();
     });
 
     // Settings fields are always editable, so nothing commits them but this:
@@ -7201,6 +7640,7 @@
     /* Picking on the import page is the same act, and has to land the same
        way — including on the main screen, which the person may well go back to. */
     window.PomImportRepoFile.onChange = function (name) {
+      importFilePick = '';
       chooseRepoFile(name);
       refreshRepoReadRow();
       refreshImportRepoFile();
@@ -7631,9 +8071,7 @@
         format's output.
       */
       window.PomOutputFormat.setHint(
-        dtcgShape === null
-          ? 'Off: Legacy JSON, as ' + filenameForShape(null) + '.'
-          : '$value / $type, as ' + filenameForShape(dtcgShape) + '.');
+        '$value / $type, as ' + filenameForShape(dtcgShape) + '.');
       window.PomOutputFormat.setResolvedHint(
         'One document instead of one per theme, routing resolved away. '
         + 'Large, so it is built when you export rather than now.');
@@ -7686,6 +8124,9 @@
     */
     function stampExport(tokens) {
       if (!tokens || typeof tokens !== 'object') return tokens;
+      /* A resolved document is left exactly as it was built: its own root
+         metadata (com.desquared.radd) says what it is, and the import reads that. */
+      if (dtcgShape === 'resolved') return tokens;
       var out = {};
       Object.keys(tokens).forEach(function(k) { out[k] = tokens[k]; });
       var ext = {};
@@ -7727,10 +8168,10 @@
       window.PomToast.show(message, isError);
     }
     
+    /* The exact number, with a thousands separator. It used to round to "9k",
+       which hides the one or two tokens that are the whole point of a comparison. */
     function formatTokenCount(n) {
-      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-      if (n >= 1000) return Math.round(n / 1000) + 'k';
-      return String(n);
+      return Number(n).toLocaleString('en-US');
     }
     
     // While the list is loading, show the skeleton action area instead of the
@@ -8073,6 +8514,9 @@
       */
       if (el('folder-push-cell')) el('folder-push-cell').hidden = comparing;
       if (el('compare-folder-mount')) el('compare-folder-mount').hidden = !comparing;
+      if (el('compare-branch-mount')) el('compare-branch-mount').hidden = !comparing || activeRepoProvider() !== 'github';
+      updatePushBranchField();
+      if (comparing) loadCompareBranches();
       if (el('primary-filename-mount')) el('primary-filename-mount').hidden = comparing;
       if (el('compare-pick-mount')) el('compare-pick-mount').hidden = !comparing;
       /*
@@ -8087,11 +8531,100 @@
 
     window.PomRepoMode.onChange = function (mode) {
       repoMode = mode;
+      /* COMPARE STARTS WHERE PUSH IS. The branch picked for pushing is the
+         branch to read, until somebody picks another in Compare; the folder is
+         one control shared by both, and the file name follows the push name
+         whenever nothing else was chosen (compareFile). A branch the list does
+         not hold — a new name, not made yet — falls back to the saved one when
+         the list is shown, so there is nothing to read from it and no error. */
+      if (mode === 'compare') {
+        compareBranch = pushBranchWanted() || null;
+        compareFile = '';
+        if (compareBranchCache && compareBranchCache.names.length) showCompareBranches(compareBranchCache.names);
+      }
+      ensureCompareFile();
       /* updateActionUI ends in applyRepoMode, so one call does both. */
       updateActionUI();
       refreshRepoReadRow();
     };
+
+    /*
+      THE BRANCHES, for the Compare picker. One request per repository and
+      token (up to 500 branches, 100 a page), remembered. The saved branch and
+      main come first, since those are what is wanted most; the rest follow in
+      the order GitHub gives them. A failure is not an error to show: the
+      picker simply stays away and the saved branch is read, as before.
+    */
+    var compareBranchCache = null;    // { key, names }
+    function branchListFor(names, saved) {
+      var out = [], seen = {};
+      [saved, 'main'].concat(names).forEach(function (n) {
+        if (n && !seen[n] && names.indexOf(n) !== -1) { seen[n] = true; out.push(n); }
+      });
+      return out;
+    }
+    function showCompareBranches(names) {
+      var c = githubConfig();
+      var list = branchListFor(names, c.branch);
+      if (compareBranch && list.indexOf(compareBranch) === -1) compareBranch = null;
+      if (window.PomPushBranch) { window.PomPushBranch.setSaved(c.branch); window.PomPushBranch.setOptions(list); }
+      var items = list.map(function (n) { return { value: n, label: n }; });
+      window.PomCompareBranch.setItems(items, compareBranch || c.branch);
+      if (window.PomImportBranch) window.PomImportBranch.setItems(items, compareBranch || c.branch);
+    }
+    function fetchBranchPage(c, parts, page, acc) {
+      var url = 'https://api.github.com/repos/' + encodeURIComponent(parts[0]) + '/' +
+                encodeURIComponent(parts[1]) + '/branches?per_page=100&page=' + page;
+      return fetch(url, { method: 'GET', headers: {
+        'Authorization': 'token ' + c.token, 'Accept': 'application/vnd.github+json' } })
+        .then(function (r) {
+          if (!r.ok) throw { status: r.status };
+          return r.json();
+        })
+        .then(function (rows) {
+          rows.forEach(function (b) { acc.push(b.name); });
+          if (rows.length === 100 && page < 5) return fetchBranchPage(c, parts, page + 1, acc);
+          return acc;
+        });
+    }
+    function loadCompareBranches() {
+      if (activeRepoProvider() !== 'github') return;
+      var c = githubConfig();
+      var parts = (c.repo || '').split('/');
+      if (!c.token || parts.length !== 2) return;
+      var key = c.repo + '|' + c.token;
+      if (compareBranchCache && compareBranchCache.key === key) {
+        showCompareBranches(compareBranchCache.names);
+        return;
+      }
+      compareBranchCache = { key: key, names: [] };
+      fetchBranchPage(c, parts, 1, []).then(function (names) {
+        compareBranchCache = { key: key, names: names };
+        showCompareBranches(names);
+      }, function () {
+        compareBranchCache = null;
+        document.getElementById('compare-branch-mount').hidden = true;
+        document.getElementById('import-repo-branch').hidden = true;
+      });
+    }
+    window.PomCompareBranch.onChange = function (value) {
+      var saved = githubConfig().branch;
+      compareBranch = value && value !== saved ? value : null;
+      refreshRepoReadRow();   // another branch is another file to compare against
+    };
+    /* The Import page's picker is the same choice: the branch a read comes from. Another branch is another listing,
+       so the folder, the file and the repository line are read again. */
+    window.PomImportBranch.onChange = function (value) {
+      var saved = githubConfig().branch;
+      compareBranch = value && value !== saved ? value : null;
+      if (compareBranchCache) showCompareBranches(compareBranchCache.names);
+      refreshRepoReadRow();
+      refreshImportRepoRow();
+    };
+    /* The file this page offers when the export's own name is not in the repo (see refreshImportRepoFile). */
+    var importFilePick = '';
     function repoSelectedFile() {
+      if (importFilePick && document.getElementById('import-page').classList.contains('visible')) return importFilePick;
       return compareTargetName();
     }
     /*
@@ -8145,6 +8678,21 @@
        from a mode you are no longer in would quietly move it. */
     function compareTargetName() {
       return repoMode === 'compare' ? (compareFile || primaryFilename()) : primaryFilename();
+    }
+
+    /*
+      COMPARE NEVER STARTS EMPTY. The file it reads is the repo's, and the name the
+      export would write is often not one the folder has — which left the picker on
+      "pick a file" with a list under it, when the obvious reading is the first JSON
+      there. So when the folder has been listed and the name Compare would read is
+      not in it, the first JSON is taken. Only in Compare: in Push the name is the
+      one being typed, and choosing for somebody there overwrote it.
+    */
+    function ensureCompareFile() {
+      if (repoMode !== 'compare' || !repoListed || !repoFileNames.length) return;
+      if (repoFileNames.indexOf(compareTargetName()) !== -1) return;
+      compareFile = repoFileNames[0];
+      showCompareSides();
     }
 
     window.PomCompareSides.onPick = function (name) {
@@ -8225,7 +8773,7 @@
       cost a whole tree walk to do it.
     */
     function listRepoJsonFiles(which) {
-      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      var c = readConfig(which);
       var folder = (c.folder || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
       var url, headers;
       if (which === 'gitlab') {
@@ -8282,7 +8830,7 @@
     */
     var repoFolderCache = null;    // { key, folders, truncated }
     function listRepoFolders(which, force) {
-      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      var c = readConfig(which);
       var where = which === 'gitlab' ? c.host + '#' + c.project : c.repo;
       var key = which + '|' + where + '|' + c.branch + '|' + c.token;
       /* Sync means ASK AGAIN. The cache is keyed by the address, so it answers
@@ -8373,7 +8921,7 @@
       — it is the same string the field beside it is already holding.
     */
     function repoAddressKey(which) {
-      var c = which === 'gitlab' ? gitlabConfig() : githubConfig();
+      var c = readConfig(which);
       var where = which === 'gitlab' ? c.host + '#' + c.project : c.repo;
       return which + '|' + where + '|' + c.branch + '|' + repoFilePath(which) + '|' + c.token;
       /* repoFilePath, not pushFilePath — this key is about the file being
@@ -8460,7 +9008,7 @@
          nobody is looking at any more. Two edits in quick succession can land
          out of order, and the older one would win by arriving last. */
       var current = function () { return repoCheckedFor === key; };
-      var branch = (which === 'gitlab' ? gitlabConfig() : githubConfig()).branch;
+      var branch = readConfig(which).branch;
       var wanted = repoFilePath(which).split('/').pop();
       /*
         FORGET WHAT THE LAST FOLDER HELD before asking about this one. The
@@ -8474,7 +9022,11 @@
       repoListed = false;
       updateActionUI();
       refreshImportRepoFile();
-      repoReadStatus('Reading ' + wanted + '…');
+      /* No "Reading <name>…" line. It named whatever was in the JSON name field at
+         that moment, so it re-appeared on every keystroke, above the fields, and the
+         whole row moved with it. The listing is one small request; what is worth
+         saying is the result (no such file, could not read), and that still is. */
+      repoReadStatus('');
       listRepoJsonFiles(which).then(function (files) {
         if (!current()) return null;
         var names = files.map(function (f) { return f.name; });
@@ -8510,6 +9062,7 @@
         /* The listing usually lands while somebody is looking at one of the
            two screens it feeds; this is the other one. */
         refreshImportRepoFile();
+        ensureCompareFile();
         if (names.indexOf(repoSelectedFile()) === -1) {
           /*
             A NAME THE REPO DOES NOT HAVE MEANS DIFFERENT THINGS IN THE TWO
@@ -8564,6 +9117,7 @@
         updateTargetRow('github', r.wantsGitHub, r.ghReady);
         if (r.wantsGitHub && r.ghReady) renderGithubFolderSelect();
       }
+      updatePushBranchField();
       updateActionUI();
     }
 
@@ -8711,10 +9265,8 @@
     // DTCG, not the one that still needs an external finishing step.
     /*
       One place a format change happens, whoever asked for it — the control,
-      a loaded config, or a later caller. dtcgShape is null for Legacy JSON
-      and the shape name otherwise; the control speaks 'legacy' instead,
-      because a radio group needs a value for every option including the
-      default one.
+      a loaded config, or a later caller. dtcgShape is 'themes' or 'resolved';
+      it is never null now that Legacy JSON is not an option.
     */
     /*
       `andThen` runs once the sandbox has rebuilt the export in the new shape.
@@ -8726,7 +9278,8 @@
     */
     function setFormat(shape, andThen) {
       dtcgShape = shape;
-      window.PomOutputFormat.setValue(shape || 'legacy');
+      window.PomOutputFormat.setValue(shape);
+      syncStructureBox();
       // Rewrite the file names BEFORE persisting, so the saved config and the
       // fields on screen never disagree about where the export lands.
       applyFilenameForFormat();
@@ -8736,7 +9289,7 @@
     }
 
     window.PomOutputFormat.onChange = function(shape) {
-      setFormat(shape === 'legacy' ? null : shape);
+      setFormat(shape === 'resolved' ? 'resolved' : 'themes');
     };
 
     updateActionUI();
@@ -8820,7 +9373,7 @@
        `what` is deliberate: one reader and one writer per provider, so "where
        we put it" and "what is in the repo" cannot drift apart. */
     function fetchGitHubFile(atPath) {
-      var c = githubConfig();
+      var c = readConfig('github');
       if (!c.token || !c.repo) return Promise.reject({ message: 'GitHub is not configured' });
       var parts = c.repo.split('/');
       if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/name' });
@@ -8988,7 +9541,18 @@
           return r.json();
         })
         .then(function (ref) {
-          if (!ref || !ref.object) return null;
+          if (!ref || !ref.object) {
+            /* No such branch. Only an EMPTY repository has nothing to branch
+               from; anywhere else a parentless commit would be a branch holding
+               this one file and none of the repository, so refuse and say how
+               to make the branch properly. */
+            return fetch(api.replace(/git\/$/, '') + 'commits?per_page=1', { method: 'GET', headers: headers })
+              .then(function (r) {
+                if (r.status === 409) return null;   // "Git Repository is empty."
+                if (r.ok) throw { message: 'The branch "' + c.branch + '" does not exist. Use "New branch" on the main screen to create it from the default branch.' };
+                return readErr(r, 'commits');
+              });
+          }
           parent = ref.object.sha;
           return fetch(api + 'commits/' + parent, { method: 'GET', headers: headers })
             .then(function (r) { return r.ok ? r.json() : readErr(r, 'commit'); });
@@ -9038,6 +9602,7 @@
     function pushGitHub(tokens, what) {
       what = what || {};
       var c = githubConfig();
+      if (what.branch) c.branch = what.branch;   // a branch made for this push
       if (!c.token || !c.repo) return Promise.reject({ message: 'GitHub not configured' });
       // Exactly two segments — `owner/repo/anything` is a typo, not a repo we
       // should quietly truncate down to `owner/repo` and push to.
@@ -9114,14 +9679,66 @@
       return msg;
     }
 
+    /*
+      THE BRANCH TO PUSH TO (GitHub only; the logic is in src/github-branch.js).
+      The picker beside the folder holds the saved branch until somebody
+      changes it. A different name is either a branch the repository has — the
+      push goes there — or one it has not, and then it is made first, from the
+      default branch. The repository decides which, not the list: the list can
+      be stale.
+    */
+    function pushBranchWanted() {
+      var saved = githubConfig().branch;
+      var want = window.PomPushBranch ? window.PomPushBranch.get().trim() : saved;
+      return want && want !== saved ? want : '';
+    }
+    function makePushBranch(name) {
+      var c = githubConfig();
+      var parts = (c.repo || '').split('/');
+      if (parts.length !== 2) return Promise.reject({ message: 'GitHub repo must be owner/repo' });
+      return window.PomGithubBranch.ensureBranch({
+        fetch: function (u, o) { return fetch(u, o); },
+        owner: parts[0], repo: parts[1], reuseExisting: true,
+        headers: { 'Authorization': 'token ' + c.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' }
+      }, name).then(function (made) {
+        /* It exists now: the lists should offer it. */
+        if (compareBranchCache && compareBranchCache.names.indexOf(made.name) === -1) {
+          compareBranchCache.names.push(made.name);
+          showCompareBranches(compareBranchCache.names);
+        }
+        return made;
+      });
+    }
+    function updatePushBranchField() {
+      var show = activeRepoProvider() === 'github';
+      var mount = document.getElementById('push-branch-mount');
+      if (!mount) return;
+      var comparing = repoMode === 'compare';
+      mount.hidden = !show || comparing;
+      if (window.PomPushBranch) window.PomPushBranch.setSaved(githubConfig().branch);
+      if (show && !comparing) loadCompareBranches();
+    }
+
     // Push the exported tokens to whichever single provider mainProviderTab
     // currently names (see its own comment — there's no simultaneous-push
     // 'both' mode any more).
-    function pushToGit() {
+    /* Push and Download send what the file holds NOW, not what it held when the
+       plugin opened — see runCompare for why a once-read copy goes stale. */
+    function refreshExport(then) {
+      showToast('Reading this Figma file\u2026');
+      compareKeepSel = selectedCollections.slice();
+      var fired = false;
+      var go = function () { if (fired) return; fired = true; compareAfterExtract = null; requestTransform(then); };
+      compareAfterExtract = go;
+      setTimeout(go, 15000);
+      parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+    }
+    function pushToGit() { refreshExport(pushToGitNow); }
+    function pushToGitNow() {
       // Same as Download: build the resolved document only when it is wanted.
       if (dtcgShape === 'resolved' && !transformedData) {
         showToast('Building the resolved document…');
-        requestTransform(pushToGit);
+        requestTransform(pushToGitNow);
         return;
       }
       var tokens = getTokensToExport();
@@ -9163,10 +9780,13 @@
         })
         .then(function() {
           if (!wantsGitHub) return;
-          return pushGitHub(tokens).then(
-            function() { results.push({ provider: 'GitHub', ok: true }); },
-            function(err) { results.push({ provider: 'GitHub', ok: false, err: err }); }
-          );
+          var asked = pushBranchWanted();
+          var made = asked ? makePushBranch(asked) : Promise.resolve(null);
+          return made.then(function (b) {
+            return pushGitHub(tokens, b ? { branch: b.name } : undefined).then(function () {
+              results.push({ provider: 'GitHub', ok: true, branch: b });
+            });
+          }).catch(function (err) { results.push({ provider: 'GitHub', ok: false, err: err }); });
         })
         .then(function() {
           var succeeded = results.filter(function(r) { return r.ok; });
@@ -9178,7 +9798,9 @@
           succeeded.forEach(function (r) { afterGitAction(r.provider === 'GitLab' ? 'gitlab' : 'github'); });
           if (failed.length === 0) {
             window.PomButtons.push.setSuccess(true);
-            showToast('Successfully pushed to ' + succeeded.map(function(r) { return r.provider; }).join(' and '));
+            showToast('Successfully pushed to ' + succeeded.map(function(r) {
+              return r.provider + (r.branch ? ' (' + (r.branch.created ? 'new branch ' : 'branch ') + r.branch.name + ')' : '');
+            }).join(' and '));
           } else if (succeeded.length === 0) {
             showToast(failed.map(function(r) { return r.provider + ': ' + errText(r.err); }).join(' — '), true);
           } else {
@@ -9193,11 +9815,12 @@
         .finally(pushDone);
     }
 
-    function doDownloadSingle() {
+    function doDownloadSingle() { refreshExport(doDownloadSingleNow); }
+    function doDownloadSingleNow() {
       // The resolved document is built on demand; everything else is ready.
       if (dtcgShape === 'resolved' && !transformedData) {
         showToast('Building the resolved document…');
-        requestTransform(doDownloadSingle);
+        requestTransform(doDownloadSingleNow);
         return;
       }
       var tokens = getTokensToExport();
@@ -9228,6 +9851,63 @@
 
         Cmd/Ctrl + Shift + G   ->  <file name>.graph.json
     */
+    /* The structure the sandbox captured on open (src/structure-capture.js). */
+    var capturedStructure = null;
+    /* The saved structures' index lines, for matching an imported JSON to one (structureNoteFor). */
+    var savedStructures = [];
+    function escapeText(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    /*
+      WHICH SAVED STRUCTURE THIS JSON BELONGS TO, in words. Chosen from the JSON's
+      own schemes, accents, modes and breakpoints (src/structure-select.js), since
+      the file it is going into may be empty. Says only what the match IS: that the
+      import can then rebuild it is a separate fact (recognise), shown beside it.
+    */
+    function structureNoteFor(doc) {
+      var S = window.PomStructureSelect;
+      if (!S) return null;
+      if (!savedStructures.length) {
+        return 'No structure is saved on this computer yet. Open the plugin in the file this JSON came from, and it is saved.';
+      }
+      var pick = S.choose(savedStructures, S.profileOf(doc));
+      var name = pick.entry ? '“' + escapeText(pick.entry.file || 'untitled') + '”' : '';
+      if (pick.kind === 'fits') return 'Matches the saved structure of ' + name + ' (' + pick.entry.layers.length + ' layers).';
+      if (pick.kind === 'partial') {
+        return 'The closest saved structure is ' + name + ', but it has no collection for the JSON’s ' + pick.missing.join(' and ') + '.';
+      }
+      return 'None of the ' + savedStructures.length + ' saved structures fits this JSON’s schemes, modes and breakpoints.';
+    }
+    /* The block shows when a structure was captured AND Resolved is on. */
+    function syncStructureBox() {
+      var box = document.getElementById('structure-capture');
+      if (box) box.hidden = !(capturedStructure && dtcgShape === 'resolved');
+    }
+    function structureArrived(msg) {
+      if (msg.known) savedStructures = msg.known;
+      if (!msg.ok || !msg.structure) return;
+      capturedStructure = msg.structure;
+      syncStructureBox();
+    }
+    function doDownloadStructure() {
+      if (!capturedStructure) return;
+      var blob = new Blob([JSON.stringify(capturedStructure, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (lastFigmaFileName || 'tokens').replace(/[\\/:*?"<>|]/g, '-') + '.structure.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Structure downloaded.');
+    }
+    (function() {
+      var b = document.getElementById('structure-download');
+      if (b) b.addEventListener('click', doDownloadStructure);
+      /* The sandbox posts when it is done, which may be before this page was
+         listening; asking again is cheap (cached) and settles it. */
+      parent.postMessage({ pluginMessage: { type: 'structureGet' } }, '*');
+    })();
+
     function doDownloadGraph() {
       if (!rawData || !rawData.collections) {
         showToast('No graph yet — run an extract first.', true);
@@ -9272,14 +9952,434 @@
     window.PomCollectionsAccordion.onClearVariables = function() {
       if (!rawData || !rawData.collections || !rawData.collections.length) return;
       var variables = rawData.collections.reduce(function(n, c) { return n + (c.variables || []).length; }, 0);
-      window.PomClearVariablesDialog.open({
-        collections: rawData.collections.length,
-        variables: variables,
-        names: rawData.collections.map(function(c) { return c.name; }),
-        fileName: lastFigmaFileName || 'this file',
-      });
+      window.PomClearVariablesDialog.open(clearSummary());
     };
-    window.PomClearVariablesDialog.onConfirm = function() {
+    /*
+      WHAT THIS FILE HOLDS THAT CAN BE CLEARED, from the last extract. One
+      reading for both doors to the same dialog — the collections list and
+      Settings — so the two cannot disagree about what a press deletes.
+      `all` ticks both boxes (Settings: the point is an empty file); the
+      collections list leaves styles unticked, as it always has.
+    */
+    function clearSummary(only) {
+      var cols = (rawData && rawData.collections) || [];
+      var st = (rawData && rawData.styles) || {};
+      return {
+        collections: cols.length,
+        variables: cols.reduce(function(n, c) { return n + (c.variables || []).length; }, 0),
+        names: cols.map(function(c) { return c.name; }),
+        list: cols.map(function(c) { return { name: c.name, variables: (c.variables || []).length }; }),
+        fileName: lastFigmaFileName || 'this file',
+        styles: { text: (st.textStyles || []).length, effect: (st.effectStyles || []).length, grid: (st.gridStyles || []).length },
+        /* Which of the two this press is about. Absent, both are offered with
+           styles unticked — what the collections list has always done. */
+        only: only
+      };
+    }
+    function updateClearFileButton() {
+      var sum = clearSummary();
+      var nStyles = sum.styles.text + sum.styles.effect + sum.styles.grid;
+      if (window.PomClearVarsBtn) window.PomClearVarsBtn.setDisabled(!rawData || sum.variables === 0);
+      if (window.PomClearStylesBtn) window.PomClearStylesBtn.setDisabled(!rawData || nStyles === 0);
+      /* Nothing to clear in an empty file: say nothing about clearing at all (still reading: leave it as it is). */
+      var emptyFile = !!rawData && sum.variables + nStyles === 0;
+      ['clear-file-title', 'clear-file-note', 'clear-file-actions'].forEach(function (id) {
+        var part = document.getElementById(id);
+        if (part) part.hidden = emptyFile;
+      });
+      var note = document.getElementById('clear-file-note');
+      if (note) {
+        note.textContent = !rawData ? 'Reading this file…'
+          : sum.variables + nStyles === 0 ? 'This file has no variables or styles.'
+          : 'This file has ' + sum.variables.toLocaleString() + ' variable' + (sum.variables === 1 ? '' : 's') + ' in ' +
+            sum.collections + ' collection' + (sum.collections === 1 ? '' : 's') + ' and ' +
+            nStyles + ' style' + (nStyles === 1 ? '' : 's') + '. An import needs a file with neither.';
+      }
+    }
+    /*
+      ===== RADD STUDIO LINK =====
+
+      The Studio opens a WebSocket on this Mac (File > Connect to Figma...) and shows a code; this connects to it,
+      says hello with the code, and then ANSWERS: the Studio asks, the plugin reports. Nothing here decides what
+      to do with a Figma file. The messages and the classification are src/studio-link.js (tested in Node); this
+      is the socket, the Settings row and the two things only this side can reach: the live Figma file and the
+      sandbox that remembers the last sync.
+
+      status, parity and read change nothing in the file; apply writes, and only after the designer's yes.
+    */
+    /*
+      SWITCHED OFF FOR NOW (2026-11-13): the Studio link is not offered. Nothing below is removed; with this false
+      the Settings section stays hidden (so there is no code to type and no way to open the socket) and
+      studioConnect refuses to run. Set it to true, rebuild, and the section comes back as it was.
+    */
+    var STUDIO_LINK_ENABLED = false;
+    (function () {
+      var block = document.getElementById('studio-link-block');
+      if (block) block.hidden = !STUDIO_LINK_ENABLED;
+    })();
+    var studioSocket = null, studioConnected = false, studioParityBusy = false, studioFailed = false;
+    var studioSyncState = { lastSync: null, baseline: null };
+    var studioSyncWaiting = [];
+    /* Set while an apply from the Studio is in the sandbox: its answer is the Studio's, not the import page's. */
+    var studioApplyDone = null;
+
+    function studioSetStatus(text, cls) {
+      var el = document.getElementById('studio-status');
+      if (!el) return;
+      el.textContent = text;
+      el.className = 'provider-sync-status' + (cls ? ' ' + cls : '');
+    }
+    function studioShowButton() {
+      if (window.PomStudioConnectBtn) window.PomStudioConnectBtn.setLabel(studioSocket ? 'Disconnect' : 'Connect');
+    }
+    function studioReply(obj) {
+      if (studioSocket && studioSocket.readyState === 1) studioSocket.send(JSON.stringify(obj));
+    }
+    /* What the file remembers of its last sync, asked of the sandbox. Answers the waiting callers once, and never
+       leaves one hanging: no answer in four seconds is "no sync point", which the report says plainly. */
+    function studioLoadSync(then) {
+      studioSyncWaiting.push(then);
+      var round = studioSyncWaiting;
+      parent.postMessage({ pluginMessage: { type: 'studioSyncLoad' } }, '*');
+      setTimeout(function () {
+        if (studioSyncWaiting !== round || !round.length) return;
+        studioSyncWaiting = [];
+        round.forEach(function (fn) { fn(); });
+      }, 4000);
+    }
+    function studioSyncArrived(msg) {
+      studioSyncState = { lastSync: msg.lastSync || null, baseline: msg.baseline || null };
+      var waiting = studioSyncWaiting;
+      studioSyncWaiting = [];
+      waiting.forEach(function (fn) { fn(); });
+    }
+    /* The file as it is NOW, as the resolved document: the plugin reads the file once when it opens and the
+       designer keeps it open while editing variables, so a parity read from that copy would say "same" about
+       a file that has since changed. Same reasoning, same mechanism as runCompare. */
+    function studioFreshResolved(done) {
+      compareKeepSel = selectedCollections.slice();
+      var fired = false;
+      var go = function () {
+        if (fired) return;
+        fired = true;
+        compareAfterExtract = null;
+        if (!rawData) { done(null); return; }
+        figmaDocForCompare('resolved', done);
+      };
+      compareAfterExtract = go;
+      setTimeout(go, 15000);
+      parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+    }
+    function studioParity(msg) {
+      var L = window.PomStudioLink;
+      if (studioParityBusy) { studioReply({ type: 'busy', id: msg.id }); return; }
+      if (!msg.tokens || typeof msg.tokens !== 'object') {
+        studioReply(L.failedReply(msg.id, 'The Studio sent no token file to compare.'));
+        return;
+      }
+      studioParityBusy = true;
+      studioSetStatus('The Studio is comparing: reading this file…', '');
+      var finish = function (reply) {
+        studioParityBusy = false;
+        if (studioConnected) studioSetStatus(studioConnectedText(), 'is-ok');
+        studioReply(reply);
+      };
+      studioLoadSync(function () {
+        studioFreshResolved(function (figmaDoc) {
+          if (!figmaDoc) { finish(L.failedReply(msg.id, 'This Figma file has no variables to compare.')); return; }
+          /* Two documents of thousands of leaves: let a frame through so the status above is seen. */
+          setTimeout(function () {
+            var reply;
+            try { reply = L.parityReply(msg.id, msg.tokens, figmaDoc, studioSyncState.baseline); }
+            catch (err) { reply = L.failedReply(msg.id, 'Could not compare: ' + String((err && err.message) || err)); }
+            finish(reply);
+          }, 0);
+        });
+      });
+    }
+    /*
+      APPLY AND READ share their first half with parity: the file as it is now, the Studio's token file, and the
+      classification of every difference. What they do with it is what differs, so that half is here once.
+      The link stays busy (any other request gets `busy`) until the reply goes out, which for an apply includes
+      the designer's answer.
+    */
+    function studioPrepare(msg, work) {
+      var L = window.PomStudioLink;
+      if (studioParityBusy) { studioReply({ type: 'busy', id: msg.id }); return; }
+      if (!msg.tokens || typeof msg.tokens !== 'object') {
+        studioReply(L.failedReply(msg.id, 'The Studio sent no token file.'));
+        return;
+      }
+      studioParityBusy = true;
+      var finish = function (reply) {
+        studioParityBusy = false;
+        if (studioConnected) studioSetStatus(studioConnectedText(), 'is-ok');
+        (Array.isArray(reply) ? reply : [reply]).forEach(studioReply);
+      };
+      studioLoadSync(function () {
+        studioFreshResolved(function (figmaDoc) {
+          if (!figmaDoc) { finish(L.failedReply(msg.id, 'This Figma file has no variables.')); return; }
+          setTimeout(function () {
+            try {
+              var detail = L.parityDetail(msg.tokens, figmaDoc, studioSyncState.baseline);
+              work({ msg: msg, figmaDoc: figmaDoc, detail: detail, finish: finish });
+            } catch (err) {
+              finish(L.failedReply(msg.id, String((err && err.message) || err)));
+            }
+          }, 0);
+        });
+      });
+    }
+
+    /* BRING FROM FIGMA: the Studio's file with only the tokens Figma changed taken from Figma. Reads, writes nothing. */
+    function studioRead(msg) {
+      var L = window.PomStudioLink, SA = window.PomStudioApply;
+      studioSetStatus('The Studio is asking for the changes made in Figma…', '');
+      studioPrepare(msg, function (ctx) {
+        var classes = (msg.classes && msg.classes.length) ? msg.classes : ['figma-changed'];
+        var names = L.namesOf(ctx.detail.result, classes);
+        var out = SA.readText(msg.tokens, ctx.figmaDoc, names);
+        /* A file of this size can pass the frame limit: pieces the Studio joins back. */
+        ctx.finish(SA.chunkReply({ type: 'read', id: msg.id, text: out.text }, 4000000, 1000000));
+      });
+    }
+
+    /* A sync point is only recorded when the write went through whole: what both sides agree on, and where from. */
+    function studioRecordSync(ctx, lastSync, appliedNames) {
+      var base = window.PomStudioLink.baselineAfterApply(studioSyncState.baseline, ctx.detail.studio, ctx.detail.figma, appliedNames);
+      studioSyncState = { lastSync: lastSync, baseline: base };
+      parent.postMessage({ pluginMessage: { type: 'studioSyncSave', lastSync: lastSync, baseline: base } }, '*');
+    }
+
+    /*
+      SEND TO FIGMA: the tokens the Studio's branch changed go into this file, after the designer says yes HERE. The
+      Studio only waits; it never writes silently. What is written is the import page's own program, cut down to
+      the writes those tokens cause (see src/studio-apply.js), through the same sandbox handler.
+    */
+    function studioApply(msg) {
+      var L = window.PomStudioLink, SA = window.PomStudioApply;
+      studioSetStatus('The Studio wants to write into this file…', '');
+      studioPrepare(msg, function (ctx) {
+        var classes = (msg.classes && msg.classes.length) ? msg.classes : ['studio-ahead'];
+        var names = L.namesOf(ctx.detail.result, classes);
+        var lastSync = { repo: msg.repo || null, branch: msg.branch || null, path: msg.path || null, sha: msg.sha || null };
+        var existing = (rawData && rawData.collections) ? rawData.collections : [];
+        var plan = SA.planApply(ctx.figmaDoc, msg.tokens, names, existing);
+        if (!plan.ok) { ctx.finish(L.failedReply(msg.id, plan.reason)); return; }
+        var skipped = plan.skipped.length;
+        var answer = function (applied, failed, withSync) {
+          ctx.finish({ type: 'applied', id: msg.id, applied: applied, failed: failed, skipped: skipped,
+                       lastSync: withSync ? lastSync : studioSyncState.lastSync });
+        };
+        var moved = names.filter(function (n) { return plan.skipped.indexOf(n) === -1; });
+        /* Nothing the Studio changed is missing here: the file is already as the branch has it, so the only thing
+           to do is remember that. */
+        if (!plan.writes) {
+          studioRecordSync(ctx, lastSync, moved);
+          answer(0, 0, true);
+          return;
+        }
+        var conflicts = ctx.detail.result.tokens.filter(function (t) { return t.class === 'conflict'; }).length;
+        var text = 'The Studio asks to write ' + plan.moved.toLocaleString() + ' token' + (plan.moved === 1 ? '' : 's') +
+          ' from ' + (msg.branch || 'its branch') + ' into this file (' + plan.writes.toLocaleString() + ' value' +
+          (plan.writes === 1 ? '' : 's') + (plan.created ? ', ' + plan.created.toLocaleString() + ' new' : '') + '). ' +
+          'Changes made here since the last sync stay as they are' +
+          (conflicts ? '; ' + conflicts + ' changed on both sides are left for someone to choose' : '') + '.' +
+          (skipped ? ' ' + skipped + ' the Studio removed ' + (skipped === 1 ? 'is' : 'are') + ' kept here.' : '');
+        studioSetStatus('Waiting for you: the Studio asks to write into this file.', '');
+        window.PomStudioConfirm.ask('Write the Studio’s changes into this file?', text, 'Write',
+          function () {
+            studioApplyDone = function (back) {
+              if (back.type === 'importRefused') {
+                ctx.finish(L.failedReply(msg.id, 'Nothing was written: ' +
+                  back.problems.map(function (p) { return p.message; }).join('  ·  ')));
+                return;
+              }
+              var r = back.report;
+              if (r.failed) { answer(Math.max(0, plan.moved - r.failed), r.failed, false); return; }
+              studioRecordSync(ctx, lastSync, moved);
+              showToast('Written from the Studio: ' + plan.moved.toLocaleString() + ' token' + (plan.moved === 1 ? '' : 's'));
+              /* The file changed underneath the main screen: its own read of it is stale now. */
+              parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+              answer(plan.moved, 0, true);
+            };
+            parent.postMessage({ pluginMessage: { type: 'applyImport', program: plan.program } }, '*');
+          },
+          function () { ctx.finish({ type: 'declined', id: msg.id }); });
+      });
+    }
+
+    /*
+      THE REPOSITORY SETTINGS FOLLOW THE STUDIO.
+
+      While this is connected, what the Studio is on is what this plugin reads and writes: its repository, its
+      branch, and where its token file is. Otherwise a designer compares the Studio's branch against a file read
+      from whatever branch these settings still named, and every difference would be one nobody made.
+
+      The Studio says it in every request that carries a file (parity, apply, read: repo, branch, path) and in a
+      `context` message of its own, which it can send as soon as it is connected and again whenever the designer
+      switches branch. Only the three things the Studio knows are set. The token stays the designer's own:
+      credentials never cross the link. The provider is the one the main screen is on (GitHub when none is set
+      up yet: the Studio does not say which host it is).
+
+      This is a change to the saved settings, so it is said in the status line, and it stays after a disconnect:
+      the last branch the Studio was on is a better start than the one before it.
+    */
+    var studioContext = null;
+    function studioConnectedText() {
+      return 'Connected to the Studio' + (studioContext && studioContext.branch
+        ? '. Repository settings follow ' + (studioContext.repo ? studioContext.repo + ' @ ' : '') + studioContext.branch
+        : '');
+    }
+    function studioAdopt(info) {
+      if (!info || typeof info !== 'object') return;
+      var repo = String(info.repo || '').trim();
+      var branch = String(info.branch || '').trim();
+      /* repoPath is the file's path from the repository's root; path is from the Studio's product folder, which
+         is the same thing only when the product is the whole repository. */
+      var path = String(info.repoPath || info.path || '').trim().replace(/^\/+/, '');
+      if (!repo && !branch && !path) return;
+      if (studioContext && studioContext.provider === (info.provider || '') && studioContext.repo === repo && studioContext.branch === branch && studioContext.path === path) return;
+      studioContext = { repo: repo, branch: branch, path: path, provider: info.provider || '' };
+      /* The Studio may name the host (provider: "github" or "gitlab"); when it does not, the main screen's. */
+      var which = (info.provider === 'github' || info.provider === 'gitlab') ? info.provider
+                : (gitlabAdded && githubAdded) ? (mainProviderTab === 'github' ? 'github' : 'gitlab')
+                : gitlabAdded ? 'gitlab' : 'github';
+      if (which === 'github' && !githubAdded) {
+        /* Nothing set up yet: the same blank GitHub section the Add button makes. */
+        addGithub();
+        activeSettingsTab = 'github';
+        window.PomRepoTab.setValue(activeSettingsTab);
+        updateProviderSectionVisibility();
+        refreshSettingsControls();
+      }
+      var cut = path.lastIndexOf('/');
+      var folder = cut === -1 ? '' : normFolder(path.slice(0, cut));
+      var file = path.slice(cut + 1);
+      if (which === 'github') {
+        if (repo) setFieldValue('gh-repo', repo);
+        if (branch) setFieldValue('gh-branch', branch);
+        if (path) {
+          if (folder && ghFolders.indexOf(folder) === -1) ghFolders.push(folder);
+          ghActiveFolder = folder;
+          renderGithubFolderList();
+        }
+      } else {
+        if (repo) setFieldValue('gl-project', repo);
+        if (branch) setFieldValue('gl-branch', branch);
+        if (path) {
+          if (folder && glFolders.indexOf(folder) === -1) glFolders.push(folder);
+          glActiveFolder = folder;
+          renderFolderList();
+        }
+      }
+      /* Both pickers (the main screen's file name and the import page's "File in the repo") name the same file. */
+      if (file) chooseRepoFile(file);
+      /* The Compare page's own branch pick is a detour from these settings; following the Studio ends it. */
+      compareBranch = null;
+      persistSettings();
+      refreshRepoReadRow();
+      /* The status the Settings page and the main screen show for this repository was about the old one: read the
+         new one now (folders, the "synced" time), quietly. Needs the designer's own token, which this never sets. */
+      syncRepo(which, true);
+      if (studioConnected && !studioParityBusy) studioSetStatus(studioConnectedText(), 'is-ok');
+      showToast('Following the Studio: ' + (repo ? repo + ' @ ' : '') + (branch || 'its branch'));
+    }
+
+    function studioHandle(msg) {
+      var L = window.PomStudioLink;
+      if (msg.type === 'status') {
+        studioLoadSync(function () {
+          var n = rawData && rawData.collections ? rawData.collections.length : 0;
+          studioReply(L.statusReply(msg.id, lastFigmaFileName || '', n, studioSyncState.lastSync));
+        });
+        return;
+      }
+      if (msg.type === 'context') {
+        studioAdopt(msg);
+        if (msg.id) studioReply({ type: 'context', id: msg.id });
+        return;
+      }
+      if (msg.type === 'parity' || msg.type === 'apply' || msg.type === 'read') studioAdopt(msg);
+      if (msg.type === 'parity') { studioParity(msg); return; }
+      if (msg.type === 'apply') { studioApply(msg); return; }
+      if (msg.type === 'read') { studioRead(msg); return; }
+      if (msg.id) studioReply(L.unsupportedReply(msg.id));
+    }
+    function studioDisconnect() {
+      var sock = studioSocket;
+      studioSocket = null; studioConnected = false; studioParityBusy = false; studioContext = null;
+      if (sock) { try { sock.close(); } catch (e) { /* already closed */ } }
+      studioShowButton();
+      studioSetStatus('Not connected.', '');
+    }
+    function studioConnect() {
+      if (!STUDIO_LINK_ENABLED) return;
+      var L = window.PomStudioLink;
+      var code = document.getElementById('studio-code').value;
+      if (!L.isCode(code)) { studioSetStatus('Type the six digits the Studio shows.', 'is-error'); return; }
+      var sock;
+      try { sock = new WebSocket(L.DEFAULT_ADDRESS); }
+      catch (err) { studioSetStatus('Could not open the link: ' + String((err && err.message) || err), 'is-error'); return; }
+      studioSocket = sock; studioConnected = false; studioFailed = false;
+      studioShowButton();
+      studioSetStatus('Connecting to the Studio…', '');
+      sock.onopen = function () {
+        sock.send(JSON.stringify(L.helloMessage(code, lastFigmaFileName || '', CLOSURE_BUILD)));
+      };
+      sock.onmessage = function (ev) {
+        if (sock !== studioSocket) return;
+        var m = null;
+        try { m = JSON.parse(ev.data); } catch (err) { return; }
+        if (!m || typeof m !== 'object') return;
+        if (m.type === 'ok') {
+          studioConnected = true;
+          studioSetStatus(studioConnectedText(), 'is-ok');
+          studioLoadSync(function () {});
+          /* The Studio sends where it works right after this, when it can. If nothing came, say so: otherwise the
+             settings simply do not change and nothing says why. */
+          setTimeout(function () {
+            if (sock !== studioSocket || !studioConnected || studioContext || studioParityBusy) return;
+            studioSetStatus('Connected to the Studio, but it has not said which repository and branch it is on. ' +
+              'Open a product with a token file in the Studio. (plugin build ' + CLOSURE_BUILD + ')', 'is-error');
+          }, 3000);
+          return;
+        }
+        if (m.type === 'refused') {
+          studioFailed = true;
+          studioSetStatus('The Studio did not accept that code. Check it, or press New code in the Studio.', 'is-error');
+          return;
+        }
+        studioHandle(m);
+      };
+      sock.onerror = function () {
+        if (sock !== studioSocket || studioConnected) return;
+        studioFailed = true;
+        studioSetStatus('Cannot reach the Studio. In the Studio choose File > Connect to Figma…, then try again.', 'is-error');
+      };
+      sock.onclose = function (ev) {
+        if (sock !== studioSocket) return;
+        var was = studioConnected;
+        studioSocket = null; studioConnected = false; studioParityBusy = false; studioContext = null;
+        studioShowButton();
+        if (was) studioSetStatus('The Studio closed the link.', '');
+        else if (!studioFailed) studioSetStatus((ev && ev.reason) ? 'The Studio closed the link: ' + ev.reason : 'Not connected.', 'is-error');
+      };
+    }
+    document.getElementById('studio-connect-btn').addEventListener('click', function () {
+      if (studioSocket) studioDisconnect(); else studioConnect();
+    });
+
+    document.getElementById('clear-vars-btn').addEventListener('click', function() {
+      if (rawData) window.PomClearVariablesDialog.open(clearSummary('variables'));
+    });
+    document.getElementById('clear-styles-btn').addEventListener('click', function() {
+      if (rawData) window.PomClearVariablesDialog.open(clearSummary('styles'));
+    });
+    var clearWatchdog = null;
+    window.PomClearVariablesDialog.onConfirm = function(pick) {
+      var includeVariables = pick.collections.length > 0;
+      var includeStyles = !!(pick.styles.text || pick.styles.effect || pick.styles.grid);
       /*
         AND THE LIST GOES WITH THEM.
 
@@ -9293,9 +10393,28 @@
         the moment the list stops being true. Waiting for the round trip would
         only choose which wrong thing to show in the meantime.
       */
-      window.PomCollectionsAccordion.close();
-      setActionsLoading(true);
-      parent.postMessage({ pluginMessage: { type: 'clearVariables' } }, '*');
+      /*
+        SAID AT ONCE, AND CHECKED. The press is acknowledged immediately, and if
+        the plugin's own code has not answered in twelve seconds the panel says
+        so instead of leaving a person to wonder — a reply that never comes is
+        exactly what a sandbox that skipped the handler looks like from here.
+      */
+      window.PomToast.show('Clearing…');
+      if (clearWatchdog) clearTimeout(clearWatchdog);
+      clearWatchdog = setTimeout(function () {
+        clearWatchdog = null;
+        setActionsLoading(false);
+        window.PomToast.show('The plugin did not answer (panel build ' + CLOSURE_BUILD + '). Reload the plugin and try again.', true);
+      }, 12000);
+      parent.postMessage({ pluginMessage: { type: 'clearVariables', includeVariables: includeVariables, includeStyles: includeStyles,
+        collections: pick.collections, styles: pick.styles } }, '*');
+      /* The heavy repaint comes AFTER the request is on its way and the toast is
+         up: if redrawing a big file's screen is slow, the plugin is already
+         working and the person has already been told. */
+      setTimeout(function () {
+        try { window.PomCollectionsAccordion.close(); } catch (e) { console.error(e); }
+        try { setActionsLoading(true); } catch (e) { console.error(e); }
+      }, 0);
     };
 
     window.onmessage = function(event) {
@@ -9304,6 +10423,9 @@
       
       // Early, lightweight file-name report (before the heavy extract) so the
       // collections card's title is set as soon as the plugin opens.
+      if (msg.type === 'studioSync') { studioSyncArrived(msg); return; }
+      if (msg.type === 'structureCaptured') { structureArrived(msg); return; }
+
       if (msg.type === 'fileInfo') {
         setFigmaFileName(msg.fileName);
         return;
@@ -9311,7 +10433,17 @@
 
       if (msg.type === 'extracted') {
         rawData = { collections: msg.collections, styles: msg.styles };
+        /* The Clear buttons and the note above them read this extract. */
+        if (typeof updateClearFileButton === 'function') updateClearFileButton();
         selectedCollections = msg.collections.map(function(col) { return col.name; });
+        if (compareAfterExtract) {
+          var cbk = compareAfterExtract, keepSel = compareKeepSel;
+          if (keepSel && keepSel.length) {
+            var still = keepSel.filter(function (n) { return msg.collections.some(function (c) { return c.name === n; }); });
+            if (still.length) selectedCollections = still;
+          }
+          setTimeout(cbk, 0);
+        }
         // Re-assert the title from the file name (kept for robustness).
         setFigmaFileName(msg.fileName);
 
@@ -9361,9 +10493,11 @@
           // than revealing as stale skeletons.
           document.querySelector('.flow-wrap').classList.add('is-empty');
           setActionsLoading(false);   // nothing to transform — reveal now
+          landOnImportWhenEmpty();
           return;
         }
 
+        landedOnImport = false;
         // A previous extract may have emptied the screen (file switched, or
         // variables added since) — put the pipeline back.
         document.querySelector('.flow-wrap').classList.remove('is-empty');
@@ -9408,10 +10542,27 @@
       }
       
       if (msg.type === 'transformed') {
+        /* A document built for Compare in the repo's own shape: it goes to the
+           comparison and nowhere else — not into transformedData, which is what
+           Download and Push send, and which follows the Settings switch. */
+        if (typeof msg.seq === 'string' && msg.seq.indexOf('compare-') === 0) {
+          var waiting = compareTransforms[msg.seq];
+          delete compareTransforms[msg.seq];
+          if (waiting) waiting(msg.payload && msg.payload.tokens);
+          return;
+        }
         // A reply to a request that has since been superseded — drop it, or it
         // overwrites the slot its own request no longer owns.
         if (msg.seq !== undefined && msg.seq !== transformSeq) return;
         transformedData = msg.payload;
+        /* The Resolved document comes back from the sandbox with the full
+           record of the file's styles; the rules the importer has (they live
+           here, not there) reproduce nearly all of it, so what is written is
+           only the difference. If that fails the full record is kept. */
+        if (dtcgShape === 'resolved' && transformedData && transformedData.tokens && window.PomRestoreSlim) {
+          try { transformedData.tokens = window.PomRestoreSlim.slim(transformedData.tokens).document; }
+          catch (slimError) { console.error('restore slimming failed, keeping the full record:', slimError); }
+        }
         updateActionUI();
         if (afterTransform) {
           var pending = afterTransform;
@@ -9554,6 +10705,7 @@
       }
       
       if (msg.type === 'importRefused') {
+        if (studioApplyDone) { var backR = studioApplyDone; studioApplyDone = null; backR(msg); return; }
         /* Refused BEFORE anything was written, which is the whole point of
            saying so differently from a failure part way through. */
         window.PomImportApplyBtn.setLoading(false);
@@ -9564,6 +10716,7 @@
       }
 
       if (msg.type === 'importApplied') {
+        if (studioApplyDone) { var backA = studioApplyDone; studioApplyDone = null; backA(msg); return; }
         window.PomImportApplyBtn.setLoading(false);
         window.PomImportApplyBtn.setDisabled(false);
         window.PomImportApplyBtn.setSuccess(!msg.report.failed);
@@ -9575,18 +10728,42 @@
             'Nothing was rolled back — Figma has no transaction — so the file holds exactly what ' +
             'the count above says.');
         } else {
+          /* Scopes Figma reads but will not write (FONT_VARIATIONS) are left out
+             of the write; say so rather than let the file differ in silence. */
+          var dropped = r.scopesDropped ? Object.keys(r.scopesDropped).map(function (k) {
+            return k + ' on ' + r.scopesDropped[k].toLocaleString();
+          }).join(', ') : '';
+          var madeStyles = (r.textStyles || 0) + (r.effectStyles || 0) + (r.gridStyles || 0);
           showToast('Imported — ' + r.variables.toLocaleString() + ' created, ' +
-                    ((r.reusedVariables || 0)).toLocaleString() + ' updated');
+                    ((r.reusedVariables || 0)).toLocaleString() + ' updated' +
+                    (madeStyles ? ' · ' + madeStyles + ' styles' : '') +
+                    (dropped ? ' · scopes Figma cannot write were left out: ' + dropped : ''));
           /* The document has changed underneath the main screen, so its own
              read of it is now stale. Re-extracting is also what makes a
              second import diff against the new state rather than the old. */
           justImported = true;
           parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+          importState.silent = false;
+          closeCompare();
           closeImport();
         }
       }
 
+      if (msg.type === 'clearProgress') {
+        if (clearWatchdog) {
+          clearTimeout(clearWatchdog);
+          clearWatchdog = setTimeout(function () {
+            clearWatchdog = null;
+            setActionsLoading(false);
+            window.PomToast.show('The plugin stopped answering while clearing "' + msg.name + '".', true);
+          }, 60000);
+        }
+        window.PomToast.show('Clearing ' + (msg.done + 1) + '/' + msg.total + ': ' + msg.name + (msg.innerTotal ? ' (' + msg.inner + '/' + msg.innerTotal + ')' : '') + '…');
+        return;
+      }
+
       if (msg.type === 'variablesCleared') {
+        if (clearWatchdog) { clearTimeout(clearWatchdog); clearWatchdog = null; }
         /*
           RE-EXTRACT RATHER THAN EDIT THE SCREEN. Everything visible here —
           the collections list, the token count, the file size, the empty
@@ -9596,6 +10773,32 @@
           and cannot drift.
         */
         var gone = (msg.removed || []).length;
+        /*
+          THE FILE'S ANSWER FIRST. What the sandbox counted AFTER removing is
+          what decides whether this worked; the tallies below are what it tried.
+          Something asked for and still there is said so, with its count — a
+          success toast over a file that did not change is the one report that
+          cannot be allowed.
+        */
+        var left = msg.remaining, asked = msg.asked || { variables: true, styles: false };
+        var stillThere = [];
+        if (left) {
+          if (asked.variables && left.collections) stillThere.push(left.collections + ' collection' + (left.collections === 1 ? '' : 's'));
+          if (asked.styles && (left.text + left.effect + left.grid)) stillThere.push((left.text + left.effect + left.grid) + ' style' + ((left.text + left.effect + left.grid) === 1 ? '' : 's'));
+        }
+        if (stillThere.length) {
+          console.warn('[Closure] still in the file after clearing: ' + JSON.stringify(left));
+          window.PomToast.show('Not everything was cleared — still here: ' + stillThere.join(' and ') + '. See the console.', true);
+          parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+          return;
+        }
+        if (msg.stylesRemoved && !gone && !(msg.failed && msg.failed.length)) {
+          var onlyS = msg.stylesRemoved.text + msg.stylesRemoved.effect + msg.stylesRemoved.grid;
+          window.PomToast.show('Deleted ' + onlyS + ' style' + (onlyS === 1 ? '' : 's') +
+            (msg.stylesRemoved.failed.length ? ' (' + msg.stylesRemoved.failed.length + ' refused)' : ''));
+          parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
+          return;
+        }
         if (msg.failed && msg.failed.length) {
           /* Partial is the state worth naming: some collections went and some
              did not, so neither "done" nor "failed" is true on its own. The
@@ -9611,8 +10814,12 @@
             true
           );
         } else {
+          var sr = msg.stylesRemoved;
+          var srn = sr ? sr.text + sr.effect + sr.grid : 0;
           window.PomToast.show('Deleted ' + gone + ' collection' + (gone === 1 ? '' : 's') +
-            ' and ' + (msg.variables || 0).toLocaleString() + ' variable' + (msg.variables === 1 ? '' : 's'));
+            ' and ' + (msg.variables || 0).toLocaleString() + ' variable' + (msg.variables === 1 ? '' : 's') +
+            (srn ? ' and ' + srn + ' style' + (srn === 1 ? '' : 's') : '') +
+            (sr && sr.failed.length ? ' (' + sr.failed.length + ' styles refused)' : ''));
         }
         parent.postMessage({ pluginMessage: { type: 'extract' } }, '*');
         return;
@@ -9665,6 +10872,12 @@
           button spends nothing.
         */
         refreshRepoReadRow();
+        /* The settings can arrive after the empty extract that opened the Import page, which then showed no repository
+           (nothing was known yet): land there if the extract has not, and read the repository card again. */
+        if (isEmptyFile()) {
+          landOnImportWhenEmpty();
+          if (document.getElementById('import-page').classList.contains('visible')) { applyImportHeader(); refreshImportRepoRow(); }
+        }
       }
       
       if (msg.type === 'GIT_SETTINGS_SAVED') {

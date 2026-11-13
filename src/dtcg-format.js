@@ -73,8 +73,19 @@
     return v !== null && typeof v === 'object' && !Array.isArray(v);
   }
 
+  /*
+    `hasOwnProperty('value')` alone also answers true for a GROUP whose Figma
+    variable is itself named exactly "value" sitting beside a sibling — e.g.
+    collection "weight" with variables "weight/value" and "weight/style-name"
+    native-converts to `{ value: {...}, "style-name": {...} }`, which has an
+    own "value" property without being a token. Every real leaf this codebase
+    writes carries `type` alongside `value` (code.source.js's `tokenNode()`
+    and every `{ type: …, value: … }` literal), so requiring the pair tells
+    the two apart and changes nothing for an actual token.
+  */
   function isTokenNode(node) {
-    return isObject(node) && Object.prototype.hasOwnProperty.call(node, 'value');
+    return isObject(node) && Object.prototype.hasOwnProperty.call(node, 'value') &&
+      Object.prototype.hasOwnProperty.call(node, 'type');
   }
 
   // A Legacy JSON math expression, e.g. '{dimension.1}*4'. DTCG has no
@@ -793,7 +804,7 @@
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  // PomDtcg, not the pre-Closure-rebrand RaddDtcg this used to be: the UI
+  // PomDtcg, not the pre-rebrand RaddDtcg this used to be: the UI
   // (ui.template.html's toDtcg()) reads window.PomDtcg.toDtcgFormat and has
   // ever since the rebrand, so that global name was always undefined —
   // window.PomDtcg.toDtcgFormat threw on every single 'transformed'

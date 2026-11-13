@@ -1,0 +1,180 @@
+/*
+  tokens.css — the plugin's own design tokens. No external design system.
+
+  THE MODEL, IN ONE PARAGRAPH
+  Every surface in the plugin stands on a LEVEL, 1 (lowest) to 4 (highest),
+  written as data-level="N" on the element. A level element re-declares
+  --background / --background-hover for everything inside it, so a card is
+  simply `<div data-level="4">` and paints `background: var(--background)`.
+  Controls (fields, tonal buttons, segmented tracks) sit one step off whatever
+  they stand on and read that from --field-fill, which each level element sets
+  for its own content — nothing in script has to know the ground.
+
+  data-theme="dark" | "light" on <html> picks the palette (the Settings toggle
+  flips it at runtime). data-scheme="inverted" flips the palette for a subtree
+  (the Figma card is the one user).
+
+  A custom property that reads var(--background) resolves where it is DECLARED,
+  not where it is used, so anything that may sit inside a level element must
+  read --background itself and not an alias declared on :root.
+*/
+
+:root {
+  /* ── type ─────────────────────────────────────────────────────────────── */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --type-body-m-size: 16px;
+  --type-body-m-line-height: 150%;
+  --type-body-m-letter-spacing: 0em;
+  --type-body-m-font-family: var(--font-sans);
+  --type-body-s-size: 14px;
+  --type-body-s-line-height: 150%;
+  --type-body-s-letter-spacing: 0em;
+  --type-body-s-font-family: var(--font-sans);
+  --type-microcopy-size: 12px;
+  --type-microcopy-line-height: 150%;
+  --type-microcopy-letter-spacing: 0.02em;
+  --type-microcopy-font-family: var(--font-sans);
+  --type-title-s-size: 20px;
+  --type-title-s-line-height: 130%;
+
+  /* font shorthands, for `font: var(--body-m-regular)` */
+  --body-m-regular: 500 16px/150% var(--font-sans);
+  --body-m-bold: 700 16px/150% var(--font-sans);
+  --microcopy-regular: 500 12px/150% var(--font-sans);
+
+  /* ── spacing ──────────────────────────────────────────────────────────── */
+  --spacing-component-1: 8px;
+  --spacing-component-2: 10px;
+  --spacing-component-3: 12px;
+  --spacing-component-4: 16px;
+  --spacing-component-5: 18px;
+  --spacing-component-6: 22px;
+  --spacing-component-7: 28px;
+
+  /* ── shape, motion, focus ─────────────────────────────────────────────── */
+  --radius-small: 6px;
+  --radius-medium: 10px;
+  --radius-large: 16px;
+  --stroke-width: 1px;
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --dur-fast: 150ms;
+  --dur-medium: 250ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --shadow-high: 0 24px 64px rgba(0, 0, 0, 0.45);
+  --shadow-menu: 0 12px 32px rgba(0, 0, 0, 0.35);
+
+  /* ── status colours (same in both themes) ─────────────────────────────── */
+  --status-error: #E5675E;
+  --status-warning: #D9A441;
+  --status-success: #5BB974;
+  --status-info: #5B9BD9;
+}
+
+/* ── palettes ────────────────────────────────────────────────────────────── */
+/* Each palette declares its own ladder (--l1…--l4) and the field fills that
+   stand one rung above each. The level rules further down pick from them. */
+
+:root,
+:root[data-theme='light'] {
+  --text: #1D1D1D;
+  --text-recessive: #595959;
+  --text-disabled: #8A8A8A;
+  --stroke: #919191;
+  --stroke-subtle: #CECECB;
+  --mark: #000000;
+  --mark-hover: #252525;
+  --accent: #1D1D1D;
+  --accent-ink: #FFFFFF;
+  --scrim: rgba(0, 0, 0, 0.42);
+  --surface-raised: #F2F2F0;
+
+  --l1: #C4C4C2;  --l1-hover: #AEAEAE;  --l1-pressed: #A1A1A1;
+  --l2: #D6D6D3;  --l2-hover: #C4C4C2;  --l2-pressed: #BABAB7;
+  --l3: #E9E9E8;  --l3-hover: #D6D6D3;  --l3-pressed: #C4C4C2;
+  --l4: #FCFCFC;  --l4-hover: #E9E9E8;  --l4-pressed: #DDDDDB;
+  --f2: #D6D6D3;  --f3: #E9E9E8;  --f4: #FCFCFC;
+}
+
+:root[data-theme='dark'] {
+  --text: #EDEDED;
+  --text-recessive: #A1A1A1;
+  --text-disabled: #6B6B6B;
+  --stroke: #494949;
+  --stroke-subtle: rgba(238, 238, 238, 0.22);
+  --mark: #FFFFFF;
+  --mark-hover: #E3E3E1;
+  --accent: #EDEDED;
+  --accent-ink: #1D1D1D;
+  --scrim: rgba(0, 0, 0, 0.55);
+  --surface-raised: #2A2A2A;
+
+  --l1: #111111;  --l1-hover: #1D1D1D;  --l1-pressed: #252525;
+  --l2: #1D1D1D;  --l2-hover: #252525;  --l2-pressed: #383838;
+  --l3: #252525;  --l3-hover: #2F2F2F;  --l3-pressed: #414141;
+  --l4: #2F2F2F;  --l4-hover: #414141;  --l4-pressed: #494949;
+  --f2: #1D1D1D;  --f3: #252525;  --f4: #2F2F2F;
+}
+
+/* Inverted = the other theme's palette, for a subtree. Light theme → dark
+   values; dark theme → light values. */
+:root[data-theme='light'] [data-scheme='inverted'],
+:root[data-theme='light'][data-scheme='inverted'] {
+  --text: #EDEDED;
+  --text-recessive: #A1A1A1;
+  --text-disabled: #6B6B6B;
+  --stroke: #494949;
+  --stroke-subtle: rgba(238, 238, 238, 0.22);
+  --mark: #FFFFFF;
+  --mark-hover: #E3E3E1;
+  --accent: #EDEDED;
+  --accent-ink: #1D1D1D;
+  --l1: #111111;  --l1-hover: #1D1D1D;  --l1-pressed: #252525;
+  --l2: #1D1D1D;  --l2-hover: #252525;  --l2-pressed: #383838;
+  --l3: #252525;  --l3-hover: #2F2F2F;  --l3-pressed: #414141;
+  --l4: #2F2F2F;  --l4-hover: #414141;  --l4-pressed: #494949;
+  --f2: #1D1D1D;  --f3: #252525;  --f4: #2F2F2F;
+}
+:root[data-theme='dark'] [data-scheme='inverted'],
+:root[data-theme='dark'][data-scheme='inverted'] {
+  --text: #1D1D1D;
+  --text-recessive: #595959;
+  --text-disabled: #8A8A8A;
+  --stroke: #919191;
+  --stroke-subtle: #CECECB;
+  --mark: #000000;
+  --mark-hover: #252525;
+  --accent: #1D1D1D;
+  --accent-ink: #FFFFFF;
+  --l1: #C4C4C2;  --l1-hover: #AEAEAE;  --l1-pressed: #A1A1A1;
+  --l2: #D6D6D3;  --l2-hover: #C4C4C2;  --l2-pressed: #BABAB7;
+  --l3: #E9E9E8;  --l3-hover: #D6D6D3;  --l3-pressed: #C4C4C2;
+  --l4: #FCFCFC;  --l4-hover: #E9E9E8;  --l4-pressed: #DDDDDB;
+  --f2: #D6D6D3;  --f3: #E9E9E8;  --f4: #FCFCFC;
+}
+
+/* The ladders are opaque: a card must read the same whatever it stands on. */
+
+/* ── levels ──────────────────────────────────────────────────────────────── */
+/* Fields stand one rung above their ground, except on level 4 (the top rung),
+   where they step back to 3 — so a field on a card and a field on the page
+   below it read alike. */
+
+[data-level='1'] {
+  --background: var(--l1);  --background-hover: var(--l1-hover);  --background-pressed: var(--l1-pressed);
+  --field-fill: var(--f2);
+}
+[data-level='2'] {
+  --background: var(--l2);  --background-hover: var(--l2-hover);  --background-pressed: var(--l2-pressed);
+  --field-fill: var(--f3);
+}
+[data-level='3'] {
+  --background: var(--l3);  --background-hover: var(--l3-hover);  --background-pressed: var(--l3-pressed);
+  --field-fill: var(--f4);
+}
+[data-level='4'] {
+  --background: var(--l4);  --background-hover: var(--l4-hover);  --background-pressed: var(--l4-pressed);
+  --field-fill: var(--f3);
+}

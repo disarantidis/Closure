@@ -139,6 +139,11 @@ function toColor(v) {
 */
 const UNITED_NUMBER = /^\s*(-?(?:\d+\.?\d*|\.\d+))\s*(px|%|rem|em|pt)\s*$/i;
 
+/* A variable's path is dotted (`a.b.c`); the name has slashes. A dot that is part of a name (`spacing/0.5`)
+   travels as U+2024 (one dot leader) so the two cannot be confused: only the Resolved import writes it. */
+const pathOfName = (name) => String(name).split('.').join('\u2024').split('/').join('.');
+const nameOf = (path) => String(path).split('.').join('/').split('\u2024').join('.');
+
 function coerce(ft, raw) {
   if (ft === 'COLOR') {
     const c = toColor(raw);
@@ -298,6 +303,15 @@ function compile(ir, plan, opts) {
     vars, modesOf, refTarget,
     (col) => keep.has(col) && nonEmpty.has(col),
   );
+  /* A caller that KNOWS the order wins over the one computed from the alias
+     graph — a Resolved import, whose architecture lists its collections in the
+     order the panel shows them. Anything it leaves out follows, in the
+     computed order, so a collection is never dropped by being unlisted. */
+  if (opts.collectionOrder && opts.collectionOrder.length) {
+    const wanted = opts.collectionOrder.filter((n) => creationOrder.indexOf(n) !== -1);
+    const rest = creationOrder.filter((n) => wanted.indexOf(n) === -1);
+    creationOrder.splice(0, creationOrder.length, ...wanted, ...rest);
+  }
 
   /* ── phase 1: collections and modes ────────────────────────────────────── */
   for (const name of creationOrder) {
@@ -307,7 +321,8 @@ function compile(ir, plan, opts) {
        is the same junk one level up — `foundation` in a real slice, whose every
        variable was a typography sub-value that got dropped above. */
     if (!nonEmpty.has(name)) { stats.skippedEmptyCollections.push(name); continue; }
-    push({ op: 'createCollection', collection: name, firstMode: modes[0] });
+    const cmeta = (ir.collectionMeta && ir.collectionMeta[name]) || null;
+    push({ op: 'createCollection', collection: name, firstMode: modes[0], hidden: cmeta && cmeta.hidden ? true : undefined });
     stats.collections++; stats.modes++;
     for (let i = 1; i < modes.length; i++) {
       push({ op: 'addMode', collection: name, mode: modes[i] });
@@ -319,9 +334,14 @@ function compile(ir, plan, opts) {
   const emitted = new Set();
   for (const spec of vars.values()) {
     if (!alive.has(vkey(spec.col, spec.path))) continue;
-    const name = spec.path.split('.').join('/');
+    const name = nameOf(spec.path);
+    /* `scopes` only when the source stated them. An EMPTY list is a statement
+       — hidden from every picker — and is kept, which is why this tests for
+       the array and not for its length. */
     push({ op: 'createVariable', collection: spec.col, name, type: spec.ft,
-           description: spec.description || undefined });
+           description: spec.description || undefined,
+           scopes: Array.isArray(spec.scopes) ? spec.scopes : undefined,
+           codeSyntax: spec.codeSyntax && Object.keys(spec.codeSyntax).length ? spec.codeSyntax : undefined });
     emitted.add(vkey(spec.col, spec.path));
     stats.variables++;
   }
@@ -330,7 +350,7 @@ function compile(ir, plan, opts) {
   /* ── phase 3: literals ─────────────────────────────────────────────────── */
   for (const spec of vars.values()) {
     if (!emitted.has(vkey(spec.col, spec.path))) continue;
-    const name = spec.path.split('.').join('/');
+    const name = nameOf(spec.path);
     for (const [mode, v] of spec.values) {
       if (v.ref !== undefined) continue;
       if (v.expr !== undefined) {
@@ -366,18 +386,56 @@ function compile(ir, plan, opts) {
   /* ── phase 4: aliases, last, so every target already exists ────────────── */
   for (const spec of vars.values()) {
     if (!emitted.has(vkey(spec.col, spec.path))) continue;
-    const name = spec.path.split('.').join('/');
+    const name = nameOf(spec.path);
     for (const [mode, v] of spec.values) {
       if (v.ref === undefined) continue;
       const target = refTarget.get(v.ref);
       if (!target || !emitted.has(vkey(target.col, target.path))) { stats.skippedUnresolved++; continue; }
       push({ op: 'setAlias', collection: spec.col, name, mode,
-             target: { collection: target.col, name: target.path.split('.').join('/') } });
+             target: { collection: target.col, name: nameOf(target.path) } });
       stats.aliases++;
     }
   }
 
   if (refusals.length) return { ok: false, refusals, program: null };
+
+  /*
+    ── phase 5: styles, after everything they can be bound to ────────────────
+
+    A style is not a variable, so nothing above knows about it; it arrives on
+    the IR (a Resolved document carries them) and is written LAST, because a
+    binding names a variable that must already exist. A binding to one that
+    this run does not create is dropped and counted — the style is still made,
+    with the value it has, rather than the whole import refusing over a field.
+  */
+  stats.styles = { text: 0, effect: 0, grid: 0, bindingsSkipped: 0 };
+  if (ir.styles) {
+    const live = (b) => !!(b && emitted.has(vkey(b.collection, pathOfName(b.name))));
+    const keepBound = (bound) => {
+      const out = {};
+      Object.keys(bound || {}).forEach((f) => {
+        if (live(bound[f])) out[f] = { collection: bound[f].collection, name: bound[f].name };
+        else stats.styles.bindingsSkipped++;
+      });
+      return out;
+    };
+    for (const t of (ir.styles.text || [])) {
+      push({ op: 'createTextStyle', name: t.name, description: t.description || undefined,
+             fontName: t.fontName, textCase: t.textCase, textDecoration: t.textDecoration,
+             values: t.values, bound: keepBound(t.bound) });
+      stats.styles.text++;
+    }
+    for (const e of (ir.styles.effect || [])) {
+      push({ op: 'createEffectStyle', name: e.name, description: e.description || undefined,
+             effects: e.effects.map((x) => Object.assign({}, x, { bound: keepBound(x.bound) })) });
+      stats.styles.effect++;
+    }
+    for (const g of (ir.styles.grid || [])) {
+      push({ op: 'createGridStyle', name: g.name, description: g.description || undefined,
+             layoutGrids: g.layoutGrids.map((x) => Object.assign({}, x, { bound: keepBound(x.bound) })) });
+      stats.styles.grid++;
+    }
+  }
 
   return { ok: true, program, stats, manifest: toManifest(plan) };
 }

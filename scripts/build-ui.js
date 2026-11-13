@@ -90,6 +90,17 @@ async function main() {
   const IMPORT_MODULES = [
     'src/import-ir.js',
     'src/import-manifest.js',
+    /* The RADD architecture as data, and the translator that reads a Resolved
+       export back into rows — runImport() in the UI calls the second. */
+    'src/architecture-radd.js',
+    'src/architecture-ods.js',
+    'src/structure-graph.js',
+    'src/import-structure.js',
+    'src/import-resolved.js',
+    /* After import-resolved.js, whose rules it measures a restore record against. */
+    'src/restore-slim.js',
+    /* One document read on its own: schemes written as values, broken references, holes. */
+    'src/source-quality.js',
     'src/import-derive.js',
     'src/import-compile.js',
     'src/import-verify.js',
@@ -110,6 +121,15 @@ async function main() {
        against document, rather than document against the live variable
        graph); see its own header. */
     'src/json-diff.js',
+    /* Push to a branch that does not exist yet: the check, the create, and the
+       name rules. Standalone, so it is tested with a mock fetch. */
+    'src/github-branch.js',
+    /* The Studio link's messages and its three-way classification; reads json-diff's global. */
+    'src/studio-link.js',
+    /* Send to / Bring from Figma: merging one side's tokens into the other, and the cut-down import program. Reads the import modules above. */
+    'src/studio-apply.js',
+    /* Which saved structure an imported JSON belongs to, judged by modes alone. */
+    'src/structure-select.js',
   ];
   const importPipeline = IMPORT_MODULES
     .map((m) => '// ===== ' + m + ' =====\n' + fs.readFileSync(path.join(ROOT, m), 'utf8'))
@@ -117,11 +137,11 @@ async function main() {
 
   const template = fs.readFileSync(path.join(ROOT, 'src/ui.template.html'), 'utf8');
   const html = template
-    .replace('__Pom_BUTTONS_STYLE__', () => style)
-    .replace('__Pom_BUTTONS_SCRIPT__', () => script)
-    .replace('__Pom_DTCG_SCRIPT__', () => dtcg)
-    .replace('__Pom_IMPORT_SCRIPT__', () => importPipeline)
-    .replace(/__Pom_BUILD_STAMP__/g, () => STAMP);
+    .replace('__UI_BUTTONS_STYLE__', () => style)
+    .replace('__UI_BUTTONS_SCRIPT__', () => script)
+    .replace('__UI_DTCG_SCRIPT__', () => dtcg)
+    .replace('__UI_IMPORT_SCRIPT__', () => importPipeline)
+    .replace(/__UI_BUILD_STAMP__/g, () => STAMP);
 
   const outFile = path.join(ROOT, 'ui.html');
   fs.writeFileSync(outFile, html);
@@ -143,6 +163,12 @@ async function main() {
 function buildCode() {
   const MODULES = [
     'src/resolve-architecture.js',
+    /* Before emit-resolved.js, which reads it when its own IIFE runs. */
+    'src/architecture-radd.js',
+    /* Before emit-resolved.js, for the same reason: it says which architecture a graph is. */
+    'src/architecture-ods.js',
+    'src/structure-graph.js',
+    'src/styles-capture.js',
     'src/emit-resolved.js',
     'src/dtcg-format.js',
     'src/import-apply.js',
@@ -151,6 +177,8 @@ function buildCode() {
        capture produces is plain data, and every judgement made about it —
        collapse, file, diff — happens in the UI on that data. */
     'src/component-capture.js',
+    /* The structure capture runs on open, in the sandbox, and only reads the variable graph. */
+    'src/structure-capture.js',
   ];
   const banner =
     '// ---------------------------------------------------------------------------\n' +

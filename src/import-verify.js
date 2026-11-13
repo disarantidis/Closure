@@ -64,6 +64,10 @@ function materialise(program) {
     return collections.get(n);
   };
   for (const op of program.ops) {
+    /* A style belongs to no collection. Asking for op.collection's entry anyway
+       made a collection called `undefined` — which the import panel then
+       counted as a twelfth new collection and drew as an empty tag. */
+    if (op.collection === undefined) continue;
     const c = get(op.collection);
     switch (op.op) {
       case 'createCollection': c.modes.push(op.firstMode); break;

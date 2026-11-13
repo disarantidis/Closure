@@ -53,6 +53,10 @@ var __dep = (typeof require !== 'undefined')
 var diff = __dep.diff;
 
 var VALUE_OPS = { setValue: 1, setAlias: 1 };
+/* A style is not a value and not a variable, and diff() has no row for it — so
+   the value-driven pass below can never name one. They are decided here, by
+   scope: everything the file says includes its styles, and values-only does not. */
+var STYLE_OPS = { createTextStyle: 1, createEffectStyle: 1, createGridStyle: 1 };
 
 function keyOf(op) {
   return op.collection + '|' + op.name + '|' + op.mode;
@@ -210,10 +214,19 @@ function filter(program, report, opts) {
     if (op.op === 'createCollection' && needCol[op.collection]) keepOp[i] = true;
   });
 
+  /* THE FIRST REAL IMPORT OF STYLES DROPPED EVERY ONE, in the "everything"
+     scope, with a summary that had just said how many it would create: this
+     filter ran in front of apply() and kept only what a diff row justified, and
+     no diff row justifies a style. */
+  if (choice.scope !== 'values') {
+    program.ops.forEach(function (op, i) { if (STYLE_OPS[op.op]) keepOp[i] = true; });
+  }
+
   program.ops.forEach(function (op, i) {
     if (!keepOp[i]) { stats.dropped++; return; }
     out.ops.push(op);
     stats.kept++;
+    if (STYLE_OPS[op.op]) stats.styles = (stats.styles || 0) + 1;
     if (VALUE_OPS[op.op]) stats.values++;
     else if (op.op === 'createVariable') stats.variables++;
     else if (op.op === 'createCollection') stats.collections++;

@@ -1,0 +1,347 @@
+/*
+  kit.css — styles for src/ui-kit/index.tsx. Colours come from tokens.css:
+  --background*, --field-fill (set per [data-level]), --text*, --stroke*.
+*/
+
+.ui-visually-hidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Field states are derived from --field-fill so one rule serves every ground. */
+.ui-btn, .ui-textfield-wrap, .ui-seg, .ui-fileitem, .ui-selcard, .ui-menu, .ui-dialog, .ui-table {
+  --field-hover: color-mix(in srgb, var(--field-fill, var(--background)) 88%, var(--text));
+  --field-pressed: color-mix(in srgb, var(--field-fill, var(--background)) 80%, var(--text));
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+.ui-spinner { animation: ui-spin 0.8s linear infinite; flex: none; }
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+
+/* ── Button ──────────────────────────────────────────────────────────────── */
+.ui-btn {
+  box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--spacing-component-1);
+  min-width: 32px;
+  border: 0; border-radius: var(--radius-medium);
+  font: 600 14px/1.2 var(--font-sans);
+  letter-spacing: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.ui-btn:focus-visible, .ui-seg-item:focus-visible, .ui-selcard:focus-visible, .ui-dialog-close:focus-visible,
+.ui-fileitem-remove:focus-visible {
+  outline: var(--focus-width) solid var(--mark);
+  outline-offset: var(--focus-offset);
+}
+/* A dropdown's button sits INSIDE its field, beside the leading icon, so an outline on the button
+   drew a second, smaller frame inside the field's own focus border (and left the icon outside it).
+   The field's border already shows the focus, exactly as it does for a text field. */
+.ui-select-btn:focus-visible { outline: none; }
+.ui-btn.s-small { block-size: 32px; padding-inline: var(--spacing-component-3); font-size: 14px; }
+.ui-btn.s-medium { block-size: 40px; padding-inline: var(--spacing-component-4); font-size: 15px; }
+.ui-btn.s-large { block-size: 48px; padding-inline: var(--spacing-component-5); font-size: 16px; }
+.ui-btn.is-square { padding-inline: 0; inline-size: 32px; }
+.ui-btn.s-medium.is-square { inline-size: 40px; }
+.ui-btn.s-large.is-square { inline-size: 48px; }
+.ui-btn.is-block { width: 100%; }
+.ui-btn-slot { display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.ui-btn-slot > svg { display: block; }
+.ui-btn-label { overflow: hidden; text-overflow: ellipsis; }
+
+.ui-btn.v-primary { background: var(--accent); color: var(--accent-ink); }
+.ui-btn.v-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 86%, var(--accent-ink)); }
+.ui-btn.v-primary:active:not(:disabled) { background: color-mix(in srgb, var(--accent) 74%, var(--accent-ink)); }
+.ui-btn.v-tonal { background: var(--field-fill, var(--background)); color: var(--text); }
+.ui-btn.v-tonal:hover:not(:disabled) { background: var(--field-hover); }
+.ui-btn.v-tonal:active:not(:disabled) { background: var(--field-pressed); }
+.ui-btn.v-ghost { background: transparent; color: var(--text); }
+.ui-btn.v-ghost:hover:not(:disabled) { background: var(--background-hover); }
+.ui-btn.v-ghost:active:not(:disabled) { background: var(--background-pressed); }
+.ui-btn.is-active { background: var(--background-hover); }
+
+/* status schemes, set on the button as data-scheme */
+.ui-btn[data-scheme='error'].v-primary { background: var(--status-error); color: #1D1D1D; }
+.ui-btn[data-scheme='error'].v-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--status-error) 88%, #fff); }
+.ui-btn[data-scheme='error'].v-tonal, .ui-btn[data-scheme='error'].v-ghost { color: var(--status-error); }
+.ui-btn[data-scheme='success'].v-primary { background: var(--status-success); color: #10210F; }
+.ui-btn[data-scheme='success'].v-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--status-success) 88%, #fff); }
+
+.ui-btn:disabled:not(.is-loading) { cursor: default; color: var(--text-disabled); }
+.ui-btn.v-primary:disabled:not(.is-loading) { background: var(--background-hover); }
+.ui-btn.v-tonal:disabled:not(.is-loading) { background: var(--field-fill, var(--background)); opacity: 0.6; }
+.ui-btn.is-loading { cursor: progress; }
+
+/* ── Tag ─────────────────────────────────────────────────────────────────── */
+.ui-tag {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  border-radius: 999px;
+  font: 500 12px/1.2 var(--font-sans); letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+.ui-tag.s-small { height: 22px; padding-inline: 8px; }
+.ui-tag.s-medium { height: 28px; padding-inline: 12px; font-size: 13px; }
+.ui-tag.v-tonal { background: var(--field-fill, var(--background-hover)); color: var(--text); }
+.ui-tag.v-primary { background: var(--accent); color: var(--accent-ink); }
+.ui-tag-leading { display: inline-flex; flex: none; }
+.ui-tag-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* ── Alert ───────────────────────────────────────────────────────────────── */
+.ui-alert {
+  display: flex; align-items: flex-start; gap: var(--spacing-component-2);
+  padding: var(--spacing-component-3) var(--spacing-component-4);
+  border-radius: var(--radius-medium);
+  background: color-mix(in srgb, var(--alert-tone, var(--text-recessive)) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--alert-tone, var(--text-recessive)) 35%, transparent);
+  color: var(--text);
+}
+.ui-alert.tone-error { --alert-tone: var(--status-error); }
+.ui-alert.tone-warning { --alert-tone: var(--status-warning); }
+.ui-alert.tone-success { --alert-tone: var(--status-success); }
+.ui-alert.tone-info { --alert-tone: var(--status-info); }
+.ui-alert-icon { flex: none; margin-top: 2px; color: var(--alert-tone); }
+.ui-alert-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ui-alert-title { font: 600 14px/1.4 var(--font-sans); }
+.ui-alert-text { font: 400 13px/1.45 var(--font-sans); color: var(--text-recessive); }
+
+/* ── Skeleton ────────────────────────────────────────────────────────────── */
+.ui-skeleton {
+  display: block; border-radius: var(--radius-small);
+  background: var(--field-fill, var(--background-hover));
+  animation: ui-pulse 1.4s ease-in-out infinite;
+}
+.ui-skeleton.is-circle { border-radius: 50%; }
+@keyframes ui-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+/* ── Marks ───────────────────────────────────────────────────────────────── */
+.ui-checkmark {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  inline-size: 20px; block-size: 20px; border-radius: 6px;
+  border: 1.5px solid var(--stroke-subtle);
+  background: transparent; color: transparent;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.ui-checkmark.is-checked { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.ui-switchmark {
+  position: relative; display: inline-block; flex: none; inline-size: 36px; block-size: 20px; border-radius: 999px;
+  background: var(--background-pressed); transition: background var(--dur-fast) var(--ease);
+}
+.ui-switchmark-thumb {
+  position: absolute; inset-block-start: 3px; inset-inline-start: 3px; inline-size: 14px; block-size: 14px;
+  border-radius: 50%; background: var(--text-recessive);
+  transition: transform var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.ui-switchmark.is-checked { background: var(--accent); }
+.ui-switchmark.is-checked .ui-switchmark-thumb { transform: translateX(16px); background: var(--accent-ink); }
+
+/* ── Checkbox ────────────────────────────────────────────────────────────── */
+.ui-check { display: inline-flex; align-items: center; gap: var(--spacing-component-2); cursor: pointer; position: relative; }
+.ui-check-label { font: 500 14px/1.4 var(--font-sans); color: var(--text); }
+.ui-check.is-disabled { cursor: default; opacity: 0.55; }
+.ui-check input:focus-visible + .ui-checkmark { outline: var(--focus-width) solid var(--mark); outline-offset: var(--focus-offset); }
+
+/* ── SelectableCard ──────────────────────────────────────────────────────── */
+.ui-selcard {
+  position: relative; display: flex; align-items: center;
+  padding: var(--spacing-component-3) 56px var(--spacing-component-3) var(--spacing-component-4);
+  border-radius: var(--radius-medium);
+  background: var(--field-fill, var(--background));
+  border: 1px solid transparent;
+  color: var(--text); cursor: pointer; outline: none;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.ui-selcard:hover { background: var(--field-hover); }
+.ui-selcard.is-selected { border-color: var(--stroke-subtle); }
+.ui-selcard-content { flex: 1; min-width: 0; }
+.ui-selcard-mark { position: absolute; inset-inline-end: var(--spacing-component-4); inset-block-start: 50%; transform: translateY(-50%); display: inline-flex; }
+
+/* ── SegmentedControl ────────────────────────────────────────────────────── */
+.ui-seg {
+  display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--radius-medium);
+  background: var(--field-fill, var(--background));
+}
+.ui-seg.is-block { display: flex; width: 100%; }
+.ui-seg-item {
+  flex: 1 1 0; min-width: 0; border: 0; border-radius: calc(var(--radius-medium) - 3px);
+  background: transparent; color: var(--text-recessive); cursor: pointer;
+  font: 600 13px/1.2 var(--font-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.ui-seg.s-small .ui-seg-item { padding: 6px 12px; }
+.ui-seg.s-medium .ui-seg-item { padding: 9px 14px; font-size: 14px; }
+.ui-seg-item:hover:not(.is-selected):not(:disabled) { color: var(--text); background: var(--field-hover); }
+.ui-seg-item.is-selected { background: var(--accent); color: var(--accent-ink); }
+.ui-seg-item:disabled { cursor: default; opacity: 0.55; }
+
+/* ── Fields: floating label, leading icon ────────────────────────────────── */
+.ui-textfield-wrap {
+  position: relative; display: inline-flex; align-items: stretch; box-sizing: border-box;
+  min-height: 52px; border-radius: var(--radius-medium);
+  background: var(--field-fill, var(--background));
+  border: 1px solid transparent;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.ui-textfield-wrap.is-block { display: flex; width: 100%; flex: none; }
+.ui-textfield-wrap:hover:not(.is-disabled):not(.is-readonly) { background: var(--field-hover); }
+.ui-textfield-wrap:focus-within { border-color: var(--mark); }
+.ui-textfield-wrap.is-disabled { opacity: 0.55; }
+.ui-textfield-wrap.is-multi { min-height: 76px; }
+.ui-textfield-leadbox {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  padding-inline-start: var(--spacing-component-3); color: var(--text-recessive);
+}
+.ui-textfield-float {
+  position: absolute; inset-block-start: 7px; inset-inline-start: var(--spacing-component-4);
+  font: 500 11px/1.2 var(--font-sans); letter-spacing: 0.02em; color: var(--text-recessive);
+  pointer-events: none; white-space: nowrap; max-width: calc(100% - 2 * var(--spacing-component-4));
+  overflow: hidden; text-overflow: ellipsis;
+}
+.ui-textfield-leadbox + .ui-textfield-float { inset-inline-start: calc(var(--spacing-component-3) + 16px + var(--spacing-component-2)); }
+.ui-textfield {
+  flex: 1; min-width: 0; width: 100%; box-sizing: border-box;
+  padding: 22px var(--spacing-component-4) 6px; margin: 0;
+  background: transparent; border: 0; outline: none; border-radius: inherit;
+  color: var(--text); font: 500 14px/1.4 var(--font-sans); text-align: start;
+}
+.ui-textfield-leadbox ~ .ui-textfield { padding-inline-start: var(--spacing-component-2); }
+.ui-textfield::placeholder { color: var(--text-recessive); opacity: 0.8; }
+.ui-textfield.is-multi { resize: vertical; padding-top: 24px; min-height: 76px; }
+/* No floating label above it, so no room kept for one: the text starts at the top-left with the same inset as the sides. */
+.ui-textfield.is-multi.is-bare { padding-block: var(--spacing-component-4); }
+.ui-textfield:disabled { cursor: default; }
+.ui-textfield.is-readonly { cursor: default; }
+
+/* select */
+.ui-select-btn { cursor: pointer; display: flex; align-items: center; }
+.ui-select-value { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
+.ui-select-value.is-placeholder { color: var(--text-recessive); }
+.ui-chevron {
+  position: absolute; inset-inline-end: var(--spacing-component-3); inset-block-start: 50%;
+  transform: translateY(-50%); color: var(--text-recessive); pointer-events: none;
+  transition: transform var(--dur-fast) var(--ease);
+}
+.is-select.is-open .ui-chevron { transform: translateY(-50%) rotate(180deg); }
+.is-select .ui-select-btn { padding-inline-end: 36px; }
+
+/* combobox arrow: a real button, unlike the select's decorative one, because it opens the list */
+.ui-combo-toggle {
+  position: absolute; inset-block: 0; inset-inline-end: 0; width: 40px; padding: 0; margin: 0;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  background: transparent; border: 0; border-radius: inherit; color: var(--text-recessive);
+}
+.ui-combo-toggle:hover { color: var(--text); }
+.ui-combo-toggle svg { transition: transform var(--dur-fast) var(--ease); }
+.is-combobox.is-open .ui-combo-toggle svg { transform: rotate(180deg); }
+.is-combobox .ui-textfield { padding-inline-end: 40px; }
+
+/* menu (portalled to <body>) */
+.ui-menu {
+  position: fixed; z-index: 1000; box-sizing: border-box; overflow-y: auto; padding: 4px;
+  border-radius: var(--radius-medium);
+  background: var(--surface-raised); color: var(--text);
+  border: 1px solid var(--stroke); box-shadow: var(--shadow-menu);
+  font: 500 14px/1.4 var(--font-sans);
+}
+/* A selected row carries a check at its right edge. */
+.ui-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: var(--radius-small); cursor: pointer; }
+.ui-option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-option-check { flex: none; color: var(--text); }
+.ui-option.is-active { background: var(--background-pressed); }
+.ui-option.is-action { justify-content: flex-start; color: var(--text-recessive); }
+.ui-option.is-action:hover { color: var(--text); background: var(--background-pressed); }
+.ui-option.is-selected { font-weight: 600; }
+.ui-menu-note { padding: 8px 10px; color: var(--text-recessive); font: 400 12px/1.4 var(--font-sans); }
+.ui-menu-note.is-footer { border-top: 1px solid var(--stroke); margin-top: 4px; padding-top: 8px; }
+
+/* ── Dialog ──────────────────────────────────────────────────────────────── */
+.ui-dialog {
+  /* the page reset zeroes margins, including the UA's `margin: auto` that centres a modal */
+  margin: auto;
+  padding: 0; border: 0; border-radius: var(--radius-large);
+  background: var(--background); color: var(--text);
+  box-shadow: var(--shadow-high);
+  inline-size: min(92vw, var(--ui-dialog-width, 480px));
+  max-block-size: 86vh; overflow: hidden;
+}
+.ui-dialog.s-small { --ui-dialog-width: 360px; }
+.ui-dialog.s-medium { --ui-dialog-width: 480px; }
+.ui-dialog.s-large { --ui-dialog-width: 640px; }
+.ui-dialog::backdrop { background: var(--scrim); }
+.ui-dialog-body { display: grid; grid-template-rows: auto 1fr auto; max-block-size: 86vh; }
+.ui-dialog-head {
+  display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 4px var(--spacing-component-2);
+  padding: var(--spacing-component-4) var(--spacing-component-4) var(--spacing-component-2);
+}
+.ui-dialog-title { grid-column: 1; margin: 0; font: 700 var(--type-title-s-size)/var(--type-title-s-line-height) var(--font-sans); }
+.ui-dialog-desc { grid-column: 1; margin: 0; font: 400 14px/1.5 var(--font-sans); color: var(--text-recessive); }
+.ui-dialog-close {
+  grid-column: 2; grid-row: 1; display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 28px; block-size: 28px; border: 0; border-radius: var(--radius-small);
+  background: transparent; color: var(--text-recessive); cursor: pointer;
+}
+.ui-dialog-close:hover { background: var(--background-hover); color: var(--text); }
+.ui-dialog-content { padding: var(--spacing-component-2) var(--spacing-component-4); overflow-y: auto; min-height: 0; }
+.ui-dialog-content.is-empty { display: none; }
+.ui-dialog-actions { padding: var(--spacing-component-2) var(--spacing-component-4) var(--spacing-component-4); display: flex; gap: var(--spacing-component-2); }
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
+.ui-toast {
+  position: fixed; z-index: 2000; inset-inline: 0; margin-inline: auto; width: fit-content; max-width: 90vw;
+  padding: 10px 16px; border-radius: 999px;
+  background: var(--surface-raised); color: var(--text); border: 1px solid var(--stroke);
+  box-shadow: var(--shadow-menu); font: 600 13px/1.3 var(--font-sans);
+  animation: ui-toast-in var(--dur-medium) var(--ease);
+}
+.ui-toast.at-bottom { inset-block-end: 20px; }
+.ui-toast.at-top { inset-block-start: 20px; }
+.ui-toast.tone-success { border-color: var(--status-success); }
+.ui-toast.tone-error { border-color: var(--status-error); }
+@keyframes ui-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+.ui-table { width: 100%; border-collapse: collapse; table-layout: auto; font: 400 13px/1.45 var(--font-sans); color: var(--text); }
+.ui-table th {
+  text-align: start; font: 600 12px/1.3 var(--font-sans); letter-spacing: 0.02em; color: var(--text-recessive);
+  padding: 8px 10px; vertical-align: bottom;
+}
+.ui-table td { padding: 8px 10px; vertical-align: top; }
+.ui-table.has-rules tbody tr + tr td { border-top: 1px solid var(--stroke); }
+.ui-table.has-rules thead th { border-bottom: 1px solid var(--stroke); }
+
+/* ── FileUploadItem ──────────────────────────────────────────────────────── */
+.ui-fileitem {
+  display: flex; align-items: center; gap: var(--spacing-component-3);
+  padding: var(--spacing-component-3) var(--spacing-component-4);
+  border-radius: var(--radius-medium); background: var(--field-fill, var(--background));
+  color: var(--text);
+}
+.ui-fileitem.has-error { border: 1px solid var(--status-error); }
+.ui-fileitem-lead { display: inline-flex; flex: none; color: var(--text-recessive); }
+.ui-fileitem-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.ui-fileitem-name { font: 600 14px/1.4 var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-fileitem-meta { font: 400 12px/1.4 var(--font-sans); color: var(--text-recessive); }
+.ui-fileitem.has-error .ui-fileitem-meta { color: var(--status-error); }
+.ui-fileitem-remove {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  inline-size: 32px; block-size: 32px; border: 0; border-radius: var(--radius-medium);
+  background: transparent; color: var(--text); cursor: pointer;
+}
+.ui-fileitem-remove.v-tonal { background: var(--field-hover); }
+.ui-fileitem-remove:hover { background: var(--field-pressed); }
+
+/* ── additions: radio mark, disabled states, segment glyphs ──────────────── */
+.ui-radiomark {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  inline-size: 20px; block-size: 20px; border-radius: 50%; border: 1.5px solid var(--stroke-subtle);
+}
+.ui-radiomark-dot { inline-size: 10px; block-size: 10px; border-radius: 50%; background: transparent; }
+.ui-radiomark.is-checked { border-color: var(--accent); }
+.ui-radiomark.is-checked .ui-radiomark-dot { background: var(--accent); }
+.ui-selcard.s-small { padding-block: var(--spacing-component-2); }
+.ui-selcard.is-disabled { opacity: 0.55; cursor: default; }
+.ui-option.is-disabled { opacity: 0.45; cursor: default; }
+.ui-seg-item { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.ui-seg-label { overflow: hidden; text-overflow: ellipsis; }

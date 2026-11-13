@@ -609,7 +609,7 @@ function derive(ir, opts) {
     let spec = vars.get(k);
     if (!spec) {
       spec = { col: a.col, path: r.path, types: new Set(), values: new Map(),
-               description: r.description || '' };
+               description: r.description || '', scopes: r.scopes, codeSyntax: r.codeSyntax };
       vars.set(k, spec);
     }
     spec.types.add(r.type);

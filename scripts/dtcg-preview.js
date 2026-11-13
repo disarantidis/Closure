@@ -7,6 +7,7 @@
 //   node scripts/dtcg-preview.js tokens.json --shape themes -o dtcg.json
 //   node scripts/dtcg-preview.js tokens.json --compare path/to/tokens_W3C.json
 //   node scripts/dtcg-preview.js graph.json --shape resolved --config my.js
+//   node scripts/dtcg-preview.js graph.json --shape resolved --restore   (adds the restore section)
 //
 // `tokens.json` is whatever the plugin currently downloads/pushes (the Legacy
 // JSON tree with its $themes / $metadata).
@@ -28,13 +29,14 @@ const { toDtcgFormat, validateDtcgClosure, TYPE_MAP } = require('../src/dtcg-for
 const SHAPES = ['partial', 'sets', 'themes', 'resolved'];
 
 function parseArgs(argv) {
-  const args = { shape: 'partial', out: null, input: null, compare: null, config: null };
+  const args = { shape: 'partial', out: null, input: null, compare: null, config: null, restore: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--shape') args.shape = argv[++i];
     else if (a === '-o' || a === '--out') args.out = argv[++i];
     else if (a === '--compare') args.compare = argv[++i];
     else if (a === '--config') args.config = argv[++i];
+    else if (a === '--restore') args.restore = true;
     else if (!args.input) args.input = a;
   }
   return args;
@@ -232,7 +234,8 @@ function previewResolved(source, args) {
     axes: config.axes,
     renameMode: config.renameMode && config.renameMode.bind(config),
     renameToken: config.renameToken && config.renameToken.bind(config),
-    typeHints: config.typeHints && config.typeHints.bind(config)
+    typeHints: config.typeHints && config.typeHints.bind(config),
+    restore: args.restore
   });
   const res = built.emit;
 

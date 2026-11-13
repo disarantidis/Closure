@@ -9,3 +9,6 @@ dist/
 # os / editor
 .DS_Store
 *.log
+
+# generated scan output
+reports/

@@ -1827,7 +1827,7 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                        'pushGitHubLarge', 'blobPayload', 'byteLength',
                        'renderImportFolderSelect', 'listRepoFolders',
                        'refreshFolderImportOffer', 'addFolderPath', 'normFolder',
-                       'foldersMissingFromRepo', 'githubCommitTree', 'syncedAgo'];
+                       'foldersMissingFromRepo', 'githubCommitTree', 'syncedAgo', 'readConfig'];
         const lifted = names.map(grab);
         if (lifted.some((x) => !x)) {
           ok('repo probe: ui.html still declares ' + names.join(', '), false,
@@ -1844,6 +1844,8 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                                    filename: ctx.primaryFilename(), branch: 'main', token: 'GHT' },
                                    ctx.__gh_over),
             isGitLabReady: () => ctx.__gl, isGitHubReady: () => ctx.__gh,
+            compareBranch: null, importFilePick: '',
+            document: { getElementById: function () { return { classList: { contains: function () { return false; } } }; } },
             gitlabAdded: false, githubAdded: false, mainProviderTab: 'gitlab',
 
             Promise, JSON, Math, parseInt, isFinite, encodeURIComponent, Array, Object, String, RegExp,
@@ -2355,6 +2357,10 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                 seq.push('GET ref (404)');
                 return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
               }
+              if (/\/commits\?per_page=1/.test(url)) {
+                seq.push('GET commits probe (409 empty)');
+                return Promise.resolve({ ok: false, status: 409, json: () => Promise.resolve({ message: 'Git Repository is empty.' }) });
+              }
               return before(url, opts);
             };
             await ctx.pushGitHubLarge(['acme', 'tokens'], gh, 'tokens/big.json',
@@ -2364,6 +2370,22 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
                seq.filter((x) => /POST refs$/.test(x)).length === 1 &&
                seq.filter((x) => /tree base=undefined/.test(x)).length === 1,
                JSON.stringify(seq));
+            /* A branch that is missing from a repository that HAS commits must
+               not become a parentless branch holding this one file. */
+            seq.length = 0;
+            ctx.fetch = (url, opts) => {
+              if (/\/ref\/heads\//.test(url)) return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
+              if (/\/commits\?per_page=1/.test(url)) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([{ sha: 'X' }]) });
+              seq.push('UNEXPECTED ' + url);
+              return before(url, opts);
+            };
+            let refused = null;
+            try {
+              await ctx.pushGitHubLarge(['acme', 'tokens'], gh, 'tokens/big.json', '{"a":1}', 'x', headers, fail);
+            } catch (e) { refused = e; }
+            ok('big push: a missing branch in a repository with commits is refused, not made parentless',
+               refused && /does not exist/.test(refused.message) && !seq.some((x) => /POST refs|commit parents/.test(x)),
+               JSON.stringify(refused) + ' ' + JSON.stringify(seq));
             ctx.fetch = (url, opts) => { calls.push({ url, opts }); return Promise.resolve(ctx.__res); };
 
             /*
@@ -2823,6 +2845,14 @@ const run = (doc, opts) => { const ir = toIR(doc); return { ir, plan: derive(ir,
          JD.detectFormat(R) === 'resolved' && JD.detectFormat(A) === 'legacy');
       ok('compare: and inferred from the leaves when there is no marker',
          JD.detectFormat(D) === 'dtcg' && JD.detectFormat({ nothing: {} }) === 'unknown');
+
+      /* A RESOLVED EXPORT IS NO LONGER STAMPED — it says what it is in its own
+         root metadata, and compare must still refuse it. */
+      const U = doc({ $extensions: { 'com.desquared.radd': { foundationDefaults: { mode: 'light' } } }, a: { b: dtok('#fff') } });
+      ok('compare: an unstamped resolved export is recognised by its root metadata',
+         JD.detectFormat(U) === 'resolved');
+      ok('compare: and refused like a stamped one',
+         JD.compare(A, U).problem && JD.compare(A, U).problem.kind === 'resolved');
 
       /* THE MARKER THE PLUGIN ACTUALLY WRITES IS 'themes', not 'dtcg' —
          stampExport takes it from the output-format control, whose DTCG value
