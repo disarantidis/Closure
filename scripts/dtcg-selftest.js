@@ -444,6 +444,49 @@ function run() {
   check('with no default named, document order still breaks the tie',
     wNoHint.$themes[0].selectedTokenSets['weight/regular'] === 'source');
 
+  /*
+    DEFAULTS NOBODY REFERENCES DO NOT SHIP (2026-11-13).
+
+    Three passes write tokens the file does not have, so that references made
+    by convention — "{lineHeights.0}" from a typography composite, the shadow
+    scale that is not a Figma variable at all — have somewhere to land. On a
+    file that makes none of those references they were 28 tokens of another
+    design system's constants: 12 elevation levels of literal hex and px, 4
+    line heights, 9 letter spacings, 3 case/decoration. Pomegranate Identity
+    shipped all 28 and referenced none.
+
+    weightLikeFixture() is that file in miniature: one `weight` collection, no
+    typography composites, no shadow tokens, nothing pointing at core.
+  */
+  const defaultsGone = ['Elevation', 'lineHeights', 'letterSpacing', 'textCase', 'textDecoration']
+    .filter((g) => wtokens.core && wtokens.core[g] !== undefined);
+  check('a default the file neither has nor references is not exported',
+    defaultsGone.length === 0, 'still present: ' + defaultsGone.join(', '));
+
+  /*
+    And the other way: the reference is what keeps it. One token pointing at
+    {lineHeights.0} has to find it, or the export ships a dangling reference —
+    which is the failure the defaults were added to prevent in the first place.
+  */
+  const refRaw = weightLikeFixture();
+  refRaw.collections.push({
+    id: 'cRef', name: 'foundation',
+    modes: [{ modeId: 'fm1', name: 'foundation' }],
+    defaultModeId: 'fm1',
+    variables: [{
+      id: 'vRef', name: 'typography/body/line-height', type: 'STRING',
+      valuesByMode: { fm1: '{lineHeights.0}' },
+      resolvedValuesByMode: { fm1: '{lineHeights.0}' },
+      aliasInfo: {}, codeSyntax: {}, description: '', scopes: [],
+    }],
+  });
+  const refTokens = plugin.toTokenFormat(
+    plugin.transformToFinalFormat(refRaw, { includeDescriptions: true }).tokens, refRaw);
+  check('a default something DOES reference is kept',
+    !!(refTokens.core && refTokens.core.lineHeights && refTokens.core.lineHeights['0']));
+  check('and keeping it leaves the reference closed',
+    plugin.validateReferenceClosure(refTokens).brokenCount === 0);
+
   // The map that feeds it, read off the collections Figma handed over.
   const names = plugin.defaultModeSetNames({
     collections: [

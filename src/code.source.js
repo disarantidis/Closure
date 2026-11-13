@@ -2363,6 +2363,116 @@ function completeThemeSelections(out, defaults) {
   // Runs last: every set is final here, so the closure it computes is the one
   // a consumer will actually validate against.
 
+/*
+  THE DEFAULTS THIS EXPORTER PUTS IN, AND WHETHER THE FILE WANTS THEM.
+
+  Three places write tokens the file does not have:
+
+    ensureCoreTextCaseAndDecorationPrimitives   textCase/*, textDecoration/*
+    ensureCoreLineHeightsLetterSpacing          lineHeights/0-3, letterSpacing/0-8
+    buildCoreElevationReference                 Elevation/{Light,Dark} mode/Level 1-6
+
+  Each exists for a reason. A typography composite emits "{lineHeights.0}"
+  by convention (see toTypographyComposite), and shadows are not Figma
+  variables at all, so without these the references they make would dangle —
+  which is the failure these were added to prevent.
+
+  The reason does not hold when nothing references them. Then they are another
+  design system's constants sitting in someone else's export: 28 tokens on
+  Pomegranate Identity (12 elevation levels of literal hex and px, 4 line
+  heights, 9 letter spacings, 3 case/decoration), none of them referenced by
+  anything in that document, none of them in that file. A reader cannot tell
+  those from the file's own.
+
+  So they are written as before and taken out again at the end, once every set
+  exists and the real references can be counted. Only the leaves THIS exporter
+  added are eligible — the before/after diff below — so a file that carries
+  its own lineHeights.0 keeps it whether or not anything points at it.
+
+  Conservative on purpose: a reference that names a parent, or that reaches
+  past a leaf into a composite's field, counts as wanting it. Keeping a token
+  nobody reads costs a line; dropping one something needs breaks the export.
+*/
+function leafTokenPaths(node, prefix, acc) {
+  acc = acc || {};
+  if (!node || typeof node !== 'object') return acc;
+  if (isLeafTokenNode(node)) { acc[prefix] = true; return acc; }
+  Object.keys(node).forEach(function (k) {
+    if (k.charAt(0) === '$') return;
+    leafTokenPaths(node[k], prefix ? prefix + '.' + k : k, acc);
+  });
+  return acc;
+}
+
+function everyReferenceIn(out) {
+  var refs = {};
+  Object.keys(out).forEach(function (setName) {
+    if (setName.charAt(0) === '$') return;
+    (function walk(node) {
+      if (!node || typeof node !== 'object') return;
+      if (isLeafTokenNode(node)) {
+        var v = node.value;
+        var str = typeof v === 'string' ? v : JSON.stringify(v);
+        (str.match(/\{[^{}]+\}/g) || []).forEach(function (m) {
+          var inner = m.slice(1, -1);
+          if (inner.indexOf('"') !== -1 || inner.indexOf(':') !== -1) return;
+          if (!/^[A-Za-z0-9_.\- ]+$/.test(inner)) return;
+          refs[inner] = true;
+        });
+        return;
+      }
+      Object.keys(node).forEach(function (k) { if (k.charAt(0) !== '$') walk(node[k]); });
+    })(out[setName]);
+  });
+  return refs;
+}
+
+/* Does any reference in the document want this path — by name, by naming a
+   group it sits in, or by reaching through it into a composite's field? */
+function pathIsWanted(path, refs) {
+  if (refs[path]) return true;
+  var keys = Object.keys(refs);
+  for (var i = 0; i < keys.length; i++) {
+    var r = keys[i];
+    if (r.indexOf(path + '.') === 0) return true;   // {Elevation.Light mode.Level 1} wants Elevation.Light mode
+    if (path.indexOf(r + '.') === 0) return true;   // {lineHeights} wants lineHeights.0
+  }
+  return false;
+}
+
+function deleteDeep(root, path) {
+  var p = path.split('.');
+  var chain = [root];
+  var c = root;
+  for (var i = 0; i < p.length - 1; i++) {
+    if (!c || typeof c !== 'object') return;
+    c = c[p[i]];
+    chain.push(c);
+  }
+  if (!c || typeof c !== 'object') return;
+  delete c[p[p.length - 1]];
+  // Take the empty groups with it, youngest first.
+  for (var j = chain.length - 1; j > 0; j--) {
+    if (chain[j] && typeof chain[j] === 'object' && !Object.keys(chain[j]).length) {
+      delete chain[j - 1][p[j - 1]];
+    } else break;
+  }
+}
+
+/* `out` is the whole document, because a reference to a core token is just as
+   likely to come from foundation or a breakpoint set as from core itself. */
+function dropUnreferencedDefaults(out, set, injected) {
+  var dropped = [];
+  if (!set || !injected || !injected.length) return dropped;
+  var refs = everyReferenceIn(out);
+  injected.forEach(function (path) {
+    if (pathIsWanted(path, refs)) return;
+    deleteDeep(set, path);
+    dropped.push(path);
+  });
+  return dropped;
+}
+
 function toTokenFormat(native, rawData) {
   var out = {};
 
@@ -2398,8 +2508,17 @@ function toTokenFormat(native, rawData) {
     applyDimensionBaseExpressions(out['core']);
   }
   if (!out['core']) out['core'] = {};
+  /*
+    What the file brought, before the defaults go in. The diff straight after
+    is the only thing dropUnreferencedDefaults() is allowed to take back out,
+    so a file's own lineHeights.0 is never at risk — see the note on that
+    function.
+  */
+  var coreBeforeDefaults = leafTokenPaths(out['core'], '');
   ensureCoreTextCaseAndDecorationPrimitives(out['core']);
   ensureCoreLineHeightsLetterSpacing(out['core']);
+  var injectedCoreDefaults = Object.keys(leafTokenPaths(out['core'], ''))
+    .filter(function (p) { return !coreBeforeDefaults[p]; });
 
   // Rule 8 (spec): foundation — unwrap double nesting
   if (native['foundation'] && native['foundation']['foundation']) {
@@ -2797,6 +2916,9 @@ function toTokenFormat(native, rawData) {
   // match the canonical the token format export exactly.
   if (!out['core']) out['core'] = {};
   out['core']['Elevation'] = buildCoreElevationReference();
+  Object.keys(leafTokenPaths(out['core']['Elevation'], 'Elevation')).forEach(function (p) {
+    injectedCoreDefaults.push(p);
+  });
 
   /*
     EVERYTHING THE RULES ABOVE DID NOT TAKE.
@@ -2965,6 +3087,17 @@ function toTokenFormat(native, rawData) {
         };
       }),
     };
+  }
+
+  /*
+    Before the themes close, because a theme must not be completed with a set
+    pulled in to satisfy a default that is about to be removed.
+  */
+  var droppedDefaults = dropUnreferencedDefaults(out, out['core'], injectedCoreDefaults);
+  if (droppedDefaults.length) {
+    console.log('[Closure] ' + droppedDefaults.length + ' default token(s) this file ' +
+      'neither has nor references were left out: ' + droppedDefaults.slice(0, 6).join(', ') +
+      (droppedDefaults.length > 6 ? ' …' : ''));
   }
 
   // Runs last: every set is final here, so the closure it computes is the one
