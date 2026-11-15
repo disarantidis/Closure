@@ -516,6 +516,107 @@ function run() {
     plugin.validateReferenceClosure(refTokens).brokenCount === 0);
 
   /*
+    THE FILE'S STYLES REACH THE TOKEN TREE (2026-11-15, issue 6).
+
+    A style used to arrive only as a NAME — $figmaStyleReferences maps it to a
+    Figma id, restore.styles carries the definition for an import. Neither is a
+    token, so Pomegranate Identity's four effect, one grid and eight paint
+    styles were invisible to anything reading the tokens.
+
+    Under their own `styles` set, because all three kinds collide with groups
+    the variables own: `elevation` holds shadow-low/medium/high, `grid` holds
+    columns/count/gutters/margins, `colours.gradient` exists.
+  */
+  const stRaw = {
+    collections: [{
+      id: 'f9', name: 'foundation',
+      modes: [{ modeId: 'f9m', name: 'foundation' }],
+      defaultModeId: 'f9m',
+      variables: [mkVar('f9v', 'radius/small', 'FLOAT', { f9m: 4 })],
+    }],
+    styles: {
+      textStyles: [],
+      effectStyles: [
+        { id: 'E:1', name: 'Elevation/medium', type: 'EFFECT', description: '', effects: [
+          { type: 'DROP_SHADOW', visible: true, blendMode: 'NORMAL', color: [0, 0, 0, 0.12],
+            offset: { x: 0, y: 3 }, radius: 6, spread: 0,
+            bound: { color: 'core::core-colours/base/black' } },
+          { type: 'DROP_SHADOW', visible: true, blendMode: 'NORMAL', color: [0, 0, 0, 0.08],
+            offset: { x: 0, y: 6 }, radius: 24, spread: 0, bound: {} },
+        ] },
+        { id: 'E:2', name: 'Background blur', type: 'EFFECT', description: '', effects: [
+          { type: 'BACKGROUND_BLUR', visible: true, blendMode: 'NORMAL', radius: 24, bound: {} },
+        ] },
+        { id: 'E:9', name: 'unreadable', type: 'EFFECT' },
+      ],
+      gridStyles: [
+        { id: 'G:1', name: 'Grid/page', type: 'GRID', description: '', layoutGrids: [
+          { pattern: 'COLUMNS', alignment: 'STRETCH', count: 12, gutterSize: 16, offset: 24,
+            visible: true, bound: { gutterSize: 'foundation::grid/gutters' } },
+        ] },
+      ],
+      paintStyles: [
+        { id: 'P:1', name: 'Gradient/Fade out · down', type: 'PAINT', description: '', paints: [
+          { type: 'GRADIENT_LINEAR', visible: true, blendMode: 'NORMAL', opacity: 1,
+            gradientStops: [
+              { position: 0, color: [0, 0, 0, 0] },
+              { position: 1, color: [0, 0, 0, 1], bound: { color: 'core::core-colours/base/black' } },
+            ], bound: {} },
+        ] },
+        { id: 'P:2', name: 'Surface/raised', type: 'PAINT', description: '', paints: [
+          { type: 'SOLID', visible: true, blendMode: 'NORMAL', color: [1, 1, 1], opacity: 0.4,
+            bound: {} },
+        ] },
+      ],
+    },
+  };
+  const stTokens = plugin.toTokenFormat(
+    plugin.transformToFinalFormat(stRaw, { includeDescriptions: true }).tokens, stRaw);
+  const ST = stTokens.styles || {};
+  check('the styles land in their own set, one group per kind', () =>
+    !!(ST.effect && ST.grid && ST.paint));
+  check('a two-layer effect style becomes a list of shadows', () => {
+    const v = ST.effect.elevation.medium.value;
+    return Array.isArray(v) && v.length === 2 && v[0].type === 'dropShadow' && v[0].y === '3';
+  });
+  check('a shadow colour bound to a variable is the reference, unbound is a literal', () => {
+    const v = ST.effect.elevation.medium.value;
+    return v[0].color === '{core-colours.base.black}' && /^(#|rgba)/.test(v[1].color);
+  });
+  check('a blur has no DTCG type, so it is the radius with its effect named', () => {
+    const b = ST.effect['background-blur'];
+    return b.value === 24 && b.type === 'number' && b.figmaEffect === 'BACKGROUND_BLUR';
+  });
+  check('a style that arrived as id-and-name only is not written', () =>
+    ST.effect.unreadable === undefined);
+  check('a grid style keeps the fields its pattern uses, bound ones as references', () => {
+    const g = ST.grid.page;
+    return g.pattern.value === 'COLUMNS' && g.count.value === 12 &&
+      g.gutterSize.value === '{grid.gutters}';
+  });
+  check('a gradient becomes stops with colour and position', () => {
+    const p = ST.paint.gradient['fade-out-down'];
+    return p.type === 'gradient' && p.value.length === 2 &&
+      p.value[1].color === '{core-colours.base.black}' && p.value[0].position === 0;
+  });
+  check('a solid paint becomes a colour, and its opacity is kept beside it', () => {
+    const p = ST.paint.surface.raised;
+    return p.type === 'color' && /^(#|rgba)/.test(p.value) && p.figmaOpacity === 0.4;
+  });
+  check('a styles theme selects the set, so the themes shape carries it too', () => {
+    const t = (stTokens.$themes || []).find((x) => x.name === 'styles');
+    return t && t.selectedTokenSets.styles === 'enabled';
+  });
+  check('the gradient survives the DTCG conversion as $type gradient', () => {
+    const dt = toDtcgFormat(stTokens, { shape: 'sets' }).tokens;
+    return dt.styles.paint.gradient['fade-out-down'].$type === 'gradient';
+  });
+  check('the effect survives as $type shadow', () => {
+    const dt = toDtcgFormat(stTokens, { shape: 'sets' }).tokens;
+    return dt.styles.effect.elevation.medium.$type === 'shadow';
+  });
+
+  /*
     A PLAIN REFERENCE SURVIVES THE DIMENSION FAMILY (2026-11-15, issue 3).
 
     dimension and number resolved every reference, because they must evaluate

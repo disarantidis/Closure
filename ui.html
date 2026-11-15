@@ -34066,7 +34066,11 @@ react/cjs/react-jsx-runtime.development.js:
     number:           'number',
     opacity:          'number',
     boxShadow:        'shadow',
-    typography:       'typography'
+    typography:       'typography',
+    /* A paint style's gradient. DTCG's gradient $value is a list of
+       { color, position }, which is what buildStyleTokens writes, so this is a
+       straight pass-through rather than a reshape. */
+    gradient:         'gradient'
   };
 
   // DTCG's typography composite has exactly these sub-values. Legacy JSON adds
@@ -43594,7 +43598,7 @@ if (global) global.PomStudioApply = api;
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'edf0287 16:11:55';
+    var CLOSURE_BUILD = 'd62f3db 16:19:32';
     (function () { var el = document.getElementById('build-stamp'); if (el) el.textContent = 'Plugin build ' + CLOSURE_BUILD; })();
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 

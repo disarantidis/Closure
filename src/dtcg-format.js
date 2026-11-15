@@ -55,7 +55,11 @@
     number:           'number',
     opacity:          'number',
     boxShadow:        'shadow',
-    typography:       'typography'
+    typography:       'typography',
+    /* A paint style's gradient. DTCG's gradient $value is a list of
+       { color, position }, which is what buildStyleTokens writes, so this is a
+       straight pass-through rather than a reshape. */
+    gradient:         'gradient'
   };
 
   // DTCG's typography composite has exactly these sub-values. Legacy JSON adds
