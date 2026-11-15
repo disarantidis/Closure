@@ -166,6 +166,29 @@ function loadFilenameHelpers() {
   `);
 }
 
+/*
+  stampExport() from the built ui.html, the same anchored-extraction trick
+  loadFilenameHelpers() uses — and for the same reason, since the identity it
+  writes is added to the finished document rather than built in the sandbox.
+  It closes over the UI's module state, so that is injected.
+
+  A null return is reported as a FAILURE below, not skipped: the note on
+  loadFilenameHelpers records what happened when an anchor moved and a block
+  silently stopped being found while the suite still reported near-perfect.
+*/
+function loadStampExport() {
+  const uiPath = path.join(ROOT, 'ui.html');
+  if (!fs.existsSync(uiPath)) return null;
+  const html = fs.readFileSync(uiPath, 'utf8');
+  const start = html.indexOf('function stampExport(tokens) {');
+  const end = html.indexOf('function getTokensToExport()');
+  if (start < 0 || end < 0 || end <= start) return null;
+  return new Function(
+    'dtcgShape', 'transformedData', 'lastFigmaFileName', 'lastFigmaFileKey', 'rawData', 'CLOSURE_BUILD',
+    html.slice(start, end) + '\nreturn stampExport;'
+  );
+}
+
 const results = [];
 /*
   `ok` may be a boolean or a function returning one. The function form exists
@@ -514,6 +537,48 @@ function run() {
     !!(refTokens.core && refTokens.core.lineHeights && refTokens.core.lineHeights['0']));
   check('and keeping it leaves the reference closed',
     plugin.validateReferenceClosure(refTokens).brokenCount === 0);
+
+  /*
+    WHICH FILE, AND WHICH VARIABLE WAS WHICH (2026-11-15, issue 12).
+
+    The document said neither. $figmaVariableReferences holds a HASH of the id
+    per theme — a stable surrogate, but one-way — and nothing named the Figma
+    file, so an importer could not refuse an export taken from the wrong one.
+  */
+  const stampFactory = loadStampExport();
+  check('stampExport can still be found in the built ui.html', !!stampFactory);
+  if (stampFactory) {
+    const idRaw = {
+      collections: [{
+        name: 'core',
+        variables: [
+          { id: 'VariableID:35:111', name: 'core-colours/brand/main' },
+          { id: 'VariableID:44:3509', name: 'core-percentage/40' },
+        ],
+      }],
+    };
+    const stamp = stampFactory('legacy', null, 'Pomegranate Identity', 'qFTKlfV7NrWXttRskDqzzL', idRaw, 'abc1234');
+    const out = stamp({ core: {} });
+    const c = out.$extensions['com.closure'];
+    check('the export says which file it came from', () =>
+      c.fileKey === 'qFTKlfV7NrWXttRskDqzzL' && c.fileName === 'Pomegranate Identity');
+    check('the variable map is keyed BY ID, which is what tells a rename from a delete', () =>
+      c.variableIds['VariableID:35:111'] === 'core::core-colours/brand/main' &&
+      Object.keys(c.variableIds).length === 2);
+    check('the build and format stamp still goes out', () =>
+      c.build === 'abc1234' && c.format === 'legacy');
+
+    /* No permission, no key: say nothing rather than claim a file. */
+    const noKey = stampFactory('legacy', null, null, null, null, 'abc1234')({ core: {} });
+    check('without a file key the export claims no file, rather than guessing', () =>
+      !('fileKey' in noKey.$extensions['com.closure']) &&
+      !('variableIds' in noKey.$extensions['com.closure']));
+
+    /* A resolved document carries its own root metadata and is left alone. */
+    const res = stampFactory('resolved', null, 'x', 'y', idRaw, 'abc1234')({ core: {}, $extensions: {} });
+    check('a resolved document is still returned untouched', () =>
+      !res.$extensions['com.closure']);
+  }
 
   /*
     THE FILE'S STYLES REACH THE TOKEN TREE (2026-11-15, issue 6).

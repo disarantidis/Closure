@@ -4303,6 +4303,11 @@ function handle_extract(msg) {
         type: 'extracted',
         collections: result,
         fileName: (figma.root && figma.root.name) || '',
+        /* WHICH FILE THIS CAME FROM. Needs manifest permissions ["fileKey"];
+           without it figma.fileKey is undefined, so this is null and the
+           export simply says nothing rather than claiming a file. A name is
+           not an identity — two files can share one. */
+        fileKey: figma.fileKey || null,
         styles: styles
       });
     });

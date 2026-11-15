@@ -43598,7 +43598,7 @@ if (global) global.PomStudioApply = api;
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = '336a1dd 16:26:27';
+    var CLOSURE_BUILD = '54df7bc 16:30:48';
     (function () { var el = document.getElementById('build-stamp'); if (el) el.textContent = 'Plugin build ' + CLOSURE_BUILD; })();
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
@@ -43868,6 +43868,10 @@ if (global) global.PomStudioApply = api;
     }
 
     var lastFigmaFileName = null;
+    /* The file's key, for the export to say which file it came from. Null
+       until an extract arrives, and null afterwards too on a plugin build
+       without manifest permissions ["fileKey"]. */
+    var lastFigmaFileKey = null;
 
     // Drives the collections card's title — the real Figma file name
     // (figma.root.name) rather than a fixed label. Remembers the last file
@@ -47602,6 +47606,35 @@ if (global) global.PomStudioApply = api;
       var ext = {};
       Object.keys(out['$extensions'] || {}).forEach(function(k) { ext[k] = out['$extensions'][k]; });
       ext['com.closure'] = { build: CLOSURE_BUILD, format: dtcgShape || 'legacy' };
+      /*
+        WHICH FILE, AND WHICH VARIABLE WAS WHICH.
+
+        The document carried neither. $figmaVariableReferences on each theme
+        holds a HASH of the id, which is a stable surrogate but one-way: a
+        reader cannot get back to the variable, and there was nothing at all to
+        say which Figma file the export came from, so an importer could not
+        refuse one taken from the wrong file.
+
+        Written once at the root, not per token: an id on each of 54,506 tokens
+        would be about 1.6 MB of repetition for 2,601 distinct variables. Keyed
+        BY ID, because keying by name is what cannot tell a rename from a
+        delete-and-create — the same id against a different name is a rename,
+        and that is the whole question being asked.
+      */
+      if (lastFigmaFileName) ext['com.closure'].fileName = lastFigmaFileName;
+      if (lastFigmaFileKey) ext['com.closure'].fileKey = lastFigmaFileKey;
+      if (rawData && rawData.collections) {
+        var ids = {};
+        var idCount = 0;
+        rawData.collections.forEach(function(col) {
+          (col.variables || []).forEach(function(v) {
+            if (!v || !v.id || !v.name) return;
+            ids[v.id] = (col.name || '') + '::' + v.name;
+            idCount++;
+          });
+        });
+        if (idCount) ext['com.closure'].variableIds = ids;
+      }
       // What the sandbox decided, when it decided anything — see its note.
       if (transformedData && transformedData.resolvedReport) {
         ext['com.closure'].resolved = transformedData.resolvedReport;
@@ -49905,6 +49938,7 @@ if (global) global.PomStudioApply = api;
 
       if (msg.type === 'extracted') {
         rawData = { collections: msg.collections, styles: msg.styles };
+        if (msg.fileKey) lastFigmaFileKey = msg.fileKey;
         /* The Clear buttons and the note above them read this extract. */
         if (typeof updateClearFileButton === 'function') updateClearFileButton();
         selectedCollections = msg.collections.map(function(col) { return col.name; });
