@@ -201,12 +201,13 @@ const results = [];
   without running. Two written on 2026-11-15 did exactly that, and were only
   noticed because a third, written as a boolean, failed beside them.
 */
-/* One variable, as the extractor hands them over. */
-function mkVar(id, name, type, byMode) {
+/* One variable, as the extractor hands them over. `scopes` is Figma's own,
+   and says what a FLOAT actually is — see isLengthVariable. */
+function mkVar(id, name, type, byMode, scopes) {
   return {
     id: id, name: name, type: type,
     valuesByMode: byMode, resolvedValuesByMode: byMode,
-    aliasInfo: {}, codeSyntax: {}, description: '', scopes: [],
+    aliasInfo: {}, codeSyntax: {}, description: '', scopes: scopes || [],
   };
 }
 
@@ -537,6 +538,59 @@ function run() {
     !!(refTokens.core && refTokens.core.lineHeights && refTokens.core.lineHeights['0']));
   check('and keeping it leaves the reference closed',
     plugin.validateReferenceClosure(refTokens).brokenCount === 0);
+
+  /*
+    A FLOAT'S TYPE COMES FROM ITS SCOPE, NOT ITS NAME (2026-11-15, issue 7).
+
+    Figma has one numeric type, so a radius, a gap, an opacity, a duration and
+    a column count are all FLOAT. The exporter chose between DTCG `dimension`
+    and `number` by the token's first path segment — `spacing` and `radius`
+    were on the list, `border/width`, `grid`, `focus`, `surface-width`,
+    `tappable-area`, `viewport` and `elevation` were not. On Pomegranate
+    Identity that split 90 pixel lengths 40 / 50, by nothing but which words
+    someone had thought of.
+
+    The scopes below are the ones read live from that file.
+  */
+  const scRaw = {
+    collections: [{
+      id: 'sq1', name: 'foundation',
+      modes: [{ modeId: 'sqm', name: 'foundation' }],
+      defaultModeId: 'sqm',
+      variables: [
+        mkVar('q1', 'radius/medium', 'FLOAT', { sqm: 12 }, ['CORNER_RADIUS']),
+        mkVar('q2', 'border/width/hairline', 'FLOAT', { sqm: 1 }, ['STROKE_FLOAT']),
+        mkVar('q3', 'grid/gutters', 'FLOAT', { sqm: 16 }, ['GAP']),
+        mkVar('q4', 'surface-width/small', 'FLOAT', { sqm: 380 }, ['WIDTH_HEIGHT']),
+        mkVar('q5', 'spacing/component/4', 'FLOAT', { sqm: 4 }, ['WIDTH_HEIGHT', 'GAP']),
+        /* not lengths */
+        mkVar('q6', 'rim/intensity', 'FLOAT', { sqm: 80 }, ['OPACITY']),
+        mkVar('q7', 'grid/count', 'FLOAT', { sqm: 12 }, []),
+        mkVar('q8', 'core-effects/angle', 'FLOAT', { sqm: 315 }, []),
+      ],
+    }],
+  };
+  const scT = plugin.toTokenFormat(
+    plugin.transformToFinalFormat(scRaw, { includeDescriptions: true }).tokens, scRaw);
+  const scTypes = {};
+  (function w(n, p) {
+    if (!n || typeof n !== 'object') return;
+    if ('value' in n && 'type' in n) { scTypes[p.join('/')] = n.type; return; }
+    Object.keys(n).forEach((k) => { if (k[0] !== '$') w(n[k], p.concat(k)); });
+  })(scT.foundation || {}, []);
+  /* The DTCG type is what a consumer reads. `spacing` and `borderRadius` are
+     legacy names that TYPE_MAP already sends to `dimension`; the ones this
+     change moves had no such name and were landing on `number`. */
+  const scD = toDtcgFormat(scT, { shape: 'sets' }).tokens.foundation;
+  const dt = (path) => path.split('/').reduce((o, k) => (o || {})[k], scD).$type;
+  check('a length scope makes a FLOAT a dimension, whatever it is called', () =>
+    ['radius/medium', 'border/width/hairline', 'grid/gutters', 'surface-width/small',
+     'spacing/component/4'].every((k) => dt(k) === 'dimension'));
+  check('an opacity stays a number', () => dt('rim/intensity') === 'number');
+  check('a FLOAT with no scope at all stays a number — the honest answer', () =>
+    dt('grid/count') === 'number' && dt('core-effects/angle') === 'number');
+  check('the rule only ever adds: what was already a dimension still is', () =>
+    dt('radius/medium') === 'dimension' && dt('spacing/component/4') === 'dimension');
 
   /*
     WHICH FILE, AND WHICH VARIABLE WAS WHICH (2026-11-15, issue 12).
