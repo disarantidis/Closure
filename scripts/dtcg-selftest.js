@@ -167,8 +167,26 @@ function loadFilenameHelpers() {
 }
 
 const results = [];
+/*
+  `ok` may be a boolean or a function returning one. The function form exists
+  because a boolean argument has to be computed before the call, which means a
+  reference into a tree that might not be there throws before check() is
+  reached; a function lets the throw be caught and reported as a failure.
+
+  It also closes a trap: a function passed to the OLD two-line version was
+  coerced with !! and a function is always truthy, so such a check passed
+  without running. Two written on 2026-11-15 did exactly that, and were only
+  noticed because a third, written as a boolean, failed beside them.
+*/
 function check(name, ok) {
-  results.push([name, !!ok]);
+  var value;
+  if (typeof ok === 'function') {
+    try { value = ok(); }
+    catch (e) { results.push([name + ' — threw: ' + (e && e.message), false]); return; }
+  } else {
+    value = ok;
+  }
+  results.push([name, !!value]);
 }
 
 function run() {
@@ -487,6 +505,35 @@ function run() {
     !!(refTokens.core && refTokens.core.lineHeights && refTokens.core.lineHeights['0']));
   check('and keeping it leaves the reference closed',
     plugin.validateReferenceClosure(refTokens).brokenCount === 0);
+
+  /*
+    A THEME PER MODE, FOR A COLLECTION NO RULE RECOGNISES (2026-11-15).
+
+    The pass-through writer has always emitted one set per mode — 37 of them on
+    Pomegranate Identity, every one named in tokenSetOrder. Nothing selected
+    them: $themes held only "foundation" and ".core", built from the two
+    collections whose names happen to match a rule. A reader following $themes
+    therefore saw one mode of each collection and read it as modes being
+    dropped.
+
+    weightLikeFixture() has exactly that shape: `weight` has three modes and no
+    rule claims it.
+  */
+  const themeNames = (wtokens.$themes || []).map((t) => t.name);
+  check('an unclaimed multi-mode collection gets one theme per mode',
+    ['light', 'regular', 'bold'].every((m) => themeNames.includes(m)),
+    'themes were: ' + themeNames.join(', '));
+  check('each one is grouped under its collection and selects its own set', () => {
+    const t = (wtokens.$themes || []).find((x) => x.name === 'bold');
+    return t && t.group === 'weight' && t.selectedTokenSets['weight/bold'] === 'enabled';
+  });
+  check('a single-mode collection gets no theme of its own — it offers no choice',
+    !themeNames.includes('uses'));
+  check('and the theme still closes: what its tokens reference is pulled in', () => {
+    const t = (wtokens.$themes || []).find((x) => x.name === 'light');
+    // `uses` references {weight.style-name}; a weight set must be selected.
+    return t && Object.keys(t.selectedTokenSets).some((k) => k.indexOf('weight/') === 0);
+  });
 
   /*
     A COMPOSITE CELL IS NAMED, NOT ID-ED (2026-11-15).
