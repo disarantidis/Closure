@@ -4309,14 +4309,20 @@ function handle_extract(msg) {
           figma.fileKey is NOT opened by a manifest permission — "fileKey" is
           not one of them (currentuser, activeusers, fileusers, payments,
           teamlibrary are), and putting it there is a manifest Figma can
-          reject. It is gated by "enablePrivatePluginApi": true AND the plugin
-          being private: a public plugin reads undefined whatever the manifest
-          says.
+          reject. The flag is "enablePrivatePluginApi": true, which this
+          manifest now carries.
 
-          So this is null on an ordinary build, and the export says nothing
-          about which file it came from rather than claiming one. A file NAME
-          is not an identity — two files can share it — which is why the name
-          is written separately and never stands in for the key.
+          Verified rather than read off a doc: the Figma Desktop Bridge plugin
+          on this machine carries that flag, carries no such permission, and
+          reads figma.fileKey fine from a locally imported dev plugin.
+
+          It stays conditional anyway. The flag is for a PRIVATE plugin —
+          Closure is imported from its manifest, so it applies, but published
+          to the Community it would have to come out and a public plugin reads
+          undefined regardless. When Figma says nothing the export says
+          nothing, rather than claiming a file. A file NAME is not an identity
+          — two files can share it — which is why the name is written
+          separately and never stands in for the key.
         */
         fileKey: figma.fileKey || null,
         styles: styles
