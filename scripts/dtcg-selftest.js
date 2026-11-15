@@ -516,6 +516,47 @@ function run() {
     plugin.validateReferenceClosure(refTokens).brokenCount === 0);
 
   /*
+    EVERY MODE OF THE SCHEME AXIS GETS A THEME (2026-11-15, second re-test).
+
+    The scheme rule works from a hand-written list — neutral, inverted, white,
+    black, brand, secondary — and that list is also what CLAIMS the collection,
+    so the pass-through rule skips it. A file whose scheme axis has other modes
+    got a theme for none of them, from either path.
+
+    Pomegranate Identity has nine: the five it knows plus success, error, info
+    and warning. The four sets were in the document and in tokenSetOrder, named
+    and unselected — 212 values nothing pointed at.
+  */
+  const sRaw = {
+    collections: [{
+      id: 'sc1', name: 'scheme',
+      modes: ['neutral', 'inverted', 'brand', 'white', 'black', 'success', 'error', 'info', 'warning']
+        .map((n, i) => ({ modeId: 'sm' + i, name: n })),
+      defaultModeId: 'sm0',
+      variables: [mkVar('sv1', 'scheme/text/basic', 'COLOR',
+        Object.fromEntries([...Array(9)].map((_, i) => ['sm' + i, { r: i / 10, g: 0, b: 0, a: 1 }])))],
+    }],
+  };
+  const sTokens = plugin.toTokenFormat(
+    plugin.transformToFinalFormat(sRaw, { includeDescriptions: true }).tokens, sRaw);
+  const sThemes = sTokens.$themes || [];
+  const sNames = sThemes.map((t) => t.name);
+  check('a scheme mode the hand-written list does not know still gets a theme',
+    ['success', 'error', 'info', 'warning'].every((n) => sNames.includes(n)));
+  check('the five it does know are still there, and none is duplicated', () => {
+    const want = ['neutral', 'inverted', 'brand', 'white', 'black'];
+    return want.every((n) => sNames.filter((x) => x === n).length === 1);
+  });
+  check('a derived scheme mode selects its own set', () => {
+    const t = sThemes.find((x) => x.name === 'warning');
+    return t && t.selectedTokenSets['scheme/warning'] === 'enabled';
+  });
+  check('an undotted scheme collection is grouped like its siblings, not as ".scheme"', () => {
+    const t = sThemes.find((x) => x.name === 'error');
+    return t && t.group === 'scheme';
+  });
+
+  /*
     A TEXT STYLE'S PROPERTY COMES FROM THE VARIABLE IT BINDS (2026-11-15).
 
     foundation.typography.<scale>.<prop> pointed at the same-named sibling
