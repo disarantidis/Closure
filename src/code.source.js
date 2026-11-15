@@ -4303,10 +4303,21 @@ function handle_extract(msg) {
         type: 'extracted',
         collections: result,
         fileName: (figma.root && figma.root.name) || '',
-        /* WHICH FILE THIS CAME FROM. Needs manifest permissions ["fileKey"];
-           without it figma.fileKey is undefined, so this is null and the
-           export simply says nothing rather than claiming a file. A name is
-           not an identity — two files can share one. */
+        /*
+          WHICH FILE THIS CAME FROM, when Figma will say.
+
+          figma.fileKey is NOT opened by a manifest permission — "fileKey" is
+          not one of them (currentuser, activeusers, fileusers, payments,
+          teamlibrary are), and putting it there is a manifest Figma can
+          reject. It is gated by "enablePrivatePluginApi": true AND the plugin
+          being private: a public plugin reads undefined whatever the manifest
+          says.
+
+          So this is null on an ordinary build, and the export says nothing
+          about which file it came from rather than claiming one. A file NAME
+          is not an identity — two files can share it — which is why the name
+          is written separately and never stands in for the key.
+        */
         fileKey: figma.fileKey || null,
         styles: styles
       });

@@ -7,7 +7,6 @@
   "capabilities": [],
   "enableProposedApi": false,
   "editorType": ["figma"],
-  "permissions": ["fileKey"],
   "networkAccess": {
     "allowedDomains": [
       "https://gitlab.com",
