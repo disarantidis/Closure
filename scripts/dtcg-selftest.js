@@ -516,6 +516,48 @@ function run() {
     plugin.validateReferenceClosure(refTokens).brokenCount === 0);
 
   /*
+    A PLAIN REFERENCE SURVIVES THE DIMENSION FAMILY (2026-11-15, issue 3).
+
+    dimension and number resolved every reference, because they must evaluate
+    arithmetic — `2*{dimension.base}` has no DTCG spelling. A value that is one
+    reference and nothing else is not arithmetic, and resolving it threw the
+    link away: 193 tokens of the real export came out as numbers where the file
+    says `{core-dimensions.12}`.
+  */
+  const refTree = {
+    core: {
+      'core-dimensions': { 12: { value: 12, type: 'number' } },
+      dimension: { base: { value: 4, type: 'dimension' } },
+      'line-heights': { 100: { value: '100%', type: 'number' } },
+    },
+    foundation: {
+      /* The math's targets sit in THIS set: in the sets shape each set is
+         converted on its own, so a reference out of it cannot be resolved and
+         would be left alone for that reason instead of this one. */
+      dimension: { base: { value: 4, type: 'dimension' } },
+      'core-dimensions': { 12: { value: 12, type: 'number' } },
+      'line-heights': { 100: { value: '100%', type: 'number' } },
+      radius: { medium: { value: '{core-dimensions.12}', type: 'dimension' } },
+      spacing: { gutter: { value: '2*{dimension.base}', type: 'dimension' } },
+      type: { leading: { value: '{line-heights.100}', type: 'number' } },
+      computed: { lh: { value: '( {core-dimensions.12} / 100 ) * {line-heights.100}', type: 'number' } },
+    },
+    $metadata: { tokenSetOrder: ['core', 'foundation'] },
+  };
+  const refOut = toDtcgFormat(refTree, { shape: 'sets' }).tokens;
+  check('a dimension that is one reference keeps the reference', () =>
+    refOut.foundation.radius.medium.$value === '{core-dimensions.12}');
+  check('a number that is one reference keeps the reference', () =>
+    refOut.foundation.type.leading.$value === '{line-heights.100}');
+  check('arithmetic is still evaluated — that is why this resolved at all', () =>
+    refOut.foundation.spacing.gutter.$value.value === 8 &&
+    refOut.foundation.spacing.gutter.$value.unit === 'px');
+  check('a computed number with two references is still evaluated', () =>
+    typeof refOut.foundation.computed.lh.$value === 'number');
+  check('a plain number is untouched', () =>
+    refOut.core.dimension.base.$value.value === 4);
+
+  /*
     EVERY MODE OF THE SCHEME AXIS GETS A THEME (2026-11-15, second re-test).
 
     The scheme rule works from a hand-written list — neutral, inverted, white,

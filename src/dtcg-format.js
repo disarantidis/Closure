@@ -326,7 +326,32 @@
     return evaluateDimensionMath(root, trimmed, depth || 0);
   }
 
+  /*
+    A PLAIN REFERENCE IS NOT A MATH EXPRESSION.
+
+    These two types resolve a reference because they have to: a dimension or a
+    number can carry arithmetic — `2*{dimension.base}`, `({size} / 100) *
+    {line-heights.100}` — and DTCG has no way to say that, so the only honest
+    output is the evaluated value.
+
+    A value that is exactly one reference and nothing else is not arithmetic.
+    DTCG aliases it natively, and resolving it threw the link away: 193 tokens
+    of a real export (Pomegranate Identity) came out as numbers where the file
+    says `{core-dimensions.12}`, so changing `core-dimensions/12` moved nothing
+    downstream. Colour, string, timing and easing aliases were kept all along —
+    this was the dimension family being treated differently for a reason that
+    only applies to expressions.
+
+    Evaluating still happens for everything else, which is every case the
+    evaluator was written for.
+  */
+  var PLAIN_REFERENCE = /^\{[^{}]+\}$/;
+  function isPlainReference(value) {
+    return typeof value === 'string' && PLAIN_REFERENCE.test(value.trim());
+  }
+
   function toDtcgDimension(value, root) {
+    if (isPlainReference(value)) return value.trim();
     if (typeof value === 'string' && value.indexOf('{') !== -1) {
       var resolved = root ? resolveDimensionNumber(root, value, 0) : null;
       if (resolved === null) return value; // still can't be resolved — leave the reference as-is
@@ -352,6 +377,10 @@
   function toDtcgNumber(value, root) {
     if (typeof value === 'number') return value;
     if (typeof value !== 'string') return value;
+    /* One reference and nothing else — see isPlainReference. The target is
+       converted by these same rules, so a consumer following the reference
+       lands on the number this would have written. */
+    if (isPlainReference(value)) return value.trim();
     var trimmed = value.trim();
     if (trimmed.indexOf('{') !== -1) {
       var resolved = root ? resolveDimensionNumber(root, trimmed, 0) : null;
