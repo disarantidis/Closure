@@ -572,8 +572,8 @@ function run() {
   };
   const stTokens = plugin.toTokenFormat(
     plugin.transformToFinalFormat(stRaw, { includeDescriptions: true }).tokens, stRaw);
-  const ST = stTokens.styles || {};
-  check('the styles land in their own set, one group per kind', () =>
+  const ST = (stTokens.foundation || {}).styles || {};
+  check('the styles land under one group, one subgroup per kind', () =>
     !!(ST.effect && ST.grid && ST.paint));
   check('a two-layer effect style becomes a list of shadows', () => {
     const v = ST.effect.elevation.medium.value;
@@ -603,17 +603,18 @@ function run() {
     const p = ST.paint.surface.raised;
     return p.type === 'color' && /^(#|rgba)/.test(p.value) && p.figmaOpacity === 0.4;
   });
-  check('a styles theme selects the set, so the themes shape carries it too', () => {
-    const t = (stTokens.$themes || []).find((x) => x.name === 'styles');
-    return t && t.selectedTokenSets.styles === 'enabled';
+  check('the styles sit in foundation, so both shapes carry them without a set of their own', () => {
+    /* A set's groups merge at the THEME root, so a "styles" SET arrived as
+       grid.page beside the grid variables. A group inside foundation does not. */
+    return !stTokens.styles && !!(stTokens.foundation && stTokens.foundation.styles);
   });
   check('the gradient survives the DTCG conversion as $type gradient', () => {
     const dt = toDtcgFormat(stTokens, { shape: 'sets' }).tokens;
-    return dt.styles.paint.gradient['fade-out-down'].$type === 'gradient';
+    return dt.foundation.styles.paint.gradient['fade-out-down'].$type === 'gradient';
   });
   check('the effect survives as $type shadow', () => {
     const dt = toDtcgFormat(stTokens, { shape: 'sets' }).tokens;
-    return dt.styles.effect.elevation.medium.$type === 'shadow';
+    return dt.foundation.styles.effect.elevation.medium.$type === 'shadow';
   });
 
   /*

@@ -1745,27 +1745,6 @@ function buildThemes(rawData, tokenSetNames) {
     }
   }
 
-  /*
-    The styles' own theme, so the set is visible in the themes shape too — a
-    set nothing selects is emitted in the sets shape and nowhere else, and the
-    style tokens are referenced by nothing, so no other theme would pull them
-    in. `core` as source, because a bound field is written as a reference into
-    it.
-  */
-  if (tokenSetNames.indexOf('styles') !== -1) {
-    var stylesHost = collectionMap['foundation'] ||
-      (rawData.collections && rawData.collections[0]);
-    if (stylesHost && stylesHost.modes && stylesHost.modes.length) {
-      themeConfigs.push({
-        name: 'styles',
-        group: null,
-        selectedTokenSets: { 'styles': 'enabled', 'core': 'source' },
-        collection: stylesHost,
-        modeIndex: 0
-      });
-    }
-  }
-
   // Core theme with dot prefix (as in the token format)
   if (tokenSetNames.indexOf('core') !== -1) {
     var coreCol = collectionMap['.core'] || collectionMap['core'];
@@ -3451,10 +3430,22 @@ function toTokenFormat(native, rawData) {
     one or two themes the named rules had managed to build. The sets were in
     the document; nothing pointed at them.
   */
-  /* The file's styles, as their own set — before the themes, so one can
-     select it (see buildStyleTokens). */
+  /*
+    The file's styles, as a `styles` group of the consumption layer.
+
+    NOT a set of their own, which is where this started and which only half
+    worked: a set's groups are merged at the THEME root, so the set's name
+    disappears and `styles/grid/page` arrived as `grid.page`, in the same group
+    as the grid variables — the collision the separate set was chosen to avoid.
+    One group inside foundation survives both shapes: `foundation/styles/...`
+    in the sets shape, `styles/...` at the theme root in the themes shape, and
+    `styles` collides with nothing either way.
+  */
   var styleTokens = buildStyleTokens(rawData);
-  if (styleTokens) out['styles'] = styleTokens;
+  if (styleTokens) {
+    if (!out['foundation']) out['foundation'] = {};
+    out['foundation']['styles'] = styleTokens;
+  }
 
   var tokenSetNames = Object.keys(out).filter(function(k) { return k !== '$themes'; });
   out['$themes'] = buildThemes(rawData, tokenSetNames);
