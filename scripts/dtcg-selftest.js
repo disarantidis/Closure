@@ -178,6 +178,15 @@ const results = [];
   without running. Two written on 2026-11-15 did exactly that, and were only
   noticed because a third, written as a boolean, failed beside them.
 */
+/* One variable, as the extractor hands them over. */
+function mkVar(id, name, type, byMode) {
+  return {
+    id: id, name: name, type: type,
+    valuesByMode: byMode, resolvedValuesByMode: byMode,
+    aliasInfo: {}, codeSyntax: {}, description: '', scopes: [],
+  };
+}
+
 function check(name, ok) {
   var value;
   if (typeof ok === 'function') {
@@ -505,6 +514,68 @@ function run() {
     !!(refTokens.core && refTokens.core.lineHeights && refTokens.core.lineHeights['0']));
   check('and keeping it leaves the reference closed',
     plugin.validateReferenceClosure(refTokens).brokenCount === 0);
+
+  /*
+    A TEXT STYLE'S PROPERTY COMES FROM THE VARIABLE IT BINDS (2026-11-15).
+
+    foundation.typography.<scale>.<prop> pointed at the same-named sibling
+    under breakpoint.typography — a convention, not a reading. Pomegranate
+    Identity binds line height to `line-height-px` (an absolute, per
+    breakpoint) while `line-height` beside it is a multiplier aliased to core
+    (normal = 1.5). For eight of ten levels size × multiplier happens to equal
+    the px value; for subtitle (22 → 26, not 33) and body-m (16 → 18, not 24)
+    it does not, and the export described a line height the file never draws.
+
+    `paragraph` below binds nothing, which is the other half of the rule: with
+    no binding to read, the conventional sibling is all there is.
+  */
+  const tRaw = {
+    collections: [{
+      id: 'bp1', name: 'breakpoint',
+      modes: [{ modeId: 'bm1', name: 'mobile' }],
+      defaultModeId: 'bm1',
+      variables: [
+        mkVar('tv1', 'breakpoint/typography/subtitle/size', 'FLOAT', { bm1: 22 }),
+        mkVar('tv2', 'breakpoint/typography/subtitle/line-height', 'FLOAT', { bm1: 1.5 }),
+        mkVar('tv3', 'breakpoint/typography/subtitle/line-height-px', 'FLOAT', { bm1: 26 }),
+        mkVar('tv4', 'breakpoint/typography/paragraph/size', 'FLOAT', { bm1: 16 }),
+        mkVar('tv5', 'breakpoint/typography/paragraph/line-height', 'FLOAT', { bm1: 1.5 }),
+      ],
+    }],
+    styles: {
+      textStyles: [
+        { id: 'S:1', name: 'Subtitle', type: 'TEXT', description: '',
+          fontName: { family: 'Inter', style: 'Regular' }, textCase: 'ORIGINAL', textDecoration: 'NONE',
+          values: { fontSize: 22 },
+          bound: { fontSize: 'breakpoint::breakpoint/typography/subtitle/size',
+                   lineHeight: 'breakpoint::breakpoint/typography/subtitle/line-height-px' } },
+        { id: 'S:2', name: 'Paragraph', type: 'TEXT', description: '',
+          fontName: { family: 'Inter', style: 'Regular' }, textCase: 'ORIGINAL', textDecoration: 'NONE',
+          values: { fontSize: 16 }, bound: {} },
+        /* A read that failed: id and name only, no bindings to offer. */
+        { id: 'S:3', name: 'Subtitle', type: 'TEXT' },
+      ],
+    },
+  };
+  const tTokens = plugin.toTokenFormat(
+    plugin.transformToFinalFormat(tRaw, { includeDescriptions: true }).tokens, tRaw);
+  const styleTypo = (tTokens.foundation && tTokens.foundation.typography) || {};
+  check('a bound property points at the variable the style binds, not the sibling', () => {
+    return styleTypo.subtitle['line-height'].value === '{breakpoint.typography.subtitle.line-height-px}';
+  });
+  check('the binding also names the collection it came from', () => {
+    return styleTypo.subtitle['line-height'].aliasCollection === 'breakpoint';
+  });
+  check('a property bound to the sibling is unchanged by the new reading', () => {
+    return styleTypo.subtitle.size.value === '{breakpoint.typography.subtitle.size}';
+  });
+  check('an unbound property keeps the conventional sibling', () => {
+    return styleTypo.paragraph['line-height'].value === '{breakpoint.typography.paragraph.line-height}';
+  });
+  check('an id-and-name-only style does not blank out what a real one bound', () => {
+    // S:3 is the same scale as S:1 and carries no `bound`; S:1 must survive it.
+    return styleTypo.subtitle['line-height'].value.indexOf('line-height-px') !== -1;
+  });
 
   /*
     A THEME PER MODE, FOR A COLLECTION NO RULE RECOGNISES (2026-11-15).
