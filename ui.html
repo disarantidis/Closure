@@ -31421,31 +31421,37 @@
       set = setShape;
       setHint = (h) => setHintState(h);
       setResolvedHint = (h) => setResolvedHintState(h);
-      const resolved = shape === "resolved";
       const choose = (next) => {
         setShape(next);
         window.PomOutputFormat.onChange?.(next);
       };
-      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-2)" }, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+      const SHAPES = [
+        { id: "themes", title: "Per theme", note: "One self-contained document per theme" },
+        { id: "sets", title: "One set per mode", note: "One set per collection and mode, with no merged copies" },
+        { id: "resolved", title: "Resolved", note: "" }
+      ];
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-2)" }, children: SHAPES.map((s) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
         SelectableCard,
         {
-          label: "Resolved",
-          selected: resolved,
-          onSelect: () => choose(resolved ? "themes" : "resolved"),
-          mark: "switch",
+          label: s.title,
+          selected: shape === s.id,
+          onSelect: () => choose(s.id),
+          mark: "radio",
           level: GROUND,
           children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 2 }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontWeight: 600, color: "var(--app-text)" }, children: "Resolved" }),
-            resolvedHint && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: resolvedHint }),
-            hint && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: hint })
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontWeight: 600, color: "var(--app-text)" }, children: s.title }),
+            s.note && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: s.note }),
+            s.id === "resolved" && resolvedHint && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: resolvedHint }),
+            s.id === "resolved" && hint && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: hint })
           ] })
-        }
-      ) });
+        },
+        s.id
+      )) });
     }
     if (container) (0, import_react_dom2.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(View, {})));
     window.PomOutputFormat = {
       onChange: null,
-      setValue: (v) => set(v === "resolved" ? "resolved" : "themes"),
+      setValue: (v) => set(v === "resolved" || v === "sets" ? v : "themes"),
       setHint: (h) => setHint(h),
       setResolvedHint: (h) => setResolvedHint(h)
     };
@@ -43598,7 +43604,7 @@ if (global) global.PomStudioApply = api;
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'ad083f2 17:28:42';
+    var CLOSURE_BUILD = 'ae79e38 17:36:21';
     (function () { var el = document.getElementById('build-stamp'); if (el) el.textContent = 'Plugin build ' + CLOSURE_BUILD; })();
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
@@ -43608,6 +43614,12 @@ if (global) global.PomStudioApply = api;
     // tree rather than one per theme. It gets its own suffix so switching
     // format never has the two land on the same file name.
     var RESOLVED_SUFFIX = '_resolved';
+    /* One set per collection and mode, which is a third document again — the
+       per-theme shape has already merged the sets away, so a consumer that
+       resolves selectedTokenSets needs this one. Its own suffix for the same
+       reason Resolved has one: switching format must never land two shapes on
+       the same file name. */
+    var SETS_SUFFIX = '_sets';
     // v1.4.0 development builds wrote _W3C before the output was renamed (it is
     // a partial DTCG conversion, not strict W3C). Still recognised so a name
     // saved by one of those strips cleanly, and re-suffixes to _dtcg, instead of
@@ -43634,12 +43646,14 @@ if (global) global.PomStudioApply = api;
     // The suffix the ACTIVE format writes to. Everything else recognises all of
     // them, so switching between formats strips cleanly in either direction.
     function activeSuffix() {
-      return dtcgShape === 'resolved' ? RESOLVED_SUFFIX : DTCG_SUFFIX;
+      if (dtcgShape === 'resolved') return RESOLVED_SUFFIX;
+      if (dtcgShape === 'sets') return SETS_SUFFIX;
+      return DTCG_SUFFIX;
     }
     // Which suffix a name currently carries — the live one, a legacy one, or none.
     function matchedDtcgSuffix(name) {
       var base = splitFilename(name).base;
-      var all = [DTCG_SUFFIX, RESOLVED_SUFFIX].concat(LEGACY_DTCG_SUFFIXES);
+      var all = [DTCG_SUFFIX, RESOLVED_SUFFIX, SETS_SUFFIX].concat(LEGACY_DTCG_SUFFIXES);
       for (var i = 0; i < all.length; i++) {
         if (all[i].length <= base.length && base.slice(-all[i].length) === all[i]) return all[i];
       }
@@ -43688,6 +43702,7 @@ if (global) global.PomStudioApply = api;
     function filenameForShape(shape) {
       var base = ensureJsonExtension(filenameFieldValue() || DEFAULT_FILENAME);
       if (shape === 'themes') return withSuffix(base, DTCG_SUFFIX);
+      if (shape === 'sets') return withSuffix(base, SETS_SUFFIX);
       if (shape === 'resolved') return withSuffix(base, RESOLVED_SUFFIX);
       return withSuffix(base, null);
     }
@@ -44334,7 +44349,8 @@ if (global) global.PomStudioApply = api;
         /* Always DTCG now: 'resolved' is the one thing a config can still ask
            for, and every other value — including 'legacy' from a config saved
            before Legacy JSON was dropped — reads as the per-theme shape. */
-        dtcgShape = config.outputFormat === 'resolved' ? 'resolved' : 'themes';
+        dtcgShape = (config.outputFormat === 'resolved' || config.outputFormat === 'sets')
+          ? config.outputFormat : 'themes';
         window.PomOutputFormat.setValue(dtcgShape);
         syncStructureBox();
         // No filename rewrite here: a config saved with dtcg on already stored
@@ -48792,7 +48808,7 @@ if (global) global.PomStudioApply = api;
     }
 
     window.PomOutputFormat.onChange = function(shape) {
-      setFormat(shape === 'resolved' ? 'resolved' : 'themes');
+      setFormat(shape === 'resolved' || shape === 'sets' ? shape : 'themes');
     };
 
     updateActionUI();

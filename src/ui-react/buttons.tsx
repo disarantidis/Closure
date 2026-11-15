@@ -1880,31 +1880,53 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
     setHint = (h) => setHintState(h);
     setResolvedHint = (h) => setResolvedHintState(h);
 
-    const resolved = shape === 'resolved';
     const choose = (next: string) => { setShape(next); window.PomOutputFormat.onChange?.(next); };
+
+    /*
+      Three documents, not a switch with two. "One set per mode" was the one
+      dtcg-format could already build and nothing could ask for: a consumer
+      that resolves themes from selectedTokenSets needs the sets, and the
+      per-theme shape has already merged them away.
+
+      A radio rather than two switches, because these are one choice of three
+      and two switches that cannot both be on would say otherwise.
+    */
+    const SHAPES: Array<{ id: string; title: string; note: string }> = [
+      { id: 'themes', title: 'Per theme', note: 'One self-contained document per theme' },
+      { id: 'sets', title: 'One set per mode', note: 'One set per collection and mode, with no merged copies' },
+      { id: 'resolved', title: 'Resolved', note: '' },
+    ];
 
     return (
       <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-2)' }}>
-        <SelectableCard
-          label="Resolved"
-          selected={resolved}
-          onSelect={() => choose(resolved ? 'themes' : 'resolved')}
-          mark="switch"
-          level={GROUND}
-        >
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>Resolved</span>
-            {resolvedHint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{resolvedHint}</span>}
-            {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
-          </span>
-        </SelectableCard>
+        {SHAPES.map((s) => (
+          <SelectableCard
+            key={s.id}
+            label={s.title}
+            selected={shape === s.id}
+            onSelect={() => choose(s.id)}
+            mark="radio"
+            level={GROUND}
+          >
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>{s.title}</span>
+              {s.note && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{s.note}</span>}
+              {/* The two hints the UI script sets belong to Resolved, and are
+                  about the document it writes — so they show on its card. */}
+              {s.id === 'resolved' && resolvedHint &&
+                <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{resolvedHint}</span>}
+              {s.id === 'resolved' && hint &&
+                <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
+            </span>
+          </SelectableCard>
+        ))}
       </span>
     );
   }
   if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomOutputFormat = {
     onChange: null,
-    setValue: (v) => set(v === 'resolved' ? 'resolved' : 'themes'),
+    setValue: (v) => set(v === 'resolved' || v === 'sets' ? v : 'themes'),
     setHint: (h) => setHint(h),
     setResolvedHint: (h) => setResolvedHint(h),
   };

@@ -373,6 +373,27 @@ function run() {
     // A name saved by a build that used the old _W3C suffix must not strand or
     // stack — it strips cleanly and re-suffixes to _dtcg.
     check('a legacy _W3C name is recognised', on.hasDtcgSuffix('tokens_W3C.json'));
+
+    /*
+      THE SETS SHAPE HAS A FILE NAME OF ITS OWN (2026-11-15).
+
+      dtcg-format could always build it; nothing could ask for it, so the
+      Settings control is now a choice of three. Each shape needs its own
+      suffix for the reason Resolved already had one — switching format must
+      never land two shapes on the same file.
+    */
+    const sets = loadFilenameHelpers()('sets');
+    check('the sets shape suffixes a name with _sets',
+      sets.dtcgFilename('tokens.json') === 'tokens_sets.json');
+    check('and strips it again, so switching format round-trips',
+      sets.plainFilename('tokens_sets.json') === 'tokens.json');
+    check('a _sets name is recognised as a shape suffix, not part of the stem',
+      sets.hasDtcgSuffix('tokens_sets.json'));
+    check('switching away from sets does not leave _sets behind',
+      on.dtcgFilename(sets.plainFilename('tokens_sets.json')) === 'tokens_dtcg.json');
+    /* filenameForShape() is not checked here: it reads the filename FIELD, so
+       it needs the DOM this extraction does not have. It is a thin wrapper
+       over withSuffix, which the four checks above exercise directly. */
     check('a legacy _W3C name strips cleanly',
       on.plainFilename('tokens_W3C.json') === 'tokens.json');
     check('a legacy _W3C name migrates to _dtcg, not tokens_W3C_dtcg',
