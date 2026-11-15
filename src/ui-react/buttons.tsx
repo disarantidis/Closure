@@ -1883,43 +1883,44 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
     const choose = (next: string) => { setShape(next); window.PomOutputFormat.onChange?.(next); };
 
     /*
-      Three documents, not a switch with two. "One set per mode" was the one
-      dtcg-format could already build and nothing could ask for: a consumer
-      that resolves themes from selectedTokenSets needs the sets, and the
-      per-theme shape has already merged them away.
+      One choice of three, drawn the way this plugin draws a choice of
+      formats: the SegmentedControl, as "Output format" and "Push destination"
+      already are. Three stacked SelectableCards was tried and is wrong here —
+      it makes a small setting as tall as a section, and the one card carrying
+      the Resolved hints towers over its two neighbours.
 
-      A radio rather than two switches, because these are one choice of three
-      and two switches that cannot both be on would say otherwise.
+      The labels stay short enough for three segments in this panel; the line
+      below says what the SELECTED one means, so only one explanation is on
+      screen at a time instead of three.
     */
-    const SHAPES: Array<{ id: string; title: string; note: string }> = [
-      { id: 'themes', title: 'Per theme', note: 'One self-contained document per theme' },
-      { id: 'sets', title: 'One set per mode', note: 'One set per collection and mode, with no merged copies' },
-      { id: 'resolved', title: 'Resolved', note: '' },
-    ];
+    const NOTE: Record<string, string> = {
+      themes: 'One self-contained document per theme.',
+      sets: 'One set per collection and mode, with no merged copies.',
+      resolved: '',
+    };
 
     return (
       <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-2)' }}>
-        {SHAPES.map((s) => (
-          <SelectableCard
-            key={s.id}
-            label={s.title}
-            selected={shape === s.id}
-            onSelect={() => choose(s.id)}
-            mark="radio"
-            level={GROUND}
-          >
-            <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>{s.title}</span>
-              {s.note && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{s.note}</span>}
-              {/* The two hints the UI script sets belong to Resolved, and are
-                  about the document it writes — so they show on its card. */}
-              {s.id === 'resolved' && resolvedHint &&
-                <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{resolvedHint}</span>}
-              {s.id === 'resolved' && hint &&
-                <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
-            </span>
-          </SelectableCard>
-        ))}
+        <SegmentedControl
+          label="Output format"
+          size="small"
+          block
+          value={shape}
+          options={[
+            { value: 'themes', label: 'Per theme' },
+            { value: 'sets', label: 'Per mode' },
+            { value: 'resolved', label: 'Resolved' },
+          ]}
+          onChange={choose}
+        />
+        {NOTE[shape] &&
+          <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{NOTE[shape]}</span>}
+        {/* Both hints are the UI script's and both are about Resolved — the
+            document it writes and how big it is — so they show only there. */}
+        {shape === 'resolved' && resolvedHint &&
+          <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{resolvedHint}</span>}
+        {shape === 'resolved' && hint &&
+          <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
       </span>
     );
   }

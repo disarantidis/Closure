@@ -31425,28 +31425,31 @@
         setShape(next);
         window.PomOutputFormat.onChange?.(next);
       };
-      const SHAPES = [
-        { id: "themes", title: "Per theme", note: "One self-contained document per theme" },
-        { id: "sets", title: "One set per mode", note: "One set per collection and mode, with no merged copies" },
-        { id: "resolved", title: "Resolved", note: "" }
-      ];
-      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-2)" }, children: SHAPES.map((s) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-        SelectableCard,
-        {
-          label: s.title,
-          selected: shape === s.id,
-          onSelect: () => choose(s.id),
-          mark: "radio",
-          level: GROUND,
-          children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: 2 }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontWeight: 600, color: "var(--app-text)" }, children: s.title }),
-            s.note && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: s.note }),
-            s.id === "resolved" && resolvedHint && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: resolvedHint }),
-            s.id === "resolved" && hint && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: hint })
-          ] })
-        },
-        s.id
-      )) });
+      const NOTE = {
+        themes: "One self-contained document per theme.",
+        sets: "One set per collection and mode, with no merged copies.",
+        resolved: ""
+      };
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { style: { display: "flex", flexDirection: "column", gap: "var(--spacing-component-2)" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+          SegmentedControl,
+          {
+            label: "Output format",
+            size: "small",
+            block: true,
+            value: shape,
+            options: [
+              { value: "themes", label: "Per theme" },
+              { value: "sets", label: "Per mode" },
+              { value: "resolved", label: "Resolved" }
+            ],
+            onChange: choose
+          }
+        ),
+        NOTE[shape] && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: NOTE[shape] }),
+        shape === "resolved" && resolvedHint && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: resolvedHint }),
+        shape === "resolved" && hint && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { style: { fontSize: 12, color: "var(--app-text-muted)" }, children: hint })
+      ] });
     }
     if (container) (0, import_react_dom2.flushSync)(() => (0, import_client.createRoot)(container).render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(View, {})));
     window.PomOutputFormat = {
@@ -43604,7 +43607,7 @@ if (global) global.PomStudioApply = api;
     // name per provider, so what Settings shows is always what gets pushed.
     // Stamped by scripts/build-ui.js. Logged on load so the build actually
     // running in Figma can be read off the console — see that file's note.
-    var CLOSURE_BUILD = 'ae79e38 17:36:21';
+    var CLOSURE_BUILD = '7ed169b 17:40:16';
     (function () { var el = document.getElementById('build-stamp'); if (el) el.textContent = 'Plugin build ' + CLOSURE_BUILD; })();
     console.log('[Closure] ui build ' + CLOSURE_BUILD);
 
