@@ -2668,14 +2668,50 @@ function typoScaleKey(name) {
   return String(name || '').replace(/\s+/g, '-').toLowerCase();
 }
 
-function boundTypographyRefs(rawData) {
+/*
+  A STYLE'S NAME IS NOT ITS SCALE'S NAME, and no single rule turns one into the
+  other. Pomegranate Identity's ten styles against its ten scales:
+
+    Title/Display  -> display        Body/L         -> body-l
+    Title/XL       -> title-xl       Body/M         -> body-m
+    Title/Subtitle -> subtitle       Body/Microcopy -> microcopy
+
+  Sometimes the whole path hyphenated, sometimes the last segment alone. So
+  offer both and let the file decide: whichever candidate names a scale the
+  document actually has, wins. Guessing one rule got font-family and line
+  height left on the conventional sibling in the 2026-11-15 16:00 export, even
+  though the binding was being read correctly — every style's key came out as
+  `title/display`, matching no scale at all.
+*/
+function typoScaleCandidates(styleName) {
+  var parts = String(styleName || '').split('/').map(function (p) {
+    return p.replace(/\s+/g, '-').toLowerCase();
+  }).filter(Boolean);
+  if (!parts.length) return [];
+  var out = [parts.join('-'), parts[parts.length - 1]];
+  if (parts.length > 2) out.push(parts.slice(1).join('-'));
+  return out;
+}
+
+function boundTypographyRefs(rawData, scales) {
   var byScale = {};
+  var known = {};
+  var haveScales = !!(scales && scales.length);
+  (scales || []).forEach(function (s) { known[typoScaleKey(s)] = true; });
   var styles = (rawData && rawData.styles && rawData.styles.textStyles) || [];
   styles.forEach(function (style) {
     /* An entry that arrived as id-and-name only (a read that failed) has no
        bindings to offer and must not blank out the convention. */
     if (!style || !style.name || !style.bound) return;
-    var key = typoScaleKey(style.name);
+    var candidates = typoScaleCandidates(style.name);
+    var key = null;
+    for (var i = 0; i < candidates.length; i++) {
+      if (!haveScales) { key = candidates[0]; break; }
+      if (known[candidates[i]]) { key = candidates[i]; break; }
+    }
+    /* No scale in this file answers to this style — say nothing rather than
+       file the bindings under a name nothing will ask for. */
+    if (!key) return;
     var per = byScale[key] || (byScale[key] = {});
     Object.keys(STYLE_FIELD_FOR_TYPO_PROP).forEach(function (prop) {
       var bound = style.bound[STYLE_FIELD_FOR_TYPO_PROP[prop]];
@@ -2915,7 +2951,7 @@ function toTokenFormat(native, rawData) {
   var foundTypography = {};
   /* What each style BINDS, which beats the same-named sibling wherever the two
      disagree — see boundTypographyRefs. */
-  var boundRefs = boundTypographyRefs(rawData);
+  var boundRefs = boundTypographyRefs(rawData, typScales);
   typScales.forEach(function(scale) {
     foundTypography[scale] = {};
     var bound = boundRefs[typoScaleKey(scale)] || {};

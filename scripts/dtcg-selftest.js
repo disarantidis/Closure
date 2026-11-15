@@ -613,6 +613,50 @@ function run() {
   check('an unbound property keeps the conventional sibling', () => {
     return styleTypo.paragraph['line-height'].value === '{breakpoint.typography.paragraph.line-height}';
   });
+  /*
+    THE STYLE'S NAME IS NOT THE SCALE'S NAME (2026-11-15, third export).
+
+    c054e82 read the bindings correctly and still changed nothing in the real
+    export: every style is called `Title/Display`, `Body/M`, `Title/Subtitle`,
+    so the key came out `title/display` and matched no scale. Both shapes are
+    needed — the whole path hyphenated for `Title/XL` -> `title-xl`, the last
+    segment alone for `Title/Display` -> `display` — and the file decides which.
+  */
+  const nRaw = {
+    collections: [{
+      id: 'bp2', name: 'breakpoint',
+      modes: [{ modeId: 'nm1', name: 'mobile' }],
+      defaultModeId: 'nm1',
+      variables: [
+        mkVar('nv1', 'breakpoint/typography/display/size', 'FLOAT', { nm1: 40 }),
+        mkVar('nv2', 'breakpoint/typography/display/line-height', 'FLOAT', { nm1: 1.2 }),
+        mkVar('nv3', 'breakpoint/typography/display/line-height-px', 'FLOAT', { nm1: 48 }),
+        mkVar('nv4', 'breakpoint/typography/title-xl/size', 'FLOAT', { nm1: 32 }),
+        mkVar('nv5', 'breakpoint/typography/title-xl/line-height-px', 'FLOAT', { nm1: 38.4 }),
+        mkVar('nv6', 'breakpoint/typography/subtitle/size', 'FLOAT', { nm1: 22 }),
+        mkVar('nv7', 'breakpoint/typography/subtitle/line-height-px', 'FLOAT', { nm1: 26 }),
+      ],
+    }],
+    styles: {
+      textStyles: ['Title/Display', 'Title/XL', 'Title/Subtitle'].map((name, i) => ({
+        id: 'S:' + (20 + i), name: name, type: 'TEXT', description: '',
+        fontName: { family: 'Inter', style: 'Bold' }, textCase: 'ORIGINAL', textDecoration: 'NONE',
+        values: {},
+        bound: { lineHeight: 'breakpoint::breakpoint/typography/' +
+          ['display', 'title-xl', 'subtitle'][i] + '/line-height-px' },
+      })),
+    },
+  };
+  const nTypo = (plugin.toTokenFormat(
+    plugin.transformToFinalFormat(nRaw, { includeDescriptions: true }).tokens, nRaw)
+    .foundation || {}).typography || {};
+  check('"Title/XL" resolves to the scale title-xl (whole path hyphenated)', () =>
+    nTypo['title-xl']['line-height'].value === '{breakpoint.typography.title-xl.line-height-px}');
+  check('"Title/Display" resolves to the scale display (last segment alone)', () =>
+    nTypo.display['line-height'].value === '{breakpoint.typography.display.line-height-px}');
+  check('"Title/Subtitle" resolves to subtitle, not title-subtitle', () =>
+    nTypo.subtitle['line-height'].value === '{breakpoint.typography.subtitle.line-height-px}');
+
   check('an id-and-name-only style does not blank out what a real one bound', () => {
     // S:3 is the same scale as S:1 and carries no `bound`; S:1 must survive it.
     return styleTypo.subtitle['line-height'].value.indexOf('line-height-px') !== -1;
