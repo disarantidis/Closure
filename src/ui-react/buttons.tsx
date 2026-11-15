@@ -1880,54 +1880,41 @@ function targetFromCheckboxes(s: PushCheckboxState): PushTarget {
     setHint = (h) => setHintState(h);
     setResolvedHint = (h) => setResolvedHintState(h);
 
-    const choose = (next: string) => { setShape(next); window.PomOutputFormat.onChange?.(next); };
-
     /*
-      One choice of three, drawn the way this plugin draws a choice of
-      formats: the SegmentedControl, as "Output format" and "Push destination"
-      already are. Three stacked SelectableCards was tried and is wrong here —
-      it makes a small setting as tall as a section, and the one card carrying
-      the Resolved hints towers over its two neighbours.
+      TWO FORMATS, AND THE SWITCH SAYS WHICH.
 
-      The labels stay short enough for three segments in this panel; the line
-      below says what the SELECTED one means, so only one explanation is on
-      screen at a time instead of three.
+      The classic export and the resolved one — the shape this control has
+      always had, and the only choice there is. A segmented control with three
+      options was tried and taken back out: the third was the sets shape, and
+      the sets shape is not a third format, it is what the CLASSIC export
+      should have been writing all along. One JSON, each collection and mode
+      its own set, nothing merged. So it is off the control and in the default.
     */
-    const NOTE: Record<string, string> = {
-      themes: 'One self-contained document per theme.',
-      sets: 'One set per collection and mode, with no merged copies.',
-      resolved: '',
-    };
+    const resolved = shape === 'resolved';
+    const choose = (next: string) => { setShape(next); window.PomOutputFormat.onChange?.(next); };
 
     return (
       <span style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-component-2)' }}>
-        <SegmentedControl
-          label="Output format"
-          size="small"
-          block
-          value={shape}
-          options={[
-            { value: 'themes', label: 'Per theme' },
-            { value: 'sets', label: 'Per mode' },
-            { value: 'resolved', label: 'Resolved' },
-          ]}
-          onChange={choose}
-        />
-        {NOTE[shape] &&
-          <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{NOTE[shape]}</span>}
-        {/* Both hints are the UI script's and both are about Resolved — the
-            document it writes and how big it is — so they show only there. */}
-        {shape === 'resolved' && resolvedHint &&
-          <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{resolvedHint}</span>}
-        {shape === 'resolved' && hint &&
-          <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
+        <SelectableCard
+          label="Resolved"
+          selected={resolved}
+          onSelect={() => choose(resolved ? 'sets' : 'resolved')}
+          mark="switch"
+          level={GROUND}
+        >
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontWeight: 600, color: 'var(--app-text)' }}>Resolved</span>
+            {resolvedHint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{resolvedHint}</span>}
+            {hint && <span style={{ fontSize: 12, color: 'var(--app-text-muted)' }}>{hint}</span>}
+          </span>
+        </SelectableCard>
       </span>
     );
   }
   if (container) flushSync(() => createRoot(container).render(<View />));
   window.PomOutputFormat = {
     onChange: null,
-    setValue: (v) => set(v === 'resolved' || v === 'sets' ? v : 'themes'),
+    setValue: (v) => set(v === 'resolved' ? 'resolved' : 'sets'),
     setHint: (h) => setHint(h),
     setResolvedHint: (h) => setResolvedHint(h),
   };

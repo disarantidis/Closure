@@ -375,22 +375,25 @@ function run() {
     check('a legacy _W3C name is recognised', on.hasDtcgSuffix('tokens_W3C.json'));
 
     /*
-      THE SETS SHAPE HAS A FILE NAME OF ITS OWN (2026-11-15).
+      THE CLASSIC EXPORT IS THE SETS SHAPE, AND KEEPS THE CLASSIC NAME.
 
-      dtcg-format could always build it; nothing could ask for it, so the
-      Settings control is now a choice of three. Each shape needs its own
-      suffix for the reason Resolved already had one — switching format must
-      never land two shapes on the same file.
+      For one build the sets shape was a third option on the control with a
+      `_sets` suffix of its own. It is not a third format: one set per
+      collection and mode is what the classic export should always have
+      written, so it is the default now and the control is back to the two
+      choices it had — classic, or resolved. The suffix is still RECOGNISED,
+      so a name written by that build strips cleanly, the same courtesy the
+      older `_W3C` names get.
     */
     const sets = loadFilenameHelpers()('sets');
-    check('the sets shape suffixes a name with _sets',
-      sets.dtcgFilename('tokens.json') === 'tokens_sets.json');
-    check('and strips it again, so switching format round-trips',
+    check('the classic shape writes the classic name, not a _sets one',
+      sets.dtcgFilename('tokens.json') === 'tokens_dtcg.json');
+    check('a _sets name from the build that wrote one still strips cleanly',
       sets.plainFilename('tokens_sets.json') === 'tokens.json');
-    check('a _sets name is recognised as a shape suffix, not part of the stem',
+    check('and is recognised as a shape suffix, not part of the stem',
       sets.hasDtcgSuffix('tokens_sets.json'));
-    check('switching away from sets does not leave _sets behind',
-      on.dtcgFilename(sets.plainFilename('tokens_sets.json')) === 'tokens_dtcg.json');
+    check('so switching format re-suffixes it rather than stacking',
+      sets.dtcgFilename(sets.plainFilename('tokens_sets.json')) === 'tokens_dtcg.json');
     /* filenameForShape() is not checked here: it reads the filename FIELD, so
        it needs the DOM this extraction does not have. It is a thin wrapper
        over withSuffix, which the four checks above exercise directly. */

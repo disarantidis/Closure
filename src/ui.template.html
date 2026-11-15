@@ -4138,11 +4138,10 @@
     // tree rather than one per theme. It gets its own suffix so switching
     // format never has the two land on the same file name.
     var RESOLVED_SUFFIX = '_resolved';
-    /* One set per collection and mode, which is a third document again — the
-       per-theme shape has already merged the sets away, so a consumer that
-       resolves selectedTokenSets needs this one. Its own suffix for the same
-       reason Resolved has one: switching format must never land two shapes on
-       the same file name. */
+    /* Written briefly while the sets shape was a third format on the control.
+       It never is now — the classic export IS the sets shape and keeps the
+       classic name — but a file named by one of those builds still has to
+       strip cleanly, the same courtesy LEGACY_DTCG_SUFFIXES gets. */
     var SETS_SUFFIX = '_sets';
     // v1.4.0 development builds wrote _W3C before the output was renamed (it is
     // a partial DTCG conversion, not strict W3C). Still recognised so a name
@@ -4170,9 +4169,7 @@
     // The suffix the ACTIVE format writes to. Everything else recognises all of
     // them, so switching between formats strips cleanly in either direction.
     function activeSuffix() {
-      if (dtcgShape === 'resolved') return RESOLVED_SUFFIX;
-      if (dtcgShape === 'sets') return SETS_SUFFIX;
-      return DTCG_SUFFIX;
+      return dtcgShape === 'resolved' ? RESOLVED_SUFFIX : DTCG_SUFFIX;
     }
     // Which suffix a name currently carries — the live one, a legacy one, or none.
     function matchedDtcgSuffix(name) {
@@ -4225,9 +4222,8 @@
     // so each card can name its own file rather than the current one's.
     function filenameForShape(shape) {
       var base = ensureJsonExtension(filenameFieldValue() || DEFAULT_FILENAME);
-      if (shape === 'themes') return withSuffix(base, DTCG_SUFFIX);
-      if (shape === 'sets') return withSuffix(base, SETS_SUFFIX);
       if (shape === 'resolved') return withSuffix(base, RESOLVED_SUFFIX);
+      if (shape === 'sets' || shape === 'themes') return withSuffix(base, DTCG_SUFFIX);
       return withSuffix(base, null);
     }
     function plainFilename(name) {
@@ -4332,7 +4328,7 @@
     // script and reads it (via defaultFilename()), and a var declared further
     // down would be hoisted but still unassigned at that point — and worse,
     // would reset it when its own line was finally reached.
-    var dtcgShape = 'themes';
+    var dtcgShape = 'sets';
     /*
       THE BRANCH A READ COMES FROM. Pushing always writes the branch in
       Settings; reading — Compare, the folder and file lists, Import from
@@ -4873,8 +4869,7 @@
         /* Always DTCG now: 'resolved' is the one thing a config can still ask
            for, and every other value — including 'legacy' from a config saved
            before Legacy JSON was dropped — reads as the per-theme shape. */
-        dtcgShape = (config.outputFormat === 'resolved' || config.outputFormat === 'sets')
-          ? config.outputFormat : 'themes';
+        dtcgShape = config.outputFormat === 'resolved' ? 'resolved' : 'sets';
         window.PomOutputFormat.setValue(dtcgShape);
         syncStructureBox();
         // No filename rewrite here: a config saved with dtcg on already stored
@@ -6019,7 +6014,7 @@
     /* json-diff names formats the way a person would; the output-format
        control names them the way it stores them. One map, at the one place
        the two meet. */
-    var SHAPE_FOR_FORMAT = { dtcg: 'themes', resolved: 'resolved' };
+    var SHAPE_FOR_FORMAT = { dtcg: 'sets', resolved: 'resolved' };
 
     /*
       THE FIGMA SIDE OF A COMPARISON, IN THE SHAPE OF THE FILE IT IS COMPARED WITH.
@@ -9332,7 +9327,7 @@
     }
 
     window.PomOutputFormat.onChange = function(shape) {
-      setFormat(shape === 'resolved' || shape === 'sets' ? shape : 'themes');
+      setFormat(shape === 'resolved' ? 'resolved' : 'sets');
     };
 
     updateActionUI();

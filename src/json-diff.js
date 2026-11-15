@@ -252,7 +252,12 @@ function countTokens(doc) { return flatten(doc).size; }
   browser run because the file in the repo predates the stamp entirely and so
   was read off its leaves instead.
 */
-var MARKER_FORMAT = { legacy: 'legacy', dtcg: 'dtcg', themes: 'dtcg', resolved: 'resolved' };
+/* `sets` is the classic export's shape — one set per collection and mode —
+   and `themes` the merged-per-theme one it replaced. Both are DTCG documents,
+   so both compare as `dtcg`. Named rather than left to the leaf fallback
+   below: that fallback would read a sets document correctly, but by luck
+   rather than because this knew what it was looking at. */
+var MARKER_FORMAT = { legacy: 'legacy', dtcg: 'dtcg', sets: 'dtcg', themes: 'dtcg', resolved: 'resolved' };
 
 function isResolvedDocument(doc) {
   var m = doc && doc.$extensions && doc.$extensions['com.desquared.radd'];
