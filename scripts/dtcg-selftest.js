@@ -946,8 +946,25 @@ function run() {
     const t = (wtokens.$themes || []).find((x) => x.name === 'bold');
     return t && t.group === 'weight' && t.selectedTokenSets['weight/bold'] === 'enabled';
   });
-  check('a single-mode collection gets no theme of its own — it offers no choice',
-    !themeNames.includes('uses'));
+  /*
+    This used to assert that a single-mode collection gets NO theme, because
+    one set offers no choice. True of the axis rule, which still skips it —
+    but it left such a set with nothing marking it `enabled`, reachable only
+    inside themes that take it as `source`. On Pomegranate Identity that was
+    `base`, 624 values with no theme that IS base the way `foundation` and
+    `.core` are. The rule now is the sharper one: every set is claimed by
+    exactly one theme.
+  */
+  check('a single-mode collection\'s set is claimed by exactly one theme', () => {
+    /* `uses` is the single-mode collection here. The axis rule still skips it;
+       the orphan rule gives it the theme that marks its set enabled.
+       (`core` and `foundation` are sets this exporter writes whether or not
+       the file has such a collection, so there is nothing to attach a theme
+       to when it does not — which is the case in this fixture.) */
+    const claims = (wtokens.$themes || [])
+      .filter((t) => (t.selectedTokenSets || {})['uses'] === 'enabled');
+    return claims.length === 1 && claims[0].name === 'uses';
+  });
   check('and the theme still closes: what its tokens reference is pulled in', () => {
     const t = (wtokens.$themes || []).find((x) => x.name === 'light');
     // `uses` references {weight.style-name}; a weight set must be selected.

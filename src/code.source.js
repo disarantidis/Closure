@@ -2099,6 +2099,58 @@ function buildThemes(rawData, tokenSetNames) {
     });
   });
 
+  /*
+    A SET NO THEME CLAIMS IS A SET NOTHING CAN ASK FOR.
+
+    The rules above cover an axis (a collection with modes) and the two
+    single-mode collections they happen to name, `foundation` and `core`. A
+    file's other single-mode collections fall between them: the pass-through
+    writer gives each one a set, and the pass-through THEME rule skips it on
+    the reasoning that one set offers no choice — true of an axis, but it
+    leaves the set with nothing marking it `enabled`.
+
+    On Pomegranate Identity that is `base`: 624 values, written into the
+    document and reachable only inside the 18 themes that take it as `source`.
+    Nothing is lost, but there is no theme that IS base, the way `foundation`
+    and `.core` are themes.
+
+    So: whatever set no theme has claimed, give it one. Measured from the
+    configs above rather than from a list, so it covers the next such
+    collection too and adds nothing where the rules already did their job.
+  */
+  var claimedAsEnabled = {};
+  themeConfigs.forEach(function (cfg) {
+    var sets = cfg.selectedTokenSets || {};
+    Object.keys(sets).forEach(function (s) { if (sets[s] === 'enabled') claimedAsEnabled[s] = true; });
+  });
+  tokenSetNames.forEach(function (setName) {
+    if (claimedAsEnabled[setName]) return;
+    var slash = setName.indexOf('/');
+    var baseName = slash === -1 ? setName : setName.slice(0, slash);
+    var modeName = slash === -1 ? null : setName.slice(slash + 1);
+    var col = null;
+    rawData.collections.forEach(function (c) {
+      if (stripIcons(c.name).replace(/^[._]+/, '') === baseName) col = c;
+    });
+    if (!col || !col.modes || !col.modes.length) return;
+    var modeIndex = 0;
+    if (modeName) {
+      col.modes.forEach(function (m, i) {
+        if (stripIcons(m.name).replace(/^[._]+/, '').toLowerCase() === modeName.toLowerCase()) modeIndex = i;
+      });
+    }
+    var sel = {};
+    sel[setName] = 'enabled';
+    themeConfigs.push({
+      name: modeName || setName,
+      group: modeName ? baseName : null,
+      selectedTokenSets: sel,
+      collection: col,
+      modeIndex: modeIndex
+    });
+    claimedAsEnabled[setName] = true;
+  });
+
   // Build theme objects
   themeConfigs.forEach(function(config) {
     var theme = {
