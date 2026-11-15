@@ -41,6 +41,7 @@ function loadPluginCode() {
       validateReferenceClosure: validateReferenceClosure,
       completeThemeSelections: completeThemeSelections,
       defaultModeSetNames: defaultModeSetNames,
+      isAliasComposite: isAliasComposite,
     };
   `;
   return new Function('figma', 'console', '__html__', src + expose)(figmaStub, quietConsole, '');
@@ -486,6 +487,66 @@ function run() {
     !!(refTokens.core && refTokens.core.lineHeights && refTokens.core.lineHeights['0']));
   check('and keeping it leaves the reference closed',
     plugin.validateReferenceClosure(refTokens).brokenCount === 0);
+
+  /*
+    A COMPOSITE CELL IS NAMED, NOT ID-ED (2026-11-15).
+
+    { color: <alias>, opacity: <alias> } carries no `type: 'VARIABLE_ALIAS'` of
+    its own, so the bare-alias branch walked past it and the raw value went out:
+    21 tokens of Pomegranate Identity's per-theme export held strings like
+    "VariableID:69:10655", which mean nothing outside that file. Verified against
+    a real export on 2026-11-15: 21 before, and this is the path that wrote them.
+  */
+  const cRaw = {
+    collections: [{
+      id: 'cc1', name: 'foundation',
+      modes: [{ modeId: 'cm1', name: 'foundation' }],
+      defaultModeId: 'cm1',
+      variables: [{
+        id: 'cv1', name: 'colours/gradient/accent-0', type: 'COLOR',
+        valuesByMode: { cm1: { color: { type: 'VARIABLE_ALIAS', id: 'VariableID:69:10655' },
+                               opacity: { type: 'VARIABLE_ALIAS', id: 'VariableID:44:3509' } } },
+        resolvedValuesByMode: { cm1: { color: { type: 'VARIABLE_ALIAS', id: 'VariableID:69:10655' },
+                                       opacity: { type: 'VARIABLE_ALIAS', id: 'VariableID:44:3509' } } },
+        /* What the extractor now records for a composite, in place of nothing. */
+        aliasInfo: { cm1: { isAlias: false, isComposite: true,
+                            parts: { color: 'core-colours.base.black', opacity: 'core-percentage.40' },
+                            partCollections: { color: '.core', opacity: '.core' } } },
+        codeSyntax: {}, description: '',
+      }, {
+        /* A composite with one field bound and one literal — the unbound half
+           must keep its value rather than vanish with the ids. */
+        id: 'cv2', name: 'colours/scrim', type: 'COLOR',
+        valuesByMode: { cm1: { color: { type: 'VARIABLE_ALIAS', id: 'VariableID:1:1' }, opacity: 0.4 } },
+        resolvedValuesByMode: { cm1: { color: { type: 'VARIABLE_ALIAS', id: 'VariableID:1:1' }, opacity: 0.4 } },
+        aliasInfo: { cm1: { isAlias: false, isComposite: true,
+                            parts: { color: 'core-colours.base.white' }, partCollections: { color: '.core' } } },
+        codeSyntax: {}, description: '',
+      }],
+    }],
+  };
+  const cNative = plugin.transformToFinalFormat(cRaw, { includeDescriptions: true }).tokens;
+  const cTokens = plugin.toTokenFormat(cNative, cRaw);
+  check('no Figma id survives into a composite token value',
+    JSON.stringify(cTokens).indexOf('VariableID:') === -1);
+  check('each half of a composite is written as the name its target spells', () => {
+    const t = cTokens.foundation.colours.gradient['accent-0'];
+    return t.value.color === '{core-colours.base.black}' && t.value.opacity === '{core-percentage.40}';
+  });
+  check('a literal half of a composite keeps its value', () => {
+    const t = cTokens.foundation.colours.scrim;
+    return t.value.color === '{core-colours.base.white}' && t.value.opacity === 0.4;
+  });
+  check('a composite names the collection of each of its references',
+    () => {
+      const t = cTokens.foundation.colours.gradient['accent-0'];
+      return t.aliasCollectionParts && t.aliasCollectionParts.color === '.core';
+    });
+  check('isAliasComposite knows the shape from a bare alias and from a plain value',
+    plugin.isAliasComposite({ color: { type: 'VARIABLE_ALIAS', id: 'x' } }) === true &&
+    plugin.isAliasComposite({ type: 'VARIABLE_ALIAS', id: 'x' }) === false &&
+    plugin.isAliasComposite({ r: 1, g: 0, b: 0, a: 1 }) === false &&
+    plugin.isAliasComposite(null) === false);
 
   // The map that feeds it, read off the collections Figma handed over.
   const names = plugin.defaultModeSetNames({

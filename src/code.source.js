@@ -126,6 +126,28 @@ function formatValue(value, type) {
   return value;
 }
 
+/*
+  A COMPOSITE CELL: not an alias, but made of them.
+
+  Figma has no single value for "this colour, at this opacity, both bound", so
+  it writes an object whose FIELDS are aliases:
+
+    { color: { type: 'VARIABLE_ALIAS', id: … }, opacity: { type: 'VARIABLE_ALIAS', id: … } }
+
+  The value itself has no `type: 'VARIABLE_ALIAS'`, so every check written for a
+  bare alias walks straight past it — which is how 21 tokens of a real export
+  (Pomegranate Identity: the gradient stops, the modal overlays, the elevation
+  colours) went out carrying Figma's internal ids.
+*/
+function isAliasComposite(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  if (value.type === 'VARIABLE_ALIAS') return false;
+  return Object.keys(value).some(function (k) {
+    var f = value[k];
+    return !!f && typeof f === 'object' && f.type === 'VARIABLE_ALIAS';
+  });
+}
+
 // --- BUILD MAPS FOR ALIAS RESOLUTION ---
 function buildCollectionMap(collections) {
   var variableToCollection = new Map();
@@ -857,6 +879,20 @@ function transformToFinalFormat(rawData, options) {
         var tokenValue;
         if (aliasData && aliasData.isAlias) {
           tokenValue = '{' + aliasData.aliasPath + '}';
+        } else if (aliasData && aliasData.isComposite) {
+          /* Field by field: an alias becomes the reference its target's name
+             spells, anything else keeps the value it had. The shape of the
+             composite is preserved — a consumer that understood
+             { color, opacity } still does. */
+          tokenValue = {};
+          var composite = (resolvedVal && typeof resolvedVal === 'object') ? resolvedVal : {};
+          Object.keys(composite).forEach(function (field) {
+            if (aliasData.parts[field]) {
+              tokenValue[field] = '{' + aliasData.parts[field] + '}';
+            } else {
+              tokenValue[field] = formatValue(composite[field], v.type);
+            }
+          });
         } else {
           tokenValue = formatValue(resolvedVal, v.type);
         }
@@ -884,6 +920,12 @@ function transformToFinalFormat(rawData, options) {
         */
         if (aliasData && aliasData.isAlias && aliasData.aliasedVarCollection) {
           token.aliasCollection = aliasData.aliasedVarCollection;
+        }
+        /* The same fact for a composite, once per field — the argument above
+           applies to each of its references separately. */
+        if (aliasData && aliasData.isComposite &&
+            Object.keys(aliasData.partCollections || {}).length) {
+          token.aliasCollectionParts = aliasData.partCollections;
         }
 
         // Figma's per-variable description. Carried on every mode's token (the
@@ -3692,6 +3734,37 @@ function handle_extract(msg) {
                       currentVal = nextVar.valuesByMode[nextModes[0]] || null;
                     }
                     resolvedValuesByMode[mId] = currentVal;
+                  })()
+                );
+              } else if (isAliasComposite(val)) {
+                /* Each field named on its own — see isAliasComposite. The value
+                   stays as Figma gave it in resolvedValuesByMode; what the
+                   export writes is built from `parts` below. */
+                resolvedValuesByMode[mId] = val;
+                resolvePromises.push(
+                  (async function() {
+                    var parts = {}, partCollections = {};
+                    var fields = Object.keys(val);
+                    for (var fi = 0; fi < fields.length; fi++) {
+                      var f = fields[fi];
+                      var part = val[f];
+                      if (!part || typeof part !== 'object' || part.type !== 'VARIABLE_ALIAS') continue;
+                      var partVar = await figma.variables.getVariableByIdAsync(part.id);
+                      if (!partVar) continue;   // another library's variable: left as it came
+                      var partCol =
+                            collectionIdToName.get(partVar.variableCollectionId) ||
+                            variableIdToCollection.get(partVar.id);
+                      parts[f] = buildAliasPath(partVar, partCol, col.name, collections);
+                      if (partCol) partCollections[f] = partCol;
+                    }
+                    if (Object.keys(parts).length) {
+                      aliasInfo[mId] = {
+                        isAlias: false,
+                        isComposite: true,
+                        parts: parts,
+                        partCollections: partCollections
+                      };
+                    }
                   })()
                 );
               } else {
